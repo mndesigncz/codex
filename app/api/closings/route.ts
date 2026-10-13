@@ -3,7 +3,7 @@ import { menaPodniku } from '@/lib/menaPodniku';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim, type Kontext } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { cashDifference, normalizeMovements, normalizeDenominations, normalizeHandover, sumMovements, ShiftPerson } from '@/lib/closing';
+import { cashDifference, normalizeMovements, normalizeDenominations, normalizeHandover, normalizePhotos, sumMovements, ShiftPerson } from '@/lib/closing';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { denSmeny, zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
 import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
@@ -159,6 +159,7 @@ export async function GET() {
     ...bezTrzby(bezMzdy(r, c.meId, p), c.meId, p.trzby),
     movements: normalizeMovements(r.movements),
     denominations: normalizeDenominations(r.denominations),
+    photos: normalizePhotos(r.photos),
     shiftEmployees: idsOf(r.shift_employees)
       .map(id => peopleById.get(id) ?? { id, name: 'Neznámý', avatar: null }),
   }));
@@ -589,6 +590,14 @@ export async function POST(request: Request) {
   try {
     const handover = normalizeHandover(b.handover);
     if (handover) await sql`UPDATE cash_closings SET handover = ${JSON.stringify(handover)}::jsonb WHERE id = ${row.id}`;
+  } catch { /* column not migrated yet */ }
+  // Fotky dokladů (R8-5) — adresy z /api/upload tohoto podniku; stejně zvlášť kvůli migraci.
+  try {
+    const photos = normalizePhotos(b.photos);
+    if (photos.length && row?.id) {
+      await sql`UPDATE cash_closings SET photos = ${JSON.stringify(photos)}::jsonb WHERE id = ${row.id}`;
+      row.photos = photos;
+    }
   } catch { /* column not migrated yet */ }
 
   // Upozornění (kromě autora): na čekající uzávěrku ten, kdo smí schvalovat,

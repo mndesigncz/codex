@@ -421,5 +421,19 @@
   "Jiný člen podniku": "Inny członek zespołu",
   "Vyber člověka": "Wybierz osobę",
   "Poznámka k výplatě (nepovinná)": "Notatka do wypłaty (opcjonalna)",
-  "Poznámka (nepovinná)": "Notatka (opcjonalna)"
+  "Poznámka (nepovinná)": "Notatka (opcjonalna)",
+  "Vyfotit výpis z terminálu": "Sfotografuj wydruk z terminala",
+  "Vyfotit Z-report": "Sfotografuj raport Z",
+  "Vyfotit účtenku": "Zrób zdjęcie paragonu",
+  "terminál": "terminal",
+  "Z-report": "raport Z",
+  "účtenka": "paragon",
+  "Fotku se nepodařilo nahrát.": "Nie udało się wgrać zdjęcia.",
+  "Fotku se nepodařilo nahrát — zkontroluj připojení.": "Nie udało się wgrać zdjęcia — sprawdź połączenie.",
+  "Nahrané doklady": "Przesłane dokumenty",
+  "Otevřít doklad {n}": "Otwórz dokument {n}",
+  "Odebrat doklad {n}": "Usuń dokument {n}",
+  "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "Najwyżej {n} zdjęcia — usuń jedno, żeby dodać inne.",
+  "Doklady k tržbě": "Dokumenty do utargu",
+  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Sfotografuj wydruk z terminala i raport Z — kierownictwo odnajdzie każdą różnicę."
 }

@@ -2768,6 +2768,8 @@ export async function GET(request: Request) {
     // Poznámky: @zmínky (kdo dostal oznámení) a připnutí nahoru autorem; typy navíc closing, event,
     // menu_item (lib/poznamky.ts). Kdo kdy naposled vlákno otevřel — bublina v seznamu je tučná,
     // když od té doby někdo jiný něco napsal.
+    // Fotky dokladů k uzávěrce (výpis z terminálu, Z-report, účtenka výdaje): [{ url: /api/upload/<id>, druh, note }].
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS photos JSONB`);
     await ddl(sql`ALTER TABLE entity_notes ADD COLUMN IF NOT EXISTS mentions INTEGER[]`);
     await ddl(sql`ALTER TABLE entity_notes ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`);
     await ddl(sql`

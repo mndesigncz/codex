@@ -18,7 +18,7 @@ import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import {
   Closing, expectedCash, expectedCashLines, cashLeft,
-  movementLabel, diffReasonLabel, hasDenominations, MOVEMENT_KINDS, vyplatyZKasyUzaverky, vyplatyICizim,
+  movementLabel, diffReasonLabel, hasDenominations, normalizePhotos, MOVEMENT_KINDS, vyplatyZKasyUzaverky, vyplatyICizim, type DruhFotky,
 } from '@/lib/closing';
 import { rozdilUzaverky, maSkrytouTrzbu } from '@/lib/uzaverkyPrehled';
 import { okJson, apiMessage } from '@/lib/api';
@@ -156,6 +156,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
   const vyplaty = c ? vyplatyZKasyUzaverky(c) : [];
   const lines = c && !skryta ? expectedCashLines(c, { payoutLabel: cizimVyplata ? t('Výplaty z kasy') : t('Výplata zaměstnance') }) : [];
   const cashTips = c && !skryta ? Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0)) : 0;
+  // Fotky dokladů (R8-5): výpis z terminálu, Z-report, účtenky výdajů — náhledy s proklikem na celou velikost.
+  const fotky = c ? normalizePhotos(c.photos) : [];
+  const druhFotky = (d: DruhFotky) => (d === 'terminal' ? t('Výpis z terminálu') : d === 'zreport' ? t('Z-report pokladny') : t('Účtenka výdaje'));
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -428,6 +431,23 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       );
                     })}
                   </div>
+                </Section>
+              )}
+
+              {fotky.length > 0 && (
+                <Section title={t('Doklady')} hint={t('Fotky z telefonu při uzávěrce — podle nich se dohledá rozdíl proti terminálu.')}>
+                  <ul className="flex flex-wrap gap-3" data-doklady-uzaverky>
+                    {fotky.map((f, i) => (
+                      <li key={f.url} className="w-28">
+                        <a href={f.url} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden ring-1 ring-black/10 tap-target"
+                          aria-label={t('Otevřít doklad {n}: {druh}', { n: i + 1, druh: druhFotky(f.druh) })}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={f.url} alt="" className="h-28 w-28 object-cover" loading="lazy" />
+                        </a>
+                        <p className="t-meta mt-1 truncate">{druhFotky(f.druh)}{f.note ? ` · ${f.note}` : ''}</p>
+                      </li>
+                    ))}
+                  </ul>
                 </Section>
               )}
 

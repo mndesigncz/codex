@@ -421,5 +421,19 @@
   "Jiný člen podniku": "Another team member",
   "Vyber člověka": "Choose a person",
   "Poznámka k výplatě (nepovinná)": "Payout note (optional)",
-  "Poznámka (nepovinná)": "Note (optional)"
+  "Poznámka (nepovinná)": "Note (optional)",
+  "Vyfotit výpis z terminálu": "Photograph the terminal slip",
+  "Vyfotit Z-report": "Photograph the Z-report",
+  "Vyfotit účtenku": "Photograph the receipt",
+  "terminál": "terminal",
+  "Z-report": "Z-report",
+  "účtenka": "receipt",
+  "Fotku se nepodařilo nahrát.": "The photo could not be uploaded.",
+  "Fotku se nepodařilo nahrát — zkontroluj připojení.": "The photo could not be uploaded — check the connection.",
+  "Nahrané doklady": "Uploaded documents",
+  "Otevřít doklad {n}": "Open document {n}",
+  "Odebrat doklad {n}": "Remove document {n}",
+  "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "At most {n} photos — remove one to add another.",
+  "Doklady k tržbě": "Sales documents",
+  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Photograph the terminal slip and the Z-report — management can then trace every difference."
 }

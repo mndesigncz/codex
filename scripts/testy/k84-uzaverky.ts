@@ -5,7 +5,7 @@
 // odečítají „už vyplaceno z kasy" — uzávěrka bez rozpisu patří autorovi jako v R8-1.
 
 import type { Testy } from './_testy.ts';
-import { normalizeMovements, vyplatyZKasyUzaverky, vyplatyICizim, sumMovements } from '../../lib/closing.ts';
+import { normalizeMovements, normalizePhotos, vyplatyZKasyUzaverky, vyplatyICizim, sumMovements, MAX_FOTEK_UZAVERKY } from '../../lib/closing.ts';
 import {
   cekajiciNavrhy, dopadNaPorci, jeBezeZmeny, marzeProcenta, mnozstviText, mujPosledniNavrh, normalizujSuroviny, odkazNaNavodZEditoru, popisRozdilu,
   recepturZmenenychZaDni, rezimEditoru, rozdilVerzi, vyberHistorii, vyberNavrhy, type NavrhReceptury,
@@ -141,4 +141,13 @@ export default function ({ eq, ok }: Testy) {
     ['/employer/overview?view=reports', '/employee/shifts?view=closing', '/employee/shifts?view=guides&guide=12', '/employee/shifts?view=home']);
   eq('kategorie oznámení: úkol, uzávěrka, jinak obecná', [kategorieOznameni('task'), kategorieOznameni('closing'), kategorieOznameni('recipe')], ['task', 'closing', 'general']);
   ok('entity_note_reads: osobní stav čtení se maže s účtem i s podnikem', ZACHAZENI_TABULEK.entity_note_reads === 'smazat' && TYMOVE_TABULKY.includes('entity_note_reads'));
+
+  // ---- fotky dokladů k uzávěrce ----
+  eq('normalizePhotos: jen adresy /api/upload/<id>, neznámý druh = terminál, duplicita pryč, poznámka oříznutá',
+    normalizePhotos([
+      { url: '/api/upload/abc', druh: 'zreport', note: ' Z 12 ' }, { url: 'https://evil/x.png', druh: 'terminal' }, { url: '/api/upload/abc', druh: 'vydaj' },
+      { url: '/api/upload/def', druh: 'cokoli' }, { url: '/api/upload/ghi', druh: 'vydaj', note: 'a'.repeat(200) }, 'nesmysl', null,
+    ]),
+    [{ url: '/api/upload/abc', druh: 'zreport', note: 'Z 12' }, { url: '/api/upload/def', druh: 'terminal' }, { url: '/api/upload/ghi', druh: 'vydaj', note: 'a'.repeat(160) }]);
+  eq('normalizePhotos: strop a ne-pole', [normalizePhotos(Array.from({ length: 10 }, (_, i) => ({ url: `/api/upload/f${i}`, druh: 'vydaj' }))).length, normalizePhotos('x'), normalizePhotos(null)], [MAX_FOTEK_UZAVERKY, [], []]);
 }

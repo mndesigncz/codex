@@ -48,6 +48,36 @@ export interface Closing {
   // "odlož přebytek do trezoru". Doesn't enter the expected/diff arithmetic
   // (the count happens first); it only changes what the next shift takes over.
   final_removal?: number | null;
+  /** Fotky dokladů (výpis z terminálu, Z-report, účtenka výdaje) — kolo 8, R8-5. Starší řádky nic. */
+  photos?: FotoDokladu[] | null;
+}
+
+// ---- Fotky dokladů k uzávěrce (kolo 8, R8-5) ---------------------------------
+// „Karta 8 420 vs. terminál 8 620" se bez výpisu z terminálu nedá dohledat.
+// Fotky jdou přes existující POST /api/upload (soukromé úložiště, adresa
+// /api/upload/<id>), do uzávěrky se ukládá jen adresa, druh a poznámka.
+
+export type DruhFotky = 'terminal' | 'zreport' | 'vydaj';
+export const DRUHY_FOTEK: readonly DruhFotky[] = ['terminal', 'zreport', 'vydaj'];
+export interface FotoDokladu { url: string; druh: DruhFotky; note?: string }
+/** Nejvýš tolik fotek na uzávěrku (tři k tržbě + účtenky výdajů). */
+export const MAX_FOTEK_UZAVERKY = 6;
+const ADRESA_FOTKY_UZAVERKY = /^\/api\/upload\/[A-Za-z0-9_-]+$/;
+
+export function normalizePhotos(raw: any): FotoDokladu[] {
+  if (!Array.isArray(raw)) return [];
+  const out: FotoDokladu[] = [];
+  const videno = new Set<string>();
+  for (const f of raw) {
+    const url = String(f?.url ?? '').trim();
+    if (!ADRESA_FOTKY_UZAVERKY.test(url) || videno.has(url)) continue;
+    const druh: DruhFotky = (DRUHY_FOTEK as readonly string[]).includes(f?.druh) ? f.druh : 'terminal';
+    const note = String(f?.note ?? '').trim().slice(0, 160);
+    out.push(note ? { url, druh, note } : { url, druh });
+    videno.add(url);
+    if (out.length >= MAX_FOTEK_UZAVERKY) break;
+  }
+  return out;
 }
 
 /**

@@ -1746,5 +1746,11 @@
   "Výplaty z kasy": "Wypłaty z kasy",
   "Poznámky — {nazev}": "Notatki — {nazev}",
   "Poznámky · {n}": "Notatki · {n}",
-  "Poznámky k položce": "Notatki do pozycji"
+  "Poznámky k položce": "Notatki do pozycji",
+  "Výpis z terminálu": "Wydruk z terminala",
+  "Z-report pokladny": "Raport Z kasy",
+  "Účtenka výdaje": "Paragon wydatku",
+  "Doklady": "Dokumenty",
+  "Fotky z telefonu při uzávěrce — podle nich se dohledá rozdíl proti terminálu.": "Zdjęcia z telefonu przy zamknięciu — na ich podstawie odnajdziesz różnicę względem terminala.",
+  "Otevřít doklad {n}: {druh}": "Otwórz dokument {n}: {druh}"
 }

@@ -22,13 +22,15 @@ import { Avatar, Button, Chip, Modal, PageHeader, PlovouciLista, Segmented, Swit
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
+  type FotoDokladu, type DruhFotky, MAX_FOTEK_UZAVERKY,
   DIFF_REASONS, type ExpectedInput,
   type DenominationCounts, denominationsFor, sumDenominations, hasDenominations,
 } from '@/lib/closing';
 import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
 import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
-import { okJson } from '@/lib/api';
+import { okJson, apiMessage } from '@/lib/api';
+import { platnaFotka } from '@/lib/ukolyPrehled';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
@@ -220,6 +222,89 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
   );
 }
 
+/**
+ * Fotky dokladů k uzávěrce (kolo 8, R8-5): výpis z platebního terminálu, Z-report pokladny,
+ * účtenka výdaje z kasy. Skrytý input s `capture="environment"` otevře na telefonu rovnou
+ * zadní fotoaparát (na počítači výběr souboru), fotka se zmenší v prohlížeči (lib/clientImage)
+ * a nahraje přes existující POST /api/upload — do uzávěrky jde jen adresa a druh.
+ * Stejný postup jako PrilozFoto u úkolu, jen bez okna: tady se fotí uprostřed formuláře.
+ */
+function FotkyDokladu({ fotky, onChange, druhy, strop = 3, kompaktni = false }: {
+  fotky: FotoDokladu[];
+  onChange: (f: FotoDokladu[]) => void;
+  /** Které druhy nabídnout jako tlačítka (každé = jedna fotka s tím druhem). */
+  druhy: DruhFotky[];
+  /** Nejvýš tolik fotek v tomhle bloku. */
+  strop?: number;
+  /** Jen tlačítko s ikonou (u výdaje v řádku pohybů). */
+  kompaktni?: boolean;
+}) {
+  const t = useT('zamestnanec');
+  const vstup = useRef<HTMLInputElement>(null);
+  const [druh, setDruh] = useState<DruhFotky>(druhy[0]);
+  const [nahravam, setNahravam] = useState(false);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const popisek = (d: DruhFotky) => (d === 'terminal' ? t('Vyfotit výpis z terminálu') : d === 'zreport' ? t('Vyfotit Z-report') : t('Vyfotit účtenku'));
+  const jmenoDruhu = (d: DruhFotky) => (d === 'terminal' ? t('terminál') : d === 'zreport' ? t('Z-report') : t('účtenka'));
+  const plno = fotky.length >= strop;
+
+  const vyfot = (d: DruhFotky) => { setDruh(d); setChyba(null); vstup.current?.click(); };
+  const nahraj = async (soubor: File | null) => {
+    if (!soubor) return;
+    setNahravam(true);
+    setChyba(null);
+    try {
+      const { compressImage } = await import('@/lib/clientImage');
+      const fd = new FormData();
+      fd.append('file', await compressImage(soubor));
+      const d = await fetch('/api/upload', { method: 'POST', body: fd }).then(okJson);
+      if (platnaFotka(d?.url)) onChange([...fotky, { url: d.url, druh }]);
+      else setChyba(t('Fotku se nepodařilo nahrát.'));
+    } catch (e) {
+      setChyba(apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
+    }
+    setNahravam(false);
+    if (vstup.current) vstup.current.value = '';
+  };
+
+  return (
+    <div className={kompaktni ? 'contents' : 'space-y-2'} data-fotky-dokladu={druhy.join(',')}>
+      <input ref={vstup} type="file" accept="image/*" capture="environment" className="hidden" aria-hidden tabIndex={-1}
+        onChange={e => void nahraj(e.target.files?.[0] ?? null)} />
+      {fotky.length > 0 && (
+        <ul className={`flex flex-wrap gap-2 ${kompaktni ? 'w-full' : ''}`} aria-label={t('Nahrané doklady')}>
+          {fotky.map((f, i) => (
+            <li key={f.url} className="relative">
+              <a href={f.url} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden ring-1 ring-black/10"
+                aria-label={t('Otevřít doklad {n}', { n: i + 1 })}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={f.url} alt="" className="h-16 w-16 object-cover" />
+              </a>
+              <span className="t-meta block w-16 truncate text-center">{jmenoDruhu(f.druh)}</span>
+              <button type="button" onClick={() => onChange(fotky.filter(x => x.url !== f.url))}
+                aria-label={t('Odebrat doklad {n}', { n: i + 1 })}
+                className="tap-target-sm absolute -top-2 -right-2 btn-icon btn-icon-danger bg-white shadow"><Icon name="close" size={13} /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {kompaktni ? (
+        <Button variant="ghost" size="sm" icon="camera" iconOnly loading={nahravam} disabled={plno} aria-label={popisek(druhy[0])} title={popisek(druhy[0])}
+          className="shrink-0" onClick={() => vyfot(druhy[0])} />
+      ) : (
+        <div className={`grid gap-2 ${druhy.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} sm:flex sm:flex-wrap`}>
+          {druhy.map(d => (
+            <Button key={d} variant="secondary" size="sm" icon="camera" loading={nahravam && druh === d} disabled={plno || nahravam}
+              className="justify-center" onClick={() => vyfot(d)}>{popisek(d)}</Button>
+          ))}
+        </div>
+      )}
+      {!kompaktni && plno && <p className="t-meta">{t('Nejvýš {n} fotky — odeber některou, když chceš jinou.', { n: strop })}</p>}
+      {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+    </div>
+  );
+}
+
 /** Člověk, kterému jde vyplatit z kasy: ten, kdo uzávěrku vyplňuje, a kolegové ze směny (kolo 8, R8-5). */
 export type PrijemceVyplaty = { id: number; name: string; avatar?: string | null; /** Měl ten den směnu — nabízí se hned, ostatní až pod „Jiný…". */ naSmene: boolean };
 
@@ -232,7 +317,7 @@ export type PrijemceVyplaty = { id: number; name: string; avatar?: string | null
  * pro zbytek podniku. Pohyb nese `userId` a snímek jména, Výplaty (GET /api/payroll)
  * pak kolegovi odečtou, co dostal z kasy, místo aby to připsaly tomu, kdo zavíral.
  */
-function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, lide, jaId }: {
+function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, lide, jaId, fotkyVydaju, setFotkyVydaju }: {
   movements: Movement[];
   setMovements: (m: Movement[]) => void;
   payDailyCash: boolean;
@@ -242,6 +327,9 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, 
   lide: PrijemceVyplaty[];
   /** Kdo uzávěrku vyplňuje (za koho se zavírá) — výchozí příjemce výplaty. */
   jaId: number | null;
+  /** Účtenky k výdajům z kasy (fotky druhu „vydaj"). */
+  fotkyVydaju: FotoDokladu[];
+  setFotkyVydaju: (f: FotoDokladu[]) => void;
 }) {
   const t = useT('zamestnanec');
   const [kind, setKind] = useState<MovementKind>('expense');
@@ -356,6 +444,8 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, 
           aria-label={kind === 'payout' ? t('Poznámka k výplatě (nepovinná)') : t('Za co byl pohyb v kase')}
           placeholder={kind === 'payout' ? t('Poznámka (nepovinná)') : (napovedaPohybu(t, kind) ?? t('Za co'))}
           className={`${inputClass} py-2 flex-1 min-w-[8rem]`} />
+        {/* Účtenka k výdaji z kasy (R8-5): vyfotit rovnou tady, ať se nákup dá dohledat. */}
+        {kind === 'expense' && <FotkyDokladu kompaktni druhy={['vydaj']} strop={3} fotky={fotkyVydaju} onChange={setFotkyVydaju} />}
         {/* Vedlejší akce: limetka patří jen „Odeslat uzávěrku" (DP §4 D). */}
         <Button variant="secondary" size="sm" icon="plus" onClick={add} disabled={!amount} className="shrink-0 grow sm:grow-0 justify-center">
           {t('Přidat')}
@@ -555,6 +645,12 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   const [coworkerSel, setCoworkerSel] = useState<Record<number, { on: boolean; payout: string }>>({});
   // Itemised cash movements — what was actually taken out of / put into the till.
   const [movements, setMovements] = useState<Movement[]>([]);
+  // Fotky dokladů (R8-5): výpis z terminálu a Z-report (krok Tržby), účtenky výdajů (pohyby v kase).
+  const [fotky, setFotky] = useState<FotoDokladu[]>([]);
+  const fotkyTrzby = fotky.filter(f => f.druh !== 'vydaj');
+  const fotkyVydaju = fotky.filter(f => f.druh === 'vydaj');
+  const nastavFotky = (druhy: DruhFotky[]) => (nove: FotoDokladu[]) =>
+    setFotky(f => [...f.filter(x => !druhy.includes(x.druh)), ...nove].slice(0, MAX_FOTEK_UZAVERKY));
   // Why the counted cash didn't match, filled in only when it doesn't.
   const [diffReason, setDiffReason] = useState('');
   const [diffNote, setDiffNote] = useState('');
@@ -710,7 +806,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         jmeno: isKiosk && selEmployee != null ? (members.find(m => m.id === selEmployee)?.name ?? null) : null,
         form, movements, denoms, countMode, leaveCash, hoTodo, hoRunningOut, hoMessage,
         diffReason, diffNote, eventId, pickedShiftId, selEmployee, coworkerSel,
-        payoutFromRegister, tipsInDrawer,
+        payoutFromRegister, tipsInDrawer, fotky,
       }));
     } catch { /* soukromé okno: po návratu se počítá znovu, jako dřív */ }
   };
@@ -727,6 +823,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       || !(Date.now() - Number(r.cas) < platnost)) return;
     setForm({ ...emptyForm(), ...r.form });
     if (Array.isArray(r.movements)) setMovements(r.movements);
+    if (Array.isArray(r.fotky)) setFotky(r.fotky.filter((f: any) => platnaFotka(f?.url)));
     if (r.denoms && typeof r.denoms === 'object') setDenoms(r.denoms);
     setCountMode(r.countMode === true);
     if (typeof r.leaveCash === 'string') setLeaveCash(r.leaveCash);
@@ -1003,6 +1100,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           payoutFromRegister, tipsInDrawer,
           eventId: eventId === '' ? null : eventId,
           movements, diffReason: diffReason || null, diffNote: diffNote || null,
+          photos: fotky,
           denominations: countMode ? denoms : null,
           finalRemoval,
           handover: (hoTodo.trim() || hoRunningOut.trim() || hoMessage.trim())
@@ -1036,6 +1134,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         setLeaveCash('');
         setHoTodo(''); setHoRunningOut(''); setHoMessage('');
         setMovements([]);
+        setFotky([]);
         setDiffReason(''); setDiffNote('');
         setPayoutFromRegister(teamPayoutFromRegister);
         setTipsInDrawer(teamTipsInDrawer);
@@ -1403,6 +1502,14 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             })}
             {field(t('Zákazníků (volitelné)'), 'customers', { unit: null, placeholder: t('počet') })}
           </div>
+          {/* Doklady k tržbě (R8-5): „karta 8 420 vs. terminál 8 620" se bez výpisu nedá dohledat. */}
+          <div className="well p-4 space-y-2">
+            <div className="flex items-baseline justify-between gap-2 flex-wrap">
+              <p className="text-sm font-semibold text-[#16181A]">{t('Doklady k tržbě')}</p>
+              <p className="t-meta">{t('Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.')}</p>
+            </div>
+            <FotkyDokladu druhy={['terminal', 'zreport']} strop={3} fotky={fotkyTrzby} onChange={nastavFotky(['terminal', 'zreport'])} />
+          </div>
           <Toggle
             title={t('Spropitné v hotovosti zůstává v kase')}
             hint={t('Zapni, když spropitné fyzicky leží v kase — jinak by se pokaždé ukazoval falešný přebytek.')}
@@ -1418,6 +1525,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             movements={movements} setMovements={setMovements}
             payDailyCash={payDailyCash} money={money} symbol={symbol}
             lide={prijemciVyplaty} jaId={actorId}
+            fotkyVydaju={fotkyVydaju} setFotkyVydaju={nastavFotky(['vydaj'])}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

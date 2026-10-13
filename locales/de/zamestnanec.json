@@ -421,5 +421,19 @@
   "Jiný člen podniku": "Anderes Teammitglied",
   "Vyber člověka": "Person auswählen",
   "Poznámka k výplatě (nepovinná)": "Notiz zur Auszahlung (optional)",
-  "Poznámka (nepovinná)": "Notiz (optional)"
+  "Poznámka (nepovinná)": "Notiz (optional)",
+  "Vyfotit výpis z terminálu": "Terminalbeleg fotografieren",
+  "Vyfotit Z-report": "Z-Bericht fotografieren",
+  "Vyfotit účtenku": "Beleg fotografieren",
+  "terminál": "Terminal",
+  "Z-report": "Z-Bericht",
+  "účtenka": "Beleg",
+  "Fotku se nepodařilo nahrát.": "Das Foto konnte nicht hochgeladen werden.",
+  "Fotku se nepodařilo nahrát — zkontroluj připojení.": "Das Foto konnte nicht hochgeladen werden — prüf die Verbindung.",
+  "Nahrané doklady": "Hochgeladene Belege",
+  "Otevřít doklad {n}": "Beleg {n} öffnen",
+  "Odebrat doklad {n}": "Beleg {n} entfernen",
+  "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "Höchstens {n} Fotos – entferne eines, um ein anderes hinzuzufügen.",
+  "Doklady k tržbě": "Belege zum Umsatz",
+  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Fotografiere den Terminalbeleg und den Z-Bericht – die Leitung kann dann jede Differenz nachvollziehen."
 }
