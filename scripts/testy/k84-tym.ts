@@ -23,6 +23,7 @@ import {
 import { dnuVRoce, narokDovolene, rokNaroku, vycistiNarok, zbudePoSchvaleni } from '../../lib/dovolena.ts';
 import { BODY_DIKU, VYCHOZI_PRISPEVEK, nastaveniDiku, overDik, vyberZed, zacatekMesice, zbyvaRozdat } from '../../lib/podekovani.ts';
 import { dochvilniZaTyden, duvodAuto, klicAuto, minulyTyden, nastaveniAuto, oslavy, zpozdeniMin } from '../../lib/automatickeBody.ts';
+import { METRIKY, postupVyzvy, vyberVyzvy, vycistiVyzvu, vyzvyKZobrazeni } from '../../lib/vyzvy.ts';
 import { AUDIT_POPISKY } from '../../lib/auditPopisky.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -254,4 +255,36 @@ export default function ({ eq, ok }: Testy) {
   ok('auto cron: volá se z /api/init denně', /pripisAutomatickeBody\(\)/.test(zdroj('app/api/init/route.ts')));
   ok('katalog: Oslavy v týmu pro vedení, zaměstnance i tablet', !!widgetKatalog('odmeny.oslavy') && widgetKatalog('odmeny.oslavy')!.rozhrani.includes('kiosk') && widgetKatalog('odmeny.oslavy')!.stranky.includes('vedeni.prehled'));
   ok('nastavení odměn: auto jde do points_config', /hodnoty, auto \},/.test(zdroj('components/employer/RewardsView.tsx')));
+
+  // =========================================================================
+  // Týmová výzva (lib/vyzvy.ts)
+  // =========================================================================
+  eq('výzva: čtyři měřítka z hotových čísel', METRIKY, ['uzaverky_bez_manka', 'ukoly', 'hodnoceni_hostu', 'trzba']);
+  const dobra = vycistiVyzvu({ nazev: '  Týden bez manka ', metrika: 'uzaverky_bez_manka', cil: '5', od: '2026-10-12', do: '2026-10-18', odmenaText: 'Pizza pro tým', odmenaBody: '' });
+  eq('výzva: vyčištěná — název oříznutý, cíl celé číslo, body bez hodnoty null', dobra, { ok: true, vyzva: { nazev: 'Týden bez manka', metrika: 'uzaverky_bez_manka', cil: 5, od: '2026-10-12', do: '2026-10-18', odmenaText: 'Pizza pro tým', odmenaBody: null } });
+  ok('výzva: bez názvu, s cizím měřítkem, se záporným cílem, s koncem před začátkem, bez odměny = chyba', [
+    vycistiVyzvu({ metrika: 'ukoly', cil: 1, od: '2026-10-12', do: '2026-10-18', odmenaText: 'x' }),
+    vycistiVyzvu({ nazev: 'a', metrika: 'x', cil: 1, od: '2026-10-12', do: '2026-10-18', odmenaText: 'x' }),
+    vycistiVyzvu({ nazev: 'a', metrika: 'ukoly', cil: -1, od: '2026-10-12', do: '2026-10-18', odmenaText: 'x' }),
+    vycistiVyzvu({ nazev: 'a', metrika: 'ukoly', cil: 1, od: '2026-10-19', do: '2026-10-18', odmenaText: 'x' }),
+    vycistiVyzvu({ nazev: 'a', metrika: 'ukoly', cil: 1, od: '2026-10-12', do: '2026-10-18' }),
+  ].every(v => v.ok === false));
+  ok('výzva: hodnocení hostů nejvýš 5 a na desetiny, body každému 0–500, nejdéle 62 dní',
+    (vycistiVyzvu({ nazev: 'a', metrika: 'hodnoceni_hostu', cil: 5.5, od: '2026-10-12', do: '2026-10-18', odmenaText: 'x' }) as any).ok === false
+    && (vycistiVyzvu({ nazev: 'a', metrika: 'hodnoceni_hostu', cil: '4.66', od: '2026-10-12', do: '2026-10-18', odmenaText: 'x' }) as any).vyzva.cil === 4.7
+    && (vycistiVyzvu({ nazev: 'a', metrika: 'ukoly', cil: 1, od: '2026-10-12', do: '2026-10-18', odmenaBody: 900 }) as any).ok === false
+    && (vycistiVyzvu({ nazev: 'a', metrika: 'ukoly', cil: 1, od: '2026-10-01', do: '2026-12-31', odmenaText: 'x' }) as any).ok === false);
+  const v = { cil: 5, od: '2026-10-12', do: '2026-10-18', hodnota: 3, splnenoAt: null };
+  eq('výzva: postup 3 z 5 = 60 %, zbývají 2 dny (16. 10.)', postupVyzvy(v, '2026-10-16'), { procento: 60, zbyvaDni: 2, predZacatkem: false, splneno: false, propadla: false });
+  eq('výzva: splněno hodnotou i zápisem; po konci bez splnění propadla; před začátkem', [postupVyzvy({ ...v, hodnota: 6 }, '2026-10-16').splneno, postupVyzvy({ ...v, splnenoAt: 'x' }, '2026-10-30').propadla, postupVyzvy(v, '2026-10-20').propadla, postupVyzvy(v, '2026-10-10').predZacatkem], [true, false, true, true]);
+  eq('výzva: procento nikdy přes 100', postupVyzvy({ ...v, hodnota: 50 }, '2026-10-16').procento, 100);
+  eq('výzva: k zobrazení — běžící a do 7 dnů po konci, nejbližší konec první', vyzvyKZobrazeni([{ od: '2026-10-01', do: '2026-10-05' }, { od: '2026-10-12', do: '2026-10-25' }, { od: '2026-10-12', do: '2026-10-18' }], '2026-10-16').map(x => x.do), ['2026-10-18', '2026-10-25']);
+  eq('výzva: z odpovědi API', vyberVyzvy({ vyzvy: [{ id: 1, nazev: 'A', metrika: 'trzba', cil: 60000, od: '2026-10-12', do: '2026-10-18', odmenaText: null, odmenaBody: 20, splnenoAt: null, hodnota: 12400 }] })[0], { id: 1, nazev: 'A', metrika: 'trzba', cil: 60000, od: '2026-10-12', do: '2026-10-18', odmenaText: null, odmenaBody: 20, splnenoAt: null, hodnota: 12400 });
+  ok('výzva: nečekaný tvar je chyba', (() => { try { vyberVyzvy({}); return false; } catch { return true; } })());
+  const ch = zdroj('app/api/rewards/challenges/route.ts');
+  ok('výzvy: čtení každý člen, vyhlášení a zrušení jen s odmeny.nastaveni, tělo přes vycistiVyzvu', /export async function GET\(\)[\s\S]*pozaduj\(null\)/.test(ch) && (ch.match(/pozaduj\('odmeny\.nastaveni'\)/g) ?? []).length === 2 && /vycistiVyzvu\(await req\.json/.test(ch));
+  ok('výzvy: splnění se zapíše jednou (splneno_at IS NULL), body všem kind vyzva s klíčem, oznámení všem', /splneno_at = NOW\(\) WHERE id = \$\{v\.id\} AND team_id = \$\{teamId\} AND splneno_at IS NULL/.test(ch) && /'vyzva', \$\{`vyzva:\$\{v\.id\}`\}/.test(ch) && /notifyUsers\(lide\.map/.test(ch));
+  ok('výzvy: uzávěrky bez manka počítá stejným cashDifference jako Uzávěrky', /cashDifference\(\{ \.\.\.r, tips_in_drawer: tipsInDrawer \}\) >= 0/.test(ch));
+  ok('výzvy: audit má popisky', ['vyzva.vyhlasit', 'vyzva.smazat', 'vyzva.splnena'].every(k => typeof AUDIT_POPISKY[k] === 'string'));
+  ok('katalog: Výzva týdne pro vedení, zaměstnance i tablet na Přehledu, Domů a Směně', !!widgetKatalog('odmeny.vyzva') && ['vedeni.prehled', 'zamestnanec.domu', 'kiosk.smena'].every(s => (widgetKatalog('odmeny.vyzva')!.stranky as string[]).includes(s)));
 }

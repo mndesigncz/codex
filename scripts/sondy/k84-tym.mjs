@@ -86,10 +86,15 @@ const podvrh = (bezPlanu = false) => (req, json, stav) => {
     if (path === '/api/schedule/rules') return json({ ok: true });
     if (path === '/api/timeoff') return json({ ok: true, request: {}, vacationPerYear: 25 });
     if (path === '/api/rewards/awards') return json({ award: { id: 99 }, zbyva: 20 });
+    if (path === '/api/rewards/challenges') return json({ vyzva: { id: 6 } });
     if (path === '/api/teams') return json({ ok: true });
     return undefined;
   }
   if (path === '/api/rewards/awards' && q.get('zed') === '1') return json(ZED);
+  if (path === '/api/rewards/challenges') return json({ vyzvy: [
+    { id: 5, nazev: 'Týden bez manka', metrika: 'uzaverky_bez_manka', cil: 5, od: den(4), do: den(-2), odmenaText: 'Pizza pro tým', odmenaBody: 20, splnenoAt: null, hodnota: 3 },
+    { id: 4, nazev: 'Hosté nad 4,8 ★', metrika: 'hodnoceni_hostu', cil: 4.8, od: den(13), do: den(3), odmenaText: null, odmenaBody: 30, splnenoAt: '2026-10-10T10:00:00Z', hodnota: 4.9 },
+  ] });
   if (path === '/api/rewards/awards' && q.get('oslavy') === '1') return json({ oslavy: [
     { userId: 18, name: 'Tereza Malá', avatar: '👱‍♀️', druh: 'vyroci', den: DNES, zaDni: 0, roky: 2, ja: false },
     { userId: 17, name: 'Jakub Horák', avatar: '🧔', druh: 'narozeniny', den: den(-3), zaDni: 3, roky: null, ja: false },
@@ -340,11 +345,17 @@ const ROZVRH = '/employer/overview?view=shifts';
 // ---------------------------------------------------------------------------
 {
   const BARISTA = roleMine('barista');
-  const fix = { stranka: 'zamestnanec.domu', polozky: [{ id: 'oslavy', widget: 'odmeny.oslavy', velikost: 'M' }, { id: 'zed', widget: 'odmeny.zed_diku', velikost: 'M' }, { id: 'moje-uroven', widget: 'moje.uroven', velikost: 'M' }], dostupne: ['odmeny.oslavy', 'odmeny.zed_diku', 'moje.uroven'], tarifem: [], zdroj: 'osobni', rozsah: 'typ:zamestnanec', zamceno: false, smiUpravit: true, smiVychozi: false, verze: 1 };
+  const fix = { stranka: 'zamestnanec.domu', polozky: [{ id: 'vyzva', widget: 'odmeny.vyzva', velikost: 'M' }, { id: 'oslavy', widget: 'odmeny.oslavy', velikost: 'M' }, { id: 'zed', widget: 'odmeny.zed_diku', velikost: 'M' }, { id: 'moje-uroven', widget: 'moje.uroven', velikost: 'M' }], dostupne: ['odmeny.vyzva', 'odmeny.oslavy', 'odmeny.zed_diku', 'moje.uroven'], tarifem: [], zdroj: 'osobni', rozsah: 'typ:zamestnanec', zamceno: false, smiUpravit: true, smiVychozi: false, verze: 1 };
   const { ctx, p, stav, chyby } = await kontext({ role: 'employee', fix, mineData: BARISTA, viewport: TEL, mobil: true, posunCasu: POSUN, dalsi: podvrh() });
   await otevriPlochu(p, '/employee/shifts?view=home', 'zamestnanec.domu');
   const w = p.locator('[data-plocha] li[data-widget="odmeny.zed_diku"]:not([hidden])');
   await dokud(async () => (await w.locator('li.list-row, .list-row').count()) > 0, 8000);
+  // Výzva týdne (kolo 8): ukazatel „3 z 5 uzávěrek · zbývají 2 dny" a odměna; splněná s chipem.
+  const vy = p.locator('[data-plocha] li[data-widget="odmeny.vyzva"]:not([hidden])');
+  const tv = await text(vy);
+  tvrdi('V1 (390): Výzva týdne — „Týden bez manka", „3 z 5 uzávěrek · zbývají 2 dny", odměna, 60 % ukazatel a splněná „Hosté nad 4,8 ★"', /Týden bez manka/.test(tv) && /3 z 5 uzávěrek · zbývají 2 dny/.test(tv) && /Pizza pro tým · \+20 b každému/.test(tv) && /Splněno/.test(tv)
+    && (await vy.locator('[data-vyzva="5"] [role="progressbar"]').getAttribute('aria-valuenow')) === '60', tv);
+  await vy.screenshot({ path: OUT + 'k84-tym-vyzva-390.png' });
   // Oslavy v týmu (kolo 8): výročí dnes s Poděkovat, narozeniny za 3 dny bez tlačítka.
   const os = p.locator('[data-plocha] li[data-widget="odmeny.oslavy"]:not([hidden])');
   const to = await text(os);
@@ -414,6 +425,23 @@ const ROZVRH = '/employer/overview?view=shifts';
   const patch = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/teams' && z.m === 'PATCH'), 4000);
   tvrdi('N1: Uložit pošle PATCH /api/teams s pointsConfig.mesicniPrispevek 80, hodnotami bez „#" a auto (narozeniny zapnuté, 25 b)', !!patch && /"mesicniPrispevek":80,"hodnoty":\["ochota","tým","host"\],"auto":\{"dochvilnost":\{"zap":true,"body":10\},"vyroci":\{"zap":true,"body":50\},"narozeniny":\{"zap":true,"body":25\}\}/.test(patch.body), patch?.body?.slice(0, 400));
   await karta.screenshot({ path: OUT + 'k84-tym-nastaveni-diku-1280.png' });
+  // Týmové výzvy (kolo 8): seznam a Nová výzva → POST /api/rewards/challenges.
+  const vyzvy = p.locator('[data-sprava-vyzev]');
+  await vyzvy.waitFor({ timeout: 5000 });
+  tvrdi('N2: karta Týmové výzvy ukazuje běžící výzvu s postupem a koš', /Týden bez manka/.test(await text(vyzvy)) && (await vyzvy.getByRole('button', { name: 'Zrušit výzvu Týden bez manka' }).count()) === 1, (await text(vyzvy)).slice(0, 200));
+  await vyzvy.getByRole('button', { name: 'Nová výzva' }).click();
+  const oknoV = p.getByRole('dialog', { name: 'Nová výzva' });
+  await oknoV.waitFor({ timeout: 5000 });
+  await oknoV.locator('#vyzva-nazev').fill('Víkend bez manka');
+  await oknoV.locator('#vyzva-metrika').selectOption('uzaverky_bez_manka');
+  await oknoV.locator('#vyzva-cil').fill('4');
+  await oknoV.locator('#vyzva-odmena').fill('Pizza pro tým');
+  await oknoV.locator('#vyzva-body').fill('15');
+  await oknoV.screenshot({ path: OUT + 'k84-tym-nova-vyzva-1280.png' });
+  await oknoV.getByRole('button', { name: 'Vyhlásit výzvu' }).click();
+  const postV = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/rewards/challenges' && z.m === 'POST'), 4000);
+  tvrdi('N2: Vyhlásit výzvu → POST { nazev, metrika, cil 4, od, do, odmenaText, odmenaBody 15 }', !!postV && /"nazev":"Víkend bez manka","metrika":"uzaverky_bez_manka","cil":4,"od":"\d{4}-\d{2}-\d{2}","do":"\d{4}-\d{2}-\d{2}","odmenaText":"Pizza pro tým","odmenaBody":15/.test(postV.body), postV?.body);
+  tvrdi('N2: okno se zavře a přijde toast', await dokud(async () => (await oknoV.count()) === 0, 4000) && await dokud(() => p.getByText('Výzva je vyhlášená').isVisible().catch(() => false), 3000));
   await ctx.close();
 }
 

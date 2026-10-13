@@ -2171,5 +2171,22 @@
   "Vyber kolegu…": "Kollegen wählen…",
   "Za co — hodnota podniku": "Wofür – Wert des Betriebs",
   "Zatím nikdo nikomu nepoděkoval. Záskok, pomoc s úklidem, hezké slovo hostovi — body od kolegů těší víc než hvězdy.": "Noch hat niemand jemandem gedankt. Einspringen, Hilfe beim Putzen, ein nettes Wort zum Gast – Punkte von Kollegen freuen mehr als Sterne.",
-  "Zeď díků": "Dankeswand"
+  "Zeď díků": "Dankeswand",
+  "+{n} b každému": "+{n} Pkt. für alle",
+  "Nesplněno": "Nicht geschafft",
+  "Průměrné hodnocení hostů": "Durchschnittliche Gästebewertung",
+  "Splněné úkoly": "Erledigte Aufgaben",
+  "Společný cíl týmu (uzávěrky bez manka, úkoly, hodnocení hostů, tržba) s ukazatelem postupu a odměnou.": "Ein gemeinsames Teamziel (Abschlüsse ohne Fehlbetrag, Aufgaben, Gästebewertung, Umsatz) mit Fortschrittsbalken und Belohnung.",
+  "Tržba období": "Umsatz im Zeitraum",
+  "Uzávěrky bez manka": "Abschlüsse ohne Fehlbetrag",
+  "Výzva týdne": "Challenge der Woche",
+  "dnes poslední den": "heute letzter Tag",
+  "skončila": "beendet",
+  "začíná {den}": "beginnt {den}",
+  "{hodnota} z {cil}": "{hodnota} von {cil}",
+  "{hodnota} z {cil} ★": "{hodnota} von {cil} ★",
+  "{hodnota} z {n, plural, one {# uzávěrky} few {# uzávěrek} other {# uzávěrek}}": "{hodnota} von {n, plural, one {# Abschluss} other {# Abschlüssen}}",
+  "{hodnota} z {n, plural, one {# úkolu} few {# úkolů} other {# úkolů}}": "{hodnota} von {n, plural, one {# Aufgabe} other {# Aufgaben}}",
+  "{n, plural, one {zbývá # den} few {zbývají # dny} other {zbývá # dní}}": "{n, plural, one {noch # Tag} other {noch # Tage}}",
+  "{nazev}: {procento} %": "{nazev}: {procento} %"
 }

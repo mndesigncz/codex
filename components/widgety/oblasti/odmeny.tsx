@@ -49,6 +49,7 @@ import { useSession } from 'next-auth/react';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { aktualniJazyk } from '@/lib/i18n/stav';
 import { dbTimeDayHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import {
@@ -63,6 +64,7 @@ import {
   runBulk, useSelection,
 } from '../../ui';
 import { BODY_DIKU, MAX_VETA_DIKU, vyberZed } from '@/lib/podekovani';
+import { postupVyzvy, vyberVyzvy, vyzvyKZobrazeni, type MetrikaVyzvy, type Vyzva } from '@/lib/vyzvy';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney } from '../../CurrencyProvider';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
@@ -1388,6 +1390,72 @@ function Oslavy({ velikost, nahled }: WidgetProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Výzva týdne (kolo 8, R8-3 — vzor Kudos / 7shifts Engage): společný cíl s ukazatelem postupu
+// ---------------------------------------------------------------------------
+
+export const URL_VYZVY = '/api/rewards/challenges';
+
+/** Název měřítka a tvar hodnoty: „3 z 5 uzávěrek", „12 400 z 60 000 Kč", „4,6 z 4,8 ★". */
+export function textMetriky(t: PrekladFn, metrika: MetrikaVyzvy): string {
+  if (metrika === 'uzaverky_bez_manka') return t('Uzávěrky bez manka');
+  if (metrika === 'ukoly') return t('Splněné úkoly');
+  if (metrika === 'hodnoceni_hostu') return t('Průměrné hodnocení hostů');
+  return t('Tržba období');
+}
+function hodnotaMetriky(t: PrekladFn, v: Vyzva, money: (n: number) => string): string {
+  const loc = aktualniJazyk();
+  if (v.metrika === 'trzba') return t('{hodnota} z {cil}', { hodnota: money(v.hodnota), cil: money(v.cil) });
+  if (v.metrika === 'hodnoceni_hostu') return t('{hodnota} z {cil} ★', { hodnota: v.hodnota.toLocaleString(loc, { maximumFractionDigits: 1 }), cil: v.cil.toLocaleString(loc, { maximumFractionDigits: 1 }) });
+  if (v.metrika === 'uzaverky_bez_manka') return t('{hodnota} z {n, plural, one {# uzávěrky} few {# uzávěrek} other {# uzávěrek}}', { hodnota: v.hodnota, n: v.cil });
+  return t('{hodnota} z {n, plural, one {# úkolu} few {# úkolů} other {# úkolů}}', { hodnota: v.hodnota, n: v.cil });
+}
+
+/** Jedna výzva: název, ukazatel, „3 z 5 uzávěrek · zbývají 2 dny", odměna a stav. */
+export function VyzvaRadek({ v, dnes, kompaktni = false }: { v: Vyzva; dnes: string; kompaktni?: boolean }) {
+  const t = useT('widgety');
+  const money = useMoney();
+  const p = postupVyzvy(v, dnes);
+  const kdy = p.splneno ? null
+    : p.predZacatkem ? t('začíná {den}', { den: v.od })
+    : p.propadla ? t('skončila')
+    : p.zbyvaDni === 0 ? t('dnes poslední den')
+    : t('{n, plural, one {zbývá # den} few {zbývají # dny} other {zbývá # dní}}', { n: p.zbyvaDni });
+  const odmena = [v.odmenaText, v.odmenaBody ? t('+{n} b každému', { n: v.odmenaBody }) : null].filter(Boolean).join(' · ');
+  return (
+    <div className="space-y-1.5" data-vyzva={v.id} data-vyzva-stav={p.splneno ? 'splneno' : p.propadla ? 'propadla' : 'bezi'}>
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+        <p className="text-[15px] font-medium leading-snug text-[#16181A] text-pretty min-w-0">{v.nazev}</p>
+        {p.splneno ? <Chip tone="ok" size="sm" icon="check">{t('Splněno')}</Chip> : p.propadla ? <Chip tone="muted" size="sm">{t('Nesplněno')}</Chip> : null}
+      </div>
+      <Pokrok procento={p.procento} popis={t('{nazev}: {procento} %', { nazev: v.nazev, procento: p.procento })} />
+      <p className="t-meta tabular-nums text-pretty">
+        {hodnotaMetriky(t, v, money)}{kdy ? ` · ${kdy}` : ''}
+      </p>
+      {!kompaktni && odmena && <p className="t-meta text-pretty">🎁 {odmena}</p>}
+    </div>
+  );
+}
+
+function VyzvaTydne({ velikost }: WidgetProps) {
+  const t = useT('widgety');
+  const { ok, ceka } = useBrana([]);
+  const data = useDataWidgetu(ok ? URL_VYZVY : null, vyberVyzvy);
+  const dnes = pragueToday();
+  const vyzvy = vyzvyKZobrazeni(data.data ?? [], dnes);
+  const odkaz = useOdkazOdmeny();
+  const strop = velikost === 'S' ? 1 : 3;
+  return (
+    <Widget nacteni={ceka ? CEKA : data} kostra="text" odkaz={velikost === 'S' ? undefined : odkaz}
+      prazdno={data.data && vyzvy.length === 0 ? null : undefined}>
+      <div className="space-y-4">
+        {vyzvy.slice(0, strop).map(v => <VyzvaRadek key={v.id} v={v} dnes={dnes} kompaktni={velikost === 'S'} />)}
+      </div>
+      {vyzvy.length > strop && <p className="t-meta mt-2">{aDalsich(t, vyzvy.length - strop)}</p>}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Výtky v týmu
 // ---------------------------------------------------------------------------
 
@@ -1488,6 +1556,7 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'odmeny.pochvaly': Pochvaly,
   'odmeny.zed_diku': ZedDiku,
   'odmeny.oslavy': Oslavy,
+  'odmeny.vyzva': VyzvaTydne,
   'odmeny.katalog': KatalogOdmen,
   'odmeny.urovne': Urovne,
   'moje.uroven': MojeUrovenWidget,

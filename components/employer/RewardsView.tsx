@@ -26,7 +26,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import {
-  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, Segmented, Skeleton, Switch, Textarea, Toast,
+  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, Segmented, Select, Skeleton, Switch, Textarea, Toast,
 } from '../ui';
 import { MAX_NAZEV_ODMENY, validujOdmenu, type ChybaOdmeny } from '@/lib/odmenyKatalog';
 import { DEFAULT_POINTS, normalizeLevels, normalizePoints, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
@@ -41,7 +41,9 @@ import { ProGate } from '../Pro';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { NaStranceOdmen, PochvalaOkno } from '../widgety/oblasti/odmeny';
+import { NaStranceOdmen, PochvalaOkno, URL_VYZVY, VyzvaRadek, textMetriky } from '../widgety/oblasti/odmeny';
+import { METRIKY, MAX_NAZEV_VYZVY, MAX_ODMENA_BODY, MAX_ODMENA_TEXT, vyberVyzvy, vycistiVyzvu, type MetrikaVyzvy } from '@/lib/vyzvy';
+import { dayPlus } from '@/lib/pragueTime';
 import { pragueToday } from '@/lib/pragueTime';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
@@ -112,6 +114,7 @@ function RewardsViewInner() {
   ) : cast === 'settings' ? (
     <div className="space-y-4">
       {nastavuje && <NastaveniBodu onUlozeno={obnov} />}
+      {nastavuje && <SpravaVyzev />}
       {spravujeKatalog && <SpravaKatalogu />}
     </div>
   ) : null;
@@ -408,6 +411,128 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
       </div>
       <Toast message={toast} onClose={() => setToast(null)} />
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Nastavení: týmové výzvy (odmeny.nastaveni) — kolo 8, R8-3
+// ---------------------------------------------------------------------------
+//
+// „Tento týden 5 uzávěrek bez manka → pizza pro tým": název, měřítko z hotových čísel, cíl,
+// od–do, odměna (text, body každému). Postup ukazuje widget Výzva týdne; tady seznam a Nová výzva.
+
+function SpravaVyzev() {
+  const t = useT('sprava');
+  const data = useDataWidgetu(URL_VYZVY, vyberVyzvy);
+  const dnes = pragueToday();
+  const vyzvy = data.data ?? [];
+  const [okno, setOkno] = useState(false);
+  const [mazu, setMazu] = useState<number | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const smazat = async (id: number) => {
+    setMazu(id); setChyba(null);
+    try {
+      await fetch(`${URL_VYZVY}?id=${id}`, { method: 'DELETE' }).then(okJson);
+      obnovDataWidgetu(URL_VYZVY);
+      setToast(t('Výzva je zrušená.'));
+    } catch (e) {
+      setChyba(apiMessage(e, t('Výzvu se nepodařilo zrušit.')));
+    } finally { setMazu(null); }
+  };
+  return (
+    <Card aria-labelledby="vyzvy-titulek" data-sprava-vyzev>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="vyzvy-titulek" className="t-card">{t('Týmové výzvy')}</h2>
+        <Button variant="secondary" size="sm" icon="plus" onClick={() => setOkno(true)}>{t('Nová výzva')}</Button>
+      </div>
+      <p className="t-meta mt-1 text-pretty">{t('Společný cíl pro celý tým s ukazatelem postupu na Přehledu, Domů i tabletu. Po splnění přijde všem oznámení a body.')}</p>
+      {data.error ? (
+        <ErrorState compact title={t('Výzvy se nenačetly')} onRetry={data.reload} detail={data.error} className="mt-3" />
+      ) : data.loading && !data.data ? (
+        <Skeleton className="mt-3 h-16" />
+      ) : vyzvy.length === 0 ? (
+        <p className="t-meta mt-3 text-pretty">{t('Zatím žádná výzva. Zkus „5 uzávěrek bez manka do neděle → pizza pro tým“.')}</p>
+      ) : (
+        <ul className="list mt-2">
+          {vyzvy.map(v => (
+            <li key={v.id} className="flex items-start gap-3 py-3">
+              <div className="min-w-0 flex-1"><VyzvaRadek v={v} dnes={dnes} /></div>
+              <Button variant="ghost" size="sm" iconOnly icon="trash" loading={mazu === v.id} aria-label={t('Zrušit výzvu {nazev}', { nazev: v.nazev })} onClick={() => { void smazat(v.id); }} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {chyba && <p className="note note-danger text-sm mt-2" role="alert">{chyba}</p>}
+      {okno && <NovaVyzvaOkno onClose={() => setOkno(false)} onHotovo={() => { setOkno(false); setToast(t('Výzva je vyhlášená — tým dostal oznámení.')); }} />}
+      <Toast message={toast} onClose={() => setToast(null)} />
+    </Card>
+  );
+}
+
+function NovaVyzvaOkno({ onClose, onHotovo }: { onClose: () => void; onHotovo: () => void }) {
+  const t = useT('sprava');
+  const tw = useT('widgety');
+  const dnes = pragueToday();
+  const [nazev, setNazev] = useState('');
+  const [metrika, setMetrika] = useState<MetrikaVyzvy>('uzaverky_bez_manka');
+  const [cil, setCil] = useState('5');
+  const [od, setOd] = useState(dnes);
+  const [doDne, setDoDne] = useState(dayPlus(dnes, 6));
+  const [odmenaText, setOdmenaText] = useState('');
+  const [odmenaBody, setOdmenaBody] = useState('');
+  const [ukladam, setUkladam] = useState(false);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const uloz = async () => {
+    const v = vycistiVyzvu({ nazev, metrika, cil, od, do: doDne, odmenaText, odmenaBody });
+    if (!v.ok) { setChyba(v.chyba); return; }
+    setUkladam(true); setChyba(null);
+    try {
+      await fetch(URL_VYZVY, { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify(v.vyzva) }).then(okJson);
+      obnovDataWidgetu(URL_VYZVY);
+      onHotovo();
+    } catch (e) {
+      setChyba(apiMessage(e, t('Výzvu se nepodařilo uložit.')));
+    } finally { setUkladam(false); }
+  };
+  return (
+    <Modal open onClose={onClose} size="md" title={t('Nová výzva')} subtitle={t('Společný cíl, který tým uvidí na Přehledu, Domů i tabletu.')}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
+        <Button variant="primary" icon="check" loading={ukladam} onClick={() => { void uloz(); }}>{t('Vyhlásit výzvu')}</Button>
+      </>}>
+      <div className="space-y-3" data-nova-vyzva>
+        <Field id="vyzva-nazev" label={t('Název')}>
+          <Input id="vyzva-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={MAX_NAZEV_VYZVY} placeholder={t('Týden bez manka')} autoFocus />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="vyzva-metrika" label={t('Co se počítá')}>
+            <Select id="vyzva-metrika" value={metrika} onChange={e => setMetrika(e.target.value as MetrikaVyzvy)}>
+              {METRIKY.map(m => <option key={m} value={m}>{textMetriky(tw, m)}</option>)}
+            </Select>
+          </Field>
+          <Field id="vyzva-cil" label={t('Cíl')} hint={metrika === 'hodnoceni_hostu' ? t('Průměr hvězd, nejvýš 5.') : metrika === 'trzba' ? t('Částka v měně podniku.') : undefined}>
+            {/* Textové pole s decimal klávesnicí (check-decimal-inputs): „4,8" hvězdy i s čárkou; vycistiVyzvu čárku převede. */}
+            <Input id="vyzva-cil" inputMode="decimal" value={cil} onChange={e => setCil(e.target.value.replace(/[^\d.,]/g, '').replace(',', '.'))} className="tabular-nums" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="vyzva-od" label={t('Od')}>
+            <Input id="vyzva-od" type="date" value={od} onChange={e => { setOd(e.target.value); if (doDne < e.target.value) setDoDne(e.target.value); }} className="appearance-none min-w-0" />
+          </Field>
+          <Field id="vyzva-do" label={t('Do')}>
+            <Input id="vyzva-do" type="date" value={doDne} min={od} onChange={e => setDoDne(e.target.value)} className="appearance-none min-w-0" />
+          </Field>
+        </div>
+        <Field id="vyzva-odmena" label={t('Odměna pro tým')} hint={t('Třeba pizza, volný pátek, společný večer.')}>
+          <Input id="vyzva-odmena" value={odmenaText} onChange={e => setOdmenaText(e.target.value)} maxLength={MAX_ODMENA_TEXT} placeholder={t('Pizza pro tým')} />
+        </Field>
+        <Field id="vyzva-body" label={t('Body každému (nepovinné)')} hint={t('Připíšou se všem lidem podniku po splnění.')}>
+          <Input id="vyzva-body" type="number" inputMode="numeric" min={0} max={MAX_ODMENA_BODY} value={odmenaBody} onChange={e => setOdmenaBody(e.target.value)} className="!w-full sm:!w-32 tabular-nums" />
+        </Field>
+        {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+      </div>
+    </Modal>
   );
 }
 

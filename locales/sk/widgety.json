@@ -2173,5 +2173,22 @@
   "Vyber kolegu…": "Vyber kolegu…",
   "Za co — hodnota podniku": "Za čo – hodnota podniku",
   "Zatím nikdo nikomu nepoděkoval. Záskok, pomoc s úklidem, hezké slovo hostovi — body od kolegů těší víc než hvězdy.": "Zatiaľ nikto nikomu nepoďakoval. Záskok, pomoc s upratovaním, pekné slovo hosťovi – body od kolegov tešia viac než hviezdy.",
-  "Zeď díků": "Stena vďaky"
+  "Zeď díků": "Stena vďaky",
+  "+{n} b každému": "+{n} b každému",
+  "Nesplněno": "Nesplnené",
+  "Průměrné hodnocení hostů": "Priemerné hodnotenie hostí",
+  "Splněné úkoly": "Splnené úlohy",
+  "Společný cíl týmu (uzávěrky bez manka, úkoly, hodnocení hostů, tržba) s ukazatelem postupu a odměnou.": "Spoločný cieľ tímu (uzávierky bez manka, úlohy, hodnotenie hostí, tržba) s ukazovateľom postupu a odmenou.",
+  "Tržba období": "Tržba obdobia",
+  "Uzávěrky bez manka": "Uzávierky bez manka",
+  "Výzva týdne": "Výzva týždňa",
+  "dnes poslední den": "dnes posledný deň",
+  "skončila": "skončila",
+  "začíná {den}": "začína {den}",
+  "{hodnota} z {cil}": "{hodnota} z {cil}",
+  "{hodnota} z {cil} ★": "{hodnota} z {cil} ★",
+  "{hodnota} z {n, plural, one {# uzávěrky} few {# uzávěrek} other {# uzávěrek}}": "{hodnota} z {n, plural, one {# uzávierky} few {# uzávierok} other {# uzávierok}}",
+  "{hodnota} z {n, plural, one {# úkolu} few {# úkolů} other {# úkolů}}": "{hodnota} z {n, plural, one {# úlohy} few {# úloh} other {# úloh}}",
+  "{n, plural, one {zbývá # den} few {zbývají # dny} other {zbývá # dní}}": "{n, plural, one {zostáva # deň} few {zostávajú # dni} other {zostáva # dní}}",
+  "{nazev}: {procento} %": "{nazev}: {procento} %"
 }

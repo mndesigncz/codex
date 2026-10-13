@@ -96,6 +96,9 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'points.award': 'Pochvala s body',
   'points.award_delete': 'Smazána pochvala',
   'points.thanks': 'Poděkování kolegovi s body',
+  'vyzva.vyhlasit': 'Vyhlášena týmová výzva',
+  'vyzva.smazat': 'Zrušena týmová výzva',
+  'vyzva.splnena': 'Týmová výzva splněna',
   // docházka (kolo 7: ruční oprava s důvodem)
   'dochazka.upravit': 'Ručně upraven záznam docházky',
   'dochazka.pridat': 'Ručně přidán záznam docházky',
@@ -276,6 +279,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   closing: 'uzaverky',
   // odměny, prémie, pochvaly
   reward: 'odmeny', wage: 'odmeny', points: 'odmeny', vyplata: 'odmeny',
+  // týmové výzvy (kolo 8)
+  vyzva: 'odmeny',
   // hosté (Managero client)
   client: 'klient', klient: 'klient', rezervace: 'klient', recenze: 'klient',
   // nastavení podniku, organizace, předplatné
