@@ -1,0 +1,18 @@
+{
+ "stranka": "vedeni.togo",
+ "polozky": [
+  { "id": "pokladna-dnes", "widget": "pokladna.dnes", "velikost": "M" },
+  { "id": "mzdy-dnes", "widget": "finance.mzdy_dnes", "velikost": "S" },
+  { "id": "otevrene", "widget": "trzby.otevrene", "velikost": "S" },
+  { "id": "mzdy-dnes-m", "widget": "finance.mzdy_dnes", "velikost": "M" },
+  { "id": "po-dnech", "widget": "trzby.po_dnech", "velikost": "M" }
+ ],
+ "dostupne": ["pokladna.dnes", "finance.mzdy_dnes", "trzby.otevrene", "trzby.po_dnech", "chat.neprectene", "sklad.dochazi", "finance.uctenky", "odkaz"],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}

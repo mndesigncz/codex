@@ -95,6 +95,27 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
+  // Data (kolo 8, R8-4): GET /api/attendance?days=1 → roster[{id,name,hourlyRate,openSince,shiftStart,shiftEnd}],
+  // entries[{employeeId,clockIn,clockOut}] (jen s dochazka.zobrazit); GET /api/pos/summary?date=<dnes> → total;
+  // GET /api/finance?month → summary.laborTargetPct (cíl podniku, jen s finance.zobrazit). Obnova po 2 min jako Pokladna dnes.
+  // Pozor: mzdy se počítají v prohlížeči z rosteru a dnešních záznamů (lib/financeWidgety mzdyDnes) — až přibude
+  // GET /api/payroll, vezme se náklad odsud a tvar MzdyDnes zůstane.
+  {
+    id: 'finance.mzdy_dnes',
+    oblast: 'finance',
+    nazev: 'Mzdy dnes',
+    popis: 'Kolik dnešek stojí na lidech: náklad odpracovaného času do teď proti dnešní tržbě z pokladny, odhad do konce plánu; ve střední kartě lidé na směně s nákladem.',
+    ikona: 'coins',
+    velikosti: ['S', 'M'],
+    vychoziVelikost: 'S',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.prehled', 'vedeni.togo', 'vedeni.dochazka', 'vedeni.finance'],
+    opravneni: { vse: ['finance.mzdy', 'finance.trzby'], nektere: [], pole: { hotove_smeny_dne: 'dochazka.zobrazit', cil_podniku: 'finance.zobrazit' } },
+    tarif: 'max',
+    kostra: { S: 'cislo', M: 'cislo' },
+    cil: { pohled: 'attendance' },
+    stav: 'hotovo',
+  },
   // Data: GET /api/finance?month → ledger[{kind,amount}], summary{wagesCash,wagesWorked,stockValue,stockTop}
   // (N8: hodnota zásob jen odsud — jedním výpočtem pro Finance i sklad)
   {

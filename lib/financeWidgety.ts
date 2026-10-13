@@ -10,10 +10,12 @@
 // se „Zkusit znovu"), ne „0 Kč"; a null z API (tržby, které role v podniku
 // nesmí vidět) zůstává null, ne nula, která by tvrdila, že podnik nic neutržil.
 
-import { dayPlus, pragueToday } from './pragueTime.ts';
+import { dayPlus, parseDbTime, pragueDayOf, pragueMomentOf, pragueToday } from './pragueTime.ts';
 import { okJson } from './api.ts';
 import { vyresPreset } from './obdobi.ts';
 import { dnesJesteChybi } from './uzaverkyOrganizace.ts';
+import { earnedFor } from './wages.ts';
+import { konecSmeny, rozeberZaznam, type ClenRosteru, type ZaznamDochazky } from './dochazkaPrehled.ts';
 
 const cis = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const nebo = (v: unknown) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -628,4 +630,115 @@ export function zmenaOprotiMinulemuTydnu(dnes: readonly number[], minuly: readon
   const min = trzbaDoHodiny(minuly, posledni);
   if (!(min > 0)) return null;
   return { pct: Math.round(((trzbaDoHodiny(dnes, posledni) - min) / min) * 100), doHodiny: hodinaTed };
+}
+
+// ---------------------------------------------------------------------------
+// Mzdy dnes živě: náklad směny proti dnešní tržbě (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Toast ukazuje labor cost jako % net sales po čtvrthodinách „for in-the-moment
+// staffing decisions". Tady totéž z toho, co aplikace už má: roster z
+// /api/attendance (kdo je napíchnutý, od kdy, za kolik, jaký má plán) a dnešní
+// záznamy docházky (kdo už odešel a kolik to stálo). Tržba je z pokladny.
+
+/** Roster a dnešní záznamy z GET /api/attendance?days=1, jak je potřebuje mzdyDnes. */
+export interface DochazkaDnes { roster: ClenRosteru[]; entries: ZaznamDochazky[] | null }
+
+export function vyberDochazkuDnes(raw: any): DochazkaDnes {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error('Docházka přišla v nečekaném tvaru.');
+  return {
+    roster: raw.roster.filter((r: any) => r && r.id != null).map((r: any) => ({
+      id: r.id, name: typeof r.name === 'string' ? r.name : undefined, avatar: r.avatar ?? null,
+      openSince: r.openSince ?? null, openEntryId: r.openEntryId ?? null,
+      shiftStart: r.shiftStart ?? null, shiftEnd: r.shiftEnd ?? null,
+      hourlyRate: r.hourlyRate == null ? null : Number(r.hourlyRate),
+    })),
+    // Bez dochazka.zobrazit API záznamy neposílá (pole chybí) — hotové dnešní směny pak neznáme.
+    entries: Array.isArray(raw.entries) ? raw.entries.filter((e: any) => e && typeof e.clockIn === 'string').map((e: any) => ({
+      id: e.id, employeeId: e.employeeId, clockIn: e.clockIn, clockOut: e.clockOut ?? null,
+    })) : null,
+  };
+}
+
+export interface ClovekNaSmene {
+  id: string;
+  jmeno: string;
+  avatar: string | null;
+  /** Sazba za hodinu; null = nenastavená (náklad se nepočítá). */
+  sazba: number | null;
+  /** Od kdy je napíchnutý. */
+  od: Date;
+  /** Náklad běžící směny do teď. */
+  naklad: number;
+  /** Plánovaný konec „HH:MM", nebo null bez plánu. */
+  planDo: string | null;
+}
+
+export interface MzdyDnes {
+  /** Náklad odpracovaného času dnes do teď: hotové dnešní směny + běžící × sazby. */
+  naklad: number;
+  /** Odhad do konce plánu: zbytek běžících směn a celé plánované směny lidí, kteří teprve přijdou. */
+  doKonce: number;
+  /** Lidé právě na směně, nejdražší první. */
+  lide: ClovekNaSmene[];
+  /** Lidé s časem dnes, ale bez sazby — jejich náklad v součtu chybí. */
+  bezSazby: number;
+  /** Dnešní hotové směny jsou v součtu (jen s dochazka.zobrazit); jinak je to jen běžící čas. */
+  sHotovymi: boolean;
+}
+
+const sazbaClena = (r: ClenRosteru): number | null => (Number.isFinite(Number(r.hourlyRate)) && Number(r.hourlyRate) > 0 ? Number(r.hourlyRate) : null);
+
+/**
+ * Dnešní mzdový náklad živě. Běžící směny se berou z rosteru (openSince), hotové
+ * z dnešních záznamů (clockOut), ať se jeden záznam nepočítá dvakrát. Zapomenuté
+ * odpíchnutí (nad 16 h) a záznamy nad 24 h se nepočítají — stejně jako lib/wages.
+ */
+export function mzdyDnes(d: DochazkaDnes, ted: number, dnes: string): MzdyDnes {
+  let naklad = 0, doKonce = 0, bezSazby = 0;
+  const lide: ClovekNaSmene[] = [];
+  const sHotovymi = d.entries != null;
+  const hotoveDnes = new Set<string>();
+  for (const e of d.entries ?? []) {
+    if (!e.clockOut) continue;
+    const od = parseDbTime(e.clockIn);
+    if (!od || pragueDayOf(od) !== dnes) continue;
+    const id = String(e.employeeId ?? '');
+    const clen = d.roster.find(r => String(r.id) === id);
+    const sazba = clen ? sazbaClena(clen) : null;
+    const { ms } = rozeberZaznam(e, ted);
+    if (ms <= 0) continue;
+    hotoveDnes.add(id);
+    if (sazba == null) { bezSazby += 1; continue; }
+    naklad += earnedFor(ms, sazba);
+  }
+  for (const r of d.roster) {
+    const id = String(r.id);
+    const sazba = sazbaClena(r);
+    const od = parseDbTime(r.openSince);
+    const konec = konecSmeny(dnes, r.shiftStart, r.shiftEnd);
+    if (od) {
+      const { ms } = rozeberZaznam({ clockIn: r.openSince as string, clockOut: null }, ted);
+      const n = sazba != null ? earnedFor(ms, sazba) : 0;
+      if (sazba == null && ms > 0 && !hotoveDnes.has(id)) bezSazby += 1;
+      naklad += n;
+      if (sazba != null && konec && konec.getTime() > ted && konec.getTime() > od.getTime()) doKonce += earnedFor(konec.getTime() - ted, sazba);
+      lide.push({ id, jmeno: r.name ?? 'Bez jména', avatar: r.avatar ?? null, sazba, od, naklad: n, planDo: konec ? String(r.shiftEnd).slice(0, 5) : null });
+      continue;
+    }
+    // Teprve přijde: plánovaná směna, která ještě nezačala, stojí celá. Kdo měl začít a nepřišel, se nepočítá —
+    // nevíme, jestli přijde; kdo už dnes odpracoval a odešel, je v `naklad`.
+    const zacatek = r.shiftStart ? pragueMomentOf(dnes, String(r.shiftStart).slice(0, 5)) : null;
+    if (sazba != null && zacatek && konec && zacatek.getTime() > ted && konec.getTime() > zacatek.getTime() && !hotoveDnes.has(id)) {
+      doKonce += earnedFor(konec.getTime() - zacatek.getTime(), sazba);
+    }
+  }
+  lide.sort((a, b) => b.naklad - a.naklad || a.jmeno.localeCompare(b.jmeno, 'cs'));
+  return { naklad, doKonce, lide, bezSazby, sHotovymi };
+}
+
+/** Podíl mzdového nákladu na tržbě v celých %, null bez tržby (nula by tvrdila „lidé nic nestojí"). */
+export function podilNakladu(naklad: number, trzba: number): number | null {
+  if (!(trzba > 0)) return null;
+  return Math.round((naklad / trzba) * 100);
 }

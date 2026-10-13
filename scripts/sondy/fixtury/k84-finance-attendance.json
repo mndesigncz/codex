@@ -1,0 +1,14 @@
+{
+ "roster": [
+  { "id": 15, "name": "Martin Nemeškal", "avatar": "🧑", "hourlyRate": 0, "hasPin": true, "openSince": null, "openEntryId": null, "shiftStart": null, "shiftEnd": null },
+  { "id": 16, "name": "Eva Testová", "avatar": "👩", "hourlyRate": 150, "hasPin": true, "openSince": "@240", "openEntryId": 901, "shiftStart": "@HM-240", "shiftEnd": "@HM+240" },
+  { "id": 17, "name": "Jakub Horák", "avatar": "🧔", "hourlyRate": 0, "hasPin": false, "openSince": "@120", "openEntryId": 902, "shiftStart": null, "shiftEnd": null },
+  { "id": 18, "name": "Petra Malá", "avatar": "👱", "hourlyRate": 180, "hasPin": true, "openSince": null, "openEntryId": null, "shiftStart": "@HM+120", "shiftEnd": "@HM+480" },
+  { "id": 19, "name": "Honza Dvořák", "avatar": null, "hourlyRate": 200, "hasPin": true, "openSince": null, "openEntryId": null, "shiftStart": "@HM-480", "shiftEnd": "@HM-240" }
+ ],
+ "entries": [
+  { "id": 901, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "👩", "clockIn": "@240", "clockOut": null, "source": "kiosk", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "planStart": null, "planEnd": null, "planDate": null },
+  { "id": 902, "employeeId": 17, "employeeName": "Jakub Horák", "employeeAvatar": "🧔", "clockIn": "@120", "clockOut": null, "source": "self", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "planStart": null, "planEnd": null, "planDate": null },
+  { "id": 903, "employeeId": 19, "employeeName": "Honza Dvořák", "employeeAvatar": null, "clockIn": "@480", "clockOut": "@240", "source": "kiosk", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "planStart": null, "planEnd": null, "planDate": null }
+ ]
+}

@@ -2188,5 +2188,21 @@
   "{hodnota} z {n, plural, one {# uzávěrky} few {# uzávěrek} other {# uzávěrek}}": "{hodnota} von {n, plural, one {# Abschluss} other {# Abschlüssen}}",
   "{hodnota} z {n, plural, one {# úkolu} few {# úkolů} other {# úkolů}}": "{hodnota} von {n, plural, one {# Aufgabe} other {# Aufgaben}}",
   "{n, plural, one {zbývá # den} few {zbývají # dny} other {zbývá # dní}}": "{n, plural, one {noch # Tag} other {noch # Tage}}",
-  "{nazev}: {procento} %": "{nazev}: {procento} %"
+  "{nazev}: {procento} %": "{nazev}: {procento} %",
+  "pokladna není propojená": "Kasse nicht verbunden",
+  "dnes zatím bez tržby": "heute noch kein Umsatz",
+  "do konce plánu ještě ~{castka}": "bis Planende noch ~{castka}",
+  "Dnes zatím nikdo nebyl na směně.": "Heute war noch niemand im Dienst.",
+  "Do konce plánu": "Bis Planende",
+  "zbytek směn podle rozvrhu": "Rest der Schichten laut Dienstplan",
+  "nikdo už nemá přijít": "niemand mehr erwartet",
+  "{n, plural, one {# člověk na směně} few {# lidé na směně} other {# lidí na směně}}": "{n, plural, one {# Person im Dienst} other {# Personen im Dienst}}",
+  "{castka}/h": "{castka}/Std.",
+  "{n, plural, one {# člověk bez sazby} few {# lidé bez sazby} other {# lidí bez sazby}} — jejich náklad v součtu chybí.": "{n, plural, one {# Person ohne Stundensatz} other {# Personen ohne Stundensatz}} — ihre Kosten fehlen in der Summe.",
+  "Jen běžící směny — hotové dnešní směny vidí role s oprávněním na docházku.": "Nur laufende Schichten — beendete Schichten von heute sehen Rollen mit Anwesenheitsrecht.",
+  "Mzdy dnes": "Löhne heute",
+  "Kolik dnešek stojí na lidech: náklad odpracovaného času do teď proti dnešní tržbě z pokladny, odhad do konce plánu; ve střední kartě lidé na směně s nákladem.": "Was der heutige Tag an Personal kostet: Lohnkosten der bisher gearbeiteten Zeit gegen den heutigen Kassenumsatz, Schätzung bis Planende; die mittlere Karte zeigt die Leute im Dienst mit Kosten.",
+  "Náklad do teď": "Kosten bis jetzt",
+  "{podil} % z dnešní tržby {castka}": "{podil} % des heutigen Umsatzes {castka}",
+  "{podil} % z tržby": "{podil} % des Umsatzes"
 }

@@ -2190,5 +2190,21 @@
   "{hodnota} z {n, plural, one {# uzávěrky} few {# uzávěrek} other {# uzávěrek}}": "{hodnota} z {n, plural, one {# uzávierky} few {# uzávierok} other {# uzávierok}}",
   "{hodnota} z {n, plural, one {# úkolu} few {# úkolů} other {# úkolů}}": "{hodnota} z {n, plural, one {# úlohy} few {# úloh} other {# úloh}}",
   "{n, plural, one {zbývá # den} few {zbývají # dny} other {zbývá # dní}}": "{n, plural, one {zostáva # deň} few {zostávajú # dni} other {zostáva # dní}}",
-  "{nazev}: {procento} %": "{nazev}: {procento} %"
+  "{nazev}: {procento} %": "{nazev}: {procento} %",
+  "pokladna není propojená": "pokladňa nie je prepojená",
+  "dnes zatím bez tržby": "dnes zatiaľ bez tržby",
+  "do konce plánu ještě ~{castka}": "do konca plánu ešte ~{castka}",
+  "Dnes zatím nikdo nebyl na směně.": "Dnes zatiaľ nikto nebol na zmene.",
+  "Do konce plánu": "Do konca plánu",
+  "zbytek směn podle rozvrhu": "zvyšok zmien podľa rozvrhu",
+  "nikdo už nemá přijít": "nikto už nemá prísť",
+  "{n, plural, one {# člověk na směně} few {# lidé na směně} other {# lidí na směně}}": "{n, plural, one {# človek na zmene} few {# ľudia na zmene} other {# ľudí na zmene}}",
+  "{castka}/h": "{castka}/h",
+  "{n, plural, one {# člověk bez sazby} few {# lidé bez sazby} other {# lidí bez sazby}} — jejich náklad v součtu chybí.": "{n, plural, one {# človek bez sadzby} few {# ľudia bez sadzby} other {# ľudí bez sadzby}} — ich náklad v súčte chýba.",
+  "Jen běžící směny — hotové dnešní směny vidí role s oprávněním na docházku.": "Len bežiace zmeny — hotové dnešné zmeny vidia roly s oprávnením na dochádzku.",
+  "Mzdy dnes": "Mzdy dnes",
+  "Kolik dnešek stojí na lidech: náklad odpracovaného času do teď proti dnešní tržbě z pokladny, odhad do konce plánu; ve střední kartě lidé na směně s nákladem.": "Koľko dnešok stojí na ľuďoch: náklad odpracovaného času doteraz proti dnešnej tržbe z pokladne, odhad do konca plánu; v strednej karte ľudia na zmene s nákladom.",
+  "Náklad do teď": "Náklad doteraz",
+  "{podil} % z dnešní tržby {castka}": "{podil} % z dnešnej tržby {castka}",
+  "{podil} % z tržby": "{podil} % z tržby"
 }

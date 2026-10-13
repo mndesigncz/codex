@@ -2187,5 +2187,21 @@
   "{hodnota} z {n, plural, one {# uzávěrky} few {# uzávěrek} other {# uzávěrek}}": "{hodnota} of {n, plural, one {# closing} other {# closings}}",
   "{hodnota} z {n, plural, one {# úkolu} few {# úkolů} other {# úkolů}}": "{hodnota} of {n, plural, one {# task} other {# tasks}}",
   "{n, plural, one {zbývá # den} few {zbývají # dny} other {zbývá # dní}}": "{n, plural, one {# day left} other {# days left}}",
-  "{nazev}: {procento} %": "{nazev}: {procento}%"
+  "{nazev}: {procento} %": "{nazev}: {procento}%",
+  "pokladna není propojená": "POS is not connected",
+  "dnes zatím bez tržby": "no sales yet today",
+  "do konce plánu ještě ~{castka}": "~{castka} more until the end of the plan",
+  "Dnes zatím nikdo nebyl na směně.": "Nobody has been on shift today yet.",
+  "Do konce plánu": "Until end of plan",
+  "zbytek směn podle rozvrhu": "rest of the shifts per schedule",
+  "nikdo už nemá přijít": "nobody else is due in",
+  "{n, plural, one {# člověk na směně} few {# lidé na směně} other {# lidí na směně}}": "{n, plural, one {# person on shift} other {# people on shift}}",
+  "{castka}/h": "{castka}/h",
+  "{n, plural, one {# člověk bez sazby} few {# lidé bez sazby} other {# lidí bez sazby}} — jejich náklad v součtu chybí.": "{n, plural, one {# person without a rate} other {# people without a rate}} — their cost is missing from the total.",
+  "Jen běžící směny — hotové dnešní směny vidí role s oprávněním na docházku.": "Running shifts only — finished shifts today are visible to roles with attendance permission.",
+  "Mzdy dnes": "Labour today",
+  "Kolik dnešek stojí na lidech: náklad odpracovaného času do teď proti dnešní tržbě z pokladny, odhad do konce plánu; ve střední kartě lidé na směně s nákladem.": "What today costs in people: labour cost worked so far against today's POS sales, estimate until the end of the plan; the medium card lists people on shift with their cost.",
+  "Náklad do teď": "Cost so far",
+  "{podil} % z dnešní tržby {castka}": "{podil} % of today's sales {castka}",
+  "{podil} % z tržby": "{podil} % of sales"
 }

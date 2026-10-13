@@ -11,6 +11,9 @@
 // „Kdo je dnes v podniku" nese Dnes v podniku ('dochazka.dnes_v_podniku': plán proti skutečnosti,
 // kdo má směnu a kdo už přišel). Balík B2 ho dodal jako hotový a tady nahradil Právě na směně,
 // které TO GO ani nemá v katalogu mezi svými stránkami.
+// Kolo 8 (R8-4): hned pod Pokladnou dnes stojí Mzdy dnes (náklad směny proti dnešní tržbě — právě tady
+// se rozhoduje „pustit někoho domů dřív") a vedle nich Otevřené účty, ať na telefonu stojí S vedle S
+// a mřížka nenechá osiřelou buňku.
 // Nástroj stránka nemá.
 import type { DefiniceStranky } from '../typy.ts';
 
@@ -24,6 +27,7 @@ export const STRANKA: DefiniceStranky = {
   inkoust: true,
   doporucene: [
     'pokladna.dnes',
+    'finance.mzdy_dnes',
     'trzby.otevrene',
     'trzby.po_dnech',
     'dochazka.prave_na_smene',
@@ -39,6 +43,8 @@ export const STRANKA: DefiniceStranky = {
   vychozi: {
     'typ:vedeni': [
       { w: 'pokladna.dnes', s: 'M' },
+      { w: 'finance.mzdy_dnes', s: 'S' },
+      { w: 'trzby.otevrene', s: 'S' },
       { w: 'trzby.po_dnech', s: 'M' },
       { w: 'dochazka.dnes_v_podniku', s: 'M' },
       { w: 'vyroba.k_vyrobe', s: 'M' },

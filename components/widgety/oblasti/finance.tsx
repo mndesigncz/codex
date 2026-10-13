@@ -31,19 +31,20 @@
 // (mesicZVolby v katalogu). Tentýž měsíc = tatáž URL = jeden dotaz na /api/finance
 // pro souhrn, podíl mezd, Kam šly peníze, hosty, postřehy i knihu výdajů na stránce.
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { mesicZVolby } from '@/lib/widgety/katalog/finance';
 import {
-  kamSlyPenize, mzdyMesice, podilMezd, urlFinanci, vyberFinance, zmenaProti as zmena, type FinanceMesice,
+  kamSlyPenize, mzdyDnes, mzdyMesice, podilMezd, podilNakladu, urlFinanci, vyberDochazkuDnes, vyberFinance, zmenaProti as zmena,
+  type FinanceMesice,
 } from '@/lib/financeWidgety';
 import { useT } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { useMoney } from '../../CurrencyProvider';
-import { BarSpark, Button, Chip, ListRow, Modal, Stat, StatRow } from '../../ui';
+import { Avatar, BarSpark, Button, Chip, ListRow, Modal, Stat, StatRow } from '../../ui';
 import { zmenaZtrat, type ZtrataInventury } from '@/lib/skladPrehled';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
@@ -253,6 +254,88 @@ function TrzbyVsMzdy({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
             <Stat label={t('Tržby')} value={money(s.revenue)} note={trend != null ? t('{zmena} proti minulému', { zmena: sZnamenkem(trend) }) : undefined} />
             <Stat label={t('Mzdy')} value={money(mzdy)} note={s.wagesWorked > 0 ? t('z docházky × sazby') : t('z denních výplat')} />
           </StatRow>
+        </div>
+      ))}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mzdy dnes (kolo 8, R8-4): náklad směny proti dnešní tržbě, živě
+// ---------------------------------------------------------------------------
+
+const URL_DOCHAZKY_DNES = '/api/attendance?days=1';
+
+/** Dnešní tržba z /api/pos/summary; propojená pokladna bez čísel (bills null) nemá co ukázat. */
+function vyberTrzbuDne(raw: any): { propojeno: boolean; trzba: number } {
+  return { propojeno: raw?.connected === true && raw?.bills != null, trzba: Number(raw?.total) || 0 };
+}
+
+function MzdyDnesWidget({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
+  const money = useMoney();
+  const smi = useSmi();
+  const { ok, ceka } = useBrana('finance.mzdy_dnes', ['finance.mzdy', 'finance.trzby']);
+  const dnes = pragueToday();
+  const doch = useDataWidgetu(ok ? URL_DOCHAZKY_DNES : null, vyberDochazkuDnes);
+  const pokladna = useDataWidgetu(ok ? `/api/pos/summary?date=${dnes}` : null, vyberTrzbuDne);
+  // Cíl podílu mezd nese /api/finance (pole `cil_podniku`): bez finance.zobrazit se Chip nekreslí, dotaz neodejde.
+  const finance = useDataWidgetu(ok && smi('finance.zobrazit') ? urlFinanci(dnes.slice(0, 7)) : null, vyberFinance);
+  // „Teď" se posouvá s obnovou po 2 minutách (jako Pokladna dnes): běžící směna roste i bez nové odpovědi.
+  const [ted, setTed] = useState(() => Date.now());
+  const { reload: obnovDoch } = doch;
+  const { reload: obnovPokladnu } = pokladna;
+  useEffect(() => {
+    if (!ok || nahled) return;
+    const i = setInterval(() => { setTed(Date.now()); obnovDoch(); obnovPokladnu(); }, 120_000);
+    return () => clearInterval(i);
+  }, [ok, nahled, obnovDoch, obnovPokladnu]);
+
+  const m = useMemo(() => (doch.data ? mzdyDnes(doch.data, ted, dnes) : null), [doch.data, ted, dnes]);
+  const trzba = pokladna.data?.propojeno ? pokladna.data.trzba : null;
+  const podil = m && trzba != null ? podilNakladu(m.naklad, trzba) : null;
+  const cil = finance.data?.souhrn.laborTargetPct ?? null;
+  const nad = podil != null && cil != null && podil > cil;
+  const cas = (d: Date) => d.toLocaleTimeString(LOCALE_PRO_JAZYK[aktualniJazyk()], { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' });
+  const nic = m && m.naklad === 0 && m.lide.length === 0 && m.doKonce === 0;
+
+  // Poznámka pod číslem: podíl z tržby (S krátce, M i s částkou tržby), nebo proč podíl není.
+  const pozTrzby = podil != null
+    ? velikost === 'S' ? t('{podil} % z tržby', { podil }) : t('{podil} % z dnešní tržby {castka}', { podil, castka: money(trzba ?? 0) })
+    : pokladna.data && !pokladna.data.propojeno ? t('pokladna není propojená') : t('dnes zatím bez tržby');
+  const pozKonec = m && m.doKonce > 0 ? t('do konce plánu ještě ~{castka}', { castka: money(m.doKonce) }) : null;
+
+  return (
+    <Widget nacteni={ceka ? CEKA : [doch, pokladna]} kostra="cislo"
+      odkaz={velikost === 'S' ? undefined : { popisek: t('Docházka'), pohled: 'attendance' }}
+      doplnek={podil != null && cil != null ? <Chip tone={nad ? 'bad' : 'ok'} size="sm">{nad ? t('nad cílem') : t('v cíli')}</Chip> : undefined}
+      prazdno={nic ? <p className="t-meta">{t('Dnes zatím nikdo nebyl na směně.')}</p> : undefined}>
+      {m && !nic && (velikost === 'S' ? (
+        // Malá karta: jedno číslo a krátká poznámka; odhad do konce plánu na vlastním řádku (poznámka Statu se zkracuje).
+        <div>
+          <Stat label={t('Náklad do teď')} value={money(m.naklad)} note={pozTrzby} />
+          {pozKonec && <p className="t-meta mt-1 text-pretty">{pozKonec}</p>}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <StatRow podleKarty>
+            <Stat label={t('Náklad do teď')} value={money(m.naklad)} note={pozTrzby} />
+            <Stat label={t('Do konce plánu')} value={m.doKonce > 0 ? `~${money(m.doKonce)}` : '—'} note={m.doKonce > 0 ? t('zbytek směn podle rozvrhu') : t('nikdo už nemá přijít')} />
+          </StatRow>
+          {m.lide.length > 0 && (
+            <div>
+              <p className="t-label mb-1">{t('{n, plural, one {# člověk na směně} few {# lidé na směně} other {# lidí na směně}}', { n: m.lide.length })}</p>
+              <ul className="list">
+                {m.lide.map(l => (
+                  <ListRow key={l.id} lead={<Avatar emoji={l.avatar} name={l.jmeno} size="sm" />} title={l.jmeno}
+                    meta={[t('od {cas}', { cas: cas(l.od) }), l.planDo ? t('do {cas}', { cas: l.planDo }) : null, l.sazba != null ? t('{castka}/h', { castka: money(l.sazba) }) : t('bez sazby')].filter(Boolean).join(' · ')}
+                    value={l.sazba != null ? <span className="tabular-nums">{money(l.naklad)}</span> : <span className="text-black/45">—</span>} />
+                ))}
+              </ul>
+            </div>
+          )}
+          {m.bezSazby > 0 && <p className="t-meta">{t('{n, plural, one {# člověk bez sazby} few {# lidé bez sazby} other {# lidí bez sazby}} — jejich náklad v součtu chybí.', { n: m.bezSazby })}</p>}
+          {!m.sHotovymi && <p className="t-meta">{t('Jen běžící směny — hotové dnešní směny vidí role s oprávněním na docházku.')}</p>}
         </div>
       ))}
     </Widget>
@@ -663,6 +746,7 @@ function Uctenky({ velikost, nahled }: WidgetProps) {
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'finance.souhrn_mesice': SouhrnMesice,
   'finance.trzby_vs_mzdy': TrzbyVsMzdy,
+  'finance.mzdy_dnes': MzdyDnesWidget,
   'finance.kam_sly_penize': KamSlyPenize,
   'finance.marze': MarzeWidget,
   'finance.hoste_vernost': HosteVernost,
