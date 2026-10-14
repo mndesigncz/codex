@@ -64,13 +64,17 @@ export default function NahlaseniSprava() {
               <ListRow key={n.id}
                 title={<span className="flex flex-wrap items-center gap-x-2">{nazevDuvodu(n.reason)}
                   {n.teamId != null && <Link href={`/admin/teams/${n.teamId}`} className="font-normal text-black/60 underline-offset-2 hover:underline">{n.teamName ?? `podnik ${n.teamId}`}</Link>}</span>}
-                meta={`${n.kind === 'zprava' ? 'Zpráva v chatu' : 'Nápad'} · ${n.reporterName ?? 'neznámý'} nahlásil ${n.reportedName ?? 'smazaný účet'} · ${n.createdAt ? dbTimeDayHM(n.createdAt) : '—'}${n.escalatedAt ? ' · e-mail odešel' : n.status === 'open' ? ' · e-mail neodešel' : ''}`}
-                detail={<>{n.snapshot ? <span className="block break-words">„{n.snapshot}“</span> : <span className="block">Obsah se nezachoval.</span>}{n.detail && <span className="block break-words mt-0.5">Poznámka: {n.detail}</span>}</>}
+                meta={`${n.createdAt ? dbTimeDayHM(n.createdAt) : '—'} · ${n.kind === 'zprava' ? 'zpráva v chatu' : 'nápad'}${n.escalatedAt ? ' · e-mail odešel' : n.status === 'open' ? ' · e-mail neodešel' : ''}`}
+                detail={<>
+                  <span className="block">{n.reporterName ?? 'Neznámý'} nahlásil {n.reportedName ?? 'smazaný účet'}</span>
+                  {n.snapshot ? <span className="block break-words">„{n.snapshot}“</span> : <span className="block">Obsah se nezachoval.</span>}
+                  {n.detail && <span className="block break-words mt-0.5">Poznámka: {n.detail}</span>}
+                </>}
                 right={<ChipLhuty l={n.lhuta} status={n.status} />}
                 actions={n.status === 'open' ? (
                   <span className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="danger" onClick={() => setOdstranit(n)} disabled={bezi != null}>Odstranit obsah</Button>
-                    <Button size="sm" variant="secondary" onClick={() => void vyrid(n, 'zamitnout')} loading={bezi === n.id} disabled={bezi != null} title="Obsah pravidla neporušuje, zůstane.">Ponechat</Button>
+                    <Button size="sm" variant="danger" className="max-sm:!h-11" onClick={() => setOdstranit(n)} disabled={bezi != null}>Odstranit obsah</Button>
+                    <Button size="sm" variant="secondary" className="max-sm:!h-11" onClick={() => void vyrid(n, 'zamitnout')} loading={bezi === n.id} disabled={bezi != null} title="Obsah pravidla neporušuje, zůstane.">Ponechat</Button>
                   </span>
                 ) : undefined} />
             ))}
