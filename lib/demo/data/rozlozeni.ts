@@ -11,9 +11,6 @@ import type { VychoziPolozka } from '@/lib/widgety/typy';
 
 export const ROZLOZENI_DEMA: Record<string, VychoziPolozka[]> = {
   'vedeni.prehled': [
-    // Navíc (kolo 9): fronta k uznání a zápisy týmu jsou v ukázce vidět hned.
-    { w: 'prehled.ceka_na_tebe', s: 'L' },
-    { w: 'odmeny.navic_tymu', s: 'M' },
     { w: 'pokladna.dnes', s: 'M' },
     { w: 'dochazka.prave_na_smene', s: 'M' },
     { w: 'ukoly.dnes', s: 'S' },
@@ -22,6 +19,9 @@ export const ROZLOZENI_DEMA: Record<string, VychoziPolozka[]> = {
     { w: 'tym.clenove', s: 'S' },
     { w: 'rozvrh.dnesni_smeny', s: 'M' },
     { w: 'oznameni.nastenka', s: 'L' },
+    // Navíc (kolo 9) až pod první obrazovkou: první krok průvodce ukazuje na sklad.dochazi.
+    { w: 'prehled.ceka_na_tebe', s: 'L' },
+    { w: 'odmeny.navic_tymu', s: 'M' },
   ],
   'vedeni.rozvrh': [
     { w: 'nastroj' },
