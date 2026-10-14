@@ -14,6 +14,7 @@ import { usePopover } from '@/lib/usePopover';
 import { useObal } from '../ObalProvider';
 import PravniOdkazy from '../pravni/PravniOdkazy';
 import JazykMenu from '../ui/JazykMenu';
+import NajitPodnik, { useUmiSkenovat } from './NajitPodnik';
 import { useT, useJazyk } from '@/lib/i18n/client';
 
 export interface ClientUser { id: number; name: string; email: string }
@@ -43,6 +44,12 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
   // Účet se nezavíral vůbec: ani Escapem, ani kliknutím vedle. Jednou
   // otevřený zůstal viset přes stránku, dokud se na něj neklikalo znovu.
   const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
+  // „Naskenovat“ (QR podniku nebo stolu) a „Zadat kód podniku“: jedno okno, NajitPodnik.tsx.
+  // Kde skenovat nejde (prohlížeč bez kamery na QR), tlačítko rovnou říká „Zadat kód“.
+  const sken = useUmiSkenovat(jeObal);
+  const [najit, setNajit] = useState<{ open: boolean; hned: boolean }>({ open: false, hned: false });
+  const otevriNajit = () => setNajit({ open: true, hned: true });
+  const popisNajit = sken.umi ? t('Naskenovat') : t('Zadat kód');
   const active = (p: string) => path === p || (p !== '/client' && path?.startsWith(p));
   return (
     <div className="min-h-[100dvh] flex flex-col" style={{ background: 'var(--bg)', color: '#16181A' }}>
@@ -66,6 +73,12 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                 <Link href="/client/me" aria-current={active('/client/me') ? 'page' : undefined}
                   className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'seg-on' : 'seg-off'}`}>{t('Moje')}</Link>
               )}
+              {/* Sken QR a kód podniku. Přihlášený má na telefonu tlačítko uprostřed spodního doku, tady jen od md. */}
+              <button type="button" onClick={otevriNajit} aria-label={sken.umi ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}
+                className={`${me ? 'hidden md:inline-flex' : 'inline-flex'} tap-target items-center justify-center gap-1.5 rounded-full px-2.5 sm:px-3.5 py-2 text-sm font-medium seg-off transition`}>
+                <Icon name="camera" size={17} aria-hidden />
+                <span className="hidden sm:inline">{popisNajit}</span>
+              </button>
               {/* Jazyk hosta: malá pilulka s globusem. Hostovská část je celá přeložená do všech pěti jazyků. */}
               <JazykMenu className="ml-0.5 sm:ml-1" />
               {me ? (
@@ -86,7 +99,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                       </div>
                       <Link role="menuitem" href="/client/me#ucet" onClick={() => setOpen(false)}
                         className="w-full text-left rounded-xl px-3 py-2 text-sm hover:bg-black/[0.05] transition flex items-center gap-2">
-                        <Icon name="user" size={16} /> Účet a soukromí
+                        <Icon name="user" size={16} /> {t('Účet a soukromí')}
                       </Link>
                       <button role="menuitem" onClick={() => odhlasit({ callbackUrl: '/client' })}
                         className="w-full text-left rounded-xl px-3 py-2 text-sm text-bad-ink hover:bg-bad/10 transition flex items-center gap-2">
@@ -112,14 +125,24 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
         <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="basis-full" />
       </footer>
 
+      <NajitPodnik open={najit.open} skenovatHned={najit.hned} jeObal={jeObal} onClose={() => setNajit({ open: false, hned: false })} />
+
       {/* Mobilní spodní dock — stejný jazyk jako administrace. */}
       {me && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
           <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label={t('Spodní navigace')}>
             {([
               { href: '/client', label: t('Podniky'), icon: 'location', on: path === '/client' || (!!path?.startsWith('/client/') && !path.startsWith('/client/me')) },
+              null,
               { href: '/client/me', label: t('Moje'), icon: 'card', on: !!path?.startsWith('/client/me') },
-            ] as const).map(i => (
+            ] as const).map(i => i === null ? (
+              // Uprostřed doku, kde je palec: sken QR na stole (v aplikaci rovnou nativní skener).
+              <button key="najit" type="button" onClick={otevriNajit} title={popisNajit}
+                className="flex flex-col items-center gap-1 rounded-2xl px-5 py-1.5 text-[#16181A] transition duration-200">
+                <span className="grid h-[30px] w-[30px] place-items-center rounded-full bg-[#C8F542] on-accent -mt-0.5" aria-hidden><Icon name="camera" size={18} strokeWidth={1.9} /></span>
+                <span className="text-[11px] leading-none font-medium">{popisNajit}</span>
+              </button>
+            ) : (
               <Link key={i.href} href={i.href} title={i.label}
                 className={`flex flex-col items-center gap-1 rounded-2xl px-6 py-1.5 transition duration-200 ${i.on ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
                 <Icon key={i.on ? 'on' : 'off'} name={i.icon} size={22} strokeWidth={i.on ? 2 : 1.7} className="i-lead" motion={i.on ? 'pop' : undefined} />
