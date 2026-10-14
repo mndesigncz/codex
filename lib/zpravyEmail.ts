@@ -14,11 +14,13 @@ import { escHtml } from './email.ts';
 import { emailText } from './i18n/email.ts';
 import type { Jazyk } from './i18n/config.ts';
 
+import { podpisoveTajemstvi } from './tajemstvi.ts';
+
 export * from './zpravyKanaly.ts';
 
 // ---- Odhlášení z e-mailů -----------------------------------------------------------------
 
-const tajemstvi = () => process.env.NEXTAUTH_SECRET || 'managero';
+const tajemstvi = () => podpisoveTajemstvi();
 
 /** Podpis pro odkaz „Odhlásit se z e-mailů“: `<id uživatele>.<24 znaků HMAC>`. */
 export function tokenOdhlaseni(userId: number): string {

@@ -120,7 +120,7 @@ export const MISTO: { tema: string; dnes: string; managero: string }[] = [
 ];
 
 export const MISTO_PATA = {
-  hlavni: 'Nejsme pokladna. Managero řeší všechno kolem ní: lidi, sklad, receptury, uzávěrky a hosty. Tržby se do něj dají přenést.',
+  hlavni: 'Nejsme pokladna. Managero řeší všechno kolem ní: lidi, sklad, receptury, uzávěrky a hosty. Tržby z pokladny Storyous se načtou samy (tarif Max).',
   vedlejsi: 'Na vlastní výpočty je Excel pořád skvělý. Managero je na provoz.',
 };
 
@@ -161,10 +161,10 @@ export const JISTOTY_NADPIS = {
 };
 
 export const JISTOTY: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'archive', title: 'Data jsou tvoje', text: 'Export kdykoli: rozvrh, docházka i finance ve formátu, který účetní otevře. Nic se nemaže ani po konci předplatného.' },
+  { icon: 'archive', title: 'Data jsou tvoje', text: 'Rozvrh, docházku i finance stáhneš v CSV, které účetní otevře (tarif Pro a Max). Po konci předplatného data nemažeme.' },
   { icon: 'lock', title: 'Každý vidí jen své', text: 'Vlastník, manažer, brigádník. Kdo nemá vidět mzdy, ten je neuvidí, ani omylem přes odkaz.' },
   { icon: 'key', title: 'Tablet u baru bez hesel', text: 'Klepnutí na jméno místo přihlašování. Sdílený tablet nemá komu vyzradit heslo, když žádné nemá.' },
-  { icon: 'warning', title: 'Výpadek wifi nelže', text: 'Aplikace řekne, co neprošlo, rozepsané nezahodí a po návratu spojení to dopíše. Starý stav nevydává za nový.' },
+  { icon: 'warning', title: 'Výpadek wifi nelže', text: 'Aplikace řekne, co neprošlo, a rozepsané nezahodí. Tablet u baru zapíše příchody i bez internetu. Starý stav nevydává za nový.' },
   { icon: 'coins', title: 'Koruny, eura i zloté', text: 'Měnu podniku si zvolíš a menu, uzávěrky i přehledy počítají v ní. Host vidí ceny v měně podniku.' },
   { icon: 'check', title: 'Nic se nezapomene', text: 'Dokud nejsou hotové povinné věci, uzávěrka zůstane zamčená. Nikdo ji neodešle napůl.' },
 ];
@@ -204,7 +204,7 @@ export const FAQ: { q: string; a: string }[] = [
   { q: 'Máme ceny v eurech.', a: 'Měnu podniku si zvolíš a všechno (menu, uzávěrky, přehledy) počítá v ní. Host vidí ceny v měně podniku.' },
   { q: 'Co se stane po zkušební době?', a: 'Předplatné se samo spustí, nebo ho zrušíš a zůstaneš na tarifu Zdarma s menším týmem. Data zůstávají tvoje, nic nemizí.' },
   { q: 'Máme víc poboček.', a: 'Každá pobočka má vlastní rozvrh, sklad i uzávěrky a vedení vidí všechny pohromadě. Člověk může patřit do víc poboček a přepíná se mezi nimi.' },
-  { q: 'Nahradí to pokladnu?', a: 'Ne a nechce. Managero řeší provoz kolem pokladny: lidi, sklad, receptury, uzávěrky a hosty. Tržby se do něj dají přenést, samotné účtování zůstává na pokladně.' },
+  { q: 'Nahradí to pokladnu?', a: 'Ne a nechce. Managero řeší provoz kolem pokladny: lidi, sklad, receptury, uzávěrky a hosty. Tržby z pokladny Storyous se načtou samy (tarif Max), samotné účtování zůstává na pokladně.' },
   { q: 'Kolik to zabere času na začátku?', a: 'Podnik založíš za pár minut a tým se připojí kódem. Sklad a receptury můžeš doplňovat postupně, rozvrh a docházka fungují hned.' },
   { q: 'Co když to týmu nesedne?', a: 'Zrušíš předplatné, data si vyexportuješ a víc nic neřešíš. Žádná výpovědní lhůta a žádný telefonát, kde tě budou přemlouvat.' },
 ];
