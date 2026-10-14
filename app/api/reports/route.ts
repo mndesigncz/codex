@@ -11,6 +11,7 @@ import { notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { hit } from '@/lib/rateLimit';
 import { platneNahlaseni, opisObsahu, nazevDuvodu } from '@/lib/moderace';
+import { eskalujNahlaseni } from '@/lib/moderaceDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,8 @@ export async function POST(request: Request) {
         });
       }
     } catch { /* upozornění je best-effort */ }
+    // Provozovatel platformy se dozví taky (slib vyřízení do 24 hodin); selhání nic nezastaví.
+    await eskalujNahlaseni({ id: Number(r.id), teamId, druh: v.kind, duvod: v.reason });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('nahlášení selhalo', e);
