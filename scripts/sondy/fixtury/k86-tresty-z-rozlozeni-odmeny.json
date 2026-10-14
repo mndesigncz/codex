@@ -1,0 +1,16 @@
+{
+ "stranka": "zamestnanec.odmeny",
+ "polozky": [
+  { "id": "nastroj", "widget": "nastroj", "velikost": "L" },
+  { "id": "moje-smeny-tresty", "widget": "moje-smeny.tresty", "velikost": "L" },
+  { "id": "moje-odkud-body", "widget": "moje.odkud_body", "velikost": "M" }
+ ],
+ "dostupne": ["moje-smeny.tresty", "moje.odkud_body", "odkaz"],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

@@ -179,27 +179,42 @@ export function DetailTrestu({ trest, onClose, vsechny = [], nahled = false }: {
             {zruseno && (
               <p className="note note-info text-pretty" data-zruseno>
                 {tr.cancelNote ? t('Zrušeno: {poznamka}', { poznamka: tr.cancelNote }) : t('Zrušeno bez poznámky.')}
-                {tr.cancelledByName ? ` · ${tr.cancelledByName}` : ''}
+                {tr.cancelledByName && <span className="block mt-0.5 opacity-80">{t('Zrušil(a) {jmeno}', { jmeno: tr.cancelledByName })}</span>}
               </p>
             )}
 
-            <ul className="list" data-udaje-trestu>
-              {tr.givenByName && <ListRow title={t('Dal(a)')} right={<span className="text-sm text-black/70 truncate">{tr.givenByName}</span>} />}
+            {/* Údaje: štítek vlevo, hodnota vpravo (na telefonu se hodnota zalomí, štítek zůstane). */}
+            <dl className="space-y-2 text-sm" data-udaje-trestu>
+              {tr.givenByName && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-black/60 shrink-0">{t('Dal(a)')}</dt>
+                  <dd className="min-w-0 text-right font-medium break-words">{tr.givenByName}</dd>
+                </div>
+              )}
               {tr.typeTitle && (
-                <ListRow title={t('Položka sazebníku')}
-                  right={<span className="text-sm text-black/70 text-right whitespace-normal">{tr.typeTitle}{poradi != null && poradi >= 2 ? <> · <span className="tabular-nums" data-poradi>{t('{n}. v tomto měsíci', { n: poradi })}</span></> : null}</span>} />
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-black/60 shrink-0">{t('Položka sazebníku')}</dt>
+                  <dd className="min-w-0 text-right font-medium break-words">
+                    {tr.typeTitle}
+                    {poradi != null && poradi >= 2 && <span className="block t-meta tabular-nums" data-poradi>{t('{n}. v tomto měsíci', { n: poradi })}</span>}
+                  </dd>
+                </div>
               )}
-              {tr.shiftId != null && (
-                nav.smiPohled('my-shifts') && !nahled
-                  ? <ListRow title={t('Směna')} meta={denDlouze(tr.day)} onClick={() => jdi('my-shifts')} />
-                  : <ListRow title={t('Směna')} meta={denDlouze(tr.day)} />
-              )}
-              {tr.closingId != null && (
-                nav.smiPohled('closing') && !nahled
-                  ? <ListRow title={t('Uzávěrka')} meta={denDlouze(tr.day)} onClick={() => jdi('closing')} />
-                  : <ListRow title={t('Uzávěrka')} meta={denDlouze(tr.day)} />
-              )}
-            </ul>
+            </dl>
+            {(tr.shiftId != null || tr.closingId != null) && (
+              <ul className="list" data-odkazy-trestu>
+                {tr.shiftId != null && (
+                  nav.smiPohled('my-shifts') && !nahled
+                    ? <ListRow title={t('Směna')} meta={<span className="cz-sentence inline-block">{denDlouze(tr.day)}</span>} onClick={() => jdi('my-shifts')} />
+                    : <ListRow title={t('Směna')} meta={<span className="cz-sentence inline-block">{denDlouze(tr.day)}</span>} />
+                )}
+                {tr.closingId != null && (
+                  nav.smiPohled('closing') && !nahled
+                    ? <ListRow title={t('Uzávěrka')} meta={<span className="cz-sentence inline-block">{denDlouze(tr.day)}</span>} onClick={() => jdi('closing')} />
+                    : <ListRow title={t('Uzávěrka')} meta={<span className="cz-sentence inline-block">{denDlouze(tr.day)}</span>} />
+                )}
+              </ul>
+            )}
 
             {tr.photoUrl && (
               <a href={tr.photoUrl} target="_blank" rel="noreferrer" className="block w-fit rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]" aria-label={t('Otevřít fotku')}>
