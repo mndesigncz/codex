@@ -1,0 +1,32 @@
+{
+ "stranka": "zamestnanec.domu",
+ "polozky": [
+  {
+   "id": "ukoly-za-body",
+   "widget": "ukoly.za_body",
+   "velikost": "M"
+  },
+  {
+   "id": "za-body-male",
+   "widget": "ukoly.za_body",
+   "velikost": "S"
+  },
+  {
+   "id": "moje-smeny-navic",
+   "widget": "moje-smeny.navic",
+   "velikost": "M"
+  }
+ ],
+ "dostupne": [
+  "ukoly.za_body",
+  "moje-smeny.navic",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

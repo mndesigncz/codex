@@ -7,10 +7,10 @@ import { jeClenem } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import {
-  jeStavNavic, limitNabidkyVycerpan, nabidkaPlatna, normalizujBody, normalizujPoznamku, normalizujPremii, posunDni, uznaniPlatne, validujZapis,
+  jeStavNavic, limitNabidkyVycerpan, nabidkaPlatna, normalizujBody, terminNabidky, urcenoPro, normalizujPoznamku, normalizujPremii, posunDni, uznaniPlatne, validujZapis,
 } from '@/lib/navic';
 import { menaPodniku } from '@/lib/menaPodniku';
-import { nactiNavic, oznamRozhodnuti, oznamUznavajicim, predMigraci, tvarNabidky, tvarNavic, zalozOdmenu } from './_spolecne';
+import { kdoJednaNavic, nactiNavic, obsazenostTerminu, oznamRozhodnuti, oznamUznavajicim, predMigraci, tvarNabidky, tvarNavic, zaborHotovo, zalozOdmenu } from './_spolecne';
 
 // „Navíc" (kolo 9, N1): co člověk na směně udělal nad rámec povinností.
 //
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   if (!smiZapsat && !smiTym) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
   const q = req.nextUrl.searchParams;
   const ucet = typNaUcet(c.role.typ);
-  const actingId = await resolveActingUser(c.meId, ucet, c.teamId, q.get('actingAs'), req);
+  const actingId = await kdoJednaNavic(c, q.get('actingAs'), req);
   const scope = q.get('scope') === 'team' && smiTym ? 'team' : 'mine';
   const stav = q.get('status');
   if (stav && !jeStavNavic(stav)) return chyba('Neznámý stav.', 400);
@@ -79,10 +79,12 @@ export async function GET(req: NextRequest) {
       ORDER BY (w.status = 'ceka') DESC, w.created_at DESC
       LIMIT ${MAX_RADKU}`;
     const nabidkaRows = await sql`
-      SELECT id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, created_at
+      SELECT id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, recurrence, rec_days, rec_interval, capacity, require_photo, target_users, created_at
       FROM extra_offers WHERE team_id = ${c.teamId} AND archived_at IS NULL AND active = TRUE
       ORDER BY points DESC, title ASC`;
-    const nabidka = nabidkaRows.map(tvarNabidky).filter(n => nabidkaPlatna(n, dnes));
+    // Jen co se dá dnes vzít a je určené tomu, čí zápisy se čtou (na tabletu vybraný člověk).
+    const komu = userId ?? actingId;
+    const nabidka = nabidkaRows.map(tvarNabidky).filter(n => terminNabidky(n, dnes) != null && urcenoPro(n, komu));
     return NextResponse.json({ items: rows.map(tvarNavic), nabidka, smi: { uznat: smiUznat, nabidka: smiNabidku, tym: smiTym, zapsat: smiZapsat } });
   } catch (e) {
     // Před migrací: prázdný seznam, ne 500 — widgety ukážou prázdný stav.
@@ -103,21 +105,8 @@ export async function POST(req: NextRequest) {
   let b: any;
   try { b = await req.json(); } catch { return chyba('Neplatný požadavek.', 400); }
   const ucet = typNaUcet(c.role.typ);
-  let actingId = await resolveActingUser(c.meId, ucet, c.teamId, b?.actingAs, req);
-  // Tablet hned po odchodu: resolveActingUser bere jen odpíchnuté, ale navíc se
-  // píše až po odchodu. Kdo z tohoto podniku odešel za poslední 3 hodiny, smí.
-  const chceZa = Number(b?.actingAs);
-  if (ucet === 'kiosk' && actingId === c.meId && Number.isInteger(chceZa) && chceZa > 0 && chceZa !== c.meId
-    && c.teamId && await jeUcetTabletu(c.meId, c.teamId) && await jeClenem(chceZa, c.teamId)) {
-    try {
-      const [r] = await sql`
-        SELECT 1 AS ok FROM time_entries
-        WHERE employee_id = ${chceZa} AND (team_id = ${c.teamId} OR team_id IS NULL)
-          AND clock_out IS NOT NULL AND clock_out >= NOW() - INTERVAL '3 hours'
-        LIMIT 1`;
-      if (r) actingId = chceZa;
-    } catch { /* bez docházky zůstane tablet sám za sebe */ }
-  }
+  // Tablet: odpíchnutý, nebo kdo odešel za poslední 3 hodiny (kdoJednaNavic).
+  const actingId = await kdoJednaNavic(c, b?.actingAs, req);
   // Za koho se zapisuje: sám za sebe (i tablet za vybraného), nebo vedení za člena.
   const cilovy = Number.isInteger(Number(b?.userId)) && Number(b.userId) > 0 ? Number(b.userId) : actingId;
   if (cilovy !== actingId && !smiUznat) return chyba('Zapsat navíc za jiného člověka smí jen ten, kdo navíc uznává.', 403);
@@ -142,17 +131,31 @@ export async function POST(req: NextRequest) {
   }
   // Nabídka: platná položka, limit za den, body a případné automatické uznání z ní.
   let nabidka: ReturnType<typeof tvarNabidky> | null = null;
+  let termin: string | null = null;
   if (z.offerId) {
     try {
-      const [o] = await sql`SELECT id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, created_at
+      const [o] = await sql`SELECT id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, recurrence, rec_days, rec_interval, capacity, require_photo, target_users, created_at
         FROM extra_offers WHERE id = ${z.offerId} AND team_id = ${c.teamId} AND archived_at IS NULL`;
       if (!o) return chyba('Položka nabídky už neexistuje.', 404);
       nabidka = tvarNabidky(o);
       if (!nabidkaPlatna(nabidka, dnes)) return chyba('Tahle položka nabídky teď neplatí.', 400);
-      const dnesni = await sql`SELECT offer_id, status FROM extra_work WHERE team_id = ${c.teamId} AND user_id = ${cilovy} AND day = ${z.day}`;
-      if (limitNabidkyVycerpan(nabidka, dnesni.map(r => ({ offerId: Number(r.offer_id), status: String(r.status) as any })))) {
-        return chyba(`Tohle už máš dnes zapsané (limit ${nabidka.maxPerDay}× za den).`, 409);
+      // Kolo 11: volitelný úkol — termín podle dne zápisu, komu je určený, limit na člověka a kapacita v termínu.
+      termin = terminNabidky(nabidka, z.day);
+      if (!termin) return chyba('Tenhle úkol se ten den dělat nedá.', 400);
+      if (!urcenoPro(nabidka, cilovy) && !smiUznat) return chyba('Tenhle úkol je určený jiným lidem.', 403);
+      const obs = await obsazenostTerminu(c.teamId, nabidka, termin);
+      const moje = (obs.zapisy.get(cilovy) ?? []).map(x => ({ offerId: nabidka!.id, status: x.status }));
+      if (limitNabidkyVycerpan(nabidka, moje)) {
+        return chyba(nabidka.recurrence === 'kdykoli' || nabidka.recurrence === 'denne' || nabidka.recurrence === 'dny' || nabidka.recurrence === 'interval'
+          ? `Tohle už máš dnes zapsané (limit ${nabidka.maxPerDay}× za den).`
+          : `Tohle už máš v tomhle termínu zapsané (limit ${nabidka.maxPerDay}×).`, 409);
       }
+      const mamZabor = obs.zabory.has(cilovy) || moje.some(x => x.status !== 'odmitnuto');
+      if (nabidka.capacity != null && !mamZabor && obs.obsazeno >= nabidka.capacity) {
+        const kdo = [...obs.zabory.keys(), ...obs.zapisy.keys()].filter((v, i, a) => a.indexOf(v) === i && v !== cilovy).map(id => obs.jmena.get(id)).filter(Boolean).slice(0, 3).join(', ');
+        return chyba(kdo ? `Úkol už je obsazený (${kdo}).` : 'Úkol už je obsazený.', 409);
+      }
+      if (nabidka.requirePhoto && !z.photoUrl && !(b?.uznat && smiUznat)) return chyba('K tomuhle úkolu je potřeba fotka.', 400);
     } catch (e) {
       if (predMigraci(e)) return chyba('Nabídka navíc ještě není připravená — spusť /api/init.', 503);
       throw e;
@@ -183,6 +186,7 @@ export async function POST(req: NextRequest) {
         ${uznat?.kym ?? null}, ${uznat ? new Date().toISOString() : null}, ${uznat?.note ?? null})
       RETURNING id`;
     const id = Number(row.id);
+    if (nabidka && termin) await zaborHotovo(c.teamId, nabidka.id, termin, cilovy, id);
     if (uznat) {
       const odmena = await zalozOdmenu({ teamId: c.teamId, userId: cilovy, points: uznat.points, bonusCzk: uznat.bonusCzk, reason: z.text, day: z.day, givenBy: uznat.kym, navicId: id });
       await sql`UPDATE extra_work SET award_id = ${odmena.awardId}, adjustment_id = ${odmena.adjustmentId} WHERE id = ${id}`;

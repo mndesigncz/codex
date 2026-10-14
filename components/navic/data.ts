@@ -11,16 +11,33 @@
 
 import { useEffect } from 'react';
 import { obnovDataWidgetu, useDataWidgetu, type StavDat } from '../widgety/useDataWidgetu';
-import { UDALOST_NAVIC, vyberDataNavic, type DataNavic } from '@/lib/navic';
+import { UDALOST_NAVIC, vyberDataNavic, vyberUkoly, type DataNavic, type UkolNavic } from '@/lib/navic';
 
 const POUZITE = new Set<string>();
 
-export { urlNavicMine, sloucZapis } from './logika';
+export { urlNavicMine, sloucZapis, urlUkolyZaBody } from './logika';
 
 /** useDataWidgetu nad /api/navic, která se po každé změně obnoví sama (obnovNavic / UDALOST_NAVIC). */
 export function useDataNavic(url: string | null): StavDat<DataNavic> {
   if (url) POUZITE.add(url);
   const data = useDataWidgetu<DataNavic>(url, vyberDataNavic);
+  useEffect(() => {
+    if (!url) return;
+    const obnov = () => obnovDataWidgetu(url);
+    window.addEventListener(UDALOST_NAVIC, obnov);
+    return () => window.removeEventListener(UDALOST_NAVIC, obnov);
+  }, [url]);
+  return data;
+}
+
+/**
+ * Dnešní úkoly za body (GET /api/navic/ukoly, kolo 11): widget, sekce v Úkolech, odznak
+ * v navigaci, okno Zapsat navíc i tablet čtou tutéž adresu — jeden dotaz na obrazovku.
+ * Obnovuje se s každou změnou navíc (zápis splní zábor, „Beru si" mění obsazenost).
+ */
+export function useUkolyZaBody(url: string | null): StavDat<UkolNavic[]> {
+  if (url) POUZITE.add(url);
+  const data = useDataWidgetu<UkolNavic[]>(url, vyberUkoly);
   useEffect(() => {
     if (!url) return;
     const obnov = () => obnovDataWidgetu(url);

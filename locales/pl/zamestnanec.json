@@ -442,5 +442,9 @@
   "Žádost se nepodařilo odeslat. Zkus to prosím znovu.": "Nie udało się wysłać wniosku. Spróbuj jeszcze raz.",
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Nie udało się anulować wniosku — spróbuj jeszcze raz.",
   "Žádosti se nenačetly.": "Nie udało się wczytać wniosków.",
-  "„{nazev}\" má termín {den}.": "„{nazev}” ma termin {den}."
+  "„{nazev}\" má termín {den}.": "„{nazev}” ma termin {den}.",
+  "Dnes tu nic za body není — zapsat můžeš i vlastní věc navíc.": "Dziś nie ma nic za punkty — możesz zapisać też coś własnego ekstra.",
+  "Volitelné — kdo chce, vezme si. Body dostaneš po uznání.": "Dobrowolne — kto chce, ten bierze. Punkty dostaniesz po uznaniu.",
+  "Za body navíc": "Ekstra za punkty",
+  "Zapsat navíc": "Zapisz ekstra"
 }

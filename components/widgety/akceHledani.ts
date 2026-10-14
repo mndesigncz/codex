@@ -33,6 +33,9 @@ export const AKCE_HLEDANI: AkceHledani[] = [
   { id: 'ukoly-dnes', nazev: 'Úkoly na dnes', kde: 'Úkoly', ikona: 'check', slova: ['dnešní', 'co mám dělat'], stranka: 'tasks', arg: 'stav:dnes', rozhrani: VZ },
   { id: 'ukoly-tyden', nazev: 'Úkoly v týdnu', kde: 'Úkoly', ikona: 'calendar', slova: ['týdenní', 'plán týdne'], stranka: 'tasks', arg: 'pohled:week', rozhrani: VZ },
   { id: 'ukoly-prehled', nazev: 'Přehled plnění úkolů', kde: 'Úkoly', ikona: 'trend', slova: ['statistika', 'graf', 'výkon', 'kdo plní'], stranka: 'tasks', arg: 'pohled:prehled', rozhrani: V },
+  // Kolo 11: volitelné úkoly za body — vedení v Úkolech › Za body (správa a dnešek), zaměstnanec v Úkolech › Za body navíc.
+  { id: 'ukoly-za-body', nazev: 'Úkoly za body', kde: 'Úkoly', ikona: 'tag', slova: ['volitelné', 'volitelné úkoly', 'za body', 'extra body', 'bonusové úkoly', 'nabídka navíc', 'beru si'], stranka: 'tasks', arg: 'za-body', rozhrani: VZ },
+  { id: 'ukoly-za-body-novy', nazev: 'Nový úkol za body', kde: 'Úkoly', ikona: 'tag', slova: ['vypsat úkol', 'volitelný úkol', 'za body', 'extra body', 'bonusový úkol', 'nabídka navíc', 'opakování'], stranka: 'tasks', arg: 'za-body:novy', rozhrani: V },
   // Sklad
   { id: 'sklad-dochazi', nazev: 'Co dochází ve skladu', kde: 'Sklad', ikona: 'box', slova: ['zásoby', 'málo', 'kriticky', 'objednat', 'nákup'], stranka: 'inventory', arg: 'stav:dochazi', rozhrani: V },
   { id: 'sklad-nakup', nazev: 'Nákupní seznam', kde: 'Sklad', ikona: 'cart', slova: ['objednávka', 'nakoupit', 'dodavatel'], stranka: 'inventory', arg: 'stav:dochazi', rozhrani: V },

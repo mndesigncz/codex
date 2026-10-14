@@ -37,6 +37,7 @@ export const STRANKA: DefiniceStranky = {
     'vyroba.k_vyrobe',
     'sklad.dochazi',
     'ukoly.dnes',
+    'ukoly.za_body',
     'odmeny.zebricek',
     'menu.vyprodano',
     // Týdenní rozpis týmu (kolo 7) — jen doporučený, ne výchozí: viz katalog rozvrh.tym_nahled.
@@ -47,6 +48,8 @@ export const STRANKA: DefiniceStranky = {
       { w: 'oznameni.nastenka', s: 'L' },
       { w: 'nastroj' },
       { w: 'klient.objednavky_od_stolu', s: 'M' },
+      // Kolo 11 (balík Z): úkoly za body toho, kdo u tabletu stojí (bez vybraného se zeptá „Kdo jsi?").
+      { w: 'ukoly.za_body', s: 'M' },
       { w: 'postupy.povinne_dnes', s: 'M' },
       { w: 'uzaverky.predavka', s: 'L' },
       { w: 'rozvrh.dnesni_smeny', s: 'M' },

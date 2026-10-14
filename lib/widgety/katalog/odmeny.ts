@@ -2,7 +2,7 @@
 //
 // Komponenty jsou v components/widgety/oblasti/odmeny.tsx, výpočty v lib/odmenyPrehled.ts.
 // Soubor patří balíku B7; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
-// Kolo 69 (B7): všech dvanáct widgetů je hotových. Kolo 9 (N1, balík V): Navíc v týmu (odmeny.navic_tymu). Kolo 10 (balík V): Tresty v týmu (odmeny.tresty_tymu). Triviální backend katalogu (vlastní body,
+// Kolo 69 (B7): všech dvanáct widgetů je hotových. Kolo 9 (N1, balík V): Navíc v týmu (odmeny.navic_tymu). Kolo 10 (balík V): Tresty v týmu (odmeny.tresty_tymu). Kolo 11 (balík V): Úkoly za body dnes (odmeny.za_body_tymu). Triviální backend katalogu (vlastní body,
 // úroveň a hodnocení i pro toho, kdo má žebříček — nález N12) je v app/api/rewards/route.ts;
 // Výtky v týmu tam navíc dostaly `flaggedUnseen` (kolik výtek člověk ještě nepotvrdil).
 import type { DefiniceWidgetu } from '../typy.ts';
@@ -179,6 +179,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // staršího měsíce. Jen s navic.zobrazit_tym; rozhodovat a zapisovat za člena jen s navic.uznat.
   {
     id: 'odmeny.navic_tymu',
+    // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).
+    pridano: '2026-10-14',
     oblast: 'odmeny',
     nazev: 'Navíc v týmu',
     popis: 'Co kdo udělal nad rámec povinností — čekající k uznání s body nebo prémií, uznané a odmítnuté za měsíc.',
@@ -211,6 +213,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // Ikona ne `warning`: tu má na Odměnách už Výtky v týmu (AK-19, ikona se ve výchozím rozložení neopakuje).
   {
     id: 'odmeny.tresty_tymu',
+    // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).
+    pridano: '2026-10-14',
     oblast: 'odmeny',
     nazev: 'Tresty v týmu',
     popis: 'Co kdo pokazil a co za to dostal — body dolů, krácení prémie nebo napomenutí; nesouhlasy k vyřízení a návrhy z docházky, uzávěrek a hodnocení.',
@@ -233,6 +237,29 @@ export const WIDGETY: DefiniceWidgetu[] = [
     rychlyFiltr: 'obdobi',
     kostra: { M: 'seznam', L: 'seznam' },
     cil: { pohled: 'rewards', arg: 'tresty' },
+    stav: 'hotovo',
+  },
+  // Data: GET /api/navic/ukoly?scope=team → ukoly[{nabidka, termin, obsazeno, stav, kdo[{userId,name,stav}]}], den, smi;
+  // GET /api/navic?scope=team&status=ceka → items[] (čekající zápisy; widget bere jen ty z úkolů za body, offerId)
+  // Kolo 11 (balík V): „Úkoly za body dnes" — volitelné úkoly, které jde dnes vzít: kdo si co vzal a kdo co splnil,
+  // kolik míst zbývá, čekající zápisy z nich s Uznat / Odmítnout, „Nový úkol za body". Ikona `tag` (cenovka v bodech):
+  // `star` má na Odměnách i Přehledu Navíc v týmu (AK-19, ikona se ve výchozím rozložení neopakuje).
+  {
+    id: 'odmeny.za_body_tymu',
+    // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).
+    pridano: '2026-10-14',
+    oblast: 'odmeny',
+    nazev: 'Úkoly za body dnes',
+    popis: 'Volitelné úkoly s body na dnešek — kdo si co vzal, kdo co splnil, kolik míst zbývá a co čeká na uznání.',
+    ikona: 'tag',
+    velikosti: ['M', 'L'],
+    vychoziVelikost: 'L',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.ukoly', 'vedeni.odmeny', 'vedeni.prehled'],
+    opravneni: { vse: ['navic.zobrazit_tym'], nektere: [], pole: { 'akce:uznat': 'navic.uznat', 'akce:novy': 'navic.nabidka' } },
+    tarif: 'pro',
+    kostra: { M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'tasks', arg: 'za-body' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → standings[{name,avatar,flagged,flaggedUnseen}] (flaggedUnseen od kola 69)

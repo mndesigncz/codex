@@ -82,6 +82,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // zaměstnance ve výchozím rozložení není (AK-19).
   {
     id: 'moje-smeny.navic',
+    // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).
+    pridano: '2026-10-14',
     oblast: 'moje-smeny',
     nazev: 'Navíc',
     popis: 'Co jsi udělal(a) nad rámec směny — zápisy, uznané body a nabídka „Co se dá udělat navíc".',
@@ -112,6 +114,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // Malá karta na Přehledu (Domů) se bez nepotvrzeného trestu v klidu nekreslí (prazdno={null}).
   {
     id: 'moje-smeny.tresty',
+    // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).
+    pridano: '2026-10-14',
     oblast: 'moje-smeny',
     nazev: 'Moje tresty',
     popis: 'Co ti vedení vytklo, co za to bylo a co ještě čeká na tvé potvrzení.',

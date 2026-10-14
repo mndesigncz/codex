@@ -14,6 +14,12 @@
 // a aria-label, štítky úkolu Chip, odkaz na návod ghost tlačítko a „Zobrazit další
 // úkoly" bez šipky v textu. Tlačítka Upravit a Smazat se ukážou, jen když je server
 // pustí (autor, ukoly.upravit, ukoly.mazat) — dřív klik skončil tichým návratem.
+//
+// Kolo 11 (balík V): část „Za body" vedle Seznamu / Týdne / Měsíce / Přehledu — volitelné úkoly
+// za body (nabídka navíc s opakováním) se správou a dneškem: kdo co vzal a splnil, kolik míst zbývá,
+// co čeká na uznání. Vedení je hledá tady. Otevírá ji `arg` „za-body" (oznámení, hledání, widget
+// Úkoly za body dnes), „za-body:novy" rovnou s oknem nového úkolu. V okně běžného „Nový úkol" je
+// volba „Volitelný — kdo chce, za body": otevře okno úkolu za body s předaným názvem a popisem.
 
 import { useState, useEffect, useMemo, useCallback, useId, useRef } from 'react';
 import { Icon } from '../Icons';
@@ -45,6 +51,9 @@ import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtHM } from '@/lib/i18n/format';
 import { sUzlem, VLOZ } from './jazyk';
+import { SpravaNabidky } from '../navic-vedeni/SpravaNabidky';
+import { NabidkaNavicOkno } from '../navic-vedeni/NabidkaNavicOkno';
+import { rozborArgZaBody } from '../navic-vedeni/zaBody';
 import { useLocale } from './jazyk';
 
 interface Member { id: number; name: string; role: string }
@@ -94,7 +103,12 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const who = filtr.kdo;
   const setWho = useCallback((kdo: FiltrUkolu['kdo'] | ((w: FiltrUkolu['kdo']) => FiltrUkolu['kdo'])) =>
     setFiltr(f => ({ ...f, kdo: typeof kdo === 'function' ? kdo(f.kdo) : kdo })), []);
-  const [view, setView] = useState<'list' | 'week' | 'month' | 'prehled'>('list');
+  const [view, setView] = useState<'list' | 'week' | 'month' | 'prehled' | 'zabody'>('list');
+  // Kolo 11: část Za body jen s právem vidět navíc týmu nebo spravovat nabídku (server /api/navic/offers totéž).
+  const vidiZaBody = smi(['navic.zobrazit_tym', 'navic.nabidka']);
+  const smiZaBody = smi('navic.nabidka');
+  // Okno „Nový úkol za body": z hlavičky, z části, z hledání (`za-body:novy`) a z běžného formuláře (s názvem).
+  const [zaBodyOkno, setZaBodyOkno] = useState<{ nazev?: string; popis?: string; zFormulare?: boolean } | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Form>(emptyForm());
@@ -143,6 +157,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   // Předání z widgetu (Po termínu → rovnou záložka Po termínu): po přechodu z uloženého, na otevřené stránce z události.
   useEffect(() => {
     const pouzij = (arg: string | null) => {
+      // Kolo 11: „za-body" (oznámení, hledání, widget) otevře část Za body, „za-body:novy" i okno nového úkolu.
+      const zb = rozborArgZaBody(arg);
+      if (zb) { setView('zabody'); if (zb.novy) setZaBodyOkno({}); return; }
       const r = rozborPredani(arg);
       if (r.stav) { setFiltr(f => ({ ...f, stav: r.stav! })); setView('list'); }
       if (r.ukolId != null) { setView('list'); setFiltr(VYCHOZI_FILTR); setDetailId(r.ukolId); }
@@ -453,14 +470,14 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       {view === 'list' && !showForm && <RychlePridani dnes={today} onPridat={rychle} />}
 
       {/* Na telefonu je souhrn dne v podtitulku hlavičky (V11) — tady by byl další řádek nad prvním úkolem. */}
-      {tasks.length > 0 && view !== 'prehled' && (
+      {tasks.length > 0 && view !== 'prehled' && view !== 'zabody' && (
         <div className="max-md:hidden">
           <UkolySouhrn hotovo={hodnotyKarty.dnesHotovo} celkem={hodnotyKarty.dnesCelkem} poTerminu={hodnotyKarty.poTerminu}
             onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />
         </div>
       )}
 
-      {tasks.length > 0 && view !== 'prehled' && (
+      {tasks.length > 0 && view !== 'prehled' && view !== 'zabody' && (
         <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'} lide={lideFiltru} />
       )}
 
@@ -474,6 +491,15 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <Field id={fid('popis')} label={t('Popis')} hint={t('Nepovinné.')}>
             <Textarea id={fid('popis')} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
           </Field>
+          {/* Kolo 11: úkol, který nikomu nezadáváš — kdo chce, vezme si ho a dostane body (okno úkolu za body s názvem). */}
+          {smiZaBody && !editingId && (
+            <ul className="list" data-volba-za-body>
+              <SwitchRow title={<span className="inline-flex items-center gap-1.5"><Icon name="tag" size={15} className="shrink-0 text-black/55" />{t('Volitelný — kdo chce, za body')}</span>}
+                hint={t('Nikomu se nezadá: lidé si ho vezmou sami („Beru si") a za splnění dostanou body. Opakování a kolik lidí nastavíš v dalším kroku.')}
+                checked={!!zaBodyOkno?.zFormulare}
+                onChange={v => setZaBodyOkno(v ? { nazev: form.title, popis: form.description, zFormulare: true } : null)} />
+            </ul>
+          )}
           {vyberVic ? (
             // Kolo 7: jeden úkol víc lidem. „Kdokoli" je výlučná; lidi se zapínají a vypínají.
             // Do deseti lidí pás pilulek (na telefonu jede do strany uvnitř sebe), nad deset
@@ -591,7 +617,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
       {akceChyba && <p className="note note-danger text-sm" role="alert">{akceChyba}</p>}
 
-      {data.error && !data.data ? (
+      {view === 'zabody' ? (
+        <SpravaNabidky dnesni onNovy={smiZaBody ? () => setZaBodyOkno({}) : undefined} />
+      ) : data.error && !data.data ? (
         <Card><ErrorState title={t('Úkoly se nenačetly')} onRetry={data.reload} detail={data.error} /></Card>
       ) : data.loading ? (
         <Card aria-busy className="space-y-2">
@@ -657,7 +685,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         stranka="vedeni.ukoly"
         hlavicka={{
           title: t('Úkoly'),
-          subtitle: data.data && tasks.length > 0 && view !== 'prehled' && souhrnDne
+          subtitle: view === 'zabody' ? t('Volitelné úkoly — kdo chce, vezme si je a dostane body.')
+            : data.data && tasks.length > 0 && view !== 'prehled' && souhrnDne
             ? <><span className="md:hidden">{souhrnDne}</span><span className="max-md:hidden">{podtitul}</span></>
             : podtitul,
           hintId: 'taskmanager',
@@ -665,9 +694,13 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           // Na telefonu jedna cesta k přidání: rychlé pole „Přidat úkol…" nad seznamem. Plný formulář je
           // v „···" — hlavička bez limetky se složí do jednoho řádku a první úkol vyjede o 68 px výš.
           primaryTelefon: null,
-          menuTelefon: [{ label: t('Nový úkol'), icon: 'plus', onClick: novyUkol }],
+          menuTelefon: [
+            { label: t('Nový úkol'), icon: 'plus', onClick: novyUkol },
+            ...(smiZaBody ? [{ label: t('Nový úkol za body'), icon: 'tag', onClick: () => { setView('zabody'); setZaBodyOkno({}); } }] : []),
+          ],
           aside: <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
-            options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }, { id: 'prehled', label: t('Přehled') }]} />,
+            options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }, { id: 'prehled', label: t('Přehled') },
+              ...(vidiZaBody ? [{ id: 'zabody' as const, label: t('Za body') }] : [])]} />,
         }}
         nastroj={nastroj}
       />
@@ -703,6 +736,16 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           </>}>
           <p className="text-sm text-black/70 text-pretty"><span className="cz-sentence">{t('„{nazev}" má termín {den}.', { nazev: mimoDen.title, den: denDlouze(mimoDen.dueDate!, loc) })}</span> {t('Opravdu ho označit jako hotový už teď?')}</p>
         </Modal>
+      )}
+      {zaBodyOkno && smiZaBody && (
+        <NabidkaNavicOkno predvyplneno={{ nazev: zaBodyOkno.nazev, popis: zaBodyOkno.popis }}
+          onClose={() => setZaBodyOkno(null)}
+          onHotovo={() => {
+            // Z běžného formuláře: rozepsaný úkol se stal úkolem za body — formulář i koncept pryč, ukázat část Za body.
+            if (zaBodyOkno.zFormulare) { koncept.hotovo(); closeForm(); }
+            setView('zabody');
+            setZprava(t('Úkol za body je vypsaný — lidé si ho vezmou sami.'));
+          }} />
       )}
       {fotoUkol && <PrilozFoto nazev={fotoUkol.title} onClose={() => setFotoUkol(null)} onHotovo={url => splnitSFotkou(fotoUkol, url)} />}
       <Toast message={zprava} onClose={() => setZprava(null)} />

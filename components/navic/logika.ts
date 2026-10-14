@@ -4,7 +4,7 @@
 // adresy vlastních dat, sloučení zápisu do seznamu, počet zápisů ke směně, popisek
 // pilulky nabídky a součet prémií za „navíc" v Mém výdělku.
 
-import { URL_NAVIC, type NabidkaNavic, type Navic } from '../../lib/navic.ts';
+import { URL_NAVIC, URL_UKOLY_NAVIC, lzeVzit, type NabidkaNavic, type Navic, type StavUkoluNavic, type UkolNavic } from '../../lib/navic.ts';
 
 /** Adresa vlastních zápisů (posledních 60 dní); na tabletu za vybraného člověka, nebo za měsíc RRRR-MM. */
 export function urlNavicMine(actingAs?: number | null, mesic?: string): string {
@@ -61,3 +61,61 @@ export function predvyplnitText(text: string, nabidka: readonly Pick<NabidkaNavi
   const t = text.trim();
   return !t || nabidka.some(n => n.title === t);
 }
+
+// ---------------------------------------------------------------------------
+// Úkoly za body (kolo 11, balík Z): čistá logika seznamu „Za body navíc"
+// ---------------------------------------------------------------------------
+
+/** Argument pohledu Úkoly z oznámení a odkazů: posune na sekci „Za body navíc" a zvýrazní ji. */
+export const ARG_ZA_BODY = 'za-body';
+
+/** Adresa dnešních úkolů za body (GET /api/navic/ukoly); na tabletu za vybraného člověka. */
+export function urlUkolyZaBody(actingAs?: number | null): string {
+  return actingAs ? `${URL_UKOLY_NAVIC}?actingAs=${actingAs}` : URL_UKOLY_NAVIC;
+}
+
+/** Akce řádku podle stavu: „Beru si" (zábor), „Hotovo" (zápis s offerId), „Vrátit" (uvolnit zábor). */
+export type AkceUkolu = 'vzit' | 'hotovo' | 'vratit';
+
+/**
+ * Které akce řádek nabídne. S kapacitou se úkol nejdřív bere („Beru si"), ať ho nedělají dva —
+ * pak „Hotovo" nebo „Vrátit". Bez kapacity (kdokoli) rovnou „Hotovo". Po odchodu ze směny
+ * (tablet) už se nic nebere: jen „Hotovo" — zapsat, co člověk udělal.
+ */
+export function akceUkolu(u: Pick<UkolNavic, 'stav'> & { nabidka: Pick<NabidkaNavic, 'capacity'> }, poOdchodu = false): AkceUkolu[] {
+  const s: StavUkoluNavic = u.stav;
+  if (s === 'vzato') return poOdchodu ? ['hotovo'] : ['hotovo', 'vratit'];
+  if (!lzeVzit(s)) return [];
+  if (poOdchodu || u.nabidka.capacity == null) return ['hotovo'];
+  return ['vzit'];
+}
+
+/** Kolik úkolů si člověk dnes může vzít (volné a „zkus znovu") — odznak u Úkolů v navigaci. */
+export const pocetKVzeti = (ukoly: readonly Pick<UkolNavic, 'stav'>[]): number => ukoly.filter(u => lzeVzit(u.stav)).length;
+
+/** Souhrn malé karty: kolik je k vzetí a nejvýš kolik bodů z nich jde dnes dostat („až +60 b"). */
+export function souhrnZaBody(ukoly: readonly UkolNavic[]): { kVzeti: number; body: number; prvni: UkolNavic | null } {
+  const k = ukoly.filter(u => lzeVzit(u.stav));
+  return { kVzeti: k.length, body: k.reduce((a, u) => a + u.nabidka.points, 0), prvni: k[0] ?? null };
+}
+
+/** Volná místa v termínu („1 z 2 volné"); bez kapacity null. */
+export function volnaMista(u: Pick<UkolNavic, 'obsazeno'> & { nabidka: Pick<NabidkaNavic, 'capacity'> }): { volno: number; z: number } | null {
+  if (u.nabidka.capacity == null) return null;
+  return { volno: Math.max(0, u.nabidka.capacity - u.obsazeno), z: u.nabidka.capacity };
+}
+
+/** Kdo další úkol má (bez mě): kdo ho bere a kdo už ho udělal — jména, ať se nedělá dvakrát. */
+export function ostatni(u: Pick<UkolNavic, 'kdo' | 'stav'>, ja: number | null): { berou: string[]; hotovo: string[] } {
+  const jini = u.kdo.filter(k => k.userId !== ja && k.name);
+  return { berou: jini.filter(k => k.stav === 'vzato').map(k => k.name), hotovo: jini.filter(k => k.stav === 'hotovo').map(k => k.name) };
+}
+
+/** Úkoly, které jsou dnes plné (stav „plno") — pilulky nabídky v okně Zapsat navíc je vypnou s „Obsazeno". */
+export const obsazeneNabidky = (ukoly: readonly Pick<UkolNavic, 'stav' | 'nabidka'>[]): Set<number> => new Set(ukoly.filter(u => u.stav === 'plno').map(u => u.nabidka.id));
+
+/** Krátké jméno do chipu „Bere Eva": jen křestní (na 320 px se „Bere Eva Svobodová, Jakub Horák" nevejde). */
+export const krestni = (jmeno: string): string => jmeno.trim().split(/\s+/)[0] ?? jmeno;
+
+/** Fotka povinná a chybí → zápis se neodešle (stejné pravidlo hlídá server 400). */
+export const chybiPovinnaFotka = (n: Pick<NabidkaNavic, 'requirePhoto'> | null | undefined, fotka: string | null): boolean => !!n?.requirePhoto && !fotka;

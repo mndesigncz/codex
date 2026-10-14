@@ -109,4 +109,26 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'tasks', arg: 'stav:hotove' },
     stav: 'hotovo',
   },
+  // Data: GET /api/navic/ukoly(?actingAs=) → { ukoly: UkolNavic[] } — volitelné úkoly za body dne (nabídka navíc
+  // s opakováním a kapacitou, kolo 11); „Beru si" / „Vrátit" POST /api/navic/ukoly, „Hotovo" POST /api/navic s offerId.
+  // Komponenta components/navic/UkolyZaBodyWidget (balík Z). Pozor: vlastní úkoly — vedení vidí své, tým má widget
+  // odmeny.za_body_tymu; na tabletu úkoly toho, kdo u tabletu stojí (bez vybraného se zeptá „Kdo jsi?").
+  {
+    id: 'ukoly.za_body',
+    // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).
+    pridano: '2026-10-14',
+    oblast: 'ukoly',
+    nazev: 'Úkoly za body',
+    popis: 'Volitelné úkoly za extra body — kdo chce, vezme si, splní a zapíše.',
+    // `gift` (odměna): na Domů ani na Směně tabletu ve výchozím rozložení není (AK-19; `star` má Zpětná vazba).
+    ikona: 'gift',
+    velikosti: ['S', 'M', 'L'],
+    vychoziVelikost: 'M',
+    rozhrani: ['zamestnanec', 'vedeni', 'kiosk'],
+    stranky: ['zamestnanec.domu', 'zamestnanec.ukoly', 'zamestnanec.odmeny', 'kiosk.smena', 'vedeni.moje_smeny'],
+    opravneni: { vse: [], nektere: ['navic.zapsat'], pole: { 'akce:vzit': 'navic.zapsat' } },
+    tarif: 'zdarma',
+    kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
+    stav: 'hotovo',
+  },
 ];

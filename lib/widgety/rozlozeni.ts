@@ -330,6 +330,37 @@ export function vychoziZKodu(stranka: DefiniceStranky, d: Pick<Divak, 'typ' | 'k
   return normalizujRozlozeni(stranka, zVychozich(vychoziTypu(stranka), najdi), najdi);
 }
 
+/**
+ * Doplní do uloženého rozložení widgety, které do aplikace přibyly až po jeho
+ * uložení (`pridano` ≥ den uložení; bez data uložení se bere jako staré). Každý
+ * se vloží za svého nejbližšího předchůdce z výchozího rozložení v kódu, který
+ * v uloženém je; když žádný není, na začátek (za nástroj stránky). Widget, který
+ * v uloženém už je (i jinou instancí), se nepřidává. Kolo 11: Navíc a Tresty
+ * v podnicích s upravenou plochou nikdo neviděl.
+ */
+export function doplnNove(ulozene: readonly PolozkaRozlozeni[], kod: readonly PolozkaRozlozeni[], ulozenoDne: string | null | undefined, najdi: Najdi = widget): PolozkaRozlozeni[] {
+  const den = typeof ulozenoDne === 'string' && /^\d{4}-\d{2}-\d{2}/.test(ulozenoDne) ? ulozenoDne.slice(0, 10) : null;
+  const out = [...ulozene];
+  const ma = new Set(out.map(p => p.widget));
+  const ids = new Set(out.map(p => p.id));
+  kod.forEach((p, i) => {
+    if (ma.has(p.widget)) return;
+    const pridano = najdi(p.widget)?.pridano;
+    if (!pridano || (den && pridano < den)) return;
+    let kam = out.findIndex(x => x.widget === NASTROJ) + 1;
+    for (let j = i - 1; j >= 0; j--) {
+      const k = out.findIndex(x => x.widget === kod[j].widget);
+      if (k >= 0) { kam = k + 1; break; }
+    }
+    let id = p.id;
+    for (let n = 2; ids.has(id); n++) id = idZWidgetu(p.widget, n);
+    ids.add(id);
+    ma.add(p.widget);
+    out.splice(kam, 0, { ...p, id });
+  });
+  return out;
+}
+
 export interface VstupRozlozeni {
   stranka: DefiniceStranky;
   divak: Divak;
@@ -375,7 +406,12 @@ export function vyresRozlozeni(v: VstupRozlozeni, najdi: Najdi = widget): Vyrese
     if (stary) { zaklad = stary[2]; zdroj = 'podnik'; rozsah = stary[1]; }
     else { zaklad = vychoziZKodu(stranka, d, najdi); zdroj = 'aplikace'; rozsah = null; }
   }
-  const nefiltrovane = normalizujRozlozeni(stranka, zaklad, najdi);
+  let nefiltrovane = normalizujRozlozeni(stranka, zaklad, najdi);
+  // Uložené rozložení (osobní, výchozí podniku, starý config) dostane widgety přidané po jeho uložení.
+  if (zdroj !== 'aplikace') {
+    const ulozenoDne = zdroj === 'osobni' ? v.osobni?.upraveno : vychozi?.upraveno ?? null;
+    nefiltrovane = normalizujRozlozeni(stranka, doplnNove(nefiltrovane, vychoziZKodu(stranka, d, najdi), ulozenoDne, najdi), najdi);
+  }
   return {
     polozky: filtrujViditelne(nefiltrovane, d, najdi),
     nefiltrovane,

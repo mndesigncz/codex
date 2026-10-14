@@ -72,6 +72,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   penalties: 'ponechat',
   // sazebník trestů: autor položky zůstane anonymní, položka podniku zůstane
   penalty_types: 'ponechat',
+  // zábor volitelného úkolu (kolo 11): krátkodobý stav „beru si", s účtem jde pryč
+  extra_claims: 'smazat',
   daily_reports: 'ponechat', recipes: 'ponechat', guides: 'ponechat', procedures: 'ponechat', polls: 'ponechat',
   stocktakes: 'ponechat', share_links: 'ponechat', menu_boards: 'ponechat', roles: 'ponechat', role_upravy: 'ponechat',
   pos_bills: 'ponechat', client_broadcasts: 'ponechat', client_pravidla_verze: 'ponechat',
@@ -132,6 +134,8 @@ export const TYMOVE_TABULKY = [
   'extra_work', 'extra_offers',
   // kolo 10: tresty
   'penalties', 'penalty_types', 'penalty_dismissed',
+  // kolo 11: volitelné úkoly
+  'extra_claims',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */
 export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_audit'];

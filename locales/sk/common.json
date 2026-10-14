@@ -166,5 +166,6 @@
   "{n} z {celkem} načtených záznamů odpovídá filtru.": "{n} z {celkem} načítaných záznamov zodpovedá filtru.",
   "Organizace": "Organizácia",
   "Nastavení organizace": "Nastavenia organizácie",
-  "Sdílení mezi podniky": "Zdieľanie medzi podnikmi"
+  "Sdílení mezi podniky": "Zdieľanie medzi podnikmi",
+  "{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}": "{n, plural, one {# úloha za body na prevzatie} few {# úlohy za body na prevzatie} other {# úloh za body na prevzatie}}"
 }

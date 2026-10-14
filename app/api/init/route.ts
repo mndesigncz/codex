@@ -2940,6 +2940,34 @@ export async function GET(request: Request) {
       )`);
     // ---- konec Tresty ----
 
+    // ---- Volitelné úkoly za body (kolo 11): nabídka navíc s opakováním, kapacitou a záborem ----
+    // extra_offers: kdy se dá vzít (recurrence kdykoli | jednou | denne | dny | tydne | mesicne |
+    // interval, rec_days 1–7, rec_interval N dní od valid_from), kolik lidí v termínu (capacity),
+    // fotka povinná, komu je určená (target_users prázdné = všem).
+    await ddl(sql`ALTER TABLE extra_offers ADD COLUMN IF NOT EXISTS recurrence TEXT NOT NULL DEFAULT 'kdykoli'`);
+    await ddl(sql`ALTER TABLE extra_offers ADD COLUMN IF NOT EXISTS rec_days INTEGER[]`);
+    await ddl(sql`ALTER TABLE extra_offers ADD COLUMN IF NOT EXISTS rec_interval INTEGER`);
+    await ddl(sql`ALTER TABLE extra_offers ADD COLUMN IF NOT EXISTS capacity INTEGER`);
+    await ddl(sql`ALTER TABLE extra_offers ADD COLUMN IF NOT EXISTS require_photo BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE extra_offers ADD COLUMN IF NOT EXISTS target_users INTEGER[]`);
+    // extra_claims: „Beru si" — člověk si úkol v termínu zabral (ať se nedělá dvakrát);
+    // po zápisu hotovo s odkazem na zápis, „Vrátit" ho uvolní.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS extra_claims (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        offer_id INTEGER NOT NULL,
+        termin TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'vzato',
+        work_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (offer_id, termin, user_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS extra_claims_team_offer ON extra_claims (team_id, offer_id, termin)`);
+    // ---- konec Volitelné úkoly ----
+
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

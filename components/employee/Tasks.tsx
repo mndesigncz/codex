@@ -15,7 +15,7 @@
 // hotovo. 🎉" je EmptyState bez emoji; štítky (výroba, pro kohokoli, opakování) jsou
 // Chip a odkaz na návod ghost tlačítko.
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { TaskChecklist, recurrenceLabel, type ChecklistItem } from '../TaskChecklist';
 import { useCurrency } from '../CurrencyProvider';
 import TaskWeekBoard from '../TaskWeekBoard';
@@ -37,6 +37,13 @@ import { UkolyFiltry } from '../ukoly/UkolyFiltry';
 import { UkolySouhrn } from '../ukoly/UkolySouhrn';
 import { UkolyMesic } from '../ukoly/UkolyMesic';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
+import { useUkolyZaBody } from '../navic/data';
+import { ARG_ZA_BODY, pocetKVzeti, urlUkolyZaBody } from '../navic/logika';
+import { UkolyZaBody } from '../navic/UkolyZaBody';
+import { ZapsatNavic } from '../navic/ZapsatNavic';
+
+/** Sbalená sekce „Za body navíc" (per zařízení — volba toho, kdo se dívá; arg za-body ji vždy rozbalí). */
+const KLIC_ZA_BODY_SBALENO = 'managero-ukoly-za-body-sbaleno';
 
 interface Props {
   user: { id?: string };
@@ -63,9 +70,24 @@ export default function Tasks({ user }: Props) {
   const [view, setView] = useState<'list' | 'week' | 'month' | 'prehled'>('list');
   const [filtr, setFiltr] = useState<FiltrUkolu>(VYCHOZI_FILTR);
   const [detailId, setDetailId] = useState<number | null>(null);
+  // Kolo 11 (balík Z): „Za body navíc" — volitelné úkoly za extra body nahoře nad seznamem. Tady je lidé hledají
+  // (Martin: „vůbec netuším, kde to najít"); oznámení o novém úkolu vede sem (arg za-body: posune a zvýrazní).
+  const smiNavic = smi('navic.zapsat');
+  const zaBody = useUkolyZaBody(smiNavic ? urlUkolyZaBody() : null);
+  const ukolyZaBody = zaBody.data ?? [];
+  const kVzeti = pocetKVzeti(ukolyZaBody);
+  const zaBodyNacteno = zaBody.data != null || !!zaBody.error;
+  const [zaBodySbaleno, setZaBodySbaleno] = useState(false);
+  // Volba sbalení až po připojení (ne v prvním vykreslení — server localStorage nezná a hydratace by nesouhlasila).
+  useEffect(() => { try { if (localStorage.getItem(KLIC_ZA_BODY_SBALENO) === '1' && cerstvePredani() !== ARG_ZA_BODY) setZaBodySbaleno(true); } catch { /* soukromé okno */ } }, []);
+  const prepniZaBody = () => setZaBodySbaleno(v => { try { localStorage.setItem(KLIC_ZA_BODY_SBALENO, v ? '0' : '1'); } catch { /* soukromé okno */ } return !v; });
+  const [zvyraznitZaBody, setZvyraznitZaBody] = useState(0);
+  const [zapsatNavic, setZapsatNavic] = useState(false);
+  const sekceZaBody = useRef<HTMLElement>(null);
   // Předání z widgetu (Po termínu → rovnou záložka Po termínu): po přechodu z uloženého, na otevřené stránce z události.
   useEffect(() => {
     const pouzij = (arg: string | null) => {
+      if (arg === ARG_ZA_BODY) { setView('list'); setZaBodySbaleno(false); setZvyraznitZaBody(n => n + 1); return; }
       const r = rozborPredani(arg);
       if (r.stav) { setFiltr(f => ({ ...f, stav: r.stav! })); setView('list'); }
       if (r.ukolId != null) { setView('list'); setFiltr(VYCHOZI_FILTR); setDetailId(r.ukolId); }
@@ -77,6 +99,18 @@ export default function Tasks({ user }: Props) {
     window.addEventListener(UDALOST_PREDANI_UKOLU, naUdalost);
     return () => window.removeEventListener(UDALOST_PREDANI_UKOLU, naUdalost);
   }, []);
+
+  // Příchod s arg za-body: jakmile je sekce na obrazovce, posunout na ni a na chvíli ji zvýraznit (fokus na nadpis).
+  useEffect(() => {
+    if (!zvyraznitZaBody) return;
+    const el = sekceZaBody.current;
+    if (!el) return;
+    const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+    el.querySelector<HTMLElement>('[data-za-body-nadpis]')?.focus({ preventScroll: true });
+    const k = setTimeout(() => setZvyraznitZaBody(0), 2600);
+    return () => clearTimeout(k);
+  }, [zvyraznitZaBody, zaBodyNacteno]);
 
   const [showLater, setShowLater] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -236,8 +270,46 @@ export default function Tasks({ user }: Props) {
   const prepinac = <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
     options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }]} />;
   const sFiltry = tasks.length > 0 && view !== 'prehled';
+  // Sekce „Za body navíc": se seznamem jen když dnes něco je; jinak tichý řádek se „Zapsat navíc".
+  const sekceZaBodyEl = smiNavic && zaBodyNacteno ? (
+    <section ref={sekceZaBody} aria-labelledby="za-body-nadpis" data-za-body-sekce data-zvyrazneno={zvyraznitZaBody ? '' : undefined}
+      className={`scroll-mt-4 rounded-3xl transition-shadow duration-200 ${zvyraznitZaBody ? 'ring-2 ring-[#C8F542] ring-offset-2 ring-offset-[var(--bg)]' : ''}`}>
+      {ukolyZaBody.length > 0 ? (
+        <Card pad="none" className="px-5">
+          <div className="flex items-center py-2">
+            <button type="button" onClick={prepniZaBody} aria-expanded={!zaBodySbaleno} aria-controls="za-body-seznam"
+              className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] !transform-none">
+              <Icon name="gift" size={18} className="shrink-0 text-black/55" />
+              <h2 id="za-body-nadpis" tabIndex={-1} data-za-body-nadpis className="t-card min-w-0 text-pretty outline-none">
+                {t('Za body navíc')}{kVzeti > 0 && <span className="tabular-nums"> ({kVzeti})</span>}
+              </h2>
+              <Icon name="chevron" size={16} className={`shrink-0 text-black/40 transition-transform duration-200 ${zaBodySbaleno ? '' : 'rotate-180'}`} />
+            </button>
+          </div>
+          {!zaBodySbaleno && (
+            <div id="za-body-seznam" className="border-t border-[var(--surface-line)] pb-1">
+              <p className="t-meta pt-3 text-pretty">{t('Volitelné — kdo chce, vezme si. Body dostaneš po uznání.')}</p>
+              <UkolyZaBody ukoly={ukolyZaBody} />
+            </div>
+          )}
+          {/* „Zapsat navíc" (vlastní věc mimo nabídku) pod seznamem — v hlavičce by na 390 px zalomil nadpis. */}
+          <div className="border-t border-[var(--surface-line)] py-3">
+            <Button variant="secondary" icon="plus" onClick={() => setZapsatNavic(true)} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
+          </div>
+        </Card>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-za-body-prazdno>
+          <h2 id="za-body-nadpis" tabIndex={-1} data-za-body-nadpis className="sr-only">{t('Za body navíc')}</h2>
+          <p className="t-meta min-w-0 flex-1 text-pretty">{t('Dnes tu nic za body není — zapsat můžeš i vlastní věc navíc.')}</p>
+          <Button variant="ghost" icon="plus" onClick={() => setZapsatNavic(true)} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
+        </div>
+      )}
+    </section>
+  ) : null;
+
   const nastroj = (
     <div className="space-y-6">
+      {sekceZaBodyEl}
       {/* Telefon začíná úkolem, ne ovládáním (audit kola 6, Z3): dřív Segmented, souhrn dne,
           hledání s Filtry a pás záložek — první úkol na y=427 z 844. Teď jeden řádek
           Seznam/Týden/Měsíc · lupa · Filtry · n; souhrn dne je až od md (po termínu je hned
@@ -325,6 +397,7 @@ export default function Tasks({ user }: Props) {
           <p className="text-sm text-black/70 text-pretty"><span className="cz-sentence">{t('„{nazev}" má termín {den}.', { nazev: mimoDen.title, den: denDlouze(mimoDen.dueDate!) })}</span> {t('Opravdu ho chceš splnit už teď?')}</p>
         </Modal>
       )}
+      {smiNavic && <ZapsatNavic open={zapsatNavic} onClose={() => setZapsatNavic(false)} />}
       {fotoUkol && <PrilozFoto nazev={fotoUkol.title} onClose={() => setFotoUkol(null)} onHotovo={url => zmenStav(fotoUkol, 'done', url)} />}
       <Toast message={bodyToast} id={idToastu} onClose={() => { setBodyToast(null); setZpetUkol(null); }}
         action={zpetUkol ? { label: t('Vrátit'), onClick: () => { const u = zpetUkol; setBodyToast(null); setZpetUkol(null); void zmenStav(u, 'pending'); } } : undefined} />

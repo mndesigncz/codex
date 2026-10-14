@@ -10,7 +10,8 @@ export const STRANKA: DefiniceStranky = {
   pohled: 'tasks',
   pristup: null,
   nastroj: { nazev: 'Úkoly', ikona: 'check', popis: 'Moje úkoly po dnech s checklisty a návody.' },
-  doporucene: ['ukoly.po_terminu', 'ukoly.tyden', 'vyroba.k_vyrobe', 'postupy.povinne_dnes', 'navody.povinne_cteni'],
+  // Kolo 11: Úkoly za body mají v nástroji vlastní sekci „Za body navíc" (Tasks.tsx) — widget je jen v galerii.
+  doporucene: ['ukoly.za_body', 'ukoly.po_terminu', 'ukoly.tyden', 'vyroba.k_vyrobe', 'postupy.povinne_dnes', 'navody.povinne_cteni'],
   vychozi: { 'typ:zamestnanec': [{ w: 'nastroj' }] },
   aktivni: true,
 };

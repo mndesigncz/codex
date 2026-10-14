@@ -10,7 +10,7 @@
 // takže zápis z telefonu se do fronty vedení propíše bez obnovení stránky.
 
 import { useEffect } from 'react';
-import { UDALOST_NAVIC, URL_NABIDKA_NAVIC, URL_NAVIC, vyberDataNavic, vyberNabidku, type DataNavic, type NabidkaNavic } from '@/lib/navic';
+import { UDALOST_NAVIC, URL_NABIDKA_NAVIC, URL_NAVIC, URL_UKOLY_NAVIC, vyberDataNavic, vyberNabidku, vyberUkoly, type DataNavic, type NabidkaNavic, type UkolNavic } from '@/lib/navic';
 import { obnovDataWidgetu, useDataWidgetu, type StavDat } from '../widgety/useDataWidgetu';
 
 const URL_ODMENY = '/api/rewards';
@@ -24,6 +24,7 @@ export function obnovNavic(): void {
   obnovDataWidgetu(URL_NAVIC);
   obnovDataWidgetu(URL_NABIDKA_NAVIC);
   obnovDataWidgetu(URL_ODMENY);
+  obnovDataWidgetu(URL_UKOLY_NAVIC);
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(UDALOST_NAVIC));
 }
 
@@ -47,6 +48,27 @@ export function useNavic(url: string | null): StavDat<DataNavic> {
 /** GET /api/navic/offers; null = neptat se. */
 export function useNabidkaNavic(url: string | null): StavDat<DataNabidky> {
   const d = useDataWidgetu(url, vyberDataNabidky);
+  useObnovaNaUdalost(url, d.reload);
+  return d;
+}
+
+/** Kolo 11: dnešní úkoly za body celého týmu pro vedení (GET /api/navic/ukoly?scope=team, navic.zobrazit_tym). */
+export const URL_UKOLY_TYMU = `${URL_UKOLY_NAVIC}?scope=team`;
+
+/** Odpověď GET /api/navic/ukoly: úkoly dne, den a co smí divák. */
+export interface DataUkoluZaBody { ukoly: UkolNavic[]; den: string; smi: { zapsat: boolean; nabidka: boolean; tym: boolean } }
+export const vyberDataUkolu = (raw: unknown): DataUkoluZaBody => {
+  const r = (raw ?? {}) as { den?: unknown; smi?: Record<string, unknown> };
+  return {
+    ukoly: vyberUkoly(raw),
+    den: typeof r.den === 'string' ? r.den : '',
+    smi: { zapsat: r.smi?.zapsat === true, nabidka: r.smi?.nabidka === true, tym: r.smi?.tym === true },
+  };
+};
+
+/** GET /api/navic/ukoly (s filtrem); null = neptat se. Obnoví se po každé změně navíc (vzít, vrátit, zápis, uznání). */
+export function useUkolyZaBody(url: string | null): StavDat<DataUkoluZaBody> {
+  const d = useDataWidgetu(url, vyberDataUkolu);
   useObnovaNaUdalost(url, d.reload);
   return d;
 }

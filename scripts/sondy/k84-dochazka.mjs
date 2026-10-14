@@ -223,9 +223,13 @@ for (const jazyk of ['de', 'pl']) {
   await p.getByRole('button', { name: 'Další akce' }).first().click();
   await p.getByRole('menuitem', { name: /Pravidla píchání/ }).click();
   const okno = p.getByRole('dialog', { name: 'Pravidla píchání' });
-  tvrdi('V5 (390): okno Pravidla píchání vyjede zdola a má „Použít moji polohu" ≥ 44 px', await dokud(() => okno.isVisible(), 3000)
+  // Okno vyjíždí zdola — měřit až po doběhnutí animace (v CI pod zátěží se jednou měřilo uprostřed).
+  const vyjelo = await dokud(() => okno.isVisible(), 3000);
+  await p.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => null))));
+  const poloha = okno.getByRole('button', { name: 'Použít moji polohu' });
+  tvrdi('V5 (390): okno Pravidla píchání vyjede zdola a má „Použít moji polohu" ≥ 44 px', vyjelo
     && await okno.evaluate(d => !!d.closest('.modal-sheet') || getComputedStyle(d).position !== 'static')
-    && (await okno.getByRole('button', { name: 'Použít moji polohu' }).boundingBox()).height >= 44);
+    && await dokud(async () => ((await poloha.boundingBox())?.height ?? 0) >= 44, 3000), String((await poloha.boundingBox())?.height));
   const pr = await preteceni(p);
   tvrdi('V5 (390): okno bez přetečení', pr.dokument <= 1 && await okno.evaluate(d => d.scrollWidth <= d.clientWidth + 1));
   await p.screenshot({ path: SNIMKY + 'k84-dochazka-pravidla-tel.png' });

@@ -16,7 +16,7 @@
 import { useMemo, useState } from 'react';
 import { Button, Chip, EmptyState, ListRow, Menu, Modal, Segmented, Stat, Toast } from '../ui';
 import { Widget } from '../widgety/Widget';
-import { useSmi } from '../widgety/NavigaceKontext';
+import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import { useMoney } from '../CurrencyProvider';
 import type { WidgetProps } from '@/lib/widgety/typy';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
@@ -26,7 +26,8 @@ import { apiMessage, okJson } from '@/lib/api';
 import { minulyMesic } from '@/lib/odmenyPrehled';
 import { URL_NAVIC, seradNavic, souhrnNavic, zapisyDne, type NabidkaNavic, type Navic, type StavNavic } from '@/lib/navic';
 import { NabidkaChipy, StavChip, odmena } from './NabidkaChipy';
-import { obnovNavic, urlNavicMine, useDataNavic } from './data';
+import { obnovNavic, urlNavicMine, useDataNavic, useUkolyZaBody } from './data';
+import { ARG_ZA_BODY, obsazeneNabidky, urlUkolyZaBody } from './logika';
 import { ZapsatNavic, type PredvolbyNavic } from './ZapsatNavic';
 
 type Filtr = StavNavic | 'vse';
@@ -50,6 +51,12 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
   const nabidka = data.data?.nabidka ?? [];
   const dnesni = useMemo(() => zapisyDne(vse, dnes), [vse, dnes]);
   const smiZapsat = !nahled && smi('navic.zapsat') && data.data?.smi.zapsat !== false;
+  const nav = useNavigace();
+  // Kolo 11: plné úkoly za body (kapacita) se v pilulkách vypnou s „Obsazeno"; adresa sdílená s widgetem Úkoly za body.
+  const ukoly = useUkolyZaBody(smiZapsat && velikost !== 'S' ? urlUkolyZaBody() : null);
+  const obsazene = useMemo(() => obsazeneNabidky(ukoly.data ?? []), [ukoly.data]);
+  // „Úkoly za body ›" vede do Úkolů na sekci Za body navíc (arg za-body) — tam se úkoly berou a plní.
+  const kUkolum = smiZapsat && nav.smiPohled('tasks');
   const [okno, setOkno] = useState<{ predvolby?: PredvolbyNavic; upravit?: Navic } | null>(null);
   const [mazani, setMazani] = useState<Navic | null>(null);
   const [mazu, setMazu] = useState(false);
@@ -137,8 +144,13 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
   // a akce dole by zmizela pod odleskem — hlavní věc widgetu je zapsat, starší zápisy se smí schovat.
   const akce = smiZapsat ? (
     <div className="space-y-2" data-navic-akce>
-      {nabidka.length > 0 && <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} label={t('Co se dá udělat navíc')} pas={!L} />}
-      {tlacitko('sm')}
+      {nabidka.length > 0 && <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} obsazene={obsazene} label={t('Co se dá udělat navíc')} pas={!L} />}
+      <div className="flex flex-wrap items-center gap-2">
+        {tlacitko('sm')}
+        {kUkolum && (
+          <Button variant="ghost" size="sm" iconAfter="chevronRight" onClick={() => nav.onNavigate('tasks', ARG_ZA_BODY)} data-navic-za-body>{t('Úkoly za body')}</Button>
+        )}
+      </div>
     </div>
   ) : null;
 

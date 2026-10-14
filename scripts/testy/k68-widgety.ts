@@ -66,7 +66,8 @@ const divak = (x: Partial<Divak> = {}): Divak => ({
   opravneni: new Set(['sklad.zobrazit']), tarif: 'max', jeSpravce: false, ...x,
 });
 const radek = (rozsah: string, polozky: PolozkaRozlozeni[], x: Partial<RadekRozlozeni> = {}): RadekRozlozeni =>
-  ({ rozsah, polozky, zamceno: false, verze: 1, ...x });
+  // Kolo 11: řádek uložený „po všech přidaných widgetech“ — doplňování nových (doplnNove) testuje k87 zvlášť.
+  ({ rozsah, polozky, zamceno: false, verze: 1, upraveno: '2099-01-01T00:00:00.000Z', ...x });
 
 export default function (t: Testy) {
   const { eq, ok } = t;

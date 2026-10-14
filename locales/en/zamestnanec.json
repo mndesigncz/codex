@@ -442,5 +442,9 @@
   "Žádost se nepodařilo odeslat. Zkus to prosím znovu.": "Couldn't send the request. Please try again.",
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Couldn't cancel the request — try again.",
   "Žádosti se nenačetly.": "Requests didn't load.",
-  "„{nazev}\" má termín {den}.": "“{nazev}” is due {den}."
+  "„{nazev}\" má termín {den}.": "“{nazev}” is due {den}.",
+  "Dnes tu nic za body není — zapsat můžeš i vlastní věc navíc.": "Nothing for points today — you can still log your own extra.",
+  "Volitelné — kdo chce, vezme si. Body dostaneš po uznání.": "Optional — take one if you like. You get the points once approved.",
+  "Za body navíc": "Extra for points",
+  "Zapsat navíc": "Log extra"
 }

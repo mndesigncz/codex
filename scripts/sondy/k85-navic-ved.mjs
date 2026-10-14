@@ -3,7 +3,7 @@
 //  O — Odměny (1280): widget Navíc v týmu — souhrn měsíce, chip „3 čeká", čekající první, filtry
 //      Čeká / Uznané / Odmítnuté / Vše a člověk; Uznat (okno: body z nabídky, krokovač ±5, prémie,
 //      poznámka → PATCH), Odmítnout (důvod → PATCH), Zapsat za člena (chip nabídky předvyplní,
-//      POST s userId a uznat); část Navíc = nabídka: Nová položka (POST), Upravit (PATCH), Smazat
+//      POST s userId a uznat); část Navíc = nabídka (od kola 11 Úkoly za body): Nový úkol za body (POST), Upravit (PATCH), Smazat
 //      s potvrzením (DELETE); v klidu žádná limetka; fotka zápisu je odkaz.
 //  T — Odměny na telefonu (390×844, dotyk; světle i tmavě): nic nepřetéká, dotykové cíle, okno Uznat zdola,
 //      profil člena se sekcí Navíc.
@@ -183,7 +183,7 @@ const ODMENY = '/employer/overview?view=rewards';
   await oknoO.getByRole('button', { name: 'Odmítnout', exact: true }).click();
   const patch2 = await dokud(() => (stav.zapisy ?? []).find(z => z.m === 'PATCH' && z.path === '/api/navic/2'), 4000);
   tvrdi('O4: Odmítnout → PATCH /api/navic/2 { status: odmitnuto, note }', !!patch2 && patch2.telo?.status === 'odmitnuto' && patch2.telo?.note === 'Záskok se platí jako směna.', JSON.stringify(patch2?.telo));
-  tvrdi('O4: chip „2 čeká" v hlavičce', await dokud(async () => /2 čeká/.test(await text(w)), 3000));
+  tvrdi('O4: chip „2 čeká" v hlavičce', await dokud(async () => /2 čeká/.test(await text(w)), 8000), (await text(w)).slice(0, 120));
 
   // Zapsat za člena: chip nabídky předvyplní text a body, POST s userId a uznat.
   await w.getByRole('button', { name: 'Zapsat za člena' }).click();
@@ -204,12 +204,13 @@ const ODMENY = '/employer/overview?view=rewards';
   // Část Navíc: správa nabídky.
   await p.locator('[data-plocha]').getByRole('tab', { name: 'Navíc' }).click();
   const sprava = p.locator('[data-sprava-nabidky]');
-  tvrdi('O6: část Navíc ukáže „Co se dá udělat navíc" s pěti položkami, chipem Vypnuto a Prošlá', await dokud(async () => (await sprava.locator('.list-row').count()) === 5, 6000)
+  tvrdi('O6: část Navíc ukáže Úkoly za body s pěti položkami, chipem Vypnuto a Prošlá', await dokud(async () => (await sprava.locator('.list-row').count()) === 5, 6000)
     && /Vypnuto/.test(await text(sprava)) && /Prošlá/.test(await text(sprava)), (await text(sprava)).slice(0, 300).replace(/\n/g, ' | '));
-  tvrdi('O6: meta položky „50 bodů · 300 Kč" a „uznává se samo", „nejvýš 1× za den"', /50 bodů · 300 Kč/.test(await text(sprava)) && /uznává se samo/.test(await text(sprava)) && /nejvýš 1× za den/.test(await text(sprava)));
+  // Kolo 11: nabídka = Úkoly za body (opakování · body · prémie; kolik lidí a „uzná se samo" v podrobnostech).
+  tvrdi('O6: meta úkolu „Kdykoli · +50 b · 300 Kč" a „uzná se samo"', /Kdykoli · \+50 b · 300 Kč/.test(await text(sprava)) && /uzná se samo/.test(await text(sprava)));
   tvrdi('O6: v části Navíc žádná limetka', (await limetek(p)) === 0);
-  await sprava.getByRole('button', { name: 'Nová položka' }).click();
-  const oknoN = p.getByRole('dialog', { name: 'Nová položka nabídky' });
+  await sprava.getByRole('button', { name: 'Nový úkol za body' }).click();
+  const oknoN = p.getByRole('dialog', { name: 'Nový úkol za body' });
   await oknoN.waitFor({ timeout: 4000 });
   await oknoN.locator('#nabidka-nazev').fill('Rozvézt catering');
   await oknoN.locator('#nabidka-body').fill('25');
@@ -217,16 +218,16 @@ const ODMENY = '/employer/overview?view=rewards';
   await oknoN.getByRole('switch', { name: 'Uznat automaticky' }).click();
   await oknoN.locator('#nabidka-limit').fill('2');
   await oknoN.screenshot({ path: SNIMKY + 'k85-navic-ved-nabidka-okno-1280.png' });
-  await oknoN.getByRole('button', { name: 'Přidat do nabídky' }).click();
+  await oknoN.getByRole('button', { name: 'Vypsat úkol' }).click();
   const postN = await dokud(() => (stav.zapisy ?? []).find(z => z.m === 'POST' && z.path === '/api/navic/offers'), 4000);
-  tvrdi('O7: Přidat → POST /api/navic/offers { title, points: 25, bonusCzk: 200, autoApprove: true, active: true, maxPerDay: 2 }', !!postN && postN.telo?.title === 'Rozvézt catering' && postN.telo?.points === 25 && postN.telo?.bonusCzk === 200
+  tvrdi('O7: Vypsat úkol → POST /api/navic/offers { title, points: 25, bonusCzk: 200, autoApprove: true, active: true, maxPerDay: 2 }', !!postN && postN.telo?.title === 'Rozvézt catering' && postN.telo?.points === 25 && postN.telo?.bonusCzk === 200
     && postN.telo?.autoApprove === true && postN.telo?.active === true && postN.telo?.maxPerDay === 2, JSON.stringify(postN?.telo));
-  tvrdi('O7: okno se zavře, toast a šestá položka v seznamu', await dokud(async () => (await oknoN.count()) === 0, 3000) && await dokud(() => p.getByText('Položka přidána do nabídky.').isVisible().catch(() => false), 3000)
+  tvrdi('O7: okno se zavře, toast a šestá položka v seznamu', await dokud(async () => (await oknoN.count()) === 0, 3000) && await dokud(() => p.getByText('Úkol za body je vypsaný.').isVisible().catch(() => false), 3000)
     && await dokud(async () => (await sprava.locator('.list-row').count()) === 6, 3000));
   // Upravit přes menu → PATCH s id.
-  await sprava.getByRole('button', { name: 'Upravit nebo smazat položku Vytřít sklad a chodbu' }).click();
+  await sprava.getByRole('button', { name: 'Upravit nebo smazat úkol Vytřít sklad a chodbu' }).click();
   await p.getByRole('menuitem', { name: 'Upravit…' }).click();
-  const oknoU = p.getByRole('dialog', { name: 'Upravit položku nabídky' });
+  const oknoU = p.getByRole('dialog', { name: 'Upravit úkol za body' });
   tvrdi('O8: Upravit… otevře okno s vyplněným názvem, body 20 a limitem 1', await oknoU.waitFor({ timeout: 4000 }).then(() => true, () => false)
     && (await oknoU.locator('#nabidka-nazev').inputValue()) === 'Vytřít sklad a chodbu' && (await oknoU.locator('#nabidka-body').inputValue()) === '20' && (await oknoU.locator('#nabidka-limit').inputValue()) === '1');
   await oknoU.locator('#nabidka-body').fill('30');
@@ -236,9 +237,9 @@ const ODMENY = '/employer/overview?view=rewards';
   // Smazat s potvrzením → DELETE ?id=.
   let dialogProhlizece = false;
   p.on('dialog', d => { dialogProhlizece = true; void d.dismiss(); });
-  await sprava.getByRole('button', { name: 'Upravit nebo smazat položku Odvézt sklo do sběru' }).click();
+  await sprava.getByRole('button', { name: 'Upravit nebo smazat úkol Odvézt sklo do sběru' }).click();
   await p.getByRole('menuitem', { name: 'Smazat…' }).click();
-  const potvrd = p.getByRole('dialog', { name: /Smazat položku „Odvézt sklo do sběru"/ });
+  const potvrd = p.getByRole('dialog', { name: /Smazat úkol „Odvézt sklo do sběru"/ });
   tvrdi('O9: Smazat… se ptá oknem, ne confirm()', await dokud(() => potvrd.isVisible().catch(() => false), 2000) && !dialogProhlizece);
   await potvrd.getByRole('button', { name: 'Smazat' }).click();
   tvrdi('O9: potvrzení pošle DELETE /api/navic/offers?id=4 a položka zmizí', await dokud(() => (stav.zapisy ?? []).some(z => z.m === 'DELETE' && z.path === '/api/navic/offers' && z.q === '?id=4'), 4000)

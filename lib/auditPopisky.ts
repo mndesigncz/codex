@@ -107,6 +107,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'navic.nabidka.pridat': 'Přidána položka nabídky navíc',
   'navic.nabidka.upravit': 'Upravena položka nabídky navíc',
   'navic.nabidka.smazat': 'Smazána položka nabídky navíc',
+  'navic.ukol.vzit': 'Vzat volitelný úkol za body',
+  'navic.ukol.vratit': 'Vrácen volitelný úkol za body',
   'tresty.udelit': 'Udělen trest',
   'tresty.upravit': 'Upraven trest',
   'tresty.zrusit': 'Zrušen trest',

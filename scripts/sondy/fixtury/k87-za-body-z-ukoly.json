@@ -1,0 +1,29 @@
+{
+ "den": "DNES",
+ "smi": { "zapsat": true, "nabidka": false, "tym": false },
+ "ukoly": [
+  {
+   "nabidka": { "id": 5, "title": "Vyleštit kávovar", "description": null, "points": 10, "bonusCzk": null, "autoApprove": false, "active": true, "validFrom": "PRED6", "validTo": null, "maxPerDay": 1, "recurrence": "interval", "recDays": [], "recInterval": 3, "capacity": 1, "requirePhoto": false, "targetUsers": [], "createdAt": "" },
+   "termin": "DNES", "obsazeno": 1, "stav": "vzato", "mojeZapisy": 0, "workId": null,
+   "kdo": [{ "userId": 16, "name": "Barbora Nováková", "stav": "vzato" }]
+  },
+  {
+   "nabidka": { "id": 3, "title": "Zaskočit za kolegu na směnu", "description": "Nahlásit, za koho.", "points": 50, "bonusCzk": 300, "autoApprove": false, "active": true, "validFrom": null, "validTo": null, "maxPerDay": null, "recurrence": "kdykoli", "recDays": [], "recInterval": null, "capacity": null, "requirePhoto": false, "targetUsers": [], "createdAt": "" },
+   "termin": "DNES", "obsazeno": 0, "stav": "volne", "mojeZapisy": 0, "workId": null, "kdo": []
+  },
+  {
+   "nabidka": { "id": 1, "title": "Vytřít sklad a chodbu", "description": "Včetně rohů za regály.", "points": 20, "bonusCzk": null, "autoApprove": false, "active": true, "validFrom": null, "validTo": null, "maxPerDay": 1, "recurrence": "denne", "recDays": [], "recInterval": null, "capacity": 1, "requirePhoto": true, "targetUsers": [], "createdAt": "" },
+   "termin": "DNES", "obsazeno": 0, "stav": "volne", "mojeZapisy": 0, "workId": null, "kdo": []
+  },
+  {
+   "nabidka": { "id": 2, "title": "Umýt výlohu zvenku", "description": null, "points": 15, "bonusCzk": null, "autoApprove": true, "active": true, "validFrom": null, "validTo": null, "maxPerDay": 1, "recurrence": "tydne", "recDays": [], "recInterval": null, "capacity": 2, "requirePhoto": false, "targetUsers": [], "createdAt": "" },
+   "termin": "DNES", "obsazeno": 1, "stav": "volne", "mojeZapisy": 0, "workId": null,
+   "kdo": [{ "userId": 4, "name": "Eva Svobodová", "stav": "vzato" }]
+  },
+  {
+   "nabidka": { "id": 4, "title": "Přerovnat regál se sirupy", "description": null, "points": 30, "bonusCzk": null, "autoApprove": false, "active": true, "validFrom": null, "validTo": null, "maxPerDay": 1, "recurrence": "dny", "recDays": [1, 3, 5], "recInterval": null, "capacity": 1, "requirePhoto": false, "targetUsers": [], "createdAt": "" },
+   "termin": "DNES", "obsazeno": 1, "stav": "plno", "mojeZapisy": 0, "workId": null,
+   "kdo": [{ "userId": 5, "name": "Jakub Horák", "stav": "vzato" }]
+  }
+ ]
+}
