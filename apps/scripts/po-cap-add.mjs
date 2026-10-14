@@ -132,7 +132,7 @@ function ios() {
 <plist version="1.0">
 <dict>
 \t<key>aps-environment</key>
-\t<string>development</string>
+\t<string>${aps}</string>
 \t<key>com.apple.developer.associated-domains</key>
 \t<array>
 ${domeny.map(d => `\t\t<string>${d}</string>`).join('\n')}

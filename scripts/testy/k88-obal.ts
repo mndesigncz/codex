@@ -80,7 +80,8 @@ export default async function ({ eq, ok }: Testy) {
   ok('most: sdílení předá soubory (Filesystem → Share files), canShare říká pravdu', /zapisDoCache\(/.test(most) && /files,/.test(most) && /canShare = /.test(most));
   ok('most: ladicí binárka hlásí sandbox APNs', /jeLadiciBinarka\(\)/.test(most) && /env: 'sandbox'/.test(most));
   ok('most: odkazy a window.open jdou přes cilOdkazu a plugin Browser', /cilOdkazu\(/.test(most) && /plugin\('Browser'\)/.test(most) && /window\.open = function/.test(most));
-  ok('po-cap-add: aps-environment volitelně production (APS_ENV)', /process\.env\.APS_ENV === 'production'/.test(zdroj('apps/scripts/po-cap-add.mjs')));
+  const poCap = zdroj('apps/scripts/po-cap-add.mjs');
+  ok('po-cap-add: aps-environment volitelně production (APS_ENV) a hodnota jde do entitlements', /process\.env\.APS_ENV === 'production'/.test(poCap) && poCap.includes('<string>${aps}</string>'));
 
   // ---- pluginy obalů ----
   const balik = (a: string) => JSON.parse(zdroj(`apps/${a}/package.json`));
