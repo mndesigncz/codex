@@ -28,6 +28,7 @@ const TRESTY: Trest[] = [
   zaklad({ id: 1, userId: 4, day: posunDen(dnes(), -2), text: 'Pozdní příchod o 25 min.', typeId: 1, typeTitle: 'Pozdní příchod', points: 10, source: 'pozde', sourceKey: 'pozde:9001' }),
   zaklad({ id: 2, userId: 3, day: posunDen(dnes(), -5), text: 'Nezavřená lednice přes noc, vyhodilo se mléko.', typeId: 3, typeTitle: 'Nezavřená lednice / sklad', points: 15,
     seenAt: `${posunDen(dnes(), -4)}T08:00:00.000Z`, response: 'Lednici jsem zavírala, těsnění nedrží.', responseAt: `${posunDen(dnes(), -4)}T08:05:00.000Z`, disputed: true }),
+  zaklad({ id: 4, userId: 3, day: posunDen(dnes(), -1), text: 'Pozdní příchod o 15 min.', typeId: 1, typeTitle: 'Pozdní příchod', points: 10, source: 'pozde', sourceKey: 'pozde:9004' }),
   zaklad({ id: 3, userId: 3, day: posunDen(dnes(), -12), text: 'Nevynesený koš před zavřením.', seenAt: `${posunDen(dnes(), -11)}T09:00:00.000Z` }),
 ];
 const NAVRHY: NavrhTrestu[] = [

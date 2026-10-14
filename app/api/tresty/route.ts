@@ -13,7 +13,8 @@ import { nactiTrest, oznamTrest, predMigraci, stropKraceniDb, tvarDruhu, tvarTre
 // GET  ?scope=mine|team&status=&month=RRRR-MM&userId=&day=&closingId=&shiftId=
 //      → { items, druhy (aktivní položky sazebníku), smi }
 //      mine (výchozí) = vlastní tresty (každý člen), team = celý podnik
-//      (tresty.zobrazit_tym). Bez month/day/closingId/shiftId posledních 90 dní.
+//      (tresty.zobrazit_tym). Bez month/day/closingId/shiftId posledních 90 dní
+//      a k tomu každý nepotvrzený (starší se nesmí ztratit, dokud ho člověk nepotvrdí).
 // GET  ?strop=1&userId=&day= (tresty.udelit) → { strop, premie, uzKraceno }:
 //      kolik jde člověku ještě krátit z prémie za měsíc dne `day`.
 // POST { userId, text, day?, shiftId?, closingId?, taskId?, typeId?, photoUrl?, points?, bonusCut?, sourceKey? }
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
         AND (${closingId}::int IS NULL OR p.closing_id = ${closingId})
         AND (${shiftId}::int IS NULL OR p.shift_id = ${shiftId})
         AND (${mesicOd}::text IS NULL OR (p.day >= ${mesicOd} AND p.day <= ${mesicDo}))
-        AND (${odDne}::text IS NULL OR p.day >= ${odDne})
+        AND (${odDne}::text IS NULL OR p.day >= ${odDne} OR (p.status = 'plati' AND p.seen_at IS NULL))
       ORDER BY p.day DESC, p.created_at DESC
       LIMIT ${MAX_RADKU}`;
     const druhy = smiUdelit || smiSazebnik
