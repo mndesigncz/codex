@@ -1808,5 +1808,11 @@
   "Další období": "Next period",
   "Navíc": "Extra work",
   "Dát trest za manko": "Penalize the shortage",
-  "Tresty": "Penalties"
+  "Tresty": "Penalties",
+  "Volitelný — kdo chce, za body": "Optional — whoever wants, for points",
+  "Nikomu se nezadá: lidé si ho vezmou sami („Beru si\") a za splnění dostanou body. Opakování a kolik lidí nastavíš v dalším kroku.": "Not assigned to anyone: people take it themselves (\"I'll take it\") and earn points for doing it. You set the repeat and how many people in the next step.",
+  "Volitelné úkoly — kdo chce, vezme si je a dostane body.": "Optional tasks — whoever wants takes them and earns points.",
+  "Nový úkol za body": "New points task",
+  "Za body": "For points",
+  "Úkol za body je vypsaný — lidé si ho vezmou sami.": "The points task is posted — people will take it themselves."
 }

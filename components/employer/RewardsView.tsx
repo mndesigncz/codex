@@ -81,6 +81,7 @@ function RewardsViewInner() {
   const nastavuje = smi('odmeny.nastaveni');
   const spravujeKatalog = smi('odmeny.katalog');
   // Kolo 9 (N1): část Navíc = nabídka „Co se dá udělat navíc" (fronta a historie jsou widget Navíc v týmu na ploše).
+  // Kolo 11: nabídka je teď „Úkoly za body" (volitelné úkoly s opakováním) — stejná správa je i v Úkolech › Za body.
   const vidiNavic = smi('navic.zobrazit_tym');
   // Kolo 10: část Tresty = sazebník (nesouhlasy, návrhy a historie jsou widget Tresty v týmu na ploše).
   const vidiTresty = smi(['tresty.udelit', 'tresty.sazebnik']);
@@ -128,6 +129,7 @@ function RewardsViewInner() {
     <Zebricek smiHodnotit={hodnoti} smiProfil={smi('tym.profil')} vidiHodnoceni={vidiKalendar}
       onHodnotit={setHodnotim} onPochvalit={setChvalim} onProfil={setProfil} />
   ) : cast === 'navic' ? (
+    // Kolo 11: správa nabídky navíc = správa Úkolů za body (karta má odkaz „Otevřít v Úkolech ›" — tam je vedení hledá).
     <SpravaNabidky />
   ) : cast === 'tresty' ? (
     <SazebnikTrestu />
