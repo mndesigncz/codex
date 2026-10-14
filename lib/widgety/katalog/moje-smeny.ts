@@ -106,4 +106,34 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
+  // Data: GET /api/tresty (vlastní tresty za 90 dní — tento i minulý měsíc celý), potvrzení a vyjádření
+  // PATCH /api/tresty/[id] { seen } / { response, disagree } — kolo 10 (balík Z), okno components/tresty/DetailTrestu.
+  // Pozor: vlastní data (každý člen bez oprávnění; vedení vidí svoje, tým má widget odmeny.tresty_tymu).
+  // Malá karta na Přehledu (Domů) se bez nepotvrzeného trestu v klidu nekreslí (prazdno={null}).
+  {
+    id: 'moje-smeny.tresty',
+    oblast: 'moje-smeny',
+    nazev: 'Moje tresty',
+    popis: 'Co ti vedení vytklo, co za to bylo a co ještě čeká na tvé potvrzení.',
+    ikona: 'warning',
+    velikosti: ['S', 'M', 'L'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni', 'zamestnanec'],
+    stranky: ['zamestnanec.domu', 'zamestnanec.odmeny', 'vedeni.moje_smeny'],
+    opravneni: { vse: [], nektere: [] },
+    tarif: 'zdarma',
+    nastaveni: [
+      {
+        klic: 'obdobi',
+        nazev: 'Měsíc',
+        typ: 'vyber',
+        moznosti: [{ id: 'tento', nazev: 'Tento' }, { id: 'minuly', nazev: 'Minulý' }],
+        vychozi: 'tento',
+      },
+    ],
+    rychlyFiltr: 'obdobi',
+    kostra: { S: 'text', M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
 ];

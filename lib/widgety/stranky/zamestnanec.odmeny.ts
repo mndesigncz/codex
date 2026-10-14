@@ -17,6 +17,7 @@ export const STRANKA: DefiniceStranky = {
   doporucene: [
     'moje.zpetna_vazba',
     'moje-smeny.navic',
+    'moje-smeny.tresty',
     'odmeny.katalog',
     'moje.odkud_body',
     'odmeny.urovne',
@@ -29,6 +30,9 @@ export const STRANKA: DefiniceStranky = {
       { w: 'nastroj' },
       // Kolo 9 (N1): sekce „Navíc" = velký widget s filtrem a měsícem (zápisy, body, nabídka).
       { w: 'moje-smeny.navic', s: 'L' },
+      // Kolo 10 (balík Z): „Moje tresty" = velký widget se souhrnem měsíce, filtrem a měsícem; z oznámení
+      // (?view=rewards&arg=tresty) se nad stránkou otevře detail nejnovějšího nepotvrzeného (MyRewards).
+      { w: 'moje-smeny.tresty', s: 'L' },
       { w: 'odmeny.katalog', s: 'L' },
       { w: 'moje.odkud_body', s: 'M' },
       { w: 'odmeny.urovne', s: 'M' },
