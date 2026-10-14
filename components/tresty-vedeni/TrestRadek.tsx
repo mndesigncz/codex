@@ -66,6 +66,16 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
     ? (x.disputed ? t('Nesouhlasí: {text}', { text: x.response }) : t('Vyjádření: {text}', { text: x.response }))
     : null;
   const zruseni = zruseno ? (x.cancelNote ? t('Zrušeno: {poznamka}', { poznamka: x.cancelNote }) : t('Zrušeno, body i krácení se vrátily.')) : null;
+  const dopad = dopadTrestu(t, x, money);
+  const stavADopad = (
+    <span className="flex flex-wrap items-center justify-end gap-1.5" data-trest-stav={stav.text}>
+      <Chip tone={stav.tone} size="sm">{stav.text}</Chip>
+      <span className={`text-[13px] font-semibold tabular-nums whitespace-nowrap ${zruseno ? 'line-through text-black/40' : 'text-[#16181A]'}`}>{dopad}</span>
+    </span>
+  );
+  const rozhodnuti = spor && smiUdelit && onPlatiDal && onZrusit;
+  // Sporný řádek nese stav i dvě tlačítka pod textem, ne v ocasu: ve střední kartě (půl Přehledu, ~470 px)
+  // by chip, dopad a dvě tlačítka vedle sebe smáčkly jméno i text na pár písmen.
   const detail = (
     <>
       {bezJmena ? null : <span className="block text-[#16181A]">{x.text}</span>}
@@ -74,19 +84,20 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
       {x.photoUrl && (
         <a href={x.photoUrl} target="_blank" rel="noreferrer" className="inline-block underline underline-offset-2 tap-target-sm">{t('Fotka')}</a>
       )}
+      {spor && <span className="mt-1.5 flex [&>span]:justify-start">{stavADopad}</span>}
+      {rozhodnuti && (
+        <span className="mt-2 flex flex-wrap items-center gap-2">
+          {/* Jméno v přístupném názvu: v seznamu je víc stejných tlačítek za sebou. `tap-target` = 44 px na telefonu. */}
+          <Button variant="secondary" size="sm" icon="check" loading={pracuji} disabled={pracuji} className="tap-target"
+            aria-label={t('Trest platí dál: {jmeno}', { jmeno: x.userName })} onClick={() => onPlatiDal(x)}>{t('Trest platí dál')}</Button>
+          <Button variant="danger" size="sm" disabled={pracuji} className="tap-target"
+            aria-label={t('Zrušit trest: {jmeno}', { jmeno: x.userName })} onClick={() => onZrusit(x)}>{t('Zrušit trest')}</Button>
+        </span>
+      )}
     </>
   );
-  const maDetail = !bezJmena || !!vyjadreni || !!zruseni || !!x.photoUrl;
-  const dopad = dopadTrestu(t, x, money);
-  const akce = spor && smiUdelit && onPlatiDal && onZrusit ? (
-    <>
-      {/* Jméno v přístupném názvu: v seznamu je víc stejných tlačítek za sebou. `tap-target` = 44 px na telefonu. */}
-      <Button variant="secondary" size="sm" icon="check" loading={pracuji} disabled={pracuji} className="tap-target"
-        aria-label={t('Trest platí dál: {jmeno}', { jmeno: x.userName })} onClick={() => onPlatiDal(x)}>{t('Trest platí dál')}</Button>
-      <Button variant="danger" size="sm" disabled={pracuji} className="tap-target"
-        aria-label={t('Zrušit trest: {jmeno}', { jmeno: x.userName })} onClick={() => onZrusit(x)}>{t('Zrušit trest')}</Button>
-    </>
-  ) : !zruseno && smiUdelit && onUpravit && onZrusit ? (
+  const maDetail = !bezJmena || !!vyjadreni || !!zruseni || !!x.photoUrl || spor;
+  const menu = !rozhodnuti && !zruseno && smiUdelit && onUpravit && onZrusit ? (
     // `!flex-none`: na telefonu by první prvek ocasu natáhlo přes řádek a „···" by stálo vlevo pod textem.
     <span className="!flex-none">
       <Menu size="sm" label={t('Upravit nebo zrušit trest: {jmeno}', { jmeno: x.userName })} items={[
@@ -101,14 +112,9 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
       title={bezJmena ? x.text : x.userName || t('Člen týmu')}
       meta={meta}
       detail={maDetail ? detail : undefined}
-      akceVRadku={!spor}
-      right={(
-        <span className="flex flex-wrap items-center justify-end gap-1.5" data-trest-stav={stav.text}>
-          <Chip tone={stav.tone} size="sm">{stav.text}</Chip>
-          <span className={`text-[13px] font-semibold tabular-nums whitespace-nowrap ${zruseno ? 'line-through text-black/40' : 'text-[#16181A]'}`}>{dopad}</span>
-        </span>
-      )}
-      actions={akce} />
+      akceVRadku
+      right={spor ? undefined : stavADopad}
+      actions={menu} />
   );
 }
 
