@@ -9,6 +9,11 @@ import { okJson } from '@/lib/api';
 import { Modal, Button, Segmented, Skeleton, Switch, SwitchRow } from '../ui';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { textNavrhu } from '@/lib/tresty';
+import { useOpravneni } from '../role/useOpravneni';
+import { useNavrhyTrestu } from '../tresty-vedeni/data';
+import { TrestTlacitko } from '../tresty-vedeni/TrestyUzaverky';
+import { klicVytky } from '../tresty-vedeni/logika';
 
 export interface ItemMark { points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -92,6 +97,10 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
   const [saveErr, setSaveErr] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpand = (k: string) => setExpanded(e => ({ ...e, [k]: !e[k] }));
+  // Kolo 10: u položky s výtkou „Dát trest". Klíč návrhu (`vytka:<id položky>`) GET hodnocení neposílá —
+  // dohledá se v návrzích trestů (klicVytky), ať návrh po udělení z widgetu zmizí.
+  const { nacteno, ma } = useOpravneni();
+  const navrhyTrestu = useNavrhyTrestu(nacteno && ma('tresty.udelit'));
 
   // Rating-star weight for the suggested points.
   useEffect(() => {
@@ -235,6 +244,18 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
           onBlur={e => saveItem(kind, id, { note: e.target.value.trim() || null })}
           className={`${inputCls} !py-2 !text-[13px] resize-none`}
         />
+        {isFlagged && (
+          <div className="flex justify-end" data-trest-za-vytku>
+            <TrestTlacitko predvolby={() => {
+              const poznamka = mark?.note ?? legacyNote ?? null;
+              return {
+                userId: employee.id, jmeno: employee.name, day: date, druhNavrhu: 'vytka',
+                text: textNavrhu({ druh: 'vytka', minuty: null, castka: null, poznamka }, money),
+                sourceKey: klicVytky(navrhyTrestu.data ?? [], { userId: employee.id, day: date, poznamka }),
+              };
+            }} />
+          </div>
+        )}
       </div>
     );
   };

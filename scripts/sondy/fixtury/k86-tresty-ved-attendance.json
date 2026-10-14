@@ -1,0 +1,17 @@
+{
+ "roster": [
+  { "id": 16, "name": "Eva Testová", "avatar": "👩", "hourlyRate": 150, "hasPin": true, "openSince": null, "openEntryId": null, "nudgedAt": null, "breakSince": null, "jobTitle": "Barista", "shiftStart": null, "shiftEnd": null },
+  { "id": 17, "name": "Jakub Horák", "avatar": "🧔", "hourlyRate": 160, "hasPin": true, "openSince": null, "openEntryId": null, "nudgedAt": null, "breakSince": null, "jobTitle": "Barman", "shiftStart": null, "shiftEnd": null }
+ ],
+ "entries": [
+  { "id": 9001, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "👩", "clockIn": "@VCERA-09:25", "clockOut": "@VCERA-17:30", "source": "self", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": "09:00", "planEnd": "17:30", "planDate": "VCERA" },
+  { "id": 9002, "employeeId": 17, "employeeName": "Jakub Horák", "employeeAvatar": "🧔", "clockIn": "@VCERA-14:18", "clockOut": "@VCERA-22:00", "source": "self", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": "14:00", "planEnd": "22:00", "planDate": "VCERA" },
+  { "id": 9003, "employeeId": 17, "employeeName": "Jakub Horák", "employeeAvatar": "🧔", "clockIn": "@PRED3-14:02", "clockOut": "@PRED3-22:00", "source": "self", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": "14:00", "planEnd": "22:00", "planDate": "PRED3" },
+  { "id": 9004, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "👩", "clockIn": "@PRED4-09:00", "clockOut": "@PRED4-17:30", "source": "self", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": "09:00", "planEnd": "17:30", "planDate": "PRED4" }
+ ],
+ "adjustments": [
+  { "id": 31, "userId": 17, "amount": -200, "day": "PRED3", "note": "Manko v uzávěrce 340 Kč.", "source": "trest" }
+ ],
+ "zamky": [],
+ "pravidlaPichani": null
+}

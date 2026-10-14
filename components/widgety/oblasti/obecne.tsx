@@ -40,6 +40,8 @@ import { widget } from '@/lib/widgety/katalog';
 import { ZDROJE_FRONT } from '@/lib/widgety/katalog/obecne';
 import { vyberNavic } from '@/lib/navic';
 import { otevriCastNavic } from '../../navic-vedeni/cast';
+import { cekaSpor, vyberTresty } from '@/lib/tresty';
+import { otevriCastTresty } from '../../tresty-vedeni/cast';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
 import { useDraft } from '@/lib/useDraft';
@@ -114,7 +116,7 @@ const ID_CEKA = 'prehled.ceka_na_tebe';
 
 type IdFronty =
   | 'volno' | 'vymeny' | 'uzaverky' | 'navrhy_skladu' | 'hlaseni' | 'odmeny'
-  | 'postupy' | 'navody' | 'rezervace' | 'objednavky' | 'slaba_hodnoceni' | 'navic';
+  | 'postupy' | 'navody' | 'rezervace' | 'objednavky' | 'slaba_hodnoceni' | 'navic' | 'tresty';
 
 interface Fronta {
   id: IdFronty;
@@ -197,6 +199,14 @@ const FRONTY: readonly Fronta[] = [
     pocet: raw => vyberNavic(raw).filter(z => z.status === 'ceka').length,
     otevri: nav => otevriCastNavic(nav),
   },
+  {
+    // Kolo 10: člověk s trestem nesouhlasí — proklik otevře Odměny › Tresty (otevriCastTresty), widget Tresty v týmu
+    // má sporné nahoře s Trest platí dál / Zrušit trest.
+    id: 'tresty', ikona: 'warning', pohled: 'rewards',
+    text: (t, n) => t('{n, plural, one {# nesouhlas s trestem} few {# nesouhlasy s trestem} other {# nesouhlasů s trestem}}', { n }),
+    pocet: raw => vyberTresty(raw).filter(cekaSpor).length,
+    otevri: nav => otevriCastTresty(nav),
+  },
 ];
 
 /** Názvy front z nastavení widgetu — do věty „Nenačetly se: …". */
@@ -222,7 +232,7 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
     const k = klicCasti(ID_CEKA, f.id);
     return !!k && vybrane.has(f.id) && smi(k);
   };
-  // Háčky v pevném pořadí, dvanáct front — každá má vlastní dotaz a mezipaměť
+  // Háčky v pevném pořadí, třináct front — každá má vlastní dotaz a mezipaměť
   // sdílenou s ostatními widgety (objednávky i sklad se tak neptají dvakrát).
   const stavy = [
     useFronta(FRONTY[0], zap(FRONTY[0])),
@@ -237,6 +247,7 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
     useFronta(FRONTY[9], zap(FRONTY[9])),
     useFronta(FRONTY[10], zap(FRONTY[10])),
     useFronta(FRONTY[11], zap(FRONTY[11])),
+    useFronta(FRONTY[12], zap(FRONTY[12])),
   ];
   const aktivni = FRONTY.map((f, i) => ({ f, s: stavy[i] })).filter(x => !x.s.vypnuto);
   const selhane = aktivni.filter(x => x.s.error);

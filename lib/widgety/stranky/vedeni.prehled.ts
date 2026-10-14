@@ -49,6 +49,7 @@ export const STRANKA: DefiniceStranky = {
     'hodnoceni.ohodnotit_smeny',
     'odmeny.zebricek',
     'odmeny.navic_tymu',
+    'odmeny.tresty_tymu',
     'akce.nejblizsi',
     'klient.hoste_vernost',
     'klient.dnesni_rezervace',
