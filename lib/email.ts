@@ -190,17 +190,24 @@ export async function sendTeamInvitation(to: string, teamName: string, inviterNa
   });
 }
 
-export async function sendBackupEmail(to: string, filename: string, json: string): Promise<SendResult> {
+/**
+ * Denní záloha: ODKAZ ke stažení, ne příloha (spuštění, balík P). Odkaz je podepsaný,
+ * platí `dni` dní a stáhnout přes něj jde jen po přihlášení s oprávněním data.zaloha
+ * v daném podniku (app/api/backup/stahnout). V e-mailu tedy nejsou žádná data.
+ */
+export async function sendBackupEmail(to: string, podnik: string, den: string, url: string, dni: number): Promise<SendResult> {
   return send({
     label: 'Managero Zálohy',
     to,
-    subject: `Záloha dat Managero — ${filename.replace('managero-backup-', '').replace('.json', '')}`,
+    subject: `Záloha dat Managero — ${den}`,
     html: `
       <div style="font-family:-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:28px;background:#F1F4EC;color:#16181A;border-radius:20px;">
-        <h1 style="font-size:20px;margin:0 0 8px;">Automatická záloha</h1>
-        <p style="color:#5c6353;font-size:14px;">V příloze je kompletní záloha dat tvého podniku (${escHtml(filename)}). Ulož si e-mail — kdyby se s databází cokoli stalo, data se z něj dají obnovit.</p>
+        <h1 style="font-size:20px;margin:0 0 8px;">Záloha dat je připravená</h1>
+        <p style="color:#5c6353;font-size:14px;">Zálohu podniku ${escHtml(podnik)} stáhneš odkazem níž. Po otevření se přihlas účtem, který má v podniku oprávnění „Dostávat zálohu dat“. Odkaz platí ${dni} dní.</p>
+        <a href="${escHtml(url)}" style="display:inline-block;margin-top:8px;background:#C8F542;color:#16181A;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:bold;">Stáhnout zálohu</a>
+        <p style="color:#5c6353;font-size:13px;margin-top:22px;">Záloha se vytvoří až při stažení. Nejsou v ní soukromé zprávy, sazby ani mzdové údaje.</p>
+        <p style="color:#8a917f;font-size:12px;">Pokud tlačítko nefunguje, otevři: ${escHtml(url)}</p>
       </div>`,
-    attachments: [{ filename, content: Buffer.from(json).toString('base64') }],
   });
 }
 

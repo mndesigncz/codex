@@ -118,6 +118,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'tresty.sazebnik.pridat': 'Přidána položka sazebníku trestů',
   'tresty.sazebnik.upravit': 'Upravena položka sazebníku trestů',
   'tresty.sazebnik.smazat': 'Smazána položka sazebníku trestů',
+  // Záloha dat (spuštění, balík P): stažení z odkazu v denním e-mailu
+  'data.zaloha.stazeni': 'Stažena záloha dat podniku',
   // docházka (kolo 7: ruční oprava s důvodem)
   'dochazka.upravit': 'Ručně upraven záznam docházky',
   'dochazka.pridat': 'Ručně přidán záznam docházky',
@@ -308,6 +310,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   client: 'klient', klient: 'klient', rezervace: 'klient', recenze: 'klient',
   // nastavení podniku, organizace, předplatné
   podnik: 'nastaveni', rozlozeni: 'nastaveni', onboarding: 'nastaveni', organization: 'nastaveni', billing: 'nastaveni',
+  // záloha dat podniku (spuštění, balík P)
+  data: 'nastaveni',
   // akce (výdej a vrácení zboží, oznámení týmu) — samostatná agenda, patří k ostatnímu
   event: 'ostatni',
   // úkoly a nápady (kolo 7: fotka jako důkaz, zamítnutí s důvodem) — provozní agenda, patří k ostatnímu
