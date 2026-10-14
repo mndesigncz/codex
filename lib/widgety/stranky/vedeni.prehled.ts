@@ -96,6 +96,8 @@ export const STRANKA: DefiniceStranky = {
       { w: 'hodnoceni.ohodnotit_smeny', s: 'L' },
       { w: 'akce.nejblizsi', s: 'M' },
       { w: 'oznameni.nastenka', s: 'M' },
+      // Kolo 11: „Úkoly za body dnes" na konci — vedení vidí, co si lidé berou za body, i s uloženou plochou (pridano).
+      { w: 'odmeny.za_body_tymu', s: 'L' },
     ],
     'role:skladnik': [
       { w: 'sklad.dochazi', s: 'L' },

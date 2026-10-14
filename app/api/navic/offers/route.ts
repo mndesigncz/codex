@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { jeClenem } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import { terminNabidky, urcenoPro, validujNabidku } from '@/lib/navic';
@@ -18,6 +19,12 @@ import { predMigraci, tvarNabidky } from '../_spolecne';
 // DELETE ?id= → archivace (zápisy, které na položku ukazují, zůstanou i s jejím názvem)
 
 export const dynamic = 'force-dynamic';
+
+/** Komu je úkol určený: jen členové tohoto podniku (prázdné = všem, to projde). */
+async function jenClenove(ids: readonly number[], teamId: number): Promise<boolean> {
+  for (const id of ids) if (!(await jeClenem(id, teamId))) return false;
+  return true;
+}
 
 const sql = neon(process.env.DATABASE_URL!);
 const chyba = (text: string, status: number) => NextResponse.json({ error: text }, { status });
@@ -49,6 +56,7 @@ export async function POST(req: NextRequest) {
   const v = validujNabidku(b ?? {});
   if (!v.ok) return chyba(v.chyba, 400);
   const n = v.nabidka;
+  if (!(await jenClenove(n.targetUsers, c.teamId))) return chyba('Úkol jde určit jen lidem z podniku.', 400);
   try {
     const [row] = await sql`
       INSERT INTO extra_offers (team_id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day,
@@ -108,6 +116,7 @@ export async function PATCH(req: NextRequest) {
     });
     if (!v.ok) return chyba(v.chyba, 400);
     const n = v.nabidka;
+    if (!(await jenClenove(n.targetUsers, c.teamId))) return chyba('Úkol jde určit jen lidem z podniku.', 400);
     const [row] = await sql`
       UPDATE extra_offers SET title = ${n.title}, description = ${n.description}, points = ${n.points}, bonus_czk = ${n.bonusCzk},
         auto_approve = ${n.autoApprove}, active = ${n.active}, valid_from = ${n.validFrom}, valid_to = ${n.validTo}, max_per_day = ${n.maxPerDay},
