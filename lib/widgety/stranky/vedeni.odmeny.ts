@@ -4,6 +4,8 @@
 // o odměny", která dřív visela nad žebříčkem, je teď widget. Kolo 9 (N1): nástroj má navíc část „Navíc"
 // (nabídka „Co se dá udělat navíc") a výchozí rozložení dostalo široký widget Navíc v týmu (fronta + historie).
 // Kolo 10 (balík V): část „Tresty" (sazebník) a široký widget Tresty v týmu (nesouhlasy, návrhy, historie).
+// Kolo 11 (balík V): část „Navíc" je správa Úkolů za body (s odkazem do Úkolů) a výchozí rozložení dostalo
+// „Úkoly za body dnes" hned za Navíc v týmu.
 //
 // Výchozí rozložení je z katalogu: co čeká na člověka (žádosti, nehodnocené směny, výtky) nahoře,
 // nástroj pod tím. Role bez odmeny.schvalovat nebo hodnoceni.zobrazit dostane totéž bez widgetů,
@@ -19,6 +21,7 @@ export const STRANKA: DefiniceStranky = {
   nastroj: { nazev: 'Žebříček a hodnocení', ikona: 'award', popis: 'Žebříček, kalendář hodnocení a nastavení úrovní, bodů a katalogu odměn.' },
   doporucene: [
     'odmeny.navic_tymu',
+    'odmeny.za_body_tymu',
     'odmeny.tresty_tymu',
     'odmeny.zadosti',
     'hodnoceni.nehodnocene',
@@ -32,6 +35,7 @@ export const STRANKA: DefiniceStranky = {
       { w: 'hodnoceni.nehodnocene', s: 'S' },
       { w: 'odmeny.vytky_tymu', s: 'S' },
       { w: 'odmeny.navic_tymu', s: 'L' },
+      { w: 'odmeny.za_body_tymu', s: 'L' },
       { w: 'odmeny.tresty_tymu', s: 'L' },
       { w: 'nastroj' },
     ],

@@ -1,0 +1,26 @@
+{
+ "stranka": "vedeni.ukoly",
+ "polozky": [
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "za-body-tymu",
+   "widget": "odmeny.za_body_tymu",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "odmeny.za_body_tymu",
+  "ukoly.po_terminu"
+ ],
+ "tarifem": [],
+ "zdroj": "aplikace",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

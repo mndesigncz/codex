@@ -22,7 +22,7 @@ import { krokBodu, teloOdmitnuti, teloUznani, uznaniVMezich } from './logika';
 export type AkceNavic = 'uznat' | 'odmitnout';
 
 /** Portál do <body> se značkou pro plochu (klepnutí v okně není gesto nad widgetem). */
-function NadPlochou({ children }: { children: React.ReactNode }) {
+export function NadPlochou({ children }: { children: React.ReactNode }) {
   const [cil, setCil] = useState<HTMLElement | null>(null);
   useEffect(() => { setCil(document.body); }, []);
   return cil ? createPortal(<div data-plocha-chrom="">{children}</div>, cil) : null;

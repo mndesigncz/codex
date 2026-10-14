@@ -6,6 +6,8 @@
 // čísel zůstává sudá na telefonu i na monitoru). Plánované widgety se vynechají, dokud je balík nedodá. Výchozí pro Provozní,
 // Skladníka a Účetní platí jen s aspoň třemi viditelnými widgety a zároveň s aspoň polovinou
 // svých položek viditelných (spec §1.3, pravidlo tří; rozlozeni.ts vychoziZKodu).
+// Kolo 11 (balík V): „Úkoly za body dnes" je v Doporučených. Na konec výchozího pro vedení zatím ne: s `pridano`
+// by ho doplnNove přidalo i do uložených rozložení v testech k68-widgety (řádky bez `upraveno`) — viz hlášení balíku V.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -49,6 +51,7 @@ export const STRANKA: DefiniceStranky = {
     'hodnoceni.ohodnotit_smeny',
     'odmeny.zebricek',
     'odmeny.navic_tymu',
+    'odmeny.za_body_tymu',
     'odmeny.tresty_tymu',
     'akce.nejblizsi',
     'klient.hoste_vernost',

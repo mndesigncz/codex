@@ -22,6 +22,14 @@ export function prelozHlaskuNavic(t: PrekladFn, chyba: string): string {
     case 'Platnost má špatný tvar data.': return t('Platnost má špatný tvar data.');
     case 'Platnost „od" je po „do".': return t('Platnost „od" je po „do".');
     case 'Limit za den musí být 1–50.': return t('Limit za den musí být 1–50.');
+    // Kolo 11: úkoly za body (opakování, kapacita, komu).
+    case 'Limit na člověka musí být 1–50.': return t('Limit na člověka musí být 1–50.');
+    case 'Neznámé opakování.': return t('Neznámé opakování.');
+    case 'Vyber aspoň jeden den v týdnu.': return t('Vyber aspoň jeden den v týdnu.');
+    case 'Interval musí být 2–90 dní.': return t('Interval musí být 2–90 dní.');
+    case 'U opakování po dnech vyplň, od kdy se počítá (platí od).': return t('U opakování po dnech vyplň, od kdy se počítá (platí od).');
+    case 'Kolik lidí ji může vzít: 1–50.': return t('Kolik lidí ji může vzít: 1–50.');
+    case 'Moc vybraných lidí.': return t('Moc vybraných lidí.');
     default: return chyba;
   }
 }

@@ -45,6 +45,11 @@
 // stejná adresa jako fronta v „Čeká na tebe") a slučují s měsícem — nesmí zmizet jen
 // proto, že jsou ze staršího měsíce.
 //
+// Kolo 11 (balík V) — Úkoly za body dnes (odmeny.za_body_tymu): volitelné úkoly, které jde dnes vzít
+// (GET /api/navic/ukoly?scope=team) — kdo si co vzal a kdo co splnil, kolik míst zbývá, čekající zápisy
+// z nich s Uznat / Odmítnout (okno UznatNavic) a „Nový úkol za body" (NabidkaNavicOkno). Prázdný den
+// vede k vypsání prvního úkolu. Části sdílí s Úkoly › Za body (components/navic-vedeni/ZaBodyDnes).
+//
 // Kolo 10 (balík V) — Tresty v týmu (odmeny.tresty_tymu): co kdo pokazil a co za to dostal.
 // Souhrn měsíce, Návrhy z dat (pozdní příchod, manko, výtka — Dát trest předvyplněně / Zahodit),
 // seznam se spornými nahoře (vyjádření člověka, Trest platí dál / Zrušit trest), „···" Upravit /
@@ -80,7 +85,10 @@ import { postupVyzvy, vyberVyzvy, vyzvyKZobrazeni, type MetrikaVyzvy, type Vyzva
 import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney } from '../../CurrencyProvider';
 import { seradNavic, souhrnNavic, urlNavic, type Navic } from '@/lib/navic';
-import { useNavic } from '../../navic-vedeni/data';
+import { URL_UKOLY_TYMU, useNavic, useUkolyZaBody } from '../../navic-vedeni/data';
+import { NabidkaNavicOkno } from '../../navic-vedeni/NabidkaNavicOkno';
+import { FrontaZaBody, RadekUkoluDnes, textSouhrnuZaBody } from '../../navic-vedeni/ZaBodyDnes';
+import { ARG_ZA_BODY, cekajiciZUkolu, seradProVedeni, souhrnZaBody } from '../../navic-vedeni/zaBody';
 import { NavicRadek, textOdmeny } from '../../navic-vedeni/NavicRadek';
 import { UznatNavic, type AkceNavic } from '../../navic-vedeni/UznatNavic';
 import { ZapsatZaClena } from '../../navic-vedeni/ZapsatZaClena';
@@ -1818,6 +1826,77 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
   );
 }
 
+// ---------------------------------------------------------------------------
+// Úkoly za body dnes (kolo 11 — balík V)
+// ---------------------------------------------------------------------------
+
+const ID_ZA_BODY = 'odmeny.za_body_tymu';
+/** Kolik dnešních úkolů ukáže střední karta (zbytek „…a další", celé v L a v Úkolech). */
+const ZA_BODY_M = 3;
+
+/** Widget Úkoly za body dnes: souhrn dne, čekající k uznání, dnešní úkoly s lidmi a volnými místy. */
+function ZaBodyTymu({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
+  const smi = useSmi();
+  const { ok, ceka } = useBranaWidgetu(ID_ZA_BODY, ['navic.zobrazit_tym']);
+  const dnes = useUkolyZaBody(ok ? URL_UKOLY_TYMU : null);
+  const cekajici = useNavic(ok ? URL_NAVIC_CEKA : null);
+  const smiUznat = !nahled && smi(klicCasti(ID_ZA_BODY, 'akce:uznat') ?? 'navic.uznat');
+  const smiNovy = !nahled && smi(klicCasti(ID_ZA_BODY, 'akce:novy') ?? 'navic.nabidka');
+  const [novy, setNovy] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const L = velikost === 'L';
+
+  const ukoly = seradProVedeni(dnes.data?.ukoly ?? []);
+  const fronta = cekajiciZUkolu(cekajici.data?.items ?? []);
+  const videt = L ? ukoly : ukoly.slice(0, ZA_BODY_M);
+  const tlacitko = smiNovy && (
+    <Button variant="secondary" size="sm" icon="plus" className="tap-target" onClick={() => setNovy(true)}>{t('Nový úkol za body')}</Button>
+  );
+  const okna = (
+    <>
+      {novy && !nahled && (
+        <NabidkaNavicOkno onClose={() => setNovy(false)} onHotovo={() => setToast(t('Úkol za body je vypsaný.'))} />
+      )}
+      <Toast message={toast} onClose={() => setToast(null)} />
+    </>
+  );
+
+  return (
+    <Widget nacteni={ceka ? CEKA : [dnes, cekajici]} odkaz={{ popisek: t('Spravovat'), pohled: 'tasks', arg: ARG_ZA_BODY }}
+      doplnek={fronta.length > 0 ? <Chip tone="wait" size="sm">{t('{n} čeká', { n: cislo(fronta.length) })}</Chip> : undefined}
+      prazdno={dnes.data && cekajici.data && ukoly.length === 0 && fronta.length === 0 ? (
+        <div className="space-y-3" data-za-body-prazdno>
+          <p className="t-meta text-pretty">{t('Dnes tu žádný úkol za body není. Vypiš volitelný úkol — kdo chce, vezme si ho a dostane body. Opakování si nastavíš sám.')}</p>
+          {tlacitko}
+          {okna}
+        </div>
+      ) : undefined}>
+      {/* Nový úkol nahoře vedle souhrnu: dole by ho u dlouhého seznamu schovalo zkrácení „Zobrazit vše". */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="t-meta min-w-0" data-za-body-souhrn>{textSouhrnuZaBody(t, souhrnZaBody(ukoly))}</p>
+        {tlacitko}
+      </div>
+      {/* Dnešní úkoly první (hlavní údaj karty — na telefonu nesmí skončit pod „Zobrazit vše"), čekající pod nimi;
+          že něco čeká, říká už chip v hlavičce. */}
+      {ukoly.length > 0 ? (
+        <div className="mt-2">
+          <ul className="list" data-za-body-seznam>{videt.map(u => <RadekUkoluDnes key={u.nabidka.id} u={u} />)}</ul>
+          {ukoly.length > videt.length && <p className="t-meta mt-1">{aDalsich(t, ukoly.length - videt.length)}</p>}
+        </div>
+      ) : (
+        <p className="t-meta mt-3">{t('Dnes se žádný úkol za body nedá vzít.')}</p>
+      )}
+      {fronta.length > 0 && (
+        <div className="mt-3">
+          <FrontaZaBody items={fronta} smiUznat={smiUznat} strop={L ? undefined : 2} />
+        </div>
+      )}
+      {okna}
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'hodnoceni.ohodnotit_smeny': OhodnotitSmeny,
   'hodnoceni.nehodnocene': NehodnoceneSmeny,
@@ -1832,6 +1911,7 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'odmeny.urovne': Urovne,
   'odmeny.navic_tymu': NavicTymu,
   'odmeny.tresty_tymu': TrestyTymu,
+  'odmeny.za_body_tymu': ZaBodyTymu,
   'moje.uroven': MojeUrovenWidget,
   'moje.zpetna_vazba': ZpetnaVazba,
   'moje.hodnoceni_smen': HodnoceniSmen,
