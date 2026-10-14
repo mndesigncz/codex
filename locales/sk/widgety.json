@@ -2421,5 +2421,6 @@
   "Navíc v týmu": "Navyše v tíme",
   "Co kdo udělal nad rámec povinností — čekající k uznání s body nebo prémií, uznané a odmítnuté za měsíc.": "Čo kto urobil nad rámec povinností — čakajúce na uznanie s bodmi alebo prémiou, uznané a odmietnuté za mesiac.",
   "Navíc k uznání": "Navyše na uznanie",
-  "Domů": "Domov"
+  "Domů": "Domov",
+  "{n, plural, one {# uznaný zápis navíc} few {# uznané zápisy navíc} other {# uznaných zápisů navíc}}": "{n, plural, one {# uznaný zápis navyše} few {# uznané zápisy navyše} other {# uznaných zápisov navyše}}"
 }

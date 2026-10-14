@@ -587,6 +587,7 @@ function pocetZaBody(t: PrekladFn, klic: string, n: number): string | null {
     case 'uzaverky': return t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n });
     case 'hodnoceni': return t('{n, plural, one {# hodnocená směna} few {# hodnocené směny} other {# hodnocených směn}}', { n });
     case 'pochvaly': return t('{n, plural, one {# pochvala} few {# pochvaly} other {# pochval}}', { n });
+    case 'navic': return t('{n, plural, one {# uznaný zápis navíc} few {# uznané zápisy navíc} other {# uznaných zápisů navíc}}', { n });
     default: return null;
   }
 }
@@ -599,6 +600,7 @@ function nazevRadkuBodu(t: PrekladFn, klic: string, nazev: string): string {
     case 'uzaverky': return t('Uzávěrky');
     case 'hodnoceni': return t('Z hodnocení směn');
     case 'pochvaly': return t('Pochvaly');
+    case 'navic': return t('Navíc');
     case 'polozky': return t('U položek a za odměny');
     default: return nazev;
   }

@@ -574,7 +574,7 @@
   "Nastavit sazbu: {jmeno}": "Ustaw stawkę: {jmeno}",
   "Nastavit sdílení": "Skonfiguruj udostępnianie",
   "Nastavit widget": "Ustaw widżet",
-  "Navíc": "Ekstra",
+  "Navíc": "Dodatkowo",
   "Načítám sklad…": "Wczytuję magazyn…",
   "Načítám členy…": "Wczytywanie członków…",
   "Načítám…": "Wczytywanie…",
@@ -2418,5 +2418,6 @@
   "Navíc v týmu": "Dodatkowo w zespole",
   "Co kdo udělal nad rámec povinností — čekající k uznání s body nebo prémií, uznané a odmítnuté za měsíc.": "Co kto zrobił ponad obowiązki — czekające na uznanie z punktami lub premią, uznane i odrzucone w miesiącu.",
   "Navíc k uznání": "Dodatkowa praca do uznania",
-  "Domů": "Dom"
+  "Domů": "Dom",
+  "{n, plural, one {# uznaný zápis navíc} few {# uznané zápisy navíc} other {# uznaných zápisů navíc}}": "{n, plural, one {# uznany wpis dodatkowy} few {# uznane wpisy dodatkowe} many {# uznanych wpisów dodatkowych} other {# uznanego wpisu dodatkowego}}"
 }

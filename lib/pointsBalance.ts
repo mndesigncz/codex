@@ -13,13 +13,15 @@ export interface PointsBreakdown {
   autoPoints: number;    // points the system derived from the shift itself
   itemPoints: number;    // points attached to individual tasks/runs/closings
   flagged: number;       // reviews or items marked "něco je špatně"
-  awards: number;        // body z pochval mimo hodnocení směny (point_awards)
+  awards: number;        // body z pochval mimo hodnocení směny (point_awards, kind <> 'navic')
   awardCount: number;    // kolik pochval
+  navicPoints: number;   // body za uznané zápisy navíc (point_awards kind = 'navic')
+  navicCount: number;    // kolik uznaných zápisů navíc
 }
 
 /** Prázdný rozpad — jeden tvar pro „člen bez bodů" všude (route i dávka). */
 export const PRAZDNY_ROZPAD: PointsBreakdown = {
-  tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0, awards: 0, awardCount: 0,
+  tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0, awards: 0, awardCount: 0, navicPoints: 0, navicCount: 0,
 };
 
 // Count the point-earning signals for one user (each guarded so a missing
@@ -62,14 +64,25 @@ export async function breakdownFor(teamId: number, userId: number): Promise<Poin
       FROM shift_review_items WHERE employee_id = ${userId} AND team_id = ${teamId}`;
     itemPoints = r?.pts ?? 0; flagged += r?.flg ?? 0;
   } catch { /* table missing */ }
-  let awards = 0, awardCount = 0;
+  let awards = 0, awardCount = 0, navicPoints = 0, navicCount = 0;
   try {
+    // Pochvaly a uznané zápisy navíc zvlášť (sloupec kind přibyl s kolem 9; bez něj je všechno pochvala).
     const [r] = await sql`
-      SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n
+      SELECT COALESCE(SUM(points) FILTER (WHERE COALESCE(kind, 'vedeni') <> 'navic'),0)::int AS pts,
+             COUNT(*) FILTER (WHERE COALESCE(kind, 'vedeni') <> 'navic')::int AS n,
+             COALESCE(SUM(points) FILTER (WHERE kind = 'navic'),0)::int AS npts,
+             COUNT(*) FILTER (WHERE kind = 'navic')::int AS nn
       FROM point_awards WHERE user_id = ${userId} AND team_id = ${teamId}`;
-    awards = r?.pts ?? 0; awardCount = r?.n ?? 0;
-  } catch { /* table missing */ }
-  return { tasks, procedures, closings, reviewPoints, ratedShifts, autoPoints, itemPoints, flagged, awards, awardCount };
+    awards = r?.pts ?? 0; awardCount = r?.n ?? 0; navicPoints = r?.npts ?? 0; navicCount = r?.nn ?? 0;
+  } catch {
+    try {
+      const [r] = await sql`
+        SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n
+        FROM point_awards WHERE user_id = ${userId} AND team_id = ${teamId}`;
+      awards = r?.pts ?? 0; awardCount = r?.n ?? 0;
+    } catch { /* table missing */ }
+  }
+  return { tasks, procedures, closings, reviewPoints, ratedShifts, autoPoints, itemPoints, flagged, awards, awardCount, navicPoints, navicCount };
 }
 
 // Batched varianta breakdownFor pro celý tým naráz: místo 5 dotazů na každého
@@ -150,18 +163,30 @@ export async function breakdownForTeam(teamId: number, userIds: number[], od: st
 
   try {
     const rows = await sql`
-      SELECT user_id AS uid, COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n
+      SELECT user_id AS uid,
+             COALESCE(SUM(points) FILTER (WHERE COALESCE(kind, 'vedeni') <> 'navic'),0)::int AS pts,
+             COUNT(*) FILTER (WHERE COALESCE(kind, 'vedeni') <> 'navic')::int AS n,
+             COALESCE(SUM(points) FILTER (WHERE kind = 'navic'),0)::int AS npts,
+             COUNT(*) FILTER (WHERE kind = 'navic')::int AS nn
       FROM point_awards WHERE user_id = ANY(${userIds}) AND team_id = ${teamId}
         AND (${odCas}::text IS NULL OR created_at >= ${odCas}::timestamp) GROUP BY user_id`;
-    for (const r of rows as any[]) { const b = map.get(r.uid); if (b) { b.awards = r.pts; b.awardCount = r.n; } }
-  } catch { /* table missing */ }
+    for (const r of rows as any[]) { const b = map.get(r.uid); if (b) { b.awards = r.pts; b.awardCount = r.n; b.navicPoints = r.npts; b.navicCount = r.nn; } }
+  } catch {
+    try {
+      const rows = await sql`
+        SELECT user_id AS uid, COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n
+        FROM point_awards WHERE user_id = ANY(${userIds}) AND team_id = ${teamId}
+          AND (${odCas}::text IS NULL OR created_at >= ${odCas}::timestamp) GROUP BY user_id`;
+      for (const r of rows as any[]) { const b = map.get(r.uid); if (b) { b.awards = r.pts; b.awardCount = r.n; } }
+    } catch { /* table missing */ }
+  }
 
   return map;
 }
 
 export function totalPoints(b: PointsBreakdown, pt: PointsConfig): number {
   return b.tasks * pt.task + b.procedures * pt.procedure + b.closings * pt.closing
-    + b.reviewPoints + b.autoPoints + b.itemPoints + (b.awards ?? 0);
+    + b.reviewPoints + b.autoPoints + b.itemPoints + (b.awards ?? 0) + (b.navicPoints ?? 0);
 }
 
 /** Current spendable balance: earned total minus reward requests still waiting

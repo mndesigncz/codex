@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
-import { resolveActingUser } from '@/lib/kioskActing';
+import { jeUcetTabletu, resolveActingUser } from '@/lib/kioskActing';
 import { jeClenem } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
@@ -103,7 +103,21 @@ export async function POST(req: NextRequest) {
   let b: any;
   try { b = await req.json(); } catch { return chyba('Neplatný požadavek.', 400); }
   const ucet = typNaUcet(c.role.typ);
-  const actingId = await resolveActingUser(c.meId, ucet, c.teamId, b?.actingAs, req);
+  let actingId = await resolveActingUser(c.meId, ucet, c.teamId, b?.actingAs, req);
+  // Tablet hned po odchodu: resolveActingUser bere jen odpíchnuté, ale navíc se
+  // píše až po odchodu. Kdo z tohoto podniku odešel za poslední 3 hodiny, smí.
+  const chceZa = Number(b?.actingAs);
+  if (ucet === 'kiosk' && actingId === c.meId && Number.isInteger(chceZa) && chceZa > 0 && chceZa !== c.meId
+    && c.teamId && await jeUcetTabletu(c.meId, c.teamId) && await jeClenem(chceZa, c.teamId)) {
+    try {
+      const [r] = await sql`
+        SELECT 1 AS ok FROM time_entries
+        WHERE employee_id = ${chceZa} AND (team_id = ${c.teamId} OR team_id IS NULL)
+          AND clock_out IS NOT NULL AND clock_out >= NOW() - INTERVAL '3 hours'
+        LIMIT 1`;
+      if (r) actingId = chceZa;
+    } catch { /* bez docházky zůstane tablet sám za sebe */ }
+  }
   // Za koho se zapisuje: sám za sebe (i tablet za vybraného), nebo vedení za člena.
   const cilovy = Number.isInteger(Number(b?.userId)) && Number(b.userId) > 0 ? Number(b.userId) : actingId;
   if (cilovy !== actingId && !smiUznat) return chyba('Zapsat navíc za jiného člověka smí jen ten, kdo navíc uznává.', 403);

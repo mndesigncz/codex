@@ -39,8 +39,7 @@ export interface Rozpad {
   pochvaly: number; pochval: number;
   /**
    * Body za uznané „navíc" (kolo 9, N1: point_awards kind 'navic') a kolik zápisů to bylo.
-   * Server je zatím posílá uvnitř `awards` (pochvaly) — jakmile pošle `navicPoints` / `navicCount`
-   * zvlášť, ukáže se řádek „Navíc" sám; do té doby jsou v Pochvalách a součet sedí.
+   * Server je posílá zvlášť (`navicPoints` / `navicCount`), v `awards` nejsou — součet sedí.
    */
   navic: number; navicPocet: number;
 }
