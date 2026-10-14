@@ -26,6 +26,7 @@ import {
 import { formatujPriPsani } from '@/lib/poukazy';
 import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
 import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
+import CekaNaZaplaceni, { ParovaniHosta } from './CekaNaZaplaceni';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const RAZITKO: CzNoun = { one: 'razítko', few: 'razítka', many: 'razítek' };
@@ -81,6 +82,8 @@ export default function CteckaKasa() {
   const [aktivni, setAktivni] = useState(true);
   const [offline, setOffline] = useState(false);
   const [mene, setMene] = useState(false);
+  // Párování s účtem z pokladny: po skenu a po akci se seznam „Čeká na zaplacení“ načte hned.
+  const [obnovaParovani, setObnovaParovani] = useState(0);
 
   const pole = useRef<HTMLInputElement>(null);
   const buf = useRef({ text: '', casy: [] as number[], posledni: 0, rucniPole: false });
@@ -175,6 +178,7 @@ export default function CteckaKasa() {
           try {
             const d = await fetch(`/api/client/staff/scan?code=${encodeURIComponent(r.kod)}`).then(okJson);
             setFaze({ druh: 'host', kod: r.kod, data: d }); zapis(d.customer?.name ?? r.kod, true, r.kod); pipni(true);
+            if (d.parovani) setObnovaParovani(n => n + 1);
           } catch (e) { const t = chyba(e, 'karta'); setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
         }
       } else if (r.typ === 'kupon') {
@@ -315,6 +319,7 @@ export default function CteckaKasa() {
       // Vypršelá karta a razítka, která se nevešla, zůstávají vidět i po návratu na „Čekám“ (do dalšího hosta).
       setUpoz({ expiredCount: x.expiredCount, lost: x.lost });
       ohlas(x.message, true); zapis(x.message, true, kod);
+      if (action === 'bill') setObnovaParovani(n => n + 1);
     } catch (e) {
       klicAkce.pochybe(e instanceof ApiError ? e.status : null);
       ohlas(chyba(e, 'karta'), false);
@@ -448,6 +453,9 @@ export default function CteckaKasa() {
               </div>
             )}
 
+            {/* Pokladna Storyous: sken založil párování, body se připíšou samy po zaplacení. */}
+            {h.parovani && <ParovaniHosta parovani={h.parovani} velke onZmena={() => setObnovaParovani(n => n + 1)} />}
+
             {/* Nejčastější akce nahoře: razítko, účtenky, body z částky. */}
             <div className="space-y-2">
               <Button size="lg" variant="primary" icon="check" block loading={busy === 'stamp'}
@@ -455,6 +463,7 @@ export default function CteckaKasa() {
                 onClick={() => akce('stamp')}>
                 {h.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
               </Button>
+              {h.bills?.length > 0 && h.parovani && <p className="t-label pt-1">Nebo vyber účet hned</p>}
               {h.bills?.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {h.bills.map((bl: any) => (
@@ -568,6 +577,9 @@ export default function CteckaKasa() {
           placeholder="Opsat kód ručně" autoCapitalize="characters" autoComplete="off" className="font-mono tracking-[0.15em] flex-1 basis-40 uppercase !w-auto !h-12" />
         <Button type="submit" size="lg" variant="secondary" icon="search" disabled={rucneRozpoznano === 'prazdny'}>Najít</Button>
       </form>
+
+      {/* Čekající párování a spárované účty (jen s pokladnou Storyous). Hláška jde do historie, ať nepřeruší dalšího hosta. */}
+      <CekaNaZaplaceni obnovit={obnovaParovani} velke onToast={t => { zapis(t, true); pipni(true); }} />
 
       <div className="flex items-center gap-2 flex-wrap">
         <span className="t-label">Návrat na čekání</span>

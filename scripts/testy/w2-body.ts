@@ -285,7 +285,8 @@ export default async function ({ eq, ok }: Testy) {
 
   // ---- kasa a objednávky berou jedno pravidlo ----
   {
-    const scan = bezKomentaru(precti('app/api/client/staff/scan/route.ts'));
+    // Připsání z účtenky žije od spuštění (balík Q) v jádru lib/vernostZUctu.ts; kasa ho volá.
+    const scan = bezKomentaru(precti('app/api/client/staff/scan/route.ts')) + bezKomentaru(precti('lib/vernostZUctu.ts'));
     ok('kasa: body a cashback z účtenky i částky přes odmenaZUctu, ne floor(částka/100) natvrdo', (scan.match(/odmenaZUctu\(/g) ?? []).length === 2 && !/Math\.floor\(total \/ 100\)/.test(scan) && !/Math\.floor\(amount \/ 100\)/.test(scan));
     ok('kasa: kredit/poukaz od obsluhy (prepaid) a položky z účtenky jdou do výpočtu', /predplaceno: b\.prepaid/.test(scan) && /polozky/.test(scan));
     ok('kasa: odmítnutá částka řekne proč (strop, minimum, kredit)', /omezeni\.join/.test(scan));

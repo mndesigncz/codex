@@ -135,7 +135,8 @@ export default function ({ eq, ok }: Testy) {
 
   // ---- Zdroje: souběhy a integrita ----
   const stamps = zdroj('lib/stamps.ts');
-  const scan = zdroj('app/api/client/staff/scan/route.ts');
+  // Připsání z účtenky žije od spuštění (balík Q) v jádru lib/vernostZUctu.ts; kasa ho volá.
+  const scan = zdroj('app/api/client/staff/scan/route.ts') + zdroj('lib/vernostZUctu.ts');
   const admin = zdroj('app/api/client/admin/stamps/route.ts');
   const member = zdroj('app/api/client/admin/stamps/member/route.ts');
   const init = zdroj('app/api/init/route.ts');

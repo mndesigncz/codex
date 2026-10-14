@@ -51,6 +51,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   client_reservations: 'upravit', client_orders: 'upravit',
   // dárkový poukaz je závazek podniku: zůstane platný, jen se odpojí od účtu a vymažou se osobní texty (viz planUzivatele)
   client_vouchers: 'upravit',
+  // čekající párování kartičky s účtem (spuštění, balík Q): bez hosta nemá smysl
+  client_bill_claims: 'smazat',
   // osobní text a soubory: řádek zůstává podniku, osobní obsah se maže (viz OSOBNI_UDAJE)
   uploads: 'upravit', audit_log: 'upravit', content_reports: 'upravit',
   // záznamy podniku: anonymní autor, obsah patří podniku
@@ -136,6 +138,8 @@ export const TYMOVE_TABULKY = [
   'penalties', 'penalty_types', 'penalty_dismissed',
   // kolo 11: volitelné úkoly
   'extra_claims',
+  // spuštění (balík Q): párování kartičky s účtem z pokladny
+  'client_bill_claims',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */
 export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_audit'];
@@ -231,6 +235,9 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
   if (u.role === 'customer') {
     for (const t of ['client_cards', 'client_memberships', 'client_loyalty_ledger', 'client_stamp_progress', 'client_coupon_claims',
       'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards', 'client_import_clenove', 'client_member_notes', 'client_automatizace_log', 'client_stamp_events']) del(t, 'customer_id');
+    del('client_bill_claims', 'customer_id');
+    // Účet v pokladně patří podniku; jen se odpojí od hosta, kterého k němu věrnost přiřadila.
+    k.push(volitelny('odpojit účty z pokladny od hosta', `UPDATE pos_bills SET customer_id = NULL WHERE customer_id = $1`, [id]));
     // Budoucí rezervace se zruší (podnik s nimi nepočítá s anonymem), minulým zmizí poznámka.
     k.push(volitelny('zrušit budoucí rezervace', `UPDATE client_reservations SET status = 'cancelled', note = NULL WHERE customer_id = $1 AND date >= $2 AND status IN ('requested', 'confirmed')`, [id, u.dnes]));
     k.push(volitelny('vymazat poznámky rezervací', `UPDATE client_reservations SET note = NULL WHERE customer_id = $1`, [id]));

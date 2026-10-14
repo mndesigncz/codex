@@ -204,5 +204,30 @@ export const ostatni: Obsluha = (p, k) => {
       pos: { connected: true, autoPos: true, tables: 8, tablesPaired: 8, items: 24, itemsLinked: 24 },
     });
   }
+
+  // ---- Kartička hosta u kasy (CardScan, čtečka) a párování s účtem z pokladny ----
+  // Ukázkový podnik pokladnu Storyous nemá: párování se nekreslí (pos: false) a kasa se chová
+  // jako bez pokladny — host se načte a razítko nebo body z částky se jen ohlásí.
+  if (cesta === '/api/client/staff/claims') {
+    if (metoda === 'PATCH') return chyba('Ukázka nemá napojenou pokladnu.', 409);
+    return ok({ pos: false, ceka: [], hotovo: [], stoly: [] });
+  }
+  if (cesta === '/api/client/staff/scan') {
+    const host = {
+      customer: { id: 901, name: 'Klára Vojtíšková' }, member: true, points: 120, credit: 0, stamps: 3, visits: 6, spend: 1840,
+      campaigns: [], posledniAkce: null, polozky: [], lastVisit: null, birthdayToday: false, tierBy: 'visits',
+      levelLabel: 'Člen', tier: 'bronze', discount: 0, discountSource: null, discountName: null, tierDiscount: 0,
+      nextTierAt: 10, nextTierLabel: 'Stříbrný', nextTierUnit: 'visits', stampedToday: false, openCoupons: [], affordable: [],
+      bills: [], parovani: null,
+      rules: { pointsPer100: 5, stampTarget: 8, stampReward: 'Káva zdarma', cashbackPct: 0, bodyPravidla: null },
+    };
+    if (metoda === 'POST') {
+      const akce = String(p.telo?.action ?? '');
+      if (akce === 'stamp') return ok({ ok: true, message: 'Klára Vojtíšková: razítko 4/8.', ...host, stamps: 4, stampedToday: true });
+      if (akce === 'points') return ok({ ok: true, message: `Klára Vojtíšková: +${Math.floor((Number(p.telo?.amount) || 0) / 100) * 5} bodů.`, ...host });
+      return chyba('V ukázce jde dát razítko nebo body z částky.', 400);
+    }
+    return ok(host);
+  }
   return undefined;
 };
