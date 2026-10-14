@@ -34,6 +34,7 @@ import { fmtDatum } from '@/lib/i18n/format';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { CILE, NAZEV_VELIKOSTI, TYPY, VELIKOSTI_TYMU, type Cil, type TypPodniku, type VelikostTymu } from '@/lib/pruvodce/typy';
 import { doporucenyTarif } from '@/lib/pruvodce/plan';
+import SouhlasPodminek from '@/components/pravni/SouhlasPodminek';
 import './cesta.css';
 
 const CheckoutModal = dynamic(() => import('@/components/CheckoutModal'), { ssr: false });
@@ -66,6 +67,9 @@ export default function Cesta() {
   const [email, setEmail] = useState('');
   const [heslo, setHeslo] = useState('');
   const [ukazHeslo, setUkazHeslo] = useState(false);
+  // Click-wrap (spuštění, balík P): bez zaškrtnutí souhlasu se podnik nezaloží (server to hlídá taky).
+  const [souhlas, setSouhlas] = useState(false);
+  const [chybaSouhlasu, setChybaSouhlasu] = useState<string | null>(null);
   const [chyba, setChyba] = useState('');
   const [existuje, setExistuje] = useState(false);
   const [prihlaseniSelhalo, setPrihlaseniSelhalo] = useState(false);
@@ -126,11 +130,12 @@ export default function Cesta() {
     e.preventDefault();
     setChyba(''); setExistuje(false);
     if (heslo.length < 8) { setChyba(t('Heslo musí mít alespoň 8 znaků.')); return; }
+    if (!souhlas) { setChybaSouhlasu(t('Bez souhlasu s podmínkami účet založit nejde.')); return; }
     setOdesila(true);
     try {
       const res = await fetch('/api/register', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: jmeno, email, password: heslo, teamName: nazev.trim(), ref: ref || undefined, odpovedi: { typ, nazev: nazev.trim(), tym: velikost ? { velikost } : undefined, cile } }),
+        body: JSON.stringify({ name: jmeno, email, password: heslo, terms: souhlas, teamName: nazev.trim(), ref: ref || undefined, odpovedi: { typ, nazev: nazev.trim(), tym: velikost ? { velikost } : undefined, cile } }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -287,6 +292,8 @@ export default function Cesta() {
                   </div>
                 </div>
               </div>
+              <SouhlasPodminek id="cs-souhlas" className="mt-4" checked={souhlas} chyba={chybaSouhlasu}
+                onChange={v => { setSouhlas(v); if (v) setChybaSouhlasu(null); }} />
               {prihlaseniSelhalo && (
                 <p className="note note-wait mt-4 text-sm" role="alert">
                   {t('Podnik je založený, jen se nepodařilo přihlásit.')} <Link href="/login" className="font-semibold underline underline-offset-2">{t('Přihlásit se')}</Link>
@@ -300,14 +307,6 @@ export default function Cesta() {
               <button type="submit" disabled={odesila || prihlaseniSelhalo || !jmeno.trim() || !email.trim() || heslo.length < 8} className="cs-dal mt-6">
                 {odesila ? t('Zakládám podnik…') : t('Založit podnik')}
               </button>
-              {t.jazyk === 'cs' ? (
-                <p className="mt-4 text-xs text-black/55 text-pretty">Založením účtu souhlasíš s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a bereš na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>/* i18n-ok: česká právní věta s odkazy jen pro češtinu */
-              ) : (
-                <p className="mt-4 text-xs text-black/55 text-pretty">
-                  {t('Založením účtu souhlasíš s podmínkami užívání a bereš na vědomí zásady ochrany osobních údajů.')}{' '}
-                  <Link href="/en/podminky" className="underline underline-offset-2">{t('Podmínky užívání')}</Link> · <Link href="/en/soukromi" className="underline underline-offset-2">{t('Zásady ochrany osobních údajů')}</Link>
-                </p>
-              )}
             </form>
           )}
 

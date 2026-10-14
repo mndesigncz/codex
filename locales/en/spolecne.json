@@ -330,5 +330,15 @@
   "připnuto": "pinned",
   "Přidat poznámku… @jméno někoho upozorní": "Add a note… @name notifies someone",
   "Koho zmínit": "Who to mention",
-  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Ctrl+Enter sends · @name notifies a colleague"
+  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Ctrl+Enter sends · @name notifies a colleague",
+  "Souhlasím s podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.": "I agree to the terms of use and acknowledge the privacy policy.",
+  "Podmínky užívání": "Terms of use",
+  "Zásady ochrany osobních údajů": "Privacy policy",
+  "Je mi aspoň {n} let.": "I am at least {n} years old.",
+  "Bez souhlasu s podmínkami účet založit nejde.": "You can't create an account without agreeing to the terms.",
+  "Aktualizovali jsme podmínky": "We've updated our terms",
+  "Platí od {datum}. Než budeš pokračovat, potvrď je prosím.": "In effect from {datum}. Please confirm them before you continue.",
+  "Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.": "The changes concern what data the app processes and how it handles it. The full text is in the links below.",
+  "Souhlasím a pokračovat": "Agree and continue",
+  "Souhlas se nepodařilo uložit. Zkus to znovu.": "Your consent couldn't be saved. Try again."
 }

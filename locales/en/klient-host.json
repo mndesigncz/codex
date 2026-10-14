@@ -46,6 +46,8 @@
   "Fotky z podniku": "Photos of the place",
   "Heslo": "Password",
   "Heslo musí mít alespoň 8 znaků.": "The password must be at least 8 characters long.",
+  "Bez souhlasu s podmínkami účet založit nejde.": "You can't create an account without agreeing to the terms.",
+  "Účet hosta si můžeš založit od 15 let.": "You can create a guest account from the age of 15.",
   "Historie ({n})": "History ({n})",
   "Historie bodů a kuponů": "Points and coupon history",
   "Historie se nenačetla": "The history didn't load",

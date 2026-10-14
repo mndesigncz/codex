@@ -6,7 +6,9 @@
 // Sem se z databáze nikdy nedostane hash hesla ani tokeny: profil prochází bílou listinou polí.
 
 /** Pole profilu, která smí do souboru. Cokoli jiného (hash hesla, tokeny, interní příznaky) se zahodí. */
-export const POLE_PROFILU = ['id', 'name', 'email', 'avatar', 'phone', 'job_title', 'shift_preference', 'theme', 'role', 'created_at'] as const;
+export const POLE_PROFILU = ['id', 'name', 'email', 'avatar', 'phone', 'job_title', 'shift_preference', 'theme', 'role', 'created_at',
+  // Spuštění (balík P): kdy a s jakou verzí podmínek a zásad člověk souhlasil.
+  'terms_version', 'privacy_version', 'terms_accepted_at'] as const;
 
 export interface SekceExportu {
   ucet: Record<string, unknown> | null;

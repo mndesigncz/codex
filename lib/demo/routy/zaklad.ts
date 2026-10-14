@@ -131,6 +131,8 @@ export const zaklad: Obsluha = (p, k) => {
   if (cesta === '/api/account') return metoda === 'GET'
     ? ok({ id: KDO_JSEM[s.role], name: clen(KDO_JSEM[s.role]).name, email: clen(KDO_JSEM[s.role]).email, theme: 'light' })
     : ok({ ok: true });
+  // Brána nové verze podmínek (spuštění, balík P) se v ukázce nemontuje; kdyby se zeptala, souhlas je aktuální.
+  if (cesta === '/api/account/souhlas') return metoda === 'GET' ? ok({ potreba: false }) : ok({ ok: true });
   if (cesta === '/api/opening-hours') return metoda === 'GET' ? ok({ openingHours: OTEVIRACI_DOBA }) : ok({ ok: true, openingHours: OTEVIRACI_DOBA });
   if (cesta === '/api/notifications') {
     if (metoda === 'PATCH') { s.notifikace.forEach(n => { n.is_read = true; }); return ok(); }

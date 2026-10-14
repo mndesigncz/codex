@@ -10,6 +10,8 @@ import { linkNewMember } from '@/lib/chat';
 import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
 import { normalizujEmail } from '@/lib/emailAdresa';
+import { HLASKA_BEZ_SOUHLASU, souhlasZTela } from '@/lib/pravni/verze';
+import { zapisSouhlas } from '@/lib/pravni/souhlasDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,10 @@ export async function POST(request: Request) {
     }
     if (password.length < 8) {
       return NextResponse.json({ error: 'Heslo musí mít alespoň 8 znaků' }, { status: 400 });
+    }
+    // Click-wrap (spuštění, balík P): zaměstnanec souhlasí s podmínkami sám za sebe.
+    if (!souhlasZTela(b)) {
+      return NextResponse.json({ error: HLASKA_BEZ_SOUHLASU }, { status: 400 });
     }
 
     // Kód týmu má šest znaků — asi miliarda kombinací. Bez limitu se dal
@@ -64,6 +70,8 @@ export async function POST(request: Request) {
       INSERT INTO users (name, email, password_hash, role, avatar, team_id, employer_id)
       VALUES (${name}, ${email}, ${passwordHash}, ${ucet}, '👤', ${team.id}, ${team.owner_id})
       RETURNING id, name, email, role`;
+
+    await zapisSouhlas(Number(user.id));
 
     // Členství hned při vstupu — ne až při prvním přihlášení (kolo 62).
     try {

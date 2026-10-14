@@ -8,6 +8,7 @@ import { LogoMark } from '@/components/Icons';
 import { okJson } from '@/lib/api';
 import JazykMenu from '@/components/ui/JazykMenu';
 import { useT } from '@/lib/i18n/client';
+import SouhlasPodminek from '@/components/pravni/SouhlasPodminek';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -26,6 +27,9 @@ function JoinForm() {
   const [teamName, setTeamName] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Click-wrap (spuštění, balík P): zaměstnanec souhlasí s podmínkami sám; server bez `terms: true` účet nezaloží.
+  const [souhlas, setSouhlas] = useState(false);
+  const [chybaSouhlasu, setChybaSouhlasu] = useState<string | null>(null);
 
   // Prefill from invitation token
   useEffect(() => {
@@ -44,6 +48,7 @@ function JoinForm() {
     e.preventDefault();
     setError('');
     if (password.length < 8) { setError(t('Heslo musí mít alespoň 8 znaků.')); return; }
+    if (!souhlas) { setChybaSouhlasu(t('Bez souhlasu s podmínkami účet založit nejde.')); return; }
     setIsLoading(true);
 
     try {
@@ -51,12 +56,12 @@ function JoinForm() {
       if (token) {
         res = await fetch('/api/invitations/accept', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, name, password }),
+          body: JSON.stringify({ token, name, password, terms: souhlas }),
         });
       } else {
         res = await fetch('/api/teams/join', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, joinCode }),
+          body: JSON.stringify({ name, email, password, joinCode, terms: souhlas }),
         });
       }
       const data = await res.json();
@@ -106,6 +111,9 @@ function JoinForm() {
               <input id="join-heslo" autoComplete="new-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('Minimálně 8 znaků')} required className={inputClass} />
             </div>
 
+            <SouhlasPodminek id="join-souhlas" checked={souhlas} chyba={chybaSouhlasu}
+              onChange={v => { setSouhlas(v); if (v) setChybaSouhlasu(null); }} />
+
             {error && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{error}</div>}
 
             <button type="submit" disabled={isLoading} className="w-full py-3 rounded-full bg-[#C8F542] hover:brightness-110 disabled:opacity-50 text-black font-semibold transition text-sm active:scale-[0.98]">
@@ -113,7 +121,6 @@ function JoinForm() {
             </button>
           </form>
 
-          <p className="mt-5 text-xs text-black/45 text-center text-pretty">Vytvořením účtu souhlasíte s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a berete na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>{/* i18n-ok: právní věta zůstává česky */}
           <p className="text-center text-black/45 text-sm mt-6">
             {t('Už máte účet?')} <Link href="/login" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">{t('Přihlásit se')}</Link>
           </p>

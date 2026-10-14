@@ -31,8 +31,14 @@ export async function GET() {
 
   const [ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy, tresty, body, navic, upravyMzdy, hodnoceni, hodnoceniPolozek] = await Promise.all([
     sekce(async () => {
-      const [u] = await sql`SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role, created_at FROM users WHERE id = ${id}`;
-      return (u ?? null) as Record<string, unknown> | null;
+      // S verzí souhlasu s podmínkami (spuštění, balík P); před migrací sloupců bez ní.
+      try {
+        const [u] = await sql`SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role, created_at, terms_version, privacy_version, terms_accepted_at FROM users WHERE id = ${id}`;
+        return (u ?? null) as Record<string, unknown> | null;
+      } catch {
+        const [u] = await sql`SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role, created_at FROM users WHERE id = ${id}`;
+        return (u ?? null) as Record<string, unknown> | null;
+      }
     }),
     sekce(async () => {
       const [u] = await sql`SELECT lang, notif_prefs FROM users WHERE id = ${id}`;
