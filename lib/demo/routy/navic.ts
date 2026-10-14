@@ -6,16 +6,19 @@ import { ok, chyba, type Obsluha } from '../typy';
 import { KDO_JSEM, LIDE, clen } from '../data/lide';
 import { dnes, posunDen } from '../cas';
 import { mojeRole } from './zaklad';
-import { limitNabidkyVycerpan, nabidkaPlatna, validujNabidku, validujZapis, type Navic, type NabidkaNavic } from '@/lib/navic';
+import { limitNabidkyVycerpan, nabidkaPlatna, rozsahTerminu, seradUkoly, stavUkolu, terminNabidky, urcenoPro, validujNabidku, validujZapis, type Navic, type NabidkaNavic, type UkolNavic } from '@/lib/navic';
 
 const jmeno = (id: number) => clen(id)?.name ?? 'Někdo';
 const avatar = (id: number) => clen(id)?.avatar ?? null;
 
 let dalsiId = 100;
 const NABIDKA: NabidkaNavic[] = [
-  { id: 1, title: 'Vytřít sklad a chodbu', description: 'Včetně rohů za regály.', points: 20, bonusCzk: null, autoApprove: false, active: true, validFrom: null, validTo: null, maxPerDay: 1, createdAt: '' },
-  { id: 2, title: 'Umýt výlohu zvenku', description: null, points: 15, bonusCzk: null, autoApprove: true, active: true, validFrom: null, validTo: null, maxPerDay: 1, createdAt: '' },
-  { id: 3, title: 'Zaskočit za kolegu na směnu', description: 'Nahlásit, za koho.', points: 50, bonusCzk: 300, autoApprove: false, active: true, validFrom: null, validTo: null, maxPerDay: null, createdAt: '' },
+  { id: 1, title: 'Vytřít sklad a chodbu', description: 'Včetně rohů za regály.', points: 20, bonusCzk: null, autoApprove: false, active: true, validFrom: null, validTo: null, maxPerDay: 1, recurrence: 'denne', recDays: [], recInterval: null, capacity: 1, requirePhoto: true, targetUsers: [], createdAt: '' },
+  { id: 2, title: 'Umýt výlohu zvenku', description: null, points: 15, bonusCzk: null, autoApprove: true, active: true, validFrom: null, validTo: null, maxPerDay: 1, recurrence: 'tydne', recDays: [], recInterval: null, capacity: 1, requirePhoto: false, targetUsers: [], createdAt: '' },
+  { id: 3, title: 'Zaskočit za kolegu na směnu', description: 'Nahlásit, za koho.', points: 50, bonusCzk: 300, autoApprove: false, active: true, validFrom: null, validTo: null, maxPerDay: null, recurrence: 'kdykoli', recDays: [], recInterval: null, capacity: null, requirePhoto: false, targetUsers: [], createdAt: '' },
+];
+const ZABORY: { offerId: number; termin: string; userId: number; stav: 'vzato' | 'hotovo' }[] = [
+  { offerId: 1, termin: dnes(), userId: 4, stav: 'vzato' },
 ];
 const ZAPISY: Navic[] = [
   { id: 1, userId: 3, userName: jmeno(3), userAvatar: avatar(3), reportedBy: null, reportedByName: null, day: posunDen(dnes(), -1), shiftId: null, closingId: null, taskId: null, offerId: 1, offerTitle: 'Vytřít sklad a chodbu', text: 'Vytřela jsem sklad i chodbu, včetně rohů.', photoUrl: null, pointsProposed: 20, status: 'ceka', points: null, bonusCzk: null, decidedBy: null, decidedByName: null, decidedAt: null, decisionNote: null, createdAt: `${posunDen(dnes(), -1)}T19:40:00.000Z` },
@@ -36,8 +39,52 @@ export const navic: Obsluha = (p, k) => {
   const smiZapsat = opr.has('navic.zapsat');
   const d = dnes();
 
+  // Kolo 11: volitelné úkoly za body — termín, obsazenost a „Beru si" nad pamětí ukázky.
+  if (cesta === '/api/navic/ukoly') {
+    const den = /^\d{4}-\d{2}-\d{2}$/.test(p.q.get('day') ?? '') ? p.q.get('day')! : d;
+    const tym = p.q.get('scope') === 'team' && smiTym;
+    const kdo = Number(p.q.get('actingAs') ?? p.telo?.actingAs) || ja;
+    const ukolPro = (n: NabidkaNavic, termin: string): UkolNavic => {
+      const { od, do: doDne } = rozsahTerminu(n, termin);
+      const vTerminu = ZAPISY.filter(z => z.offerId === n.id && z.day >= od && z.day <= doDne);
+      const zab = ZABORY.filter(z => z.offerId === n.id && z.termin === termin);
+      const lide = new Set([...vTerminu.filter(z => z.status !== 'odmitnuto').map(z => z.userId), ...zab.map(z => z.userId)]);
+      const moje = vTerminu.filter(z => z.userId === kdo);
+      return {
+        nabidka: n, termin, obsazeno: lide.size,
+        stav: stavUkolu({ zapisy: moje, vzato: zab.some(z => z.userId === kdo && z.stav === 'vzato'), obsazeno: lide.size, capacity: n.capacity, maxPerDay: n.maxPerDay }),
+        mojeZapisy: moje.filter(z => z.status !== 'odmitnuto').length,
+        workId: moje.length ? moje[0].id : null,
+        kdo: [...lide].map(id => ({ userId: id, name: jmeno(id), stav: zab.some(z => z.userId === id && z.stav === 'vzato') ? 'vzato' as const : 'hotovo' as const })),
+      };
+    };
+    if (metoda === 'GET') {
+      const ukoly = NABIDKA.filter(n => n.active && (tym || urcenoPro(n, kdo)))
+        .map(n => ({ n, termin: terminNabidky(n, den) }))
+        .filter((x): x is { n: NabidkaNavic; termin: string } => x.termin != null)
+        .map(x => ukolPro(x.n, x.termin));
+      return ok({ ukoly: seradUkoly(ukoly), den, smi: { zapsat: smiZapsat, nabidka: smiNabidku, tym: smiTym } });
+    }
+    if (metoda === 'POST') {
+      const n = NABIDKA.find(x => x.id === Number(p.telo?.offerId));
+      if (!n) return chyba('Úkol už v nabídce není.', 404);
+      const termin = terminNabidky(n, d);
+      if (!termin) return chyba('Tenhle úkol se dnes dělat nedá.');
+      const u = ukolPro(n, termin);
+      if (p.telo?.akce === 'vzit') {
+        if (u.stav === 'plno') return chyba('Úkol už je obsazený.', 409);
+        if (!ZABORY.some(z => z.offerId === n.id && z.termin === termin && z.userId === kdo)) ZABORY.push({ offerId: n.id, termin, userId: kdo, stav: 'vzato' });
+      } else {
+        const i = ZABORY.findIndex(z => z.offerId === n.id && z.termin === termin && z.userId === kdo && z.stav === 'vzato');
+        if (i >= 0) ZABORY.splice(i, 1);
+      }
+      return ok({ ok: true, ukol: ukolPro(n, termin) });
+    }
+    return ok();
+  }
+
   if (cesta === '/api/navic/offers') {
-    if (metoda === 'GET') return ok({ offers: smiNabidku ? NABIDKA : NABIDKA.filter(n => nabidkaPlatna(n, d)), smi: { nabidka: smiNabidku } });
+    if (metoda === 'GET') return ok({ offers: smiNabidku ? NABIDKA : NABIDKA.filter(n => terminNabidky(n, d) != null && urcenoPro(n, ja)), smi: { nabidka: smiNabidku } });
     if (!smiNabidku) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
     if (metoda === 'POST') {
       const v = validujNabidku(p.telo ?? {});
@@ -102,7 +149,7 @@ export const navic: Obsluha = (p, k) => {
       const userId = scope === 'team' ? Number(p.q.get('userId')) || null : (Number(p.q.get('actingAs')) || ja);
       const items = ZAPISY.filter(z => (!userId || z.userId === userId) && (!stav || z.status === stav) && (!mesic || z.day.startsWith(mesic)) && (!den || z.day === den))
         .sort((a, b) => (a.status === 'ceka' ? 0 : 1) - (b.status === 'ceka' ? 0 : 1) || b.createdAt.localeCompare(a.createdAt));
-      return ok({ items, nabidka: NABIDKA.filter(n => nabidkaPlatna(n, d)), smi: { uznat: smiUznat, nabidka: smiNabidku, tym: smiTym, zapsat: smiZapsat } });
+      return ok({ items, nabidka: NABIDKA.filter(n => terminNabidky(n, d) != null && urcenoPro(n, userId ?? ja)), smi: { uznat: smiUznat, nabidka: smiNabidku, tym: smiTym, zapsat: smiZapsat } });
     }
     if (metoda === 'POST') {
       const b = p.telo ?? {};
@@ -126,6 +173,8 @@ export const navic: Obsluha = (p, k) => {
         createdAt: new Date().toISOString(),
       };
       ZAPISY.unshift(z);
+      // Zábor „Beru si" po splnění: hotovo.
+      if (n) { const t = terminNabidky(n, z.day); const zab = ZABORY.find(x => x.offerId === n.id && x.termin === t && x.userId === cilovy); if (zab) zab.stav = 'hotovo'; }
       return ok({ ok: true, item: z }, 201);
     }
     return ok();

@@ -65,6 +65,20 @@ export interface Navic {
   createdAt: string;
 }
 
+/**
+ * Opakování volitelného úkolu (kolo 11): kdy se dá vzít a splnit.
+ *  - kdykoli  — každý den, dokud položka platí (termín = den),
+ *  - jednou   — jediný termín za celou platnost (kapacita = kolik lidí celkem),
+ *  - denne    — každý den (termín = den; rozdíl proti „kdykoli" je jen v popisu pro lidi),
+ *  - dny      — vybrané dny v týdnu (recDays 1 = pondělí … 7 = neděle),
+ *  - tydne    — jednou za týden (termín = pondělí toho týdne),
+ *  - mesicne  — jednou za měsíc (termín = první den měsíce),
+ *  - interval — každých N dní od data „platí od" (recInterval).
+ */
+export type OpakovaniNabidky = 'kdykoli' | 'jednou' | 'denne' | 'dny' | 'tydne' | 'mesicne' | 'interval';
+export const OPAKOVANI_NABIDKY: readonly OpakovaniNabidky[] = ['kdykoli', 'jednou', 'denne', 'dny', 'tydne', 'mesicne', 'interval'];
+export const jeOpakovani = (x: unknown): x is OpakovaniNabidky => typeof x === 'string' && (OPAKOVANI_NABIDKY as readonly string[]).includes(x);
+
 export interface NabidkaNavic {
   id: number;
   title: string;
@@ -76,9 +90,41 @@ export interface NabidkaNavic {
   active: boolean;
   validFrom: string | null;
   validTo: string | null;
-  /** Nejvýš tolikrát za den na člověka (null = bez limitu). */
+  /** Nejvýš tolikrát za termín na člověka (null = bez limitu). U „kdykoli" je termín den. */
   maxPerDay: number | null;
+  /** Kdy se dá vzít (kolo 11; starší položky = „kdykoli"). */
+  recurrence: OpakovaniNabidky;
+  /** Dny v týdnu pro „dny" (1 = pondělí … 7 = neděle). */
+  recDays: number[];
+  /** Každých kolik dní pro „interval". */
+  recInterval: number | null;
+  /** Kolik lidí ji může v jednom termínu vzít (null = kdokoli). */
+  capacity: number | null;
+  /** Bez fotky nejde zapsat jako hotové. */
+  requirePhoto: boolean;
+  /** Komu je určená (prázdné = všem, kdo smí zapisovat navíc). */
+  targetUsers: number[];
   createdAt: string;
+}
+
+/** Stav člověka u volitelného úkolu v termínu. */
+export type StavUkoluNavic = 'volne' | 'vzato' | 'ceka' | 'uznano' | 'odmitnuto' | 'plno';
+
+/** Volitelný úkol pro jeden termín (GET /api/navic/ukoly). */
+export interface UkolNavic {
+  nabidka: NabidkaNavic;
+  /** Klíč termínu (den, pondělí týdne, první den měsíce, nebo „jednou"). */
+  termin: string;
+  /** Kolik lidí ho v termínu vzalo nebo splnilo (bez odmítnutých). */
+  obsazeno: number;
+  /** Můj stav (nebo stav vybraného člověka na tabletu). */
+  stav: StavUkoluNavic;
+  /** Kolikrát jsem ho v termínu už zapsal(a) (bez odmítnutých). */
+  mojeZapisy: number;
+  /** Id mého posledního zápisu v termínu (k otevření). */
+  workId: number | null;
+  /** Kdo ho má vzatý nebo hotový (jména — ať se nedělá dvakrát). */
+  kdo: { userId: number; name: string; stav: 'vzato' | 'hotovo' }[];
 }
 
 /** Odpověď GET /api/navic. */
@@ -154,6 +200,12 @@ export function vyberNabidku(raw: unknown): NabidkaNavic[] {
       validFrom: den(x.validFrom) || null,
       validTo: den(x.validTo) || null,
       maxPerDay: cele(x.maxPerDay),
+      recurrence: jeOpakovani(x.recurrence) ? x.recurrence : 'kdykoli',
+      recDays: Array.isArray(x.recDays) ? x.recDays.map(cele).filter((d: number | null): d is number => d != null && d >= 1 && d <= 7) : [],
+      recInterval: cele(x.recInterval),
+      capacity: cele(x.capacity),
+      requirePhoto: x.requirePhoto === true,
+      targetUsers: Array.isArray(x.targetUsers) ? x.targetUsers.map(cele).filter((d: number | null): d is number => d != null && d > 0) : [],
       createdAt: String(x.createdAt ?? ''),
     });
   }
@@ -240,12 +292,129 @@ export function nabidkaPlatna(n: Pick<NabidkaNavic, 'active' | 'validFrom' | 'va
   return true;
 }
 
-/** Kolikrát už člověk dnes tuhle položku zapsal — proti maxPerDay. */
+/** Kolikrát už člověk v termínu (u „kdykoli" dnes) tuhle položku zapsal — proti maxPerDay. */
 export function limitNabidkyVycerpan(n: Pick<NabidkaNavic, 'id' | 'maxPerDay'>, dnesniZapisy: readonly Pick<Navic, 'offerId' | 'status'>[]): boolean {
   if (n.maxPerDay == null || n.maxPerDay <= 0) return false;
   const pocet = dnesniZapisy.filter(z => z.offerId === n.id && z.status !== 'odmitnuto').length;
   return pocet >= n.maxPerDay;
 }
+
+// ---------------------------------------------------------------------------
+// Volitelné úkoly (kolo 11): termín, rozsah, dostupnost
+// ---------------------------------------------------------------------------
+
+/** Den v týdnu podle ISO (1 = pondělí … 7 = neděle) pro RRRR-MM-DD. */
+export function denVTydnu(d: string): number {
+  const w = new Date(`${d}T12:00:00Z`).getUTCDay();
+  return w === 0 ? 7 : w;
+}
+
+/** Pondělí týdne, do kterého den patří. */
+export function pondeli(d: string): string {
+  return posunDni(d, 1 - denVTydnu(d));
+}
+
+/** Počet dní mezi dvěma dny (b − a). */
+function rozdilDni(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+}
+
+/**
+ * Klíč termínu, do kterého den patří — nebo null, když se úkol ten den vzít nedá
+ * (vypnutý, mimo platnost, jiný den v týdnu, mimo interval).
+ */
+export function terminNabidky(n: Pick<NabidkaNavic, 'active' | 'validFrom' | 'validTo' | 'recurrence' | 'recDays' | 'recInterval'>, d: string): string | null {
+  if (!nabidkaPlatna(n, d)) return null;
+  switch (n.recurrence) {
+    case 'jednou': return 'jednou';
+    case 'dny': return n.recDays.includes(denVTydnu(d)) ? d : null;
+    case 'tydne': return pondeli(d);
+    case 'mesicne': return `${d.slice(0, 7)}-01`;
+    case 'interval': {
+      if (!n.validFrom || !n.recInterval) return null;
+      const r = rozdilDni(n.validFrom, d);
+      return r >= 0 && r % n.recInterval === 0 ? d : null;
+    }
+    default: return d;
+  }
+}
+
+/** Dny, které termín pokrývá (zápisy v tomhle rozsahu se počítají do kapacity a limitu). */
+export function rozsahTerminu(n: Pick<NabidkaNavic, 'recurrence' | 'validFrom' | 'validTo'>, termin: string): { od: string; do: string } {
+  if (n.recurrence === 'jednou' || termin === 'jednou') return { od: n.validFrom ?? '0000-01-01', do: n.validTo ?? '9999-12-31' };
+  if (n.recurrence === 'tydne') return { od: termin, do: posunDni(termin, 6) };
+  if (n.recurrence === 'mesicne') return { od: termin, do: `${termin.slice(0, 7)}-31` };
+  return { od: termin, do: termin };
+}
+
+/** Je úkol určený tomuhle člověku? (prázdný seznam = všem.) */
+export const urcenoPro = (n: Pick<NabidkaNavic, 'targetUsers'>, userId: number): boolean => !n.targetUsers.length || n.targetUsers.includes(userId);
+
+/**
+ * Stav úkolu pro člověka v termínu: z jeho zápisů a záborů, obsazenosti a kapacity.
+ * `zapisy` = jeho zápisy z téhle položky v rozsahu termínu, `vzato` = má zábor
+ * („Beru si"), `obsazeno` = kolik různých lidí ho v termínu vzalo nebo splnilo.
+ */
+export function stavUkolu(o: {
+  zapisy: readonly Pick<Navic, 'status'>[]; vzato: boolean; obsazeno: number; capacity: number | null; maxPerDay: number | null;
+}): StavUkoluNavic {
+  const platne = o.zapisy.filter(z => z.status !== 'odmitnuto');
+  const limit = o.maxPerDay ?? null;
+  // Splnil(a) to už tolikrát, kolik smí → stav posledního zápisu.
+  if (platne.length && (limit == null ? true : platne.length >= limit)) {
+    return platne.some(z => z.status === 'ceka') ? 'ceka' : 'uznano';
+  }
+  if (o.vzato) return 'vzato';
+  if (o.capacity != null && o.obsazeno >= o.capacity && !platne.length) return 'plno';
+  // Jen odmítnuté zápisy: jde to zkusit znovu, UI ukáže, že minule neprošlo.
+  if (o.zapisy.length && !platne.length) return 'odmitnuto';
+  return 'volne';
+}
+
+/** Dá se úkol vzít nebo zapsat? */
+export const lzeVzit = (s: StavUkoluNavic): boolean => s === 'volne' || s === 'odmitnuto';
+
+/** Klíč popisu opakování k překladu v UI (+ parametry). */
+export function popisOpakovani(n: Pick<NabidkaNavic, 'recurrence' | 'recDays' | 'recInterval'>): { klic: string; n?: number; dny?: number[] } {
+  switch (n.recurrence) {
+    case 'jednou': return { klic: 'Jednorázově' };
+    case 'denne': return { klic: 'Každý den' };
+    case 'dny': return { klic: 'Vybrané dny', dny: n.recDays };
+    case 'tydne': return { klic: 'Jednou týdně' };
+    case 'mesicne': return { klic: 'Jednou měsíčně' };
+    case 'interval': return { klic: 'Každých {n} dní', n: n.recInterval ?? 0 };
+    default: return { klic: 'Kdykoli' };
+  }
+}
+
+/** Seřadit úkoly: k vzetí nahoře (nejvíc bodů první), pak moje rozdělané, hotové a plné dole. */
+export function seradUkoly(u: readonly UkolNavic[]): UkolNavic[] {
+  const vaha = (s: StavUkoluNavic) => (s === 'vzato' ? 0 : s === 'volne' || s === 'odmitnuto' ? 1 : s === 'ceka' ? 2 : s === 'uznano' ? 3 : 4);
+  return [...u].sort((a, b) => vaha(a.stav) - vaha(b.stav) || b.nabidka.points - a.nabidka.points || a.nabidka.title.localeCompare(b.nabidka.title, 'cs'));
+}
+
+export function vyberUkoly(raw: unknown): UkolNavic[] {
+  const r = raw as { ukoly?: unknown } | null;
+  const pole = Array.isArray(r?.ukoly) ? r!.ukoly : Array.isArray(raw) ? raw : [];
+  const out: UkolNavic[] = [];
+  for (const x of pole as any[]) {
+    const [n] = vyberNabidku([x?.nabidka]);
+    if (!n || typeof x?.termin !== 'string') continue;
+    const stavy: StavUkoluNavic[] = ['volne', 'vzato', 'ceka', 'uznano', 'odmitnuto', 'plno'];
+    out.push({
+      nabidka: n,
+      termin: x.termin,
+      obsazeno: Math.max(0, cele(x.obsazeno) ?? 0),
+      stav: stavy.includes(x.stav) ? x.stav : 'volne',
+      mojeZapisy: Math.max(0, cele(x.mojeZapisy) ?? 0),
+      workId: cele(x.workId),
+      kdo: Array.isArray(x.kdo) ? x.kdo.filter((k: any) => cele(k?.userId)).map((k: any) => ({ userId: cele(k.userId)!, name: String(k.name ?? ''), stav: k.stav === 'hotovo' ? 'hotovo' : 'vzato' })) : [],
+    });
+  }
+  return out;
+}
+
+export const URL_UKOLY_NAVIC = '/api/navic/ukoly';
 
 /** Jaké rozhodnutí je dovolené: čekající jde uznat i odmítnout; uznané jde ještě odmítnout (vrátí body); odmítnuté jde uznat. */
 export function prechodDovolen(ze: StavNavic, na: StavNavic): boolean {
@@ -300,6 +469,12 @@ export interface ZapisNabidky {
   validFrom: string | null;
   validTo: string | null;
   maxPerDay: number | null;
+  recurrence: OpakovaniNabidky;
+  recDays: number[];
+  recInterval: number | null;
+  capacity: number | null;
+  requirePhoto: boolean;
+  targetUsers: number[];
 }
 
 export function validujNabidku(b: Record<string, unknown>): { ok: true; nabidka: ZapisNabidky } | { ok: false; chyba: string } {
@@ -317,10 +492,26 @@ export function validujNabidku(b: Record<string, unknown>): { ok: true; nabidka:
   if (od === false || doD === false) return { ok: false, chyba: 'Platnost má špatný tvar data.' };
   if (od && doD && od > doD) return { ok: false, chyba: 'Platnost „od" je po „do".' };
   const max = b.maxPerDay == null || b.maxPerDay === '' ? null : cele(b.maxPerDay);
-  if (max != null && (max < 1 || max > 50)) return { ok: false, chyba: 'Limit za den musí být 1–50.' };
+  if (max != null && (max < 1 || max > 50)) return { ok: false, chyba: 'Limit na člověka musí být 1–50.' };
+  const opak: OpakovaniNabidky = b.recurrence == null || b.recurrence === '' ? 'kdykoli' : jeOpakovani(b.recurrence) ? b.recurrence : ('x' as OpakovaniNabidky);
+  if (!jeOpakovani(opak)) return { ok: false, chyba: 'Neznámé opakování.' };
+  const dny = Array.isArray(b.recDays) ? [...new Set(b.recDays.map(cele).filter((d): d is number => d != null && d >= 1 && d <= 7))].sort((x, y) => x - y) : [];
+  if (opak === 'dny' && !dny.length) return { ok: false, chyba: 'Vyber aspoň jeden den v týdnu.' };
+  const interval = b.recInterval == null || b.recInterval === '' ? null : cele(b.recInterval);
+  if (opak === 'interval' && (interval == null || interval < 2 || interval > 90)) return { ok: false, chyba: 'Interval musí být 2–90 dní.' };
+  if (opak === 'interval' && !od) return { ok: false, chyba: 'U opakování po dnech vyplň, od kdy se počítá (platí od).' };
+  const kapacita = b.capacity == null || b.capacity === '' ? null : cele(b.capacity);
+  if (kapacita != null && (kapacita < 1 || kapacita > 50)) return { ok: false, chyba: 'Kolik lidí ji může vzít: 1–50.' };
+  const komu = Array.isArray(b.targetUsers) ? [...new Set(b.targetUsers.map(cele).filter((d): d is number => d != null && d > 0))] : [];
+  if (komu.length > 200) return { ok: false, chyba: 'Moc vybraných lidí.' };
   return {
     ok: true,
-    nabidka: { title, description: popis, points: body ?? 0, bonusCzk: premie && premie > 0 ? premie : null, autoApprove: b.autoApprove === true, active: b.active !== false, validFrom: od, validTo: doD, maxPerDay: max },
+    nabidka: {
+      title, description: popis, points: body ?? 0, bonusCzk: premie && premie > 0 ? premie : null, autoApprove: b.autoApprove === true, active: b.active !== false,
+      validFrom: od, validTo: doD, maxPerDay: max,
+      recurrence: opak, recDays: opak === 'dny' ? dny : [], recInterval: opak === 'interval' ? interval : null,
+      capacity: kapacita, requirePhoto: b.requirePhoto === true, targetUsers: komu,
+    },
   };
 }
 

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
-import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
-import { nabidkaPlatna, validujNabidku } from '@/lib/navic';
+import { terminNabidky, urcenoPro, validujNabidku } from '@/lib/navic';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { notifyUsers } from '@/lib/push';
 import { predMigraci, tvarNabidky } from '../_spolecne';
 
 // Nabídka „Co se dá udělat navíc" (kolo 9, N1): položky s body (a volitelně prémií),
@@ -27,12 +28,12 @@ export async function GET() {
   const spravce = c.role.opravneni.has('navic.nabidka');
   try {
     const rows = await sql`
-      SELECT id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, created_at
+      SELECT id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, recurrence, rec_days, rec_interval, capacity, require_photo, target_users, created_at
       FROM extra_offers WHERE team_id = ${c.teamId} AND archived_at IS NULL
       ORDER BY active DESC, points DESC, title ASC`;
     const dnes = pragueToday();
     const vse = rows.map(tvarNabidky);
-    return NextResponse.json({ offers: spravce ? vse : vse.filter(n => nabidkaPlatna(n, dnes)), smi: { nabidka: spravce } });
+    return NextResponse.json({ offers: spravce ? vse : vse.filter(n => terminNabidky(n, dnes) != null && urcenoPro(n, c.meId)), smi: { nabidka: spravce } });
   } catch (e) {
     if (predMigraci(e)) return NextResponse.json({ offers: [], smi: { nabidka: spravce } });
     console.error('navic/offers GET', e);
@@ -50,10 +51,28 @@ export async function POST(req: NextRequest) {
   const n = v.nabidka;
   try {
     const [row] = await sql`
-      INSERT INTO extra_offers (team_id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, created_by)
-      VALUES (${c.teamId}, ${n.title}, ${n.description}, ${n.points}, ${n.bonusCzk}, ${n.autoApprove}, ${n.active}, ${n.validFrom}, ${n.validTo}, ${n.maxPerDay}, ${c.meId})
-      RETURNING id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, created_at`;
+      INSERT INTO extra_offers (team_id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day,
+        recurrence, rec_days, rec_interval, capacity, require_photo, target_users, created_by)
+      VALUES (${c.teamId}, ${n.title}, ${n.description}, ${n.points}, ${n.bonusCzk}, ${n.autoApprove}, ${n.active}, ${n.validFrom}, ${n.validTo}, ${n.maxPerDay},
+        ${n.recurrence}, ${n.recDays.length ? n.recDays : null}, ${n.recInterval}, ${n.capacity}, ${n.requirePhoto}, ${n.targetUsers.length ? n.targetUsers : null}, ${c.meId})
+      RETURNING id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, recurrence, rec_days, rec_interval, capacity, require_photo, target_users, created_at`;
     const mena = await menaPodniku(c.teamId);
+    // Kolo 11: nový volitelný úkol, který jde vzít už dnes, se lidem oznámí (komu je určený, jinak všem, kdo zapisují navíc).
+    const nova = tvarNabidky(row);
+    if (nova.active && terminNabidky(nova, pragueToday()) != null) {
+      try {
+        const komu = (nova.targetUsers.length ? nova.targetUsers : await clenoveSOpravnenim(c.teamId, 'navic.zapsat')).filter(id => id !== c.meId);
+        if (komu.length) {
+          await notifyUsers(komu, {
+            title: `Nový úkol za body: ${nova.title}`.slice(0, 120),
+            body: [nova.points ? `+${nova.points} b` : null, nova.bonusCzk ? `+${mena.money(nova.bonusCzk)}` : null, nova.description].filter(Boolean).join(' · ').slice(0, 140),
+            link: '/employee/shifts?view=tasks&arg=za-body', type: 'navic', category: 'general',
+          });
+        }
+      } catch (e) {
+        console.error('navic/offers: oznámení nového úkolu', e);
+      }
+    }
     audit(c.teamId, c.meId, 'navic.nabidka.pridat', 'extra_offer', Number(row.id), `${n.title} · ${n.points} b${n.bonusCzk ? ` + ${mena.money(n.bonusCzk)}` : ''}${n.autoApprove ? ' · uznává se samo' : ''}`);
     return NextResponse.json({ ok: true, offer: tvarNabidky(row) }, { status: 201 });
   } catch (e) {
@@ -71,7 +90,7 @@ export async function PATCH(req: NextRequest) {
   const id = Number(b?.id);
   if (!Number.isInteger(id) || id <= 0) return chyba('Neplatné číslo položky.', 400);
   try {
-    const [stara] = await sql`SELECT id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, created_at
+    const [stara] = await sql`SELECT id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, recurrence, rec_days, rec_interval, capacity, require_photo, target_users, created_at
       FROM extra_offers WHERE id = ${id} AND team_id = ${c.teamId} AND archived_at IS NULL`;
     if (!stara) return chyba('Položka nenalezena.', 404);
     const puvodni = tvarNabidky(stara);
@@ -82,14 +101,20 @@ export async function PATCH(req: NextRequest) {
       autoApprove: b.autoApprove ?? puvodni.autoApprove, active: b.active ?? puvodni.active,
       validFrom: b.validFrom === undefined ? puvodni.validFrom : b.validFrom, validTo: b.validTo === undefined ? puvodni.validTo : b.validTo,
       maxPerDay: b.maxPerDay === undefined ? puvodni.maxPerDay : b.maxPerDay,
+      recurrence: b.recurrence ?? puvodni.recurrence, recDays: b.recDays ?? puvodni.recDays,
+      recInterval: b.recInterval === undefined ? puvodni.recInterval : b.recInterval,
+      capacity: b.capacity === undefined ? puvodni.capacity : b.capacity,
+      requirePhoto: b.requirePhoto ?? puvodni.requirePhoto, targetUsers: b.targetUsers ?? puvodni.targetUsers,
     });
     if (!v.ok) return chyba(v.chyba, 400);
     const n = v.nabidka;
     const [row] = await sql`
       UPDATE extra_offers SET title = ${n.title}, description = ${n.description}, points = ${n.points}, bonus_czk = ${n.bonusCzk},
-        auto_approve = ${n.autoApprove}, active = ${n.active}, valid_from = ${n.validFrom}, valid_to = ${n.validTo}, max_per_day = ${n.maxPerDay}
+        auto_approve = ${n.autoApprove}, active = ${n.active}, valid_from = ${n.validFrom}, valid_to = ${n.validTo}, max_per_day = ${n.maxPerDay},
+        recurrence = ${n.recurrence}, rec_days = ${n.recDays.length ? n.recDays : null}, rec_interval = ${n.recInterval}, capacity = ${n.capacity},
+        require_photo = ${n.requirePhoto}, target_users = ${n.targetUsers.length ? n.targetUsers : null}
       WHERE id = ${id} AND team_id = ${c.teamId}
-      RETURNING id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, created_at`;
+      RETURNING id, title, description, points, bonus_czk, auto_approve, active, valid_from, valid_to, max_per_day, recurrence, rec_days, rec_interval, capacity, require_photo, target_users, created_at`;
     audit(c.teamId, c.meId, 'navic.nabidka.upravit', 'extra_offer', id, `${n.title} · ${n.points} b${n.active ? '' : ' · vypnuto'}`);
     return NextResponse.json({ ok: true, offer: tvarNabidky(row) });
   } catch (e) {

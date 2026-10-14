@@ -148,6 +148,13 @@ export interface DefiniceWidgetu {
    */
   rychlyFiltr?: string | false;
   kostra?: Partial<Record<Velikost, Kostra>>;
+  /**
+   * Den, kdy widget přibyl do aplikace (RRRR-MM-DD, kolo 11). Uložené rozložení
+   * (osobní i výchozí podniku) starší než tenhle den ho dostane doplněné na místo
+   * z výchozího rozložení v kódu — jednou: po dalším uložení už platí volba člověka.
+   * Bez toho nové funkce v podnicích s upravenou plochou nikdo neuvidí.
+   */
+  pridano?: string;
   /** Widget peněz: smí být jedinou inkoustovou plochou stránky (DP §2.10). */
   muzeInkoust?: boolean;
   /**

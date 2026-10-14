@@ -179,6 +179,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // staršího měsíce. Jen s navic.zobrazit_tym; rozhodovat a zapisovat za člena jen s navic.uznat.
   {
     id: 'odmeny.navic_tymu',
+    // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).
+    pridano: '2026-10-14',
     oblast: 'odmeny',
     nazev: 'Navíc v týmu',
     popis: 'Co kdo udělal nad rámec povinností — čekající k uznání s body nebo prémií, uznané a odmítnuté za měsíc.',
@@ -211,6 +213,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // Ikona ne `warning`: tu má na Odměnách už Výtky v týmu (AK-19, ikona se ve výchozím rozložení neopakuje).
   {
     id: 'odmeny.tresty_tymu',
+    // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).
+    pridano: '2026-10-14',
     oblast: 'odmeny',
     nazev: 'Tresty v týmu',
     popis: 'Co kdo pokazil a co za to dostal — body dolů, krácení prémie nebo napomenutí; nesouhlasy k vyřízení a návrhy z docházky, uzávěrek a hodnocení.',
