@@ -17,11 +17,21 @@
 //   SONDY_ZAKLAD=http://localhost:3400 node scripts/sondy/kiosk.mjs
 import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, dokud, roleMine, DIR, BASE } from './k68-spolecne.mjs';
+// Pevné „teď" pro fixtury i prohlížeč: dnes 14:30 v Praze. Směny se počítají od teď, a kolem půlnoci
+// by se plán přehoupl přes den (CI v 23:49 → „po plánu" chyběl); tablet ve skutečnosti dostává jen dnešní směny.
+const TED = (() => {
+  const den = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
+  const poledne = new Date(`${den}T12:00:00Z`);
+  const posun = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Prague', hour: 'numeric', hourCycle: 'h23' }).format(poledne)) - 12;
+  const [r, mes, d] = den.split('-').map(Number);
+  return Date.UTC(r, mes - 1, d, 14 - posun, 30);
+})();
+
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
 /** Náhled rozvrhu týmu (/api/shifts?team=1) s dnešním a zítřejším pražským dnem místo DNES/ZITRA ve fixtuře. */
 const tymoveSmeny = () => {
-  const den = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + n * 86400000));
+  const den = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(TED + n * 86400000));
   return JSON.parse(readFileSync(DIR + 'k69-b1-shifts-team.json', 'utf8').replaceAll('"DNES"', `"${den(0)}"`).replaceAll('"ZITRA"', `"${den(1)}"`));
 };
 const FIX = nacti('k69-b9-rozlozeni-smena');
@@ -30,8 +40,8 @@ const STRANKA = 'kiosk.smena';
 
 /** Pražské „HH:MM:SS" pro čas posunutý o minuty od teď (tvar, v jakém rozpis vrací Postgres). */
 const prahaHMS = (posunMin) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-  .format(new Date(Date.now() + posunMin * 60000));
-const isoPred = (min) => new Date(Date.now() - min * 60000).toISOString();
+  .format(new Date(TED + posunMin * 60000));
+const isoPred = (min) => new Date(TED - min * 60000).toISOString();
 
 /**
  * Roster kolem teď: Martin (PIN) na směně, která skončila před hodinou → „po plánu";
@@ -65,8 +75,8 @@ const podvrh = (req, json, stav) => {
     const telo = req.postDataJSON();
     (stav.dochazka ??= []).push(telo);
     const clen = roster().roster.find(r => r.id === telo.employeeId);
-    if (telo.action === 'out') return json({ ok: true, action: 'out', entry: { id: clen?.openEntryId ?? 1, clockIn: clen?.openSince ?? isoPred(60), clockOut: new Date().toISOString() }, closingDone: stav.uzaverkaHotova ?? true });
-    return json({ ok: true, action: telo.action, entry: { id: 900, clockIn: new Date().toISOString(), clockOut: null } });
+    if (telo.action === 'out') return json({ ok: true, action: 'out', entry: { id: clen?.openEntryId ?? 1, clockIn: clen?.openSince ?? isoPred(60), clockOut: new Date(TED).toISOString() }, closingDone: stav.uzaverkaHotova ?? true });
+    return json({ ok: true, action: telo.action, entry: { id: 900, clockIn: new Date(TED).toISOString(), clockOut: null } });
   }
   if (path === '/api/closings/handover' && m === 'GET') return json(nacti('k69-b9-handover'));
   // Tablet má od kola 7 rozvrh.nahled: Dnešní směny berou náhled rozvrhu týmu (tvar skutečné routy).
@@ -89,6 +99,7 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
 // ---------------------------------------------------------------------------
 {
   const { ctx, p, stav, chyby } = await kontext({ role: 'kiosk', viewport: { width: 768, height: 1024 }, mobil: true, fix: FIX, mineData: KIOSK, dalsi: podvrh });
+  await ctx.clock.install({ time: TED });
   await otevriTablet(p);
   console.log(await p.evaluate(() => {
     const out = [];
@@ -185,6 +196,7 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
 {
   const bez = roleMine('kiosk', ['sklad.zobrazit', 'objednavky.zobrazit']);
   const { ctx, p, stav } = await kontext({ role: 'kiosk', viewport: { width: 768, height: 1024 }, mobil: true, fix: FIX, mineData: bez, dalsi: podvrh });
+  await ctx.clock.install({ time: TED });
   await otevriTablet(p);
   await p.waitForTimeout(600);
   tvrdi('role bez skladu: záložka Sklad ani Objednávky nejsou, Směna, Úkoly, Postupy, Uzávěrka a Návody ano',
@@ -200,6 +212,7 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
 {
   const bez = roleMine('kiosk', ['sklad.zobrazit']);
   const { ctx, p } = await kontext({ role: 'kiosk', viewport: { width: 768, height: 1024 }, mobil: true, fix: FIX, mineData: bez, mineZpozdeni: 6000, dalsi: podvrh });
+  await ctx.clock.install({ time: TED });
   await p.goto(BASE + '/kiosk', { waitUntil: 'load' });
   await dokud(() => zalozka(p, 'Směna').isVisible().catch(() => false), 8000);
   tvrdi('pozdní oprávnění: před odpovědí /api/teams/mine je v pásu jen Směna (useSmi je přísné)', await p.locator('nav button').count() === 1 && await zalozka(p, 'Směna').getAttribute('aria-current') === 'page');
@@ -214,6 +227,7 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
 // ---------------------------------------------------------------------------
 {
   const { ctx, p, stav } = await kontext({ role: 'kiosk', viewport: { width: 810, height: 1080 }, mobil: true, fix: FIX, mineData: KIOSK, dalsi: podvrh });
+  await ctx.clock.install({ time: TED });
   stav.uzaverkaHotova = false;
   await otevriTablet(p);
   const odpichni = async (jmeno) => {
@@ -273,6 +287,7 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
     return podvrh(req, json, stav);
   };
   const { ctx, p, chyby } = await kontext({ role: 'kiosk', viewport: { width: 768, height: 1024 }, mobil: true, fix: FIX, mineData: KIOSK, dalsi: jeden });
+  await ctx.clock.install({ time: TED });
   await otevriTablet(p);
   await zalozka(p, 'Sklad').click();
   const pas = p.getByRole('tablist', { name: 'Stav zásob' });
@@ -313,8 +328,8 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
 // 6) Týdenní rozpis: vedení přidá tabletu widget Kdo má směnu (doporučený, ne výchozí)
 // ---------------------------------------------------------------------------
 {
-  const dnesP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
-  const zaDni = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + n * 86400000));
+  const dnesP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(TED));
+  const zaDni = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(TED + n * 86400000));
   const fix = { ...FIX, polozky: [...FIX.polozky, { id: 'tym-nahled', widget: 'rozvrh.tym_nahled', velikost: 'L', nastaveni: { rozsah: 'tyden' } }] };
   const smeny = (req, json, stav) => {
     const u = new URL(req.url());
@@ -331,6 +346,7 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
     return podvrh(req, json, stav);
   };
   const { ctx, p, stav, chyby } = await kontext({ role: 'kiosk', viewport: { width: 810, height: 1080 }, mobil: true, fix, mineData: KIOSK, dalsi: smeny });
+  await ctx.clock.install({ time: TED });
   await otevriTablet(p);
   const w = p.locator(`[data-plocha="${STRANKA}"] li[data-widget="rozvrh.tym_nahled"]`);
   tvrdi('rozpis: widget Kdo má směnu se na tabletu vykreslí', await dokud(() => w.isVisible().catch(() => false), 8000));
