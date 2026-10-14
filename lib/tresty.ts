@@ -439,7 +439,7 @@ export function stavTrestu(t: Pick<Trest, 'status' | 'seenAt' | 'disputed' | 'di
   if (t.status === 'zruseno') return { tone: 'muted', text: 'Zrušeno' };
   if (cekaSpor(t)) return { tone: 'wait', text: 'Nesouhlasí' };
   if (!t.seenAt) return { tone: 'bad', text: 'Nepotvrzeno' };
-  return { tone: 'ok', text: 'Vzato na vědomí' };
+  return { tone: 'muted', text: 'Vzato na vědomí' };
 }
 
 /** Trest do věty: body dolů a krácení prémie, nebo „Napomenutí" (měna přes formátovač podniku). */

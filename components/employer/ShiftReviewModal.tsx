@@ -15,7 +15,7 @@ import { useNavrhyTrestu } from '../tresty-vedeni/data';
 import { TrestTlacitko } from '../tresty-vedeni/TrestyUzaverky';
 import { klicVytky } from '../tresty-vedeni/logika';
 
-export interface ItemMark { points: number; note: string | null; flagged: boolean }
+export interface ItemMark { id?: number | null; points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
 
 interface TaskDetail {
@@ -251,7 +251,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               return {
                 userId: employee.id, jmeno: employee.name, day: date, druhNavrhu: 'vytka',
                 text: textNavrhu({ druh: 'vytka', minuty: null, castka: null, poznamka }, money),
-                sourceKey: klicVytky(navrhyTrestu.data ?? [], { userId: employee.id, day: date, poznamka }),
+                sourceKey: mark?.id ? `vytka:${mark.id}` : klicVytky(navrhyTrestu.data ?? [], { userId: employee.id, day: date, poznamka }),
               };
             }} />
           </div>
