@@ -86,3 +86,49 @@ export function vzdalenostText(m: number, locale: string): string {
   if (m < 1000) return `${Math.round(m)} m`;
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: m < 10_000 ? 1 : 0 }).format(m / 1000)} km`;
 }
+
+// ---------------------------------------------------------------------------
+// Prohlížeč: poloha pro Píchačky (spuštění, balík P)
+// ---------------------------------------------------------------------------
+//
+// Server polohu porovnával od kola 8, ale žádný klient ji neposílal: každé píchnutí z telefonu
+// u podniku se zapnutým pravidlem skončilo jako 'missing'. Widget Píchačky (components/widgety/
+// oblasti/dochazka.tsx) teď při příchodu polohu získá, když GET /api/attendance řekne
+// `pichaniPoloha: true`. Před prvním použitím krátká informace (odsouhlasení se pamatuje
+// v zařízení); odmítnutí nebo nedostupná poloha = píchnutí projde se stavem 'missing' jako dřív.
+
+/** Jak dlouho se na polohu čeká, než píchnutí odejde bez ní. */
+export const CEKANI_NA_POLOHU_MS = 8000;
+
+/** Klíč v localStorage: člověk viděl informaci o ověřování vzdálenosti. */
+export const KLIC_INFO_POLOHY = 'managero-pichani-poloha-info';
+
+/** Viděl už člověk na tomhle zařízení informaci? Bez úložiště (soukromé okno) se ptá znovu. */
+export function infoPolohyPotvrzeno(uloziste: Pick<Storage, 'getItem'> | null | undefined): boolean {
+  try { return uloziste?.getItem(KLIC_INFO_POLOHY) === '1'; } catch { return false; }
+}
+
+export function potvrdInfoPolohy(uloziste: Pick<Storage, 'setItem'> | null | undefined): void {
+  try { uloziste?.setItem(KLIC_INFO_POLOHY, '1'); } catch { /* bez úložiště se zeptá příště znovu */ }
+}
+
+/**
+ * Poloha telefonu, nebo null (prohlížeč ji neumí, člověk ji odmítl, nepřišla do `ms`).
+ * Nikdy nevyhazuje — píchnutí bez polohy musí projít.
+ */
+export function zjistiPolohu(geo: Geolocation | null | undefined, ms: number = CEKANI_NA_POLOHU_MS): Promise<Poloha | null> {
+  if (!geo) return Promise.resolve(null);
+  return new Promise(resolve => {
+    let hotovo = false;
+    const konec = (v: Poloha | null) => { if (!hotovo) { hotovo = true; resolve(v); } };
+    // Pojistka: některé prohlížeče timeout neohlídají (dialog oprávnění visí).
+    const pojistka = setTimeout(() => konec(null), ms + 500);
+    try {
+      geo.getCurrentPosition(
+        p => { clearTimeout(pojistka); konec({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: Math.round(p.coords.accuracy ?? 9999) }); },
+        () => { clearTimeout(pojistka); konec(null); },
+        { enableHighAccuracy: true, timeout: ms, maximumAge: 60_000 },
+      );
+    } catch { clearTimeout(pojistka); konec(null); }
+  });
+}

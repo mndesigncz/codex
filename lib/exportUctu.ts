@@ -17,6 +17,15 @@ export interface SekceExportu {
   volno: Record<string, unknown>[] | null;
   dostupnost: Record<string, unknown>[] | null;
   zpravy: Record<string, unknown>[] | null;
+  // Spuštění (balík P): co o člověku vede podnik — tresty, body (pochvaly, navíc, tresty),
+  // zápisy navíc, úpravy mzdy (prémie, srážky, krácení) a hodnocení směn. Nepovinné, ať starší
+  // volající (a testy) bez nich fungují; chybějící klíč není „nedostupné", jen nevyžádané.
+  tresty?: Record<string, unknown>[] | null;
+  body?: Record<string, unknown>[] | null;
+  navic?: Record<string, unknown>[] | null;
+  upravyMzdy?: Record<string, unknown>[] | null;
+  hodnoceni?: Record<string, unknown>[] | null;
+  hodnoceniPolozek?: Record<string, unknown>[] | null;
 }
 
 export const VERZE_EXPORTU = 1;
@@ -33,7 +42,7 @@ export function sestavExport(sekce: SekceExportu, vytvoreno: Date = new Date(), 
     aplikace: 'Managero',
     verze: VERZE_EXPORTU,
     vytvoreno: vytvoreno.toISOString(),
-    poznamka: 'Jen tvoje vlastní data: profil, nastavení, tvoje směny, docházka, žádosti o volno, dostupnost a zprávy, které jsi napsal(a). Zprávy ostatních a data podniku v souboru nejsou.',
+    poznamka: 'Jen tvoje vlastní data: profil, nastavení, tvoje směny, docházka (včetně výsledku ověření polohy, ukládá se jen vzdálenost), žádosti o volno, dostupnost, zprávy, které jsi napsal(a), tresty, body, zápisy navíc, úpravy mzdy a hodnocení směn. Zprávy ostatních a data podniku v souboru nejsou.',
     ucet,
     nastaveni: sekce.nastaveni,
     clenstvi: sekce.clenstvi ?? [],
@@ -42,6 +51,12 @@ export function sestavExport(sekce: SekceExportu, vytvoreno: Date = new Date(), 
     volno: sekce.volno ?? [],
     dostupnost: sekce.dostupnost ?? [],
     zpravy: sekce.zpravy ?? [],
+    tresty: sekce.tresty ?? [],
+    body: sekce.body ?? [],
+    navic: sekce.navic ?? [],
+    upravyMzdy: sekce.upravyMzdy ?? [],
+    hodnoceni: sekce.hodnoceni ?? [],
+    hodnoceniPolozek: sekce.hodnoceniPolozek ?? [],
     nedostupne,
     oriznute,
   };

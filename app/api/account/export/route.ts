@@ -29,7 +29,7 @@ export async function GET() {
   const brana = await hit(`export-dat:${id}`, 6, 60 * 60, { failClosed: true });
   if (!brana.ok) return NextResponse.json({ error: 'Příliš mnoho stažení. Zkus to později.' }, { status: 429 });
 
-  const [ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy] = await Promise.all([
+  const [ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy, tresty, body, navic, upravyMzdy, hodnoceni, hodnoceniPolozek] = await Promise.all([
     sekce(async () => {
       const [u] = await sql`SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role, created_at FROM users WHERE id = ${id}`;
       return (u ?? null) as Record<string, unknown> | null;
@@ -45,9 +45,19 @@ export async function GET() {
     sekce(async () => await sql`
       SELECT id, team_id, date, start_time, end_time, type
       FROM shifts WHERE employee_id = ${id} ORDER BY date, id LIMIT ${STROP}` as Record<string, unknown>[]),
-    sekce(async () => await sql`
-      SELECT id, team_id, clock_in, clock_out, source, note
-      FROM time_entries WHERE employee_id = ${id} ORDER BY clock_in, id LIMIT ${STROP}` as Record<string, unknown>[]),
+    // Docházka i s výsledkem ověření polohy (geo_status ok/far/missing a vzdálenost v metrech —
+    // souřadnice se neukládají). Před migrací sloupců bez nich.
+    sekce(async () => {
+      try {
+        return await sql`
+          SELECT id, team_id, clock_in, clock_out, source, note, geo_status, geo_distance_m
+          FROM time_entries WHERE employee_id = ${id} ORDER BY clock_in, id LIMIT ${STROP}` as Record<string, unknown>[];
+      } catch {
+        return await sql`
+          SELECT id, team_id, clock_in, clock_out, source, note
+          FROM time_entries WHERE employee_id = ${id} ORDER BY clock_in, id LIMIT ${STROP}` as Record<string, unknown>[];
+      }
+    }),
     sekce(async () => await sql`
       SELECT id, team_id, from_date, to_date, type, note, status, created_at
       FROM time_off_requests WHERE employee_id = ${id} ORDER BY id LIMIT ${STROP}` as Record<string, unknown>[]),
@@ -59,10 +69,31 @@ export async function GET() {
       SELECT m.id, m.conversation_id, c.team_id, m.content, m.attachment_name, m.created_at
       FROM chat_messages m LEFT JOIN conversations c ON c.id = m.conversation_id
       WHERE m.sender_id = ${id} ORDER BY m.id LIMIT ${STROP}` as Record<string, unknown>[]),
+    // Tresty (i zrušené — záznam zůstává), body (pochvaly, navíc, tresty, poděkování), zápisy navíc,
+    // úpravy mzdy (prémie, srážky, krácení prémie trestem) a hodnocení směn: vše jen o mně.
+    sekce(async () => await sql`
+      SELECT id, team_id, day, type_title, text, photo_url, points, bonus_cut, status, source, seen_at, response, response_at,
+             disputed, dispute_handled_at, cancelled_at, cancel_note, created_at
+      FROM penalties WHERE user_id = ${id} ORDER BY id LIMIT ${STROP}` as Record<string, unknown>[]),
+    sekce(async () => await sql`
+      SELECT id, team_id, points, reason, kind, created_at
+      FROM point_awards WHERE user_id = ${id} ORDER BY id LIMIT ${STROP}` as Record<string, unknown>[]),
+    sekce(async () => await sql`
+      SELECT id, team_id, day, text, photo_url, status, points, bonus_czk, decision_note, decided_at, created_at
+      FROM extra_work WHERE user_id = ${id} ORDER BY id LIMIT ${STROP}` as Record<string, unknown>[]),
+    sekce(async () => await sql`
+      SELECT id, team_id, day, amount, note, source, created_at
+      FROM wage_adjustments WHERE user_id = ${id} ORDER BY day, id LIMIT ${STROP}` as Record<string, unknown>[]),
+    sekce(async () => await sql`
+      SELECT id, team_id, work_date, rating, note, points, flagged, created_at
+      FROM shift_reviews WHERE employee_id = ${id} ORDER BY work_date, id LIMIT ${STROP}` as Record<string, unknown>[]),
+    sekce(async () => await sql`
+      SELECT id, team_id, work_date, kind, points, note, flagged, created_at
+      FROM shift_review_items WHERE employee_id = ${id} ORDER BY work_date, id LIMIT ${STROP}` as Record<string, unknown>[]),
   ]);
 
   const ted = new Date();
-  const dokument = sestavExport({ ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy }, ted, STROP);
+  const dokument = sestavExport({ ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy, tresty, body, navic, upravyMzdy, hodnoceni, hodnoceniPolozek }, ted, STROP);
   return new NextResponse(JSON.stringify(dokument, null, 2), {
     status: 200,
     headers: {
