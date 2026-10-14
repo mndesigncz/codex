@@ -100,8 +100,9 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Úkol za body z „Hotovo" má přednost (čerstvý z /api/navic/ukoly); jinak položka z nabídky.
   const vybrana: NabidkaNavic | null = offerId != null
-    ? nabidka.find(n => n.id === offerId) ?? (predvolby?.nabidka?.id === offerId ? predvolby.nabidka : null)
+    ? (predvolby?.nabidka?.id === offerId ? predvolby.nabidka : null) ?? nabidka.find(n => n.id === offerId) ?? null
     : null;
   // Úkol „jen s fotkou": bez fotky by server vrátil 400 — řekne se to dřív, u tlačítka fotky.
   const fotkaPovinna = vybrana?.requirePhoto === true;

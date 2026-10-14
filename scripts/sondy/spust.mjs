@@ -165,6 +165,7 @@ export const ZELENE = [
   'k85-navic-ved',
   'k86-tresty-z',
   'k86-tresty-ved',
+  'k87-za-body-z',
   'preteceni-vedeni',
   'preteceni-vedeni-tablet',
   'preteceni-zamestnanec',

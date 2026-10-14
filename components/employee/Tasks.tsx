@@ -77,7 +77,9 @@ export default function Tasks({ user }: Props) {
   const ukolyZaBody = zaBody.data ?? [];
   const kVzeti = pocetKVzeti(ukolyZaBody);
   const zaBodyNacteno = zaBody.data != null || !!zaBody.error;
-  const [zaBodySbaleno, setZaBodySbaleno] = useState(() => { try { return localStorage.getItem(KLIC_ZA_BODY_SBALENO) === '1'; } catch { return false; } });
+  const [zaBodySbaleno, setZaBodySbaleno] = useState(false);
+  // Volba sbalení až po připojení (ne v prvním vykreslení — server localStorage nezná a hydratace by nesouhlasila).
+  useEffect(() => { try { if (localStorage.getItem(KLIC_ZA_BODY_SBALENO) === '1' && cerstvePredani() !== ARG_ZA_BODY) setZaBodySbaleno(true); } catch { /* soukromé okno */ } }, []);
   const prepniZaBody = () => setZaBodySbaleno(v => { try { localStorage.setItem(KLIC_ZA_BODY_SBALENO, v ? '0' : '1'); } catch { /* soukromé okno */ } return !v; });
   const [zvyraznitZaBody, setZvyraznitZaBody] = useState(0);
   const [zapsatNavic, setZapsatNavic] = useState(false);
@@ -274,7 +276,7 @@ export default function Tasks({ user }: Props) {
       className={`scroll-mt-4 rounded-3xl transition-shadow duration-200 ${zvyraznitZaBody ? 'ring-2 ring-[#C8F542] ring-offset-2 ring-offset-[var(--bg)]' : ''}`}>
       {ukolyZaBody.length > 0 ? (
         <Card pad="none" className="px-5">
-          <div className="flex flex-wrap items-center gap-2 py-2">
+          <div className="flex items-center py-2">
             <button type="button" onClick={prepniZaBody} aria-expanded={!zaBodySbaleno} aria-controls="za-body-seznam"
               className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] !transform-none">
               <Icon name="gift" size={18} className="shrink-0 text-black/55" />
@@ -283,7 +285,6 @@ export default function Tasks({ user }: Props) {
               </h2>
               <Icon name="chevron" size={16} className={`shrink-0 text-black/40 transition-transform duration-200 ${zaBodySbaleno ? '' : 'rotate-180'}`} />
             </button>
-            <Button variant="secondary" icon="plus" onClick={() => setZapsatNavic(true)} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
           </div>
           {!zaBodySbaleno && (
             <div id="za-body-seznam" className="border-t border-[var(--surface-line)] pb-1">
@@ -291,6 +292,10 @@ export default function Tasks({ user }: Props) {
               <UkolyZaBody ukoly={ukolyZaBody} />
             </div>
           )}
+          {/* „Zapsat navíc" (vlastní věc mimo nabídku) pod seznamem — v hlavičce by na 390 px zalomil nadpis. */}
+          <div className="border-t border-[var(--surface-line)] py-3">
+            <Button variant="secondary" icon="plus" onClick={() => setZapsatNavic(true)} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
+          </div>
         </Card>
       ) : (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-za-body-prazdno>

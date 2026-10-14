@@ -93,14 +93,15 @@ export function UkolyZaBodyWidget({ velikost, nahled }: WidgetProps) {
 
   return (
     <>
-      <Widget nacteni={data} odkaz={odkaz}
+      {/* Seznam je omezený (M tři úkoly bez popisu), takže se nezkracuje pod „Zobrazit vše" — akce zůstanou vidět. */}
+      <Widget nacteni={data} odkaz={odkaz} bezZkraceni={!L}
         doplnek={souhrn.kVzeti > 0 ? <Chip tone="muted" size="sm">{souhrn.kVzeti}</Chip> : undefined}
         prazdno={data.data && ukoly.length === 0 ? (
           <EmptyState compact illustration="odmeny" title={t('Dnes nic za body')} hint={prazdnoText} action={tlacitkoZapsat('md')} />
         ) : undefined}>
         <div className="space-y-3" data-za-body-widget={velikost}>
           {naTabletu && osoba && <p className="t-meta">{t('Pro: {jmeno}', { jmeno: osoba.jmeno })}</p>}
-          <UkolyZaBody ukoly={ukoly} actingAs={actingAs} jmeno={naTabletu ? osoba?.jmeno ?? null : null} velke={naTabletu} nahled={nahled} max={L ? undefined : 4} />
+          <UkolyZaBody ukoly={ukoly} actingAs={actingAs} jmeno={naTabletu ? osoba?.jmeno ?? null : null} velke={naTabletu} nahled={nahled} max={L ? undefined : 3} popisy={L || naTabletu} />
           {L && tlacitkoZapsat('md')}
         </div>
       </Widget>

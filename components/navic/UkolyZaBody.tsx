@@ -59,7 +59,7 @@ export function textOpakovani(t: PrekladFn, n: Pick<NabidkaNavic, 'recurrence' |
   }
 }
 
-export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = false, velke = false, nahled = false, max, jenAkce = false, onZapsano }: {
+export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = false, velke = false, nahled = false, max, jenAkce = false, popisy = true, onZapsano }: {
   ukoly: readonly UkolNavic[];
   /** Tablet: za koho (vybraný člověk) — jde do „Beru si" i do zápisu. */
   actingAs?: number | null;
@@ -75,6 +75,8 @@ export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = 
   max?: number;
   /** Malá karta widgetu: jen tlačítka akcí (název a body nese karta sama). */
   jenAkce?: boolean;
+  /** Popis úkolu pod meta řádkem (střední karta widgetu ho vynechá — vejdou se tři úkoly bez „Zobrazit vše"). */
+  popisy?: boolean;
   onZapsano?: (item: Navic) => void;
 }) {
   const t = useT('widgety');
@@ -113,7 +115,7 @@ export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = 
         aria-label={t('Beru si: {nazev}', { nazev })} onClick={() => void zmen(u, 'vzit')} data-akce="vzit">{t('Beru si')}</Button>
     );
     if (a === 'vratit') return (
-      <Button key={a} variant="ghost" size={size} icon="undo" disabled={probiha != null}
+      <Button key={a} variant="ghost" size={size} disabled={probiha != null}
         aria-label={t('Vrátit: {nazev}', { nazev })} onClick={() => void zmen(u, 'vratit')} data-akce="vratit">{t('Vrátit')}</Button>
     );
     return (
@@ -141,7 +143,7 @@ export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = 
             {odmena && <span className="shrink-0 font-bold tabular-nums leading-snug text-[15px] text-[#16181A]" data-body>{odmena}</span>}
           </div>
           <p className="t-meta mt-0.5 text-pretty" data-meta>{meta.join(' · ')}</p>
-          {n.description && <p className="text-[13px] text-black/55 leading-snug mt-1 text-pretty">{n.description}</p>}
+          {popisy && n.description && <p className="text-[13px] text-black/55 leading-snug mt-1 text-pretty">{n.description}</p>}
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <Chip tone={chip.tone} size="sm" icon={chip.icon}>{chip.text}</Chip>
             {n.requirePhoto && <Chip tone="muted" size="sm" icon="camera">{t('s fotkou')}</Chip>}

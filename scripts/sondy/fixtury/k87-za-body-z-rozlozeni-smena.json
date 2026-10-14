@@ -1,0 +1,54 @@
+{
+ "stranka": "kiosk.smena",
+ "polozky": [
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "ukoly-za-body",
+   "widget": "ukoly.za_body",
+   "velikost": "M"
+  }
+ ],
+ "dostupne": [
+  "akce.checklist",
+  "akce.nejblizsi",
+  "chat.neprectene",
+  "dochazka.dnes_v_podniku",
+  "dochazka.prave_na_smene",
+  "klient.dnesni_rezervace",
+  "klient.objednavky_od_stolu",
+  "menu.vyprodano",
+  "navody.k_uzaverce",
+  "navody.nove",
+  "navody.povinne_cteni",
+  "odkaz",
+  "odmeny.zebricek",
+  "oznameni.nastenka",
+  "postupy.posledni_prubehy",
+  "postupy.povinne_dnes",
+  "postupy.pripominky",
+  "postupy.spustit",
+  "rozvrh.dnesni_smeny",
+  "sdileni.pripnuta_nabidka",
+  "sklad.dochazi",
+  "sklad.inventura",
+  "sklad.nahlasit",
+  "sklad.stav_kategorie",
+  "sklad.zapsat_novou",
+  "ukoly.dnes",
+  "ukoly.po_terminu",
+  "ukoly.za_body",
+  "uzaverky.predavka",
+  "vyroba.k_vyrobe"
+ ],
+ "tarifem": [],
+ "zdroj": "aplikace",
+ "rozsah": null,
+ "zamceno": false,
+ "smiUpravit": false,
+ "smiVychozi": false,
+ "verze": 0
+}
