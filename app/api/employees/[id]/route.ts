@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints, PointsConfig } from '@/lib/rewardLevels';
+import { breakdownFor, totalPoints as soucetBodu } from '@/lib/pointsBalance';
 import { pragueToday, pragueHM, pragueDaySafe } from '@/lib/pragueTime';
 import { clenPodniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
@@ -47,53 +48,14 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   const levels = normalizeLevels(levelsRaw);
   const points: PointsConfig = normalizePoints(pointsRaw);
 
-  let tasksDone = 0, procedures = 0, closingsTotal = 0, reviewPoints = 0, autoPoints = 0, itemPoints = 0, flagged = 0, ratedShifts = 0;
-  try {
-    const [r] = await sql`SELECT COUNT(*)::int AS n FROM tasks WHERE completed_by = ${employeeId} AND status = 'done'`;
-    tasksDone = r?.n ?? 0;
-  } catch { /* ignore */ }
-  try {
-    const [r] = await sql`SELECT COUNT(*)::int AS n FROM procedure_runs WHERE user_id = ${employeeId} AND status = 'completed'`;
-    procedures = r?.n ?? 0;
-  } catch { /* ignore */ }
-  try {
-    const [r] = await sql`SELECT COUNT(*)::int AS n FROM cash_closings WHERE created_by = ${employeeId} AND covered_by IS NULL`;
-    closingsTotal = r?.n ?? 0;
-  } catch {
-    try {
-      const [r] = await sql`SELECT COUNT(*)::int AS n FROM cash_closings WHERE created_by = ${employeeId}`;
-      closingsTotal = r?.n ?? 0;
-    } catch { /* ignore */ }
-  }
-  try {
-    const [r] = await sql`
-      SELECT COALESCE(SUM(points),0)::int AS pts, COALESCE(SUM(auto_points),0)::int AS auto,
-             COUNT(*)::int AS n, COUNT(*) FILTER (WHERE flagged)::int AS flg
-      FROM shift_reviews WHERE employee_id = ${employeeId} AND team_id = ${teamId}`;
-    reviewPoints = r?.pts ?? 0; autoPoints = r?.auto ?? 0; ratedShifts = r?.n ?? 0; flagged = r?.flg ?? 0;
-  } catch {
-    try {
-      const [r] = await sql`SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n FROM shift_reviews WHERE employee_id = ${employeeId} AND team_id = ${teamId}`;
-      reviewPoints = r?.pts ?? 0; ratedShifts = r?.n ?? 0;
-    } catch { /* ignore */ }
-  }
-  try {
-    const [r] = await sql`
-      SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*) FILTER (WHERE flagged)::int AS flg
-      FROM shift_review_items WHERE employee_id = ${employeeId} AND team_id = ${teamId}`;
-    itemPoints = r?.pts ?? 0; flagged += r?.flg ?? 0;
-  } catch { /* ignore */ }
-  // Pochvaly s body (kolo 5) — stejná aritmetika jako lib/pointsBalance.
-  let awards = 0, awardCount = 0;
-  try {
-    const [r] = await sql`
-      SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n
-      FROM point_awards WHERE user_id = ${employeeId} AND team_id = ${teamId}`;
-    awards = r?.pts ?? 0; awardCount = r?.n ?? 0;
-  } catch { /* table missing */ }
-
-  const totalPoints = tasksDone * points.task + procedures * points.procedure + closingsTotal * points.closing
-    + reviewPoints + autoPoints + itemPoints + awards;
+  // Stejný rozpad i součet jako žebříček a odměny (lib/pointsBalance) — dřív tu
+  // byla vlastní kopie bez filtru na podnik a bez pravidla o prázdném postupu (k89).
+  const b = await breakdownFor(teamId, employeeId);
+  const { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints, autoPoints, itemPoints, flagged, ratedShifts } = b;
+  // „Pochvaly“ v profilu dál ukazují všechny body z point_awards (pochvaly, navíc i tresty) jako dřív.
+  const awards = b.awards + b.navicPoints + b.trestPoints;
+  const awardCount = b.awardCount + b.navicCount + b.trestCount;
+  const totalPoints = soucetBodu(b, points);
   const st = standingForPoints(levels, totalPoints);
 
   const today = pragueToday();

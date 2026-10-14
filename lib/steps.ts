@@ -55,7 +55,8 @@ export function stepPenalty(s: Step): number {
   return weightSpec(s.weight).minus;
 }
 
-/** Plus points for a done step, by weight. */
+/** Plus weight of a done step — its share of the run's completion bonus
+ *  (scoreRun: bonus = body za postup × hotové plus / všechny plus), not raw points. */
 export function stepPlus(s: Step): number {
   return weightSpec(s.weight).plus;
 }

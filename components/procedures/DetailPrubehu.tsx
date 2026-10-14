@@ -10,7 +10,7 @@
 import { Icon } from '../Icons';
 import { Avatar, Chip, Modal } from '../ui';
 import { isExcused } from '@/lib/procedureScoring';
-import { parseSteps, stepPenalty, stepPlus, mimoRozsah, rozsahKroku, hodnotaSJednotkou, normalizujHodnoty } from '@/lib/steps';
+import { parseSteps, stepPenalty, mimoRozsah, rozsahKroku, hodnotaSJednotkou, normalizujHodnoty } from '@/lib/steps';
 import { delka, type PrubehApi } from '@/lib/postupyPrehled';
 import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
 import { fmtCislo } from '@/lib/i18n/format';
@@ -88,7 +88,6 @@ export default function DetailPrubehu({ prubeh, kroky, kdy, onClose }: {
                     </p>
                   )}
                 </div>
-                {hotovo && stepPlus(st) > 0 && <span className="shrink-0 text-xs font-semibold text-ok-ink tabular-nums">+{stepPlus(st)}</span>}
               </li>
             );
           })}

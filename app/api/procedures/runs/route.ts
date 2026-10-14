@@ -381,6 +381,10 @@ export async function PATCH(request: Request) {
     // ---- Automatic points: score the run from step weights and skip reasons,
     // and write it into the same per-item ledger the review modal edits. A row
     // the employer already touched wins (ON CONFLICT DO NOTHING).
+    // Řádek nese jen PŘÍPLATEK/SRÁŽKU ke kroku — základ za dokončený postup
+    // (cfg.procedure) se počítá jednou v totalPoints(); cfg.procedure je tu
+    // jen strop bonusu za úplnost (k89: dřív se základ platil dvakrát a za
+    // každou fajfku bod navíc).
     try {
       const [proc] = await sql`SELECT items FROM procedures WHERE id = ${run.procedure_id}`;
       const [teamCfg] = await sql`SELECT points_config FROM teams WHERE id = ${run.team_id}`;
