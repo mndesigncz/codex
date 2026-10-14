@@ -1135,6 +1135,8 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
   const { jazyk } = useJazyk();
   const dnes = pragueToday();
   const [druh, setDruh] = useState<'premie' | 'srazka'>(clovek.druh);
+  // Typ prémie (spuštění, balík P): tresty smí krátit jen nenárokovou prémii (§ 346b ZP).
+  const [typPremie, setTypPremie] = useState<'premie' | 'mzda'>('premie');
   const [castka, setCastka] = useState('');
   const [den, setDen] = useState(dnes >= rozmezi.od && dnes <= rozmezi.do ? dnes : rozmezi.do);
   const [poznamka, setPoznamka] = useState('');
@@ -1149,7 +1151,7 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
     try {
       await fetch('/api/wage-adjustments', {
         method: 'POST', headers: JSON_HLAVICKA,
-        body: JSON.stringify({ userId: Number(clovek.id), day: den, amount: druh === 'premie' ? cislo : -cislo, note: poznamka.trim() || undefined }),
+        body: JSON.stringify({ userId: Number(clovek.id), day: den, amount: druh === 'premie' ? cislo : -cislo, druh: druh === 'premie' ? typPremie : undefined, note: poznamka.trim() || undefined }),
       }).then(okJson);
       obnovDochazku();
       onClose();
@@ -1179,6 +1181,16 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
       </>}>
       <div className="space-y-4">
         <Segmented ariaLabel={t('Druh')} value={druh} onChange={setDruh} options={[{ id: 'premie', label: t('Prémie') }, { id: 'srazka', label: t('Srážka') }]} />
+        {druh === 'premie' && (
+          <div className="space-y-1.5" data-typ-premie>
+            <p className="field-label">{t('Typ prémie')}</p>
+            <Segmented ariaLabel={t('Typ prémie')} value={typPremie} onChange={setTypPremie}
+              options={[{ id: 'premie', label: t('Nenároková prémie') }, { id: 'mzda', label: t('Mzda / ostatní') }]} />
+            <p className="t-meta text-pretty">{typPremie === 'premie'
+              ? t('Dobrovolná prémie nad mzdu. Jen z ní jde krátit při trestu.')
+              : t('Část mzdy, na kterou má člověk nárok (smlouva, mzdový výměr). Trest ji krátit nesmí.')}</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field id="uprava-castka" label={t('Částka')}>
             <div className="relative">
@@ -1200,7 +1212,7 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
             <ul className="list">
               {upravy.map(u => (
                 <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
-                  meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : u.source === 'navic' ? ` · ${t('za navíc')}` : u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : ''}`}
+                  meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : u.source === 'navic' ? ` · ${t('za navíc')}` : u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : u.source === 'premie' ? ` · ${t('nenároková prémie')}` : ''}`}
                   value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>}
                   actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat zápis')} loading={mazu === u.id} onClick={() => { void smaz(u.id); }} />} />
               ))}

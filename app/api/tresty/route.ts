@@ -4,7 +4,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { jeClenem } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
-import { jeStavTrestu, posunDni, trestText, validujTrest } from '@/lib/tresty';
+import { jeStavTrestu, posunDni, trestText, validujTrest, VETA_BEZ_PREMIE } from '@/lib/tresty';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { nactiTrest, oznamTrest, predMigraci, stropKraceniDb, tvarDruhu, tvarTrestu, zalozTrest } from './_spolecne';
 
@@ -119,8 +119,8 @@ export async function POST(req: NextRequest) {
       const s = await stropKraceniDb(c.teamId, z.userId, z.day);
       if (z.bonusCut > s.strop) {
         return chyba(s.strop > 0
-          ? `Krátit jde nejvýš ${mena.money(s.strop)} — víc prémií ten měsíc nemá.`
-          : 'Tenhle měsíc nemá žádné prémie, krátit není z čeho. Dej body nebo napomenutí.', 409, { strop: s.strop });
+          ? `Krátit jde nejvýš ${mena.money(s.strop)} — víc nenárokových prémií ten měsíc nemá.`
+          : VETA_BEZ_PREMIE, 409, { strop: s.strop });
       }
     }
     if (z.sourceKey) {

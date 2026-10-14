@@ -34,8 +34,10 @@ export default function ({ eq, ok }: Testy) {
   eq('trest: bez textu', validujTrest({ userId: 3 }, DNES), { ok: false, chyba: 'Napiš, co se stalo.' });
   ok('trest: den v budoucnu neprojde', !validujTrest({ userId: 3, text: 'Pozdě', day: '2026-10-20' }, DNES).ok);
   ok('trest: záporné body neprojdou', !validujTrest({ userId: 3, text: 'Pozdě', points: -10 }, DNES).ok);
-  const zNavrhu = validujTrest({ userId: 3, text: 'Manko', sourceKey: 'manko:55' }, DNES);
-  ok('trest z návrhu: zdroj podle klíče, bez bodů napomenutí', zNavrhu.ok && zNavrhu.trest.source === 'manko' && zNavrhu.trest.sourceKey === 'manko:55' && zNavrhu.trest.points === 0);
+  const zNavrhu = validujTrest({ userId: 3, text: 'Pozdě', sourceKey: 'pozde:55' }, DNES);
+  ok('trest z návrhu: zdroj podle klíče, bez bodů napomenutí', zNavrhu.ok && zNavrhu.trest.source === 'pozde' && zNavrhu.trest.sourceKey === 'pozde:55' && zNavrhu.trest.points === 0);
+  // Spuštění (balík P): manko trestem není (§ 346b ZP, jen dohoda o odpovědnosti) — klíč manko:<id> neprojde.
+  eq('trest z manka: odmítnut větou o dohodě o odpovědnosti', validujTrest({ userId: 3, text: 'Manko', sourceKey: 'manko:55' }, DNES), { ok: false, chyba: 'Manko řeš dohodou o odpovědnosti, ne trestem.' });
   ok('trest: nesmyslný klíč návrhu neprojde', !validujTrest({ userId: 3, text: 'Manko', sourceKey: 'cokoli:1' }, DNES).ok);
   ok('trest: fotka jen z uploadu nebo https', validujTrest({ userId: 3, text: 'Rozbitá sklenice', photoUrl: '/api/upload/abcdef12' }, DNES).ok && !validujTrest({ userId: 3, text: 'Rozbitá sklenice', photoUrl: 'javascript:x' }, DNES).ok);
   eq('klíč návrhu', [platnyKlicNavrhu('pozde:12'), platnyKlicNavrhu('vytka:x'), druhZKlice('vytka:9'), druhZKlice('nic')], [true, false, 'vytka', null]);

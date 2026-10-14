@@ -136,5 +136,11 @@ export default function ({ eq, ok }: Testy) {
   ok('Docházka: trest za pozdní příchod (pozde:<id>) a krácení prémie (trest) v úpravách', /sourceKey: `pozde:\$\{k\.id\}`/.test(doch) && (doch.match(/u\.source === 'trest'/g) ?? []).length === 2);
   const okno = zdroj('components/tresty-vedeni/DatTrest.tsx');
   ok('okno Dát trest: validujTrest před odesláním, strop z GET ?strop=1, 409 se stropem pod krácením, čísla s klávesnicí', /validujTrest\(/.test(okno) && /urlStropu\(/.test(okno) && /res\.status === 409 && typeof d\?\.strop === 'number'/.test(okno) && (okno.match(/inputMode="numeric"/g) ?? []).length === 2);
-  ok('okno Dát trest: krácení vždy s větou, že jde jen o prémii', /Krátí se jen prémie za ten měsíc, ne mzda/.test(okno));
+  ok('okno Dát trest: krácení vždy s větou, že jde jen o nenárokovou prémii (§ 346b)', /Krátí se jen nenároková prémie za ten měsíc, ne mzda — peněžní postihy zákoník práce zakazuje \(§ 346b\)/.test(okno));
+  ok('okno Dát trest: věta, že napomenutí není výtka podle § 52 písm. g)', /Napomenutí v aplikaci není výtka podle § 52 písm\. g\) zákoníku práce\./.test(okno));
+  ok('okno Dát trest: při stropu 0 řekne proč a jak prémii založit', /Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není\. Založ ji v Docházce/.test(okno));
+  // Spuštění (balík P): manko trestem není — detail uzávěrky dál volá TrestTlacitko s klíčem manko:<id>,
+  // ale tlačítko místo okna ukáže jen větu (TrestyUzaverky.tsx).
+  const tu = zdroj('components/tresty-vedeni/TrestyUzaverky.tsx');
+  ok('manko: TrestTlacitko u manka místo tlačítka větu „Manko řeš dohodou o odpovědnosti, ne trestem."', /druhNavrhu === 'manko'/.test(tu) && /Manko řeš dohodou o odpovědnosti, ne trestem\./.test(tu));
 }

@@ -12,10 +12,12 @@ import { predMigraci } from '../_spolecne';
 // (POST /api/tresty se sourceKey), nebo zahodí (POST sem). Vyřízený návrh se
 // už nenabídne (penalties.source_key, penalty_dismissed).
 //
-// GET  (tresty.udelit) → { navrhy } za posledních DNI_NAVRHU dní:
+// GET  (tresty.udelit) → { navrhy, manka } za posledních DNI_NAVRHU dní:
 //      pozde:<time_entry>  příchod o víc než PRAH_POZDE_MIN min po začátku plánované směny,
-//      manko:<closing>     uzávěrka s mankem aspoň PRAH_MANKA (měna podniku), na toho, kdo ji dělal,
-//      vytka:<item>        výtka u položky v hodnocení směny.
+//      vytka:<item>        výtka u položky v hodnocení směny;
+//      manka               kolik uzávěrek mělo manko aspoň PRAH_MANKA (měna podniku). Manko
+//                          trestem není (§ 346b, § 252 zákoníku práce — jen dohoda
+//                          o odpovědnosti), UI místo návrhu ukáže větu VETA_MANKO bez akce.
 // POST { klic } (tresty.udelit) → zahodit návrh.
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +39,7 @@ export async function GET() {
       UNION SELECT source_key FROM penalty_dismissed WHERE team_id = ${c.teamId}`;
     vyrizene = new Set(rows.map(r => String(r.source_key)));
   } catch (e) {
-    if (predMigraci(e)) return NextResponse.json({ navrhy: [] });
+    if (predMigraci(e)) return NextResponse.json({ navrhy: [], manka: 0 });
     throw e;
   }
 
@@ -75,28 +77,25 @@ export async function GET() {
     console.error('tresty/navrhy pozdě', e);
   }
 
-  // Manko v uzávěrce: na toho, kdo uzávěrku dělal (pomocné řádky za kolegy ne).
+  // Manko v uzávěrce: jen spočítat (pomocné řádky za kolegy ne) — návrh trestu z něj nevzniká.
+  let manka = 0;
   try {
     const rows = await sql`
-      SELECT cc.*, u.name AS user_name, u.avatar AS user_avatar
+      SELECT cc.*
       FROM cash_closings cc
-      LEFT JOIN users u ON u.id = cc.created_by
       WHERE cc.team_id = ${c.teamId} AND cc.covered_by IS NULL
         AND COALESCE(cc.shift_date, cc.date) >= ${od}
       ORDER BY COALESCE(cc.shift_date, cc.date) DESC
       LIMIT 200`;
     for (const r of rows as any[]) {
-      const klic = `manko:${r.id}`;
-      if (vyrizene.has(klic)) continue;
+      if (vyrizene.has(`manko:${r.id}`)) continue;
       const diff = cashDifference({
         opening_cash: num(r.opening_cash), cash_revenue: num(r.cash_revenue), expenses: num(r.expenses), cash_removed: num(r.cash_removed),
         self_payout: num(r.self_payout), closing_cash: num(r.closing_cash), tips: num(r.tips), payout_from_register: r.payout_from_register ?? null,
         tips_in_drawer: r.tips_in_drawer ?? null, tips_card: num(r.tips_card),
       });
       if (diff > -PRAH_MANKA) continue;
-      navrhy.push({ klic, druh: 'manko', userId: Number(r.created_by), userName: String(r.user_name ?? ''), userAvatar: r.user_avatar ?? null,
-        day: String(r.shift_date ?? r.date).slice(0, 10), closingId: Number(r.id), shiftId: r.shift_id ? Number(r.shift_id) : null,
-        minuty: null, castka: Math.round(-diff), poznamka: null });
+      manka++;
     }
   } catch (e) {
     console.error('tresty/navrhy manko', e);
@@ -122,7 +121,7 @@ export async function GET() {
   }
 
   navrhy.sort((a, b) => b.day.localeCompare(a.day) || a.userName.localeCompare(b.userName, 'cs'));
-  return NextResponse.json({ navrhy });
+  return NextResponse.json({ navrhy, manka });
 }
 
 export async function POST(req: NextRequest) {

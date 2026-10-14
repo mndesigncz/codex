@@ -8,14 +8,20 @@
 //    uzávěrka / úkol, nepovinně položka ze sazebníku, fotka; trest = body dolů
 //    (point_awards kind 'trest', záporné) a/nebo krácení prémie (wage_adjustments
 //    source 'trest', záporné). Bez bodů i krácení je to napomenutí;
-//  - krácení prémie jde nejvýš do výše prémií člověka za ten měsíc: peněžní pokuty
-//    zaměstnanci zákoník práce zakazuje (§ 346d), krátit nenárokovou prémii ne;
+//  - krácení prémie jde nejvýš do výše NENÁROKOVÝCH prémií člověka za ten měsíc
+//    (wage_adjustments source 'premie', ZDROJ_NENAROKOVE_PREMIE): peněžní postihy
+//    zaměstnanci zákoník práce zakazuje (§ 346b odst. 1; NS 21 Cdo 3471/2024), krátit
+//    nenárokovou prémii ne. Mzda, starší kladné úpravy bez typu, prémie za navíc ani
+//    odměny z katalogu se do stropu nepočítají;
 //  - člověk dostane oznámení, trest vidí v Odměnách, potvrdí „Beru na vědomí"
 //    a může se vyjádřit (i nesouhlasit) — vedení to vidí ve frontě;
 //  - vedení trest upraví nebo zruší (body i krácení se vrátí, záznam zůstane);
 //  - sazebník: typické prohřešky s body a krácením, vybírá se jedním klepnutím;
-//  - návrhy z dat: pozdní příchod, manko v uzávěrce, výtka z hodnocení směny →
-//    „Dát trest" předvyplněně, nebo zahodit.
+//  - návrhy z dat: pozdní příchod a výtka z hodnocení směny → „Dát trest" předvyplněně,
+//    nebo zahodit. Manko v uzávěrce trestem NENÍ (spuštění, balík P): za schodek ručí
+//    zaměstnanec jen podle dohody o odpovědnosti (§ 252 zákoníku práce), ne pokutou.
+//    Druh 'manko' zůstává kvůli starým záznamům, nový trest z manka validace odmítne;
+//  - napomenutí v aplikaci není výtka podle § 52 písm. g) zákoníku práce (VETA_VYTKA).
 //
 // Tenhle soubor je čistá logika bez React a bez DB (testy scripts/testy/k86-tresty.ts).
 // Server: app/api/tresty/route.ts, app/api/tresty/[id]/route.ts,
@@ -45,8 +51,16 @@ export const DNI_ZPETNE = 31;
 export const DNI_NAVRHU = 14;
 /** Pozdní příchod je návrh trestu od tolika minut (stejný práh jako docházka a tablet). */
 export const PRAH_POZDE_MIN = 10;
-/** Manko je návrh trestu od téhle částky (měna podniku). */
+/** Manko od téhle částky (měna podniku) se v návrzích připomene větou VETA_MANKO (trest to není). */
 export const PRAH_MANKA = 50;
+/** Zdroj úpravy mzdy „nenároková prémie" (wage_adjustments.source) — jediný základ stropu krácení. */
+export const ZDROJ_NENAROKOVE_PREMIE = 'premie';
+/** Věta místo návrhu trestu za manko (bez akce). */
+export const VETA_MANKO = 'Manko řeš dohodou o odpovědnosti, ne trestem.';
+/** Drobná věta v okně trestu. */
+export const VETA_VYTKA = 'Napomenutí v aplikaci není výtka podle § 52 písm. g) zákoníku práce.';
+/** Hláška strop 0: proč krátit nejde a jak prémii založit. */
+export const VETA_BEZ_PREMIE = 'Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není. Založ ji v Docházce → Prémie a srážky jako „Nenároková prémie“. Starší prémie bez typu se nepočítají.';
 
 export interface Trest {
   id: number;
@@ -324,6 +338,8 @@ export function validujTrest(b: Record<string, unknown>, dnes: string): { ok: tr
   let source: ZdrojTrestu = 'rucne';
   if (b.sourceKey != null && b.sourceKey !== '') {
     if (!platnyKlicNavrhu(b.sourceKey)) return { ok: false, chyba: 'Návrh trestu nesedí.' };
+    // Manko trestem není (§ 346b, § 252 ZP): klíč manko:<uzávěrka> se už nepřijme.
+    if (druhZKlice(b.sourceKey) === 'manko') return { ok: false, chyba: VETA_MANKO };
     sourceKey = b.sourceKey;
     source = druhZKlice(b.sourceKey) ?? 'rucne';
   }
@@ -364,9 +380,9 @@ export function validujDruh(b: Record<string, unknown>): { ok: true; druh: Zapis
 // ---------------------------------------------------------------------------
 
 /**
- * Kolik jde ještě krátit z prémie za měsíc: prémie za měsíc (kladné úpravy mimo
- * tresty) minus to, co už tresty ten měsíc krátily (bez právě upravovaného trestu).
- * Nikdy záporně.
+ * Kolik jde ještě krátit z prémie za měsíc: nenárokové prémie za měsíc (kladné úpravy
+ * se source 'premie') minus to, co už tresty ten měsíc krátily (bez právě upravovaného
+ * trestu). Nikdy záporně.
  */
 export function stropKraceni(premieMesice: number, uzKraceno: number): number {
   return Math.max(0, Math.round((Number(premieMesice) || 0) - (Number(uzKraceno) || 0)));
