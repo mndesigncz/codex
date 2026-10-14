@@ -183,7 +183,7 @@ const ODMENY = '/employer/overview?view=rewards';
   await oknoO.getByRole('button', { name: 'Odmítnout', exact: true }).click();
   const patch2 = await dokud(() => (stav.zapisy ?? []).find(z => z.m === 'PATCH' && z.path === '/api/navic/2'), 4000);
   tvrdi('O4: Odmítnout → PATCH /api/navic/2 { status: odmitnuto, note }', !!patch2 && patch2.telo?.status === 'odmitnuto' && patch2.telo?.note === 'Záskok se platí jako směna.', JSON.stringify(patch2?.telo));
-  tvrdi('O4: chip „2 čeká" v hlavičce', await dokud(async () => /2 čeká/.test(await text(w)), 3000));
+  tvrdi('O4: chip „2 čeká" v hlavičce', await dokud(async () => /2 čeká/.test(await text(w)), 8000), (await text(w)).slice(0, 120));
 
   // Zapsat za člena: chip nabídky předvyplní text a body, POST s userId a uznat.
   await w.getByRole('button', { name: 'Zapsat za člena' }).click();

@@ -26,7 +26,11 @@ const podvrh = (req, json) => {
   tvrdi('Ctrl K otevře hledání', await okno.waitFor({ timeout: 5000 }).then(() => true, () => false));
   tvrdi('bez dotazu nabízí stránky aplikace', await okno.getByRole('option', { name: /Sklad/ }).count() >= 1);
   await okno.getByRole('combobox').fill('sklad');
-  tvrdi('„sklad" najde stránku Sklad', await dokud(async () => await okno.getByRole('option', { name: /Sklad/ }).count() >= 1, 3000));
+  // Sklad je v seznamu i bez dotazu — čekat, až se seznam přepočítá (Přehled zmizí a zvýrazněná je Sklad),
+  // jinak Enter v CI pod zátěží vybral první položku starého seznamu (Přehled).
+  tvrdi('„sklad" najde stránku Sklad', await dokud(async () => await okno.getByRole('option', { name: /Sklad/ }).count() >= 1
+    && await okno.getByRole('option', { name: /^Přehled$/ }).count() === 0
+    && /Sklad/.test((await okno.locator('[role="option"][aria-selected="true"]').first().textContent().catch(() => '')) ?? ''), 5000));
   await p.keyboard.press('Enter');
   // Sklad je těžká stránka (líně načtený kód); v CI běží sondy souběžně a 6 s nestačilo (2× v říjnu 2026).
   tvrdi('Enter otevře Sklad a okno se zavře', await dokud(async () => await p.locator('[data-plocha="vedeni.sklad"]').count() === 1 && await okno.count() === 0, 15000), p.url());
