@@ -1084,6 +1084,34 @@ export const KATALOG: Opravneni[] = [
   ]
  },
  {
+  "id": "tresty.zobrazit_tym",
+  "oblast": "Tým",
+  "nazev": "Vidět tresty celého týmu",
+  "popis": "Seznam trestů a napomenutí všech členů, u uzávěrek, v profilu člena a ve widgetech vedení. Vlastní tresty vidí každý bez oprávnění.",
+  "citlivost": "střední",
+  "vyzaduje": []
+ },
+ {
+  "id": "tresty.udelit",
+  "oblast": "Tým",
+  "nazev": "Udělovat tresty",
+  "popis": "Zapsat, co kdo pokazil, a dát trest: body dolů nebo krácení prémie (nejvýš do výše prémií za měsíc), bez obojího napomenutí. Upravit a zrušit trest, vyřídit nesouhlas, návrhy trestů z pozdních příchodů, manka a výtek.",
+  "citlivost": "vysoká",
+  "vyzaduje": [
+   "tresty.zobrazit_tym"
+  ]
+ },
+ {
+  "id": "tresty.sazebnik",
+  "oblast": "Tým",
+  "nazev": "Sazebník trestů",
+  "popis": "Vypsat a měnit typické prohřešky s body a krácením prémie, ze kterých se při udělení trestu vybírá jedním klepnutím.",
+  "citlivost": "střední",
+  "vyzaduje": [
+   "tresty.zobrazit_tym"
+  ]
+ },
+ {
   "id": "chat.pouzivat",
   "oblast": "Komunikace",
   "nazev": "Týmový chat a ankety",
@@ -1836,6 +1864,9 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "stoly.qr",
    "stoly.upravit",
    "stoly.zobrazit",
+   "tresty.sazebnik",
+   "tresty.udelit",
+   "tresty.zobrazit_tym",
    "tym.kontakty",
    "tym.odebrat",
    "tym.pozvat",
@@ -1970,6 +2001,9 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "sklad.zobrazit",
    "stoly.qr",
    "stoly.zobrazit",
+   "tresty.sazebnik",
+   "tresty.udelit",
+   "tresty.zobrazit_tym",
    "tym.profil",
    "tym.zobrazit",
    "ukoly.mazat",
@@ -2148,6 +2182,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "receptury.zobrazit",
    "sklad.ceny",
    "sklad.zobrazit",
+   "tresty.zobrazit_tym",
    "tym.zobrazit",
    "uzaverky.exportovat",
    "uzaverky.zobrazit_vse"

@@ -2419,5 +2419,7 @@
   "Co kdo udělal nad rámec povinností — čekající k uznání s body nebo prémií, uznané a odmítnuté za měsíc.": "What people did beyond their duties — pending approval with points or a bonus, approved and declined for the month.",
   "Navíc k uznání": "Extra work to approve",
   "Domů": "Home",
-  "{n, plural, one {# uznaný zápis navíc} few {# uznané zápisy navíc} other {# uznaných zápisů navíc}}": "{n, plural, one {# approved extra entry} other {# approved extra entries}}"
+  "{n, plural, one {# uznaný zápis navíc} few {# uznané zápisy navíc} other {# uznaných zápisů navíc}}": "{n, plural, one {# approved extra entry} other {# approved extra entries}}",
+  "{n, plural, one {# trest s body} few {# tresty s body} other {# trestů s body}}": "{n, plural, one {# penalty with points} other {# penalties with points}}",
+  "Tresty": "Penalties"
 }

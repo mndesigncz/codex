@@ -2419,5 +2419,7 @@
   "Co kdo udělal nad rámec povinností — čekající k uznání s body nebo prémií, uznané a odmítnuté za měsíc.": "Co kto zrobił ponad obowiązki — czekające na uznanie z punktami lub premią, uznane i odrzucone w miesiącu.",
   "Navíc k uznání": "Dodatkowa praca do uznania",
   "Domů": "Dom",
-  "{n, plural, one {# uznaný zápis navíc} few {# uznané zápisy navíc} other {# uznaných zápisů navíc}}": "{n, plural, one {# uznany wpis dodatkowy} few {# uznane wpisy dodatkowe} many {# uznanych wpisów dodatkowych} other {# uznanego wpisu dodatkowego}}"
+  "{n, plural, one {# uznaný zápis navíc} few {# uznané zápisy navíc} other {# uznaných zápisů navíc}}": "{n, plural, one {# uznany wpis dodatkowy} few {# uznane wpisy dodatkowe} many {# uznanych wpisów dodatkowych} other {# uznanego wpisu dodatkowego}}",
+  "{n, plural, one {# trest s body} few {# tresty s body} other {# trestů s body}}": "{n, plural, one {# kara z punktami} few {# kary z punktami} many {# kar z punktami} other {# kary z punktami}}",
+  "Tresty": "Kary"
 }

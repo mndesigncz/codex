@@ -42,6 +42,8 @@ export interface Rozpad {
    * Server je posílá zvlášť (`navicPoints` / `navicCount`), v `awards` nejsou — součet sedí.
    */
   navic: number; navicPocet: number;
+  /** Body z trestů (kolo 10: point_awards kind 'trest', záporné číslo) a kolik trestů s body. */
+  tresty: number; trestu: number;
 }
 
 export interface Sazebnik { ukol: number; postup: number; uzaverka: number }
@@ -65,6 +67,7 @@ function vyberRozpad(b: any): Rozpad {
     automaticke: cele(b?.autoPoints), uPolozek: cele(b?.itemPoints), vytek: cele(b?.flagged),
     pochvaly: cele(b?.awards), pochval: cele(b?.awardCount),
     navic: cele(b?.navicPoints), navicPocet: cele(b?.navicCount),
+    tresty: cele(b?.trestPoints), trestu: cele(b?.trestCount),
   };
 }
 
@@ -120,6 +123,8 @@ export function odkudBody(r: Rozpad, s: Sazebnik): RadekBodu[] {
     { klic: 'pochvaly', nazev: 'Pochvaly', body: r.pochvaly, pocet: r.pochval, ikona: 'award' },
     // Kolo 9: uznané „navíc" jako vlastní řádek — jen když je server posílá zvlášť (jinak jsou v Pochvalách).
     ...(r.navic !== 0 || r.navicPocet > 0 ? [{ klic: 'navic', nazev: 'Navíc', body: r.navic, pocet: r.navicPocet, ikona: 'sparkle' }] : []),
+    // Kolo 10: tresty (body dolů) jako vlastní řádek, jen když nějaké jsou.
+    ...(r.tresty !== 0 || r.trestu > 0 ? [{ klic: 'tresty', nazev: 'Tresty', body: r.tresty, pocet: r.trestu, ikona: 'warning' }] : []),
     // Body u položek jsou i odečtené odměny (záporné řádky ledgeru) — patří do součtu, jinak nesedí s celkem.
     { klic: 'polozky', nazev: 'U položek a za odměny', body: r.uPolozek, pocet: null, ikona: 'gift' },
   ];
@@ -217,7 +222,7 @@ export function dnyHodnoceni(raw: any): DenHodnoceni[] {
     const vytka = it.flagged === true;
     // Kolo 9: uznané „navíc" přichází jako pochvala s důvodem „Navíc: …" (point_awards kind navic) — vlastní druh s ikonou.
     const nazev = String(it.label ?? 'Hodnocení');
-    const druh = it.kind === 'award' && /^Navíc: /.test(nazev) ? 'navic' : String(it.kind ?? '');
+    const druh = it.kind === 'award' && /^Navíc: /.test(nazev) ? 'navic' : it.kind === 'award' && /^Trest: /.test(nazev) ? 'trest' : String(it.kind ?? '');
     x.polozky.push({ druh, id: cele(it.refId), nazev, body: cele(it.points), poznamka: text(it.note), vytka });
     x.vytka = x.vytka || vytka;
   }

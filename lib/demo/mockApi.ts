@@ -29,6 +29,7 @@ import { ostatni } from './routy/ostatni';
 import { finance } from './routy/finance';
 import { klient } from './routy/klient';
 import { navic } from './routy/navic';
+import { tresty } from './routy/tresty';
 import { prazdne } from './routy/prazdne';
 
 declare global {
@@ -41,7 +42,7 @@ declare global {
 }
 
 // Pořadí je důležité: konkrétní handlery před obecným zbytkem.
-const OBSLUHY: Obsluha[] = [zaklad, lide, rozvrh, ukoly, uzaverky, sklad, komunikace, ostatni, finance, klient, navic];
+const OBSLUHY: Obsluha[] = [zaklad, lide, rozvrh, ukoly, uzaverky, sklad, komunikace, ostatni, finance, klient, navic, tresty];
 
 let stav: DemoStav | null = null;
 let hlasitel: HlaseniAkce = () => {};
