@@ -496,10 +496,13 @@ export async function awardBirthdays(): Promise<number> {
   for (const r of rows) {
     try {
       await award(Number(r.team_id), Number(r.customer_id), Number(r.birthday_points), 'birthday', `bday:${year}`, 'Dárek k narozeninám');
+      // Přání k narozeninám od podniku je marketing (zákon 480/2004, Apple 4.5.4): kategorie
+      // 'novinky' = chodí jen hostům, kteří novinky výslovně povolili (lib/pushPravidla OPT_IN).
+      // Body se připíšou vždy; bez souhlasu je host uvidí na kartičce, jen bez upozornění.
       if (!vlastniZprava.has(Number(r.team_id))) notifyUser(Number(r.customer_id), {
         title: `Všechno nejlepší! ${r.birthday_points} bodů od ${r.team_name}`,
         body: 'Dárek k narozeninám máš na kartičce.',
-        link: r.slug ? `/client/${r.slug}?tab=loyalty` : '/client/me', type: 'success',
+        link: r.slug ? `/client/${r.slug}?tab=loyalty` : '/client/me', type: 'success', category: 'novinky',
       }).catch(() => {});
       n++;
     } catch { /* další člen; nepovedené připsání nesmí zastavit ostatní */ }

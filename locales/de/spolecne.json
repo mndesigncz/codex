@@ -330,5 +330,15 @@
   "připnuto": "angeheftet",
   "Přidat poznámku… @jméno někoho upozorní": "Notiz hinzufügen… @Name benachrichtigt jemanden",
   "Koho zmínit": "Wen erwähnen",
-  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Strg+Enter sendet · @Name benachrichtigt eine Kollegin oder einen Kollegen"
+  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Strg+Enter sendet · @Name benachrichtigt eine Kollegin oder einen Kollegen",
+  "Souhlasím s podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.": "Ich stimme den Nutzungsbedingungen zu und nehme die Datenschutzerklärung zur Kenntnis.",
+  "Podmínky užívání": "Nutzungsbedingungen",
+  "Zásady ochrany osobních údajů": "Datenschutzerklärung",
+  "Je mi aspoň {n} let.": "Ich bin mindestens {n} Jahre alt.",
+  "Bez souhlasu s podmínkami účet založit nejde.": "Ohne Zustimmung zu den Nutzungsbedingungen kann kein Konto angelegt werden.",
+  "Aktualizovali jsme podmínky": "Wir haben die Bedingungen aktualisiert",
+  "Platí od {datum}. Než budeš pokračovat, potvrď je prosím.": "Gültig ab {datum}. Bitte bestätige sie, bevor du weitermachst.",
+  "Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.": "Die Änderungen betreffen, welche Daten die App verarbeitet und wie sie damit umgeht. Den vollen Wortlaut findest du unter den Links unten.",
+  "Souhlasím a pokračovat": "Zustimmen und weiter",
+  "Souhlas se nepodařilo uložit. Zkus to znovu.": "Die Zustimmung konnte nicht gespeichert werden. Versuch es noch einmal."
 }

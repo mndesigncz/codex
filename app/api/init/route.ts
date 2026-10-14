@@ -2561,6 +2561,10 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`);
     // Souhlas s podmínkami a zásadami při založení účtu (čas, kdy ho člověk dal).
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP`);
+    // Spuštění (balík P): KTERÉ verze podmínek a zásad člověk odsouhlasil (lib/pravni/verze.ts).
+    // Bez verze nejde poznat, kdo novou verzi ještě neviděl; brána NovaVerze se podle nich ptá znovu.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_version TEXT`);
     // Reset hesla: v databázi je jen otisk tokenu, nikdy token sám (únik DB nedá přístup k účtům).
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS password_resets (

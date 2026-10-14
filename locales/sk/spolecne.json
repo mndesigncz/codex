@@ -330,5 +330,15 @@
   "připnuto": "pripnuté",
   "Přidat poznámku… @jméno někoho upozorní": "Pridať poznámku… @meno niekoho upozorní",
   "Koho zmínit": "Koho spomenúť",
-  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Ctrl+Enter odošle · @meno upozorní kolegu"
+  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Ctrl+Enter odošle · @meno upozorní kolegu",
+  "Souhlasím s podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.": "Súhlasím s podmienkami používania a beriem na vedomie zásady ochrany osobných údajov.",
+  "Podmínky užívání": "Podmienky používania",
+  "Zásady ochrany osobních údajů": "Zásady ochrany osobných údajov",
+  "Je mi aspoň {n} let.": "Mám aspoň {n} rokov.",
+  "Bez souhlasu s podmínkami účet založit nejde.": "Bez súhlasu s podmienkami sa účet založiť nedá.",
+  "Aktualizovali jsme podmínky": "Aktualizovali sme podmienky",
+  "Platí od {datum}. Než budeš pokračovat, potvrď je prosím.": "Platia od {datum}. Kým budeš pokračovať, potvrď ich, prosím.",
+  "Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.": "Zmeny sa týkajú toho, aké údaje aplikácia spracúva a ako s nimi zaobchádza. Celé znenie nájdeš v odkazoch nižšie.",
+  "Souhlasím a pokračovat": "Súhlasím a pokračovať",
+  "Souhlas se nepodařilo uložit. Zkus to znovu.": "Súhlas sa nepodarilo uložiť. Skús to znova."
 }

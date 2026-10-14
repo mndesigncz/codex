@@ -1694,7 +1694,7 @@ export const KATALOG: Opravneni[] = [
   "id": "data.zaloha",
   "oblast": "Nastavení podniku",
   "nazev": "Dostávat zálohu dat",
-  "popis": "Denní e-mail s kompletní zálohou dat: mzdy, sazby, osobní údaje, chat. Oprávnění k příjmu, ne k akci.",
+  "popis": "Denní e-mail s odkazem ke stažení zálohy dat podniku (stáhne jen přihlášený s tímto oprávněním). Osobní údaje týmu a týmový chat; bez soukromých zpráv, sazeb a mezd.",
   "citlivost": "vysoká",
   "vyzaduje": []
  },

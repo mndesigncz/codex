@@ -351,7 +351,9 @@ export async function GET(req: NextRequest) {
       zamky = await zamkyPodniku(c.teamId, dayPlus(dnes, -(days - 1)), dnes);
       pravidlaPichani = await pravidlaPichaniPodniku(c.teamId);
     }
-    return NextResponse.json({ roster, entries, adjustments, zamky, ...(pravidlaPichani ? { pravidlaPichani } : {}) });
+    // Píchačky (spuštění, balík P): jestli má telefon při příchodu přibalit polohu. Tablet polohu neposílá.
+    const pichaniPoloha = c.role.typ !== 'kiosk' && pravidloUcinne(pravidlaPichani ?? await pravidlaPichaniPodniku(c.teamId));
+    return NextResponse.json({ roster, entries, adjustments, zamky, pichaniPoloha, ...(pravidlaPichani ? { pravidlaPichani } : {}) });
   }
 
   // Zaměstnanec — vlastní záznamy (posledních 70 dní — i „minulý měsíc" na 31.) v TOMHLE podniku.
@@ -421,7 +423,10 @@ export async function GET(req: NextRequest) {
         ORDER BY day DESC, id DESC`;
     } catch { /* bez migrace */ }
   }
-  return NextResponse.json({ roster: [ja], entries, adjustments });
+  // Píchačky (spuštění, balík P): podnik ověřuje polohu příchodu → telefon ji při příchodu přibalí.
+  // Jen ano/ne — souřadnice ani poloměr podniku zaměstnanec nepotřebuje.
+  const pichaniPoloha = pravidloUcinne(await pravidlaPichaniPodniku(c.teamId));
+  return NextResponse.json({ roster: [ja], entries, adjustments, pichaniPoloha });
 }
 
 // POST — clock in / out. Sám za sebe kdokoli z podniku; za jiného jen

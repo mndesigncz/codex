@@ -204,6 +204,21 @@ export function totalPoints(b: PointsBreakdown, pt: PointsConfig): number {
     + b.reviewPoints + b.autoPoints + b.itemPoints + (b.awards ?? 0) + (b.navicPoints ?? 0) + (b.trestPoints ?? 0);
 }
 
+/**
+ * Body do VEŘEJNÉHO žebříčku týmu (i na tabletu): jen získané body, bez trestů
+ * (spuštění, balík P). Žebříček visí před celým týmem — záporné body za trest by tam
+ * byly veřejným pranýřem; pořadí má říkat, kdo si body vydělal. Zůstatek člověka
+ * (totalPoints, Můj výdělek, odměny) se nemění, tresty v něm zůstávají.
+ */
+export function bodyZebricku(b: PointsBreakdown, pt: PointsConfig): number {
+  return totalPoints({ ...b, trestPoints: 0 }, pt);
+}
+
+/** Rozpad do žebříčku: bez trestů (počet i body), ať se z něj nedají dopočítat. */
+export function rozpadZebricku(b: PointsBreakdown): PointsBreakdown {
+  return { ...b, trestPoints: 0, trestCount: 0 };
+}
+
 /** Current spendable balance: earned total minus reward requests still waiting
  *  for approval (their deduction lands only on approve, but the points are
  *  already spoken for). */

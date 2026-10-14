@@ -6,6 +6,8 @@ import bcrypt from 'bcryptjs';
 import { sql, customerByCard } from '@/lib/client';
 import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
+import { HLASKA_BEZ_SOUHLASU, HLASKA_BEZ_VEKU, souhlasZTela, vekZTela } from '@/lib/pravni/verze';
+import { zapisSouhlas } from '@/lib/pravni/souhlasDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -18,6 +20,10 @@ export async function POST(request: Request) {
   if (!name || !email || !password) return NextResponse.json({ error: 'Vyplň jméno, e-mail a heslo.' }, { status: 400 });
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ error: 'E-mail nevypadá správně.' }, { status: 400 });
   if (password.length < 8) return NextResponse.json({ error: 'Heslo musí mít alespoň 8 znaků.' }, { status: 400 });
+  // Click-wrap (spuštění, balík P): dřív klient posílal `terms: true` a server ho ignoroval — čas souhlasu
+  // dostal každý. Teď bez výslovného zaškrtnutí podmínek a věku (aspoň 15 let) účet nevznikne.
+  if (!souhlasZTela(b)) return NextResponse.json({ error: HLASKA_BEZ_SOUHLASU }, { status: 400 });
+  if (!vekZTela(b)) return NextResponse.json({ error: HLASKA_BEZ_VEKU }, { status: 400 });
   // Limit podle IP jde PŘED dotazem na existenci účtu i před bcryptem: samotné
   // počítadlo per e-mail nezastaví skript, který zkouší tisíce různých adres
   // (výčet účtů podle 409 + bcrypt cost 12 za každý pokus + spam řádků v users).
@@ -50,5 +56,7 @@ export async function POST(request: Request) {
       VALUES (${name}, ${email}, ${hash}, 'customer', '👤', 'Host', ${referredBy})
       RETURNING id, name, email`;
   }
+  // Verze podmínek a zásad k času souhlasu (lib/pravni/verze.ts).
+  await zapisSouhlas(Number(u.id));
   return NextResponse.json({ ok: true, user: u, referred: !!referredBy });
 }

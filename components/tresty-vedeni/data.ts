@@ -79,6 +79,18 @@ export function useNavrhyTrestu(zapnuto: boolean): StavDat<NavrhTrestu[]> {
   return d;
 }
 
+/**
+ * Kolik uzávěrek mělo za posledních 14 dní manko (GET /api/tresty/navrhy → `manka`). Trest
+ * z manka není (§ 346b ZP); widget místo návrhu ukáže větu VETA_MANKO. Stejná adresa jako
+ * návrhy — mezipaměť drží surovou odpověď, takže se nepošle druhý dotaz.
+ */
+export function useMankaNavrhu(zapnuto: boolean): number {
+  const url = zapnuto ? URL_NAVRHY_TRESTU : null;
+  const d = useDataWidgetu(url, (raw: unknown) => Math.max(0, Math.round(Number((raw as { manka?: unknown } | null)?.manka) || 0)));
+  useObnovaNaUdalost(url, d.reload);
+  return d.data ?? 0;
+}
+
 /** Strop krácení pro člověka a den (jen tresty.udelit); null = neptat se. */
 export function useStropKraceni(url: string | null): StavDat<StropKraceni> {
   return useDataWidgetu(url, vyberStrop);

@@ -8,8 +8,10 @@
 //  - chipy sazebníku („Pozdní příchod · −10 b"): klepnutí = položka + body, krácení
 //    a text; ukáže, kolikátý stejný prohřešek to člověk v měsíci má (poradiOpakovani);
 //  - „Co se stalo?" (do 500), den (dnes, nejvýš 31 dní zpět), body dolů s krokovačem ±5,
-//    krácení prémie v měně podniku se stropem z GET ?strop=1 (bez prémií pole vypnuté
-//    s větou; vždy s větou, že se krátí jen prémie, ne mzda), nepovinná fotka;
+//    krácení prémie v měně podniku se stropem z GET ?strop=1 — jen z NENÁROKOVÝCH prémií
+//    (bez nich pole vypnuté s větou, proč a jak prémii založit; vždy s větou, že se krátí
+//    jen nenároková prémie, ne mzda — § 346b ZP), nepovinná fotka;
+//  - drobná věta, že napomenutí v aplikaci není výtka podle § 52 písm. g) ZP;
 //  - 0 bodů a 0 krácení = napomenutí (náhled pod poli, jiné tlačítko);
 //  - validace stejná jako na serveru (validujTrest), 409 se stropem → věta pod krácením.
 //
@@ -175,9 +177,10 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
     const f = formular();
     const telo = upravit ? teloUpravy(f, upravit) : teloTrestu(f, predvolby ?? {});
     // Stejná pravidla jako na serveru — hláška je vidět dřív, než požadavek odejde.
-    const v = validujTrest(upravit ? { ...upravit, ...telo, userId: upravit.userId } : telo, dnes);
+    // Úprava staršího trestu z manka nesmí spadnout na pravidle „manko trestem není" — klíč návrhu se při úpravě neposílá.
+    const v = validujTrest(upravit ? { ...upravit, ...telo, userId: upravit.userId, sourceKey: null } : telo, dnes);
     if (!v.ok) { setChyba(prelozHlaskuTrestu(t, v.chyba)); return; }
-    if (nadStrop) { setChybaKraceni(stropKc ? t('Krátit jde nejvýš {castka}.', { castka: money(stropKc) }) : t('Tenhle měsíc nemá žádné prémie, krátit není z čeho. Dej body nebo napomenutí.')); return; }
+    if (nadStrop) { setChybaKraceni(stropKc ? t('Krátit jde nejvýš {castka}.', { castka: money(stropKc) }) : t('Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není. Založ ji v Docházce → Prémie a srážky jako „Nenároková prémie“. Starší prémie bez typu se nepočítají.')); return; }
     if (upravit && Object.keys(telo).length === 0) { onClose(); return; }
     setUkladam(true);
     setChyba(null); setChybaKraceni(null);
@@ -217,9 +220,9 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
   const hintKraceni = !userId
     ? t('Vyber člověka — ukáže se, kolik jde krátit.')
     : bezPremii
-      ? t('Tenhle měsíc nemá prémie — krátit není z čeho. Dej body nebo napomenutí.')
+      ? t('Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není. Založ ji v Docházce → Prémie a srážky jako „Nenároková prémie“. Starší prémie bez typu se nepočítají.')
       : strop.data
-        ? t('Prémie za měsíc: {premie} · krátit jde nejvýš {strop}', { premie: money(strop.data.premie), strop: money(stropKc ?? 0) })
+        ? t('Nenárokové prémie za měsíc: {premie} · krátit jde nejvýš {strop}', { premie: money(strop.data.premie), strop: money(stropKc ?? 0) })
         : t('Načítám prémie…');
 
   return (
@@ -290,7 +293,7 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
               <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{symbol}</span>
             </div>
           </Field>
-          <p className="t-meta -mt-2 text-pretty">{t('Krátí se jen prémie za ten měsíc, ne mzda — peněžní pokuty zákon nedovoluje.')}</p>
+          <p className="t-meta -mt-2 text-pretty">{t('Krátí se jen nenároková prémie za ten měsíc, ne mzda — peněžní postihy zákoník práce zakazuje (§ 346b).')}</p>
           <div className="min-w-0">
             <p className="field-label">{t('Fotka (nepovinná)')}</p>
             <input ref={vstup} type="file" accept="image/*" capture="environment" className="hidden" aria-hidden tabIndex={-1}
@@ -317,6 +320,7 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
               {t('Dopad: {dopad}', { dopad: dopadTrestu(t, { points: bodyCislo, bonusCut: kraceniCislo }, money) })}
             </p>
           )}
+          <p className="t-meta text-pretty" data-trest-vytka>{t('Napomenutí v aplikaci není výtka podle § 52 písm. g) zákoníku práce.')}</p>
           {upravit && zmeny && meniDopad(zmeny) && (
             <p className="t-meta text-pretty">{t('Změnou výše nebo dne se trest vrátí k potvrzení — člověk dostane nové oznámení.')}</p>
           )}

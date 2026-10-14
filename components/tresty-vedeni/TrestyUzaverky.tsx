@@ -5,7 +5,8 @@
 //    z její osádky (trestyKUzaverce, GET scope=team&day=), s akcemi jako ve widgetu;
 //    prázdno = tichý řádek, bez tresty.zobrazit_tym se nekreslí nic;
 //  - `TrestTlacitko`: tlačítko „Dát trest" s oknem a předvolbami pro místa mimo seznamy
-//    trestů — manko v detailu uzávěrky, výtka v hodnocení směny. Jen s tresty.udelit.
+//    trestů — výtka v hodnocení směny. Jen s tresty.udelit. U manka v detailu uzávěrky
+//    (spuštění, balík P) místo tlačítka věta, že manko se řeší dohodou o odpovědnosti.
 // Okna jdou nad vlastní překryv detailu (z-80), proto `nadOkny`.
 
 import React, { useState } from 'react';
@@ -74,6 +75,12 @@ export function TrestTlacitko({ predvolby, popisek, nadOkny = true, onUlozeno, v
   const dne = useTresty(smi && vyrizeno && ma('tresty.zobrazit_tym') ? urlTresty({ scope: 'team', day: vyrizeno.day }) : null);
   const uzJe = !!vyrizeno && (dne.data?.items ?? []).some(x => x.sourceKey === vyrizeno.sourceKey && x.status === 'plati');
   if (!smi) return null;
+  // Manko trestem není (§ 346b odst. 1 zákoníku práce): místo tlačítka „Dát trest za manko"
+  // věta, jak to řešit. Klíč návrhu manko:<id> by server stejně odmítl.
+  const pevne = typeof predvolby === 'function' ? null : predvolby;
+  if (pevne?.druhNavrhu === 'manko' || vyrizeno?.sourceKey.startsWith('manko:')) {
+    return <p className={`t-meta text-pretty ${className}`} data-manko-veta>{t('Manko řeš dohodou o odpovědnosti, ne trestem.')}</p>;
+  }
   // Okno zůstává připojené i po udělení (tlačítko zmizí): drží toast „Trest udělen".
   return (
     <>

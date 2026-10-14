@@ -51,7 +51,7 @@
 // vede k vypsání prvního úkolu. Části sdílí s Úkoly › Za body (components/navic-vedeni/ZaBodyDnes).
 //
 // Kolo 10 (balík V) — Tresty v týmu (odmeny.tresty_tymu): co kdo pokazil a co za to dostal.
-// Souhrn měsíce, Návrhy z dat (pozdní příchod, manko, výtka — Dát trest předvyplněně / Zahodit),
+// Souhrn měsíce, Návrhy z dat (pozdní příchod, výtka — Dát trest předvyplněně / Zahodit; manko jen větou, trestem není),
 // seznam se spornými nahoře (vyjádření člověka, Trest platí dál / Zrušit trest), „···" Upravit /
 // Zrušit, „Dát trest" nahoře. Sporné se berou zvlášť (status=plati, stejná adresa jako fronta
 // v „Čeká na tebe") a slučují s měsícem. Okna a řádky jsou v components/tresty-vedeni.
@@ -94,7 +94,7 @@ import { UznatNavic, type AkceNavic } from '../../navic-vedeni/UznatNavic';
 import { ZapsatZaClena } from '../../navic-vedeni/ZapsatZaClena';
 import { filtrujNavic, lideZeZapisu, mesicZNastaveni, poctyStavu, sloucCekajici, type FiltrStavu } from '../../navic-vedeni/logika';
 import { souhrnTrestu, urlTresty, type NavrhTrestu, type Trest } from '@/lib/tresty';
-import { URL_TRESTY_PLATNE, useNavrhyTrestu, useTresty } from '../../tresty-vedeni/data';
+import { URL_TRESTY_PLATNE, useMankaNavrhu, useNavrhyTrestu, useTresty } from '../../tresty-vedeni/data';
 import { DatTrest } from '../../tresty-vedeni/DatTrest';
 import { TrestRadek } from '../../tresty-vedeni/TrestRadek';
 import { NavrhyTrestu } from '../../tresty-vedeni/NavrhyTrestu';
@@ -1719,7 +1719,10 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
   const mesicni = useTresty(ok ? urlTresty({ scope: 'team', month: mesic }) : null);
   const platne = useTresty(ok ? URL_TRESTY_PLATNE : null);
   const smiUdelit = !nahled && smi(klicCasti(ID_TRESTY, 'akce:udelit') ?? 'tresty.udelit');
-  const navrhy = useNavrhyTrestu(ok && smi(klicCasti(ID_TRESTY, 'navrhy') ?? 'tresty.udelit'));
+  const smiNavrhy = ok && smi(klicCasti(ID_TRESTY, 'navrhy') ?? 'tresty.udelit');
+  const navrhy = useNavrhyTrestu(smiNavrhy);
+  // Manko trestem není (§ 346b ZP): místo návrhu jen věta bez akce (spuštění, balík P).
+  const manka = useMankaNavrhu(smiNavrhy);
   const [filtr, setFiltr] = useState<FiltrTrestu>('vse');
   const [clovek, setClovek] = useState<string>('');
   const [davam, setDavam] = useState<PredvolbyTrestu | null>(null);
@@ -1753,6 +1756,11 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
     souhrn.kraceni > 0 ? t('krácení {castka}', { castka: money(souhrn.kraceni) }) : null,
     sporu > 0 ? t('{n} nesouhlasí', { n: cislo(sporu) }) : null,
   ].filter(Boolean);
+  const vetaManko = manka > 0 && (!L || filtr === 'vse' || filtr === 'plati') ? (
+    <p className="t-meta mt-3 text-pretty" data-tresty-manko>
+      {t('{n, plural, one {# uzávěrka s mankem.} few {# uzávěrky s mankem.} other {# uzávěrek s mankem.}}', { n: manka })} {t('Manko řeš dohodou o odpovědnosti, ne trestem.')}
+    </p>
+  ) : null;
   const tlacitko = smiUdelit && (
     <Button variant="secondary" size="sm" icon="warning" onClick={() => setDavam({})}>{t('Dát trest')}</Button>
   );
@@ -1773,6 +1781,7 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
       prazdno={vse && vse.length === 0 && vsechnyNavrhy.length === 0 ? (
         <div className="space-y-3" data-tresty-prazdno>
           <p className="t-meta text-pretty">{t('Tento měsíc bez trestů. Když něco nevyjde, dej trest nebo napomenutí odsud, z profilu člena, z uzávěrky nebo z docházky.')}</p>
+          {vetaManko}
           {tlacitko}
           {okna}
         </div>
@@ -1812,6 +1821,7 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
           {vsechnyNavrhy.length > navrhyVidet.length && <p className="t-meta mt-1">{aDalsich(t, vsechnyNavrhy.length - navrhyVidet.length)}</p>}
         </div>
       )}
+      {vetaManko}
       {videt.length > 0 ? (
         <div className="mt-3">
           {(sporne.length > 0 || navrhyVidet.length > 0) && <p className="t-label">{t('Tresty')}</p>}

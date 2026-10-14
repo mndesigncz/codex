@@ -1,175 +1,77 @@
 import { NextResponse } from 'next/server';
 import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
-import { sendBackupEmail } from '@/lib/email';
+import { sendBackupEmail, odkazovyZaklad } from '@/lib/email';
 import { pragueToday } from '@/lib/pragueTime';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { cestaOdkazuZalohy, podepisOdkazZalohy, PLATNOST_ODKAZU_DNI } from '@/lib/pravni/zalohaOdkaz';
 
 export const dynamic = 'force-dynamic';
-// Záloha stahuje obsah mnoha tabulek přes všechny týmy — default 10 s nestačí.
 export const maxDuration = 60;
 
-/**
- * How each table is narrowed to ONE team. A backup e-mail must only ever
- * contain the recipient's own data — the whole point of the per-team split.
- *   team          … WHERE team_id = $team
- *   user:<col>    … WHERE <col> IN (members of $team)
- *   conversation  … WHERE conversation_id IN (conversations of $team)
- *   scopedBy      … vlastní WHERE fragment pro tabulky, které se k týmu
- *                   dostanou přes víc kroků (menu: board → sekce → položky)
- * Tables where the newest scoping column may not exist yet fall back from
- * `team` to `user:<col>`; if nothing works the table is skipped for that team
- * (omitting data is safe, leaking someone else's is not).
- */
-const TABLES: { name: string; team?: boolean; user?: string; conversation?: boolean; scopedBy?: string }[] = [
-  { name: 'invitations', team: true },
-  // Členství a organizace (kolo 55): role, pozice a sazba v členství i
-  // nastavení organizace (zdroje sdílených číselníků) patří do zálohy.
-  { name: 'team_members', team: true },
-  // Vlastní role podniku (kolo 67): bez nich by team_members.role_id po
-  // obnově ukazovalo do prázdna.
-  { name: 'roles', team: true },
-  { name: 'organizations', scopedBy: 'id = (SELECT organization_id FROM teams WHERE id = $1)' },
-  { name: 'shifts', team: true, user: 'employee_id' },
-  { name: 'shift_requests', team: true, user: 'employee_id' },
-  { name: 'availability_requests', team: true, user: 'employee_id' },
-  { name: 'time_entries', team: true, user: 'employee_id' },
-  { name: 'time_off_requests', team: true, user: 'employee_id' },
-  { name: 'shift_offers', team: true },
-  { name: 'shift_reviews', team: true, user: 'employee_id' },
-  { name: 'cash_closings', team: true, user: 'created_by' },
-  { name: 'inventory_items', team: true },
-  { name: 'inventory_categories', team: true },
-  { name: 'inventory_log', scopedBy: 'item_id IN (SELECT id FROM inventory_items WHERE team_id = $1)' },
-  { name: 'inventory_reports', team: true, user: 'reported_by' },
-  { name: 'conversations', team: true },
-  { name: 'conversation_members', conversation: true },
-  { name: 'chat_messages', conversation: true },
-  { name: 'guide_categories', team: true },
-  { name: 'guides', team: true },
-  { name: 'procedures', team: true, user: 'created_by' },
-  { name: 'procedure_runs', team: true, user: 'user_id' },
-  { name: 'tasks', team: true, user: 'created_by' },
-  { name: 'planning_cards', team: true, user: 'created_by' },
-  { name: 'daily_reports', team: true, user: 'created_by' },
-  { name: 'recipes', team: true, user: 'created_by' },
-  { name: 'announcements', team: true, user: 'author_id' },
-  { name: 'suggestions', team: true, user: 'author_id' },
-  { name: 'share_links', team: true },
-  { name: 'menu_boards', team: true },
-  { name: 'menu_sections', scopedBy: 'board_id IN (SELECT id FROM menu_boards WHERE team_id = $1)' },
-  { name: 'menu_items', scopedBy: 'section_id IN (SELECT id FROM menu_sections WHERE board_id IN (SELECT id FROM menu_boards WHERE team_id = $1))' },
-  { name: 'notifications', user: 'user_id' },
-];
-
-// users are exported WITHOUT password_hash; push_subscriptions (auth keys) are never exported.
-const USERS_QUERY =
-  'SELECT id, name, email, role, avatar, phone, job_title, shift_preference, employer_id, team_id, theme, created_at FROM users WHERE team_id = $1';
-
-/** One team's data, table by table. */
-async function dumpTeam(sql: any, teamId: number): Promise<{ dump: Record<string, any[]>; rowCount: number }> {
-  const dump: Record<string, any[]> = {};
-  let rowCount = 0;
-  const put = (name: string, rows: any[]) => { dump[name] = rows; rowCount += rows.length; };
-
-  try {
-    put('teams', await sql.query('SELECT * FROM teams WHERE id = $1', [teamId]));
-  } catch { dump['teams'] = []; }
-  try {
-    put('users', await sql.query(USERS_QUERY, [teamId]));
-  } catch { dump['users'] = []; }
-
-  for (const t of TABLES) {
-    let rows: any[] | null = null;
-    if (t.team) {
-      try { rows = await sql.query(`SELECT * FROM ${t.name} WHERE team_id = $1`, [teamId]); } catch { rows = null; }
-    }
-    if (rows === null && t.user) {
-      try {
-        rows = await sql.query(
-          `SELECT * FROM ${t.name} WHERE ${t.user} IN (SELECT id FROM users WHERE team_id = $1)`,
-          [teamId],
-        );
-      } catch { rows = null; }
-    }
-    if (rows === null && t.scopedBy) {
-      try { rows = await sql.query(`SELECT * FROM ${t.name} WHERE ${t.scopedBy}`, [teamId]); } catch { rows = null; }
-    }
-    if (rows === null && t.conversation) {
-      try {
-        rows = await sql.query(
-          `SELECT * FROM ${t.name} WHERE conversation_id IN (SELECT id FROM conversations WHERE team_id = $1)`,
-          [teamId],
-        );
-      } catch { rows = null; }
-    }
-    put(t.name, rows ?? []);
-  }
-  return { dump, rowCount };
-}
-
-// Daily backup: exports each team's data to JSON and e-mails it to THAT
-// team's members with data.zaloha only, so a copy always lives outside the database and
-// nobody ever receives another business's rows.
-// Protected: Vercel Cron sends `Authorization: Bearer $CRON_SECRET` automatically.
+// Denní záloha (Vercel Cron): každému, kdo má v podniku oprávnění data.zaloha,
+// přijde e-mail s ODKAZEM ke stažení zálohy toho podniku — ne příloha.
+//
+// Dřív šla celá záloha jako nešifrovaná příloha: soukromé zprávy, sazby a mzdy
+// ležely ve schránkách (a v jejich zálohách, přeposlaných zprávách…) bez jakékoli
+// kontroly přístupu. Teď odkaz nese jen podepsané číslo podniku s platností
+// 7 dní (lib/pravni/zalohaOdkaz.ts) a /api/backup/stahnout navíc chce přihlášení
+// člověka s data.zaloha v tom podniku; zálohu skládá až v tu chvíli a nikde ji
+// neukládá. Odejde-li člověk z podniku nebo přijde o oprávnění, starý odkaz mu
+// už nic nevydá.
+//
+// Chráněno: Vercel Cron posílá `Authorization: Bearer $CRON_SECRET`.
 export async function GET(request: Request) {
   const gate = checkCron(request);
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
-  const url = new URL(request.url);
+
+  const tajemstvi = process.env.NEXTAUTH_SECRET;
+  if (!podepisOdkazZalohy(1, tajemstvi)) {
+    // Bez tajemství nejde odkaz podepsat ani ověřit — posílat nepodepsaný by bylo horší než nic.
+    console.error('backup: NEXTAUTH_SECRET chybí nebo je krátký — odkazy na zálohu se neposílají.');
+    return NextResponse.json({ ok: false, error: 'Záloha není nakonfigurovaná (chybí NEXTAUTH_SECRET).' }, { status: 503 });
+  }
 
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const teams = await sql`SELECT id, name FROM teams ORDER BY id`;
-    const stamp = pragueToday(); // název souboru podle dne v Praze, ne v UTC
+    const den = pragueToday();
+    const zaklad = odkazovyZaklad();
 
-    let sent = 0, failed = 0, totalRows = 0, teamsBackedUp = 0;
-    // Selhání u jednoho týmu nesmí shodit zálohu ostatních — proto per-tým try.
+    let sent = 0, failed = 0, teamsNotified = 0;
+    // Selhání u jednoho podniku nesmí shodit ostatní — proto try po podnicích.
     const problems: string[] = [];
     for (const team of teams as any[]) {
       try {
-        // Příjemci podle oprávnění data.zaloha z členství (kolo 67). Dřív se
-        // četlo zrcadlo users.role/team_id, takže zálohu dostalo jen vedení,
-        // které mělo tenhle podnik zrovna aktivní — kdo byl přepnutý jinam,
-        // zůstal bez ní.
         const ids = await clenoveSOpravnenim(Number(team.id), 'data.zaloha');
         if (!ids.length) continue;
-        const employers = await sql`
+        const prijemci = await sql`
           SELECT DISTINCT email FROM users
           WHERE id = ANY(${ids}::int[]) AND email IS NOT NULL`;
-        if (!employers.length) continue; // nobody to receive it — skip the work
-
-        const { dump, rowCount } = await dumpTeam(sql, Number(team.id));
-        totalRows += rowCount;
-        teamsBackedUp++;
-
-        const filename = `managero-backup-${stamp}.json`;
-        const json = JSON.stringify(
-          { exportedAt: new Date().toISOString(), team: team.name, rowCount, data: dump },
-          null, 2,
-        );
-        for (const e of employers) {
-          // Záloha, o které si myslíme, že odešla, je horší než žádná:
-          // majitel se na ni spoléhá. `sendBackupEmail` chybu vrací,
-          // nevyhazuje — proto se čte návratová hodnota.
-          const mail = await sendBackupEmail(e.email as string, filename, json);
+        if (!prijemci.length) continue;
+        const token = podepisOdkazZalohy(Number(team.id), tajemstvi);
+        if (!token) continue;
+        const odkaz = `${zaklad}${cestaOdkazuZalohy(token)}`;
+        teamsNotified++;
+        for (const e of prijemci) {
+          // Odkaz, o kterém si myslíme, že odešel, je horší než žádný: majitel se
+          // na zálohu spoléhá. `sendBackupEmail` chybu vrací — čte se návratová hodnota.
+          const mail = await sendBackupEmail(e.email as string, String(team.name ?? ''), den, odkaz, PLATNOST_ODKAZU_DNI);
           if (mail.sent) sent++;
           else { failed++; problems.push(`${team.name}: ${String(mail.error ?? 'e-mail neodešel').slice(0, 80)}`); }
         }
       } catch (err) {
         failed++;
-        problems.push(`${team.name}: záloha se nevytvořila — ${String((err as any)?.message ?? err).slice(0, 80)}`);
+        problems.push(`${team.name}: odkaz se nepodařilo poslat — ${String((err as any)?.message ?? err).slice(0, 80)}`);
       }
     }
 
-    // „ok" jen když se něco opravdu odeslalo a nic neselhalo. Dřív se vracelo
-    // ok:true i když nedorazil jediný mail — provozovatel se spolehl na zálohu,
-    // kterou nikdy nedostal.
-    const ok = failed === 0 && (sent > 0 || teamsBackedUp === 0);
+    const ok = failed === 0 && (sent > 0 || teamsNotified === 0);
     if (!ok) console.error('backup: part failed', { sent, failed, problems });
-    return NextResponse.json({ ok, teams: teamsBackedUp, rowCount: totalRows, emailedTo: sent, failed, problems }, { status: ok ? 200 : 500 });
+    return NextResponse.json({ ok, teams: teamsNotified, emailedTo: sent, failed, problems }, { status: ok ? 200 : 500 });
   } catch (error) {
     console.error('backup failed', error);
     // Ven jde jen to, že se nepovedlo. Hlášky Postgresu prozrazují schéma.
-    return NextResponse.json({ ok: false, error: 'Zálohu se nepodařilo vytvořit.' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: 'Odkazy na zálohu se nepodařilo rozeslat.' }, { status: 500 });
   }
 }

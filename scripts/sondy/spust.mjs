@@ -169,6 +169,7 @@ export const ZELENE = [
   'k86-tresty-ved',
   'k87-za-body-z',
   'k87-za-body-ved',
+  'k88-souhlas',
   'preteceni-vedeni',
   'preteceni-vedeni-tablet',
   'preteceni-zamestnanec',

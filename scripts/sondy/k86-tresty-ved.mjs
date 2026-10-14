@@ -2,7 +2,8 @@
 //
 //  O — Odměny (1280): widget Tresty v týmu — souhrn měsíce, chip „2 nesouhlasí", sporné nahoře s vyjádřením
 //      (Trest platí dál → PATCH disputeHandled, Zrušit trest s důvodem → PATCH zruseno), Návrhy (Dát trest
-//      předvyplněně z manka → POST se sourceKey, Zahodit → POST navrhy), „···" Upravit (+5 b → PATCH points),
+//      předvyplněně z pozdního příchodu → POST se sourceKey, Zahodit → POST navrhy; manko jen větou „Manko řeš
+//      dohodou o odpovědnosti, ne trestem." — spuštění, balík P), „···" Upravit (+5 b → PATCH points),
 //      Dát trest z hlavičky (člověk bez prémií = krácení vypnuté, napomenutí, 409 se stropem pod krácením),
 //      filtry Platné / Nesouhlasí / Zrušené / Vše; část Tresty = sazebník (Nová položka / Upravit / Smazat);
 //      v klidu žádná limetka.
@@ -11,8 +12,8 @@
 //  P — Přehled: Čeká na tebe má „2 nesouhlasy s trestem" (jen s tresty.udelit; bez něj se na návrhy neptá
 //      a Dát trest chybí) a proklik otevře Odměny › Tresty; střední widget má odkaz „Odměny".
 //  D — Hluboký odkaz ?view=rewards&arg=tresty otevře část Tresty; hledání „potrestat" najde Dát trest.
-//  U — Detail uzávěrky (1280 a 390): „Dát trest za manko" (autor, text, klíč manko:<id>, okno nad detailem)
-//      a sekce „Tresty na směně".
+//  U — Detail uzávěrky (1280 a 390): u manka věta o dohodě o odpovědnosti místo „Dát trest za manko"
+//      (spuštění, balík P: § 346b ZP) a sekce „Tresty na směně".
 //  H — Docházka: Souhrn hodin — „Dát trest za pozdní příchod" u Jakuba (nevyřízený příchod z návrhů), ne u Evy
 //      (její příchod už trest má); POST s pozde:<id záznamu>.
 //  L — Polsky na 320 px: widget a okno Dát trest bez přetečení.
@@ -74,7 +75,7 @@ const podvrh = ({ att = null } = {}) => {
       if (path === '/api/tresty/navrhy') {
         const vyrizene = new Set(data.items.map(x => x.sourceKey).filter(Boolean));
         if (m === 'POST') { navrhy.navrhy = navrhy.navrhy.filter(n => n.klic !== telo?.klic); return json({ ok: true }); }
-        return json({ navrhy: navrhy.navrhy.filter(n => !vyrizene.has(n.klic)) });
+        return json({ navrhy: navrhy.navrhy.filter(n => !vyrizene.has(n.klic)), manka: navrhy.manka ?? 0 });
       }
       const mm = /^\/api\/tresty\/(\d+)$/.exec(path);
       if (mm && m === 'PATCH') {
@@ -175,35 +176,38 @@ const platneVMesici = vMesici.filter(x => x.status === 'plati');
     && /line-through/.test(await radky.filter({ hasText: 'Rozbitá sklenice' }).locator('[data-trest-stav] span').last().getAttribute('class') ?? ''));
   tvrdi('O1: chip „Nepotvrzeno" je jediný červený (bad), ostatní tlumené', (await w.locator('.chip-bad').count()) === (await w.getByText('Nepotvrzeno', { exact: true }).count()));
   const navrhyW = w.locator('[data-navrhy-trestu]');
-  tvrdi('O1: Návrhy — tři (pozdní příchod 18 min, manko 340 Kč, výtka s poznámkou)', (await navrhyW.locator('.list-row').count()) === 3 && /Pozdní příchod o 18 min/.test(await text(navrhyW))
-    && /Manko v uzávěrce 340 Kč/.test(await text(navrhyW)) && /Výtka z hodnocení: Špinavá parní tryska/.test(await text(navrhyW)));
+  tvrdi('O1: Návrhy — dva (pozdní příchod 18 min, výtka s poznámkou), manko mezi nimi není', (await navrhyW.locator('.list-row').count()) === 2 && /Pozdní příchod o 18 min/.test(await text(navrhyW))
+    && !/Manko/.test(await text(navrhyW)) && /Výtka z hodnocení: Špinavá parní tryska/.test(await text(navrhyW)));
+  tvrdi('O1: manko jen větou bez akce „1 uzávěrka s mankem. Manko řeš dohodou o odpovědnosti, ne trestem."',
+    /1 uzávěrka s mankem\. Manko řeš dohodou o odpovědnosti, ne trestem\./.test(await text(w.locator('[data-tresty-manko]'))) && (await w.locator('[data-tresty-manko] button').count()) === 0);
   tvrdi('O1: v klidu žádná limetka na ploše', (await limetek(p)) === 0, `${await limetek(p)}×`);
   await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-odmeny-1280.png', fullPage: true });
 
-  // Dát trest z návrhu manka: předvyplněné okno, POST se sourceKey.
-  await navrhyW.getByRole('button', { name: 'Dát trest: Eva Testová' }).click();
+  // Dát trest z návrhu pozdního příchodu: předvyplněné okno, POST se sourceKey.
+  await navrhyW.getByRole('button', { name: 'Dát trest: Jakub Horák' }).click();
   const okno = p.getByRole('dialog', { name: 'Dát trest' });
   await okno.waitFor({ timeout: 4000 });
   await dokud(async () => /krátit jde nejvýš/.test(await text(okno.locator('[data-trest-strop]'))), 4000);
-  tvrdi('O2: okno z návrhu — Eva v podtitulku, text „Manko v uzávěrce 340 Kč.", chip Manko v kase vybraný, 20 b, krácení 200',
-    await dokud(async () => /Eva Testová/.test(await text(okno)), 2000) && (await okno.locator('#trest-text').inputValue()).replace(/\u00a0/g, ' ') === 'Manko v uzávěrce 340 Kč.'
-    && (await okno.getByRole('button', { name: /Manko v kase/ }).getAttribute('aria-pressed')) === 'true'
-    && (await okno.locator('#trest-body').inputValue()) === '20' && (await okno.locator('#trest-kraceni').inputValue()) === '200',
-    JSON.stringify([await okno.locator('#trest-text').inputValue(), await okno.getByRole('button', { name: /Manko v kase/ }).getAttribute('aria-pressed'), await okno.locator('#trest-body').inputValue(), await okno.locator('#trest-kraceni').inputValue(), (await text(okno)).slice(0, 120)]));
-  tvrdi('O2: pod krácením „Prémie za měsíc: 1 500 Kč · krátit jde nejvýš 1 500 Kč" a věta, že se krátí jen prémie', /Prémie za měsíc: 1 500 Kč · krátit jde nejvýš 1 500 Kč/.test(await text(okno))
-    && /Krátí se jen prémie za ten měsíc, ne mzda/.test(await text(okno)) && /Dopad: −20 b · krácení 200 Kč/.test(await text(okno)));
+  tvrdi('O2: okno z návrhu — Jakub v podtitulku, text „Pozdní příchod o 18 min.", chip Pozdní příchod vybraný, 10 b, bez krácení',
+    await dokud(async () => /Jakub Horák/.test(await text(okno)), 2000) && (await okno.locator('#trest-text').inputValue()).replace(/\u00a0/g, ' ') === 'Pozdní příchod o 18 min.'
+    && await dokud(async () => (await okno.getByRole('button', { name: /Pozdní příchod/ }).getAttribute('aria-pressed')) === 'true', 3000)
+    && (await okno.locator('#trest-body').inputValue()) === '10' && (await okno.locator('#trest-kraceni').inputValue()) === '',
+    JSON.stringify([await okno.locator('#trest-text').inputValue(), await okno.getByRole('button', { name: /Pozdní příchod/ }).getAttribute('aria-pressed'), await okno.locator('#trest-body').inputValue(), await okno.locator('#trest-kraceni').inputValue(), (await text(okno)).slice(0, 120)]));
+  tvrdi('O2: pod krácením „Nenárokové prémie za měsíc: 1 500 Kč · krátit jde nejvýš 1 500 Kč", věta o § 346b a o výtce podle § 52', /Nenárokové prémie za měsíc: 1 500 Kč · krátit jde nejvýš 1 500 Kč/.test(await text(okno))
+    && /Krátí se jen nenároková prémie za ten měsíc, ne mzda — peněžní postihy zákoník práce zakazuje \(§ 346b\)/.test(await text(okno))
+    && /Napomenutí v aplikaci není výtka podle § 52 písm\. g\) zákoníku práce\./.test(await text(okno)) && /Dopad: −10 b/.test(await text(okno)));
   await okno.screenshot({ path: SNIMKY + 'k86-tresty-ved-dat-trest-1280.png' });
   await okno.getByRole('button', { name: 'Dát trest', exact: true }).click();
   const post = await dokud(() => (stav.zapisy ?? []).find(z => z.m === 'POST' && z.path === '/api/tresty'), 4000);
-  tvrdi('O2: POST /api/tresty { userId: 16, closingId: 503, sourceKey: manko:503, typeId: 2, points: 20, bonusCut: 200, day }', !!post && post.telo?.userId === 16 && post.telo?.closingId === 503
-    && post.telo?.sourceKey === 'manko:503' && post.telo?.typeId === 2 && post.telo?.points === 20 && post.telo?.bonusCut === 200 && post.telo?.day === DNY.PRED3, JSON.stringify(post?.telo));
-  tvrdi('O2: toast „Trest udělen — Eva Testová dostal(a) oznámení." a návrh manka zmizel', await dokud(() => p.getByText('Trest udělen — Eva Testová dostal(a) oznámení.').isVisible().catch(() => false), 3000)
-    && await dokud(async () => (await navrhyW.locator('.list-row').count()) === 2, 3000));
-
-  // Zahodit návrh pozdního příchodu.
-  await navrhyW.getByRole('button', { name: 'Zahodit návrh: Jakub Horák' }).click();
-  tvrdi('O3: Zahodit → POST /api/tresty/navrhy { klic: pozde:9002 } a návrh zmizí', await dokud(() => (stav.zapisy ?? []).some(z => z.m === 'POST' && z.path === '/api/tresty/navrhy' && z.telo?.klic === 'pozde:9002'), 4000)
+  tvrdi('O2: POST /api/tresty { userId: 17, shiftId: 701, sourceKey: pozde:9002, typeId: 1, points: 10, day: včera }', !!post && post.telo?.userId === 17 && post.telo?.shiftId === 701
+    && post.telo?.sourceKey === 'pozde:9002' && post.telo?.typeId === 1 && post.telo?.points === 10 && !post.telo?.bonusCut && post.telo?.day === DNY.VCERA, JSON.stringify(post?.telo));
+  tvrdi('O2: toast „Trest udělen — Jakub Horák dostal(a) oznámení." a návrh pozdního příchodu zmizel', await dokud(() => p.getByText('Trest udělen — Jakub Horák dostal(a) oznámení.').isVisible().catch(() => false), 3000)
     && await dokud(async () => (await navrhyW.locator('.list-row').count()) === 1, 3000));
+
+  // Zahodit návrh výtky.
+  await navrhyW.getByRole('button', { name: 'Zahodit návrh: Tereza Malá' }).click();
+  tvrdi('O3: Zahodit → POST /api/tresty/navrhy { klic: vytka:77 } a návrh zmizí', await dokud(() => (stav.zapisy ?? []).some(z => z.m === 'POST' && z.path === '/api/tresty/navrhy' && z.telo?.klic === 'vytka:77'), 4000)
+    && await dokud(async () => (await navrhyW.locator('.list-row').count()) === 0, 3000));
 
   // Spor: Trest platí dál.
   await w.getByRole('button', { name: 'Trest platí dál: Tereza Malá' }).first().click();
@@ -221,7 +225,9 @@ const platneVMesici = vMesici.filter(x => x.status === 'plati');
     && await dokud(async () => !/nesouhlasí/.test(await text(w.locator('[data-tresty-souhrn]'))), 3000));
 
   // „···" Upravit: +5 b → PATCH jen points.
-  await w.getByRole('button', { name: 'Upravit nebo zrušit trest: Jakub Horák' }).first().click();
+  // Starší trest za manko (záznam z doby před balíkem P) jde upravit dál — řádek podle textu, ne první Jakubův
+  // (nahoře je teď čerstvý trest za pozdní příchod z O2).
+  await w.locator('.list-row', { hasText: 'Manko v uzávěrce 340 Kč.' }).getByRole('button', { name: 'Upravit nebo zrušit trest: Jakub Horák' }).first().click();
   await p.getByRole('menuitem', { name: 'Upravit…' }).click();
   const uprava = p.getByRole('dialog', { name: 'Upravit trest' });
   tvrdi('O6: Upravit… otevře okno úprav s textem a body 20', await uprava.waitFor({ timeout: 4000 }).then(() => true, () => false)
@@ -239,8 +245,9 @@ const platneVMesici = vMesici.filter(x => x.status === 'plati');
   await nove.waitFor({ timeout: 4000 });
   tvrdi('O7: bez člověka a bez bodů tlačítko „Dát napomenutí" zakázané, pod krácením „Vyber člověka…"', await nove.getByRole('button', { name: 'Dát napomenutí', exact: true }).isDisabled() && /Vyber člověka/.test(await text(nove)));
   await nove.locator('#trest-kdo').selectOption('18');
-  await dokud(async () => /nemá prémie/.test(await text(nove.locator('[data-trest-strop]'))), 4000);
-  tvrdi('O7: Tereza bez prémií → krácení vypnuté s větou „… nemá prémie — krátit není z čeho"', await nove.locator('#trest-kraceni').isDisabled() && /Tenhle měsíc nemá prémie/.test(await text(nove)));
+  await dokud(async () => /žádná není/.test(await text(nove.locator('[data-trest-strop]'))), 4000);
+  tvrdi('O7: Tereza bez nenárokové prémie → krácení vypnuté s větou proč a jak prémii založit', await nove.locator('#trest-kraceni').isDisabled()
+    && /Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není\. Založ ji v Docházce → Prémie a srážky/.test(await text(nove)));
   await nove.getByRole('button', { name: /Pozdní příchod/ }).click();
   tvrdi('O7: chip Pozdní příchod předvyplní text a 10 b', (await nove.locator('#trest-text').inputValue()) === 'Pozdní příchod' && (await nove.locator('#trest-body').inputValue()) === '10');
   await nove.getByRole('button', { name: 'Méně bodů' }).click();
@@ -337,7 +344,7 @@ for (const tmavy of [false, true]) {
   if (!tmavy) await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-odmeny-390.png', fullPage: false });
   if (!tmavy) await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-odmeny-390-cela.png', fullPage: true });
   else await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-odmeny-390-tmave.png', fullPage: false });
-  await w.locator('[data-navrhy-trestu]').getByRole('button', { name: 'Dát trest: Eva Testová' }).click();
+  await w.locator('[data-navrhy-trestu]').getByRole('button', { name: 'Dát trest: Jakub Horák' }).click();
   const okno = p.getByRole('dialog', { name: 'Dát trest' });
   await okno.waitFor({ timeout: 4000 });
   await doberAnimace(okno);
@@ -386,8 +393,8 @@ for (const tmavy of [false, true]) {
   const tl = ceka.getByRole('button', { name: '2 nesouhlasy s trestem' });
   tvrdi('P1: Čeká na tebe má „2 nesouhlasy s trestem"', await dokud(async () => (await tl.count()) === 1, 8000), (await text(ceka)).replace(/\n/g, ' | '));
   const w = widgetLi(p, 'odmeny.tresty_tymu');
-  tvrdi('P2: střední widget na Přehledu má odkaz „Odměny", nejvýš pět trestů a tři návrhy', (await w.getByRole('button', { name: 'Odměny', exact: true }).count()) === 1
-    && (await w.locator('[data-tresty-seznam] .list-row').count()) <= 5 && (await w.locator('[data-navrhy-trestu] .list-row').count()) === 3);
+  tvrdi('P2: střední widget na Přehledu má odkaz „Odměny", nejvýš pět trestů a dva návrhy (manko jen větou)', (await w.getByRole('button', { name: 'Odměny', exact: true }).count()) === 1
+    && (await w.locator('[data-tresty-seznam] .list-row').count()) <= 5 && (await w.locator('[data-navrhy-trestu] .list-row').count()) === 2 && (await w.locator('[data-tresty-manko]').count()) === 1);
   await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-prehled-1280.png', fullPage: true });
   await tl.click();
   tvrdi('P3: proklik otevře Odměny s částí Tresty (sazebník)', await dokud(async () => (await p.locator('[data-plocha="vedeni.odmeny"]').count()) === 1 && (await p.locator('[data-sazebnik-trestu]').count()) === 1, 8000)
@@ -439,26 +446,15 @@ for (const [nazev, volby] of [['1280', { viewport: PC, mobil: false }], ['390', 
   await nastroj.locator('.list-row').first().click();
   const d = p.getByRole('dialog').last();
   tvrdi(`U1 (${nazev}): detail uzávěrky se otevře`, await dokud(() => d.getByText('Vyplněná čísla').isVisible().catch(() => false), 6000));
+  // Spuštění (balík P): manko trestem není (§ 346b ZP) — místo „Dát trest za manko" věta bez akce.
   const manko = d.locator('[data-trest-za-manko]');
-  const maManko = await dokud(async () => (await manko.count()) === 1, 3000);
-  tvrdi(`U1 (${nazev}): u manka je „Dát trest za manko"`, maManko, (await text(d)).slice(0, 200));
+  const maManko = await dokud(async () => (await manko.locator('[data-manko-veta]').count()) === 1, 3000);
+  tvrdi(`U1 (${nazev}): u manka věta „Manko řeš dohodou o odpovědnosti, ne trestem." a žádné tlačítko trestu`, maManko
+    && /Manko řeš dohodou o odpovědnosti, ne trestem\./.test(await text(manko)) && (await manko.getByRole('button').count()) === 0, (await text(d)).slice(0, 200));
   if (maManko) {
     await manko.scrollIntoViewIfNeeded();
     if (nazev === '390') await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-uzaverka-manko-390.png', fullPage: false });
-    await manko.getByRole('button', { name: 'Dát trest za manko' }).click();
-    const okno = p.getByRole('dialog', { name: 'Dát trest' });
-    const otevreno = await okno.waitFor({ timeout: 4000 }).then(() => true, () => false);
-    if (otevreno) await doberAnimace(okno);
-    tvrdi(`U2 (${nazev}): okno nad detailem s autorem uzávěrky a textem „Manko v uzávěrce …"`, otevreno && await naKlepnuti(okno.locator('#trest-text'))
-      && /^Manko v uzávěrce .+\.$/.test(await okno.locator('#trest-text').inputValue()) && (await okno.locator('#trest-kdo').count()) === 0);
-    await dokud(async () => (await okno.getByRole('button', { name: /Manko v kase/ }).getAttribute('aria-pressed')) === 'true', 3000);
-    tvrdi(`U2 (${nazev}): položka sazebníku Manko v kase se vybrala sama (20 b)`, (await okno.getByRole('button', { name: /Manko v kase/ }).getAttribute('aria-pressed')) === 'true' && (await okno.locator('#trest-body').inputValue()) === '20');
-    if (nazev === '390') await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-uzaverka-dat-trest-390.png', fullPage: false });
-    await okno.getByRole('button', { name: 'Dát trest', exact: true }).click();
-    const post = await dokud(() => (stav.zapisy ?? []).find(z => z.m === 'POST' && z.path === '/api/tresty'), 4000);
-    tvrdi(`U2 (${nazev}): POST s closingId, sourceKey manko:<id> a autorem uzávěrky`, !!post && post.telo?.closingId === stav.detailId && post.telo?.sourceKey === `manko:${stav.detailId}` && Number(post.telo?.userId) > 0, JSON.stringify(post?.telo));
-    tvrdi(`U2 (${nazev}): po udělení „Dát trest za manko" zmizí (za tuhle uzávěrku už trest je) a toast zůstane`, await dokud(async () => (await manko.getByRole('button', { name: 'Dát trest za manko' }).count()) === 0, 4000)
-      && await dokud(() => p.getByText(/^Trest udělen — /).isVisible().catch(() => false), 3000));
+    tvrdi(`U2 (${nazev}): bez okna Dát trest a bez POST`, (await p.getByRole('dialog', { name: 'Dát trest' }).count()) === 0 && !(stav.zapisy ?? []).some(z => z.m === 'POST' && z.path === '/api/tresty'));
   }
   const sekce = d.locator('[data-tresty-uzaverky]');
   await sekce.scrollIntoViewIfNeeded();

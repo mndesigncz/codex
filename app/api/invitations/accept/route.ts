@@ -10,6 +10,8 @@ import { clenoveSOpravnenim, roleClena } from '@/lib/opravneniDb';
 import { cilPozvanky, roleZPozvanky as vyberRoliPozvanky } from '@/lib/pozvanky';
 import { vychoziRolePodniku, typUctu, zapisRoliClenstvi, type RoleNoveho } from '../../teams/_role';
 import { nactiRoliPozvanky } from '../_role';
+import { HLASKA_BEZ_SOUHLASU, souhlasZTela } from '@/lib/pravni/verze';
+import { zapisSouhlas } from '@/lib/pravni/souhlasDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,9 +54,12 @@ function oznamPrijeti(teamId: number, body: string) {
 // POST { token, name, password } → create employee account from invitation
 export async function POST(request: Request) {
   try {
-    const { token, name, password } = await request.json();
+    const b = await request.json();
+    const { token, name, password } = b;
     if (!token || !name || !password) return NextResponse.json({ error: 'Všechna pole jsou povinná' }, { status: 400 });
     if (password.length < 8) return NextResponse.json({ error: 'Heslo musí mít alespoň 8 znaků' }, { status: 400 });
+    // Click-wrap (spuštění, balík P): i člověk s existujícím účtem souhlasí (podmínky se mohly změnit).
+    if (!souhlasZTela(b)) return NextResponse.json({ error: HLASKA_BEZ_SOUHLASU }, { status: 400 });
 
     const sql = neon(process.env.DATABASE_URL!);
     const [inv] = await sql`SELECT * FROM invitations WHERE token = ${token}`;
@@ -96,6 +101,7 @@ export async function POST(request: Request) {
                   WHERE id = ${existing.id} AND team_id IS NULL`;
       } catch { /* zrcadlo se doplní při přihlášení */ }
       await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;
+      await zapisSouhlas(Number(existing.id));
       try { await linkNewMember(sql, team.id, team.owner_id, Number(existing.id)); } catch { /* chat je volitelný */ }
       oznamPrijeti(Number(team.id), `${existing.name} se připojil/a do týmu — už má účet, přibylo mu členství.`);
       return NextResponse.json({ ok: true, user: { id: existing.id, name: existing.name, email: inv.email }, existingAccount: true });
@@ -114,6 +120,7 @@ export async function POST(request: Request) {
       RETURNING id, name, email, role`;
 
     await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;
+    await zapisSouhlas(Number(user.id));
     await pridejClenstvi(Number(user.id), Number(team.id), newRole, { jobTitle: inv.job_title || null })
       .then(() => zapisRoliClenstvi(Number(user.id), Number(team.id), nova)).catch(() => {});
     await linkNewMember(sql, team.id, team.owner_id, user.id);

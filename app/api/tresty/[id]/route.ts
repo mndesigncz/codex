@@ -3,7 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
-import { MAX_DELKA_VYJADRENI, normalizujPoznamku, normalizujText, trestText, validujTrest } from '@/lib/tresty';
+import { MAX_DELKA_VYJADRENI, normalizujPoznamku, normalizujText, trestText, validujTrest, VETA_BEZ_PREMIE } from '@/lib/tresty';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { nactiTrest, oznamTrest, oznamVyjadreni, oznamZruseni, predMigraci, stropKraceniDb, tvarTrestu, zalozTrest, zrusDopad } from '../_spolecne';
 
@@ -121,12 +121,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         typeTitle = String(t.title);
       }
     }
-    if (z.bonusCut > 0) {
+    // Strop se hlídá, jen když se krácení zvyšuje nebo trest stěhuje do jiného měsíce: snížit
+    // nebo nechat dřívější krácení (z doby před typem prémie) jde vždy.
+    if (z.bonusCut > 0 && (z.bonusCut > puvodni.bonusCut || z.day.slice(0, 7) !== puvodni.day.slice(0, 7))) {
       const s = await stropKraceniDb(c.teamId, puvodni.userId, z.day, id);
       if (z.bonusCut > s.strop) {
         return chyba(s.strop > 0
-          ? `Krátit jde nejvýš ${mena.money(s.strop)} — víc prémií ten měsíc nemá.`
-          : 'Tenhle měsíc nemá žádné prémie, krátit není z čeho. Dej body nebo napomenutí.', 409, { strop: s.strop });
+          ? `Krátit jde nejvýš ${mena.money(s.strop)} — víc nenárokových prémií ten měsíc nemá.`
+          : VETA_BEZ_PREMIE, 409, { strop: s.strop });
       }
     }
     const zmenaDopadu = z.points !== puvodni.points || z.bonusCut !== puvodni.bonusCut || z.day !== puvodni.day;
