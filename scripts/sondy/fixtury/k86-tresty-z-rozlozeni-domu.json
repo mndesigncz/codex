@@ -1,0 +1,15 @@
+{
+ "stranka": "zamestnanec.domu",
+ "polozky": [
+  { "id": "tresty-male", "widget": "moje-smeny.tresty", "velikost": "S" },
+  { "id": "moje-smeny-tresty", "widget": "moje-smeny.tresty", "velikost": "M" }
+ ],
+ "dostupne": ["moje-smeny.tresty", "odkaz"],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

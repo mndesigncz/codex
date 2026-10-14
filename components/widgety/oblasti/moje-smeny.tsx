@@ -35,6 +35,10 @@
 //  - Nejbližší směna (když už běží) a Minulé směny mají akci „Navíc" → okno se směnou
 //    a jejím dnem; u směny chip „navíc: 2", když k ní zápisy jsou. GET ?shiftId= po jedné
 //    směně by byl drahý — bere se jedna odpověď vlastních zápisů za 60 dní a počítá se tady.
+//
+// Kolo 10 (balík Z) — „Tresty":
+//  - moje-smeny.tresty — vlastní tresty, potvrzení „Beru na vědomí" a vyjádření
+//    (komponenta components/tresty/TrestyWidget, okno components/tresty/DetailTrestu).
 
 import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
@@ -58,6 +62,7 @@ import { NavicWidget } from '../../navic/NavicWidget';
 import { pocetNavicKeSmene } from '../../navic/logika';
 import { ZapsatNavic, type PredvolbyNavic } from '../../navic/ZapsatNavic';
 import { urlNavicMine, useDataNavic } from '../../navic/data';
+import { TrestyWidget } from '../../tresty/TrestyWidget';
 
 // ---------------------------------------------------------------------------
 // Pomocníci (záměrně v souboru — oblast je samostatný líný kus s jedním vlastníkem)
@@ -380,4 +385,5 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'moje.minule_smeny': MinuleSmeny,
   'moje.schvalene_volno': SchvaleneVolno,
   'moje-smeny.navic': NavicWidget,
+  'moje-smeny.tresty': TrestyWidget,
 };
