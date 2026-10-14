@@ -329,7 +329,7 @@ for (const tmavy of [false, true]) {
 }
 {
   // Účetní: navic.zobrazit_tym ano (ve skutečné roli), ale v podvrhu role bez navic.* → fronta není a nic se neptá.
-  const { ctx, p, stav } = await kontext({ viewport: PC, fix: FIX_PREHLED, mineData: roleMine('ucetni'), dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ viewport: PC, fix: FIX_PREHLED, mineData: roleMine('ucetni', ['navic.zapsat', 'navic.zobrazit_tym', 'navic.uznat', 'navic.nabidka']), dalsi: podvrh() });
   await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1500);
   tvrdi('P4: bez navic.uznat se fronta nekreslí a /api/navic se nevolá', (await p.getByRole('button', { name: /zápis.* navíc k uznání/ }).count()) === 0 && dotazyNa(stav, ['/api/navic']).length === 0, JSON.stringify(dotazyNa(stav, ['/api/navic']).map(d => d.u)));
