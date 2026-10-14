@@ -142,7 +142,13 @@ for (const [nazev, volby] of [['390', { viewport: TEL, mobil: true }], ['1280', 
     && (await d.getByLabel('Co bylo navíc?').inputValue()) === 'Vytřít sklad a chodbu' && /Fotka \(povinná\)/.test(await text(d)) && /Bez fotky to zapsat nejde\./.test(await text(d)), await text(d));
   tvrdi(`Z1 (${nazev}): z Hotovo okno ukáže jen ten úkol („Úkol za body", +20 b), ne pilulky celé nabídky`, await d.locator('[data-ukol-v-okne="1"]').count() === 1 && await d.locator('[data-nabidka-navic]').count() === 0
     && /\+20 b po uznání vedením\./.test(await text(d.locator('[data-ukol-v-okne="1"]'))));
-  if (nazev === '390') tvrdi('Z1 (390): v okně z Hotovo je tlačítko fotky vidět bez posouvání', await d.getByRole('button', { name: 'Vyfotit / nahrát' }).evaluate(el => el.getBoundingClientRect().bottom <= window.innerHeight));
+  // Okno na telefonu vyjíždí zdola — měřit až po doběhnutí animace (v produkčním buildu se otevře dřív, než dojede).
+  if (nazev === '390') {
+    await p.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => null))));
+    const foto = d.getByRole('button', { name: 'Vyfotit / nahrát' });
+    tvrdi('Z1 (390): v okně z Hotovo je tlačítko fotky vidět bez posouvání', await dokud(() => foto.evaluate(el => el.getBoundingClientRect().bottom <= window.innerHeight), 3000),
+      String(await foto.evaluate(el => `${Math.round(el.getBoundingClientRect().bottom)} / ${window.innerHeight}`)));
+  }
   await d.getByRole('button', { name: 'Zapsat', exact: true }).click();
   tvrdi(`Z1 (${nazev}): bez fotky → věta „Tenhle úkol chce fotku…" (role=alert) a žádný POST /api/navic`, await dokud(() => d.locator('[data-chyba-fotky]').isVisible().catch(() => false), 2000)
     && /Tenhle úkol chce fotku/.test(await text(d.locator('[data-chyba-fotky]'))) && postyNavic(stav).length === 0);
