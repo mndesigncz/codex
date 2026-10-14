@@ -73,6 +73,7 @@ export default function ({ eq, ok }: Testy) {
   // ---- výběr z odpovědi ----
   const data = vyberDataNavic({ items: [{ id: '5', userId: 3, day: '2026-10-13T00:00:00', status: 'bla', points: '20' }, { bez: 'id' }], nabidka: [{ id: 1, title: 'X', points: '15', autoApprove: 'ne' }], smi: { uznat: true } });
   eq('výběr: cizí stav = ceka, body číslo, den oříznutý, bez id vynecháno', [data.items.length, data.items[0].status, data.items[0].points, data.items[0].day], [1, 'ceka', 20, '2026-10-13']);
+  eq('výběr: chybějící vazby jsou null, ne 0 (closingId 0 by přeskočil zápis bez uzávěrky)', [data.items[0].closingId, data.items[0].shiftId, data.items[0].reportedBy, data.items[0].bonusCzk], [null, null, null, null]);
   eq('výběr: nabídka a smi', [data.nabidka[0].points, data.nabidka[0].autoApprove, data.smi.uznat, data.smi.zapsat, data.smi.tym], [15, false, true, true, false]);
   eq('url: filtry', urlNavic({ scope: 'team', status: 'ceka', mesic: '2026-10' }), '/api/navic?scope=team&status=ceka&month=2026-10');
   eq('url: bez filtru', urlNavic(), '/api/navic');

@@ -94,6 +94,8 @@ export interface DataNavic {
 // ---------------------------------------------------------------------------
 
 const cele = (v: unknown): number | null => {
+  // null, undefined a prázdný řetězec = chybí (Number(null) je 0, a to by z chybějící vazby udělalo uzávěrku č. 0).
+  if (v == null || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? Math.round(n) : null;
 };
