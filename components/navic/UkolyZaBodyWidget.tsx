@@ -1,11 +1,11 @@
 'use client';
 
 // Widget „Úkoly za body" (ukoly.za_body, kolo 11 — balík Z): volitelné úkoly, které si člověk
-// může dnes vzít za extra body. Na Domů hned za Nejbližší směnou, na tabletu (Směna) pro toho,
+// může dnes vzít za extra body. Na Domů u Nejbližší směny (pod Navíc), na tabletu (Směna) pro toho,
 // kdo u tabletu stojí; vedení vidí své vlastní.
 //
 //  - S: „3 úkoly za body · až +60 b" a první volný s „Beru si" (bez kapacity „Hotovo");
-//  - M: seznam (nejvýš 4) — UkolyZaBody;
+//  - M: seznam (nejvýš 3, bez popisů — bez „Zobrazit vše", akce jsou vidět) — UkolyZaBody;
 //  - L: všechny + „Zapsat navíc" (vlastní věc mimo nabídku).
 // Data: GET /api/navic/ukoly (useUkolyZaBody — tatáž adresa jako sekce v Úkolech a odznak
 // v navigaci). Metadata v lib/widgety/katalog/ukoly.ts, registrace v

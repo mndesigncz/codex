@@ -175,6 +175,16 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
     }
   };
 
+  const zUkolu = !upravit && predvolby?.nabidka != null && offerId === predvolby.nabidka.id;
+  const popisVybrane = vybrana ? (
+    <p className="t-meta mt-2 text-pretty" data-vybrana-nabidka={vybrana.id}>
+      {vybrana.autoApprove
+        ? t('{odmena} — uzná se samo hned po zapsání.', { odmena: odmenaKratce(vybrana, money) || t('bez odměny') })
+        : t('{odmena} po uznání vedením.', { odmena: odmenaKratce(vybrana, money) || t('bez odměny') })}
+      {vybrana.description ? ` ${vybrana.description}` : ''}
+      {vybrana.requirePhoto ? ` ${t('Bez fotky to zapsat nejde.')}` : ''}
+    </p>
+  ) : null;
   const min = vedeni ? undefined : posunDni(dnes, -DNI_ZPETNE);
   const delka = text.length;
 
@@ -188,19 +198,19 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
           <Button variant="primary" icon="check" loading={ukladam} disabled={nahravam} onClick={() => void uloz()}>{upravit ? t('Uložit') : t('Zapsat')}</Button>
         </>}>
         <div className="space-y-4" data-zapsat-navic>
-          {nabidka.length > 0 && (
+          {zUkolu && vybrana ? (
+            // Z „Hotovo" u úkolu za body: úkol je vybraný, pilulky celé nabídky by na telefonu odsunuly
+            // text a fotku pod ohyb — místo nich jen ten jeden úkol a co za něj bude.
+            <div data-ukol-v-okne={vybrana.id}>
+              <p className="t-label">{t('Úkol za body')}</p>
+              <p className="t-card mt-1 text-pretty">{vybrana.title}</p>
+              {popisVybrane}
+            </div>
+          ) : nabidka.length > 0 && (
             <div>
               <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} vybrane={offerId} onVyber={vyberNabidku} money={money}
                 obsazene={obsazene} label={t('Co se dá udělat navíc')} />
-              {vybrana && (
-                <p className="t-meta mt-2 text-pretty" data-vybrana-nabidka={vybrana.id}>
-                  {vybrana.autoApprove
-                    ? t('{odmena} — uzná se samo hned po zapsání.', { odmena: odmenaKratce(vybrana, money) || t('bez odměny') })
-                    : t('{odmena} po uznání vedením.', { odmena: odmenaKratce(vybrana, money) || t('bez odměny') })}
-                  {vybrana.description ? ` ${vybrana.description}` : ''}
-                  {vybrana.requirePhoto ? ` ${t('Bez fotky to zapsat nejde.')}` : ''}
-                </p>
-              )}
+              {popisVybrane}
             </div>
           )}
           <Field id="navic-text" label={t('Co bylo navíc?')} error={chyba}
