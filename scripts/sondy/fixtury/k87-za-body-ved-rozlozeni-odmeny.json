@@ -1,0 +1,26 @@
+{
+ "stranka": "vedeni.odmeny",
+ "polozky": [
+  {
+   "id": "za-body-tymu",
+   "widget": "odmeny.za_body_tymu",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "odmeny.za_body_tymu",
+  "odmeny.navic_tymu"
+ ],
+ "tarifem": [],
+ "zdroj": "aplikace",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

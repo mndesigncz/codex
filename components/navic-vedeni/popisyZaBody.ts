@@ -63,15 +63,22 @@ export function metaUkolu(t: PrekladFn, n: NabidkaNavic, money: (x: number) => s
 }
 
 /** Podrobnosti úkolu (zalamují se): „1 člověk · každý až 2× · jen 2 lidem · uzná se samo · s fotkou · od 12. 10.". */
-export function podrobnostiUkolu(t: PrekladFn, n: NabidkaNavic): string {
+export function podrobnostiUkolu(t: PrekladFn, n: NabidkaNavic, jmena?: ReadonlyMap<number, string>): string {
   return [
     textKapacity(t, n.capacity),
     n.maxPerDay != null && n.maxPerDay > 1 ? t('každý až {n}×', { n: n.maxPerDay }) : null,
-    n.targetUsers.length ? t('{n, plural, one {jen # člověku} few {jen # lidem} other {jen # lidem}}', { n: n.targetUsers.length }) : null,
+    n.targetUsers.length ? textKomu(t, n.targetUsers, jmena) : null,
     n.autoApprove ? t('uzná se samo') : null,
     n.requirePhoto ? t('s fotkou') : null,
     textPlatnosti(t, n.validFrom, n.validTo),
   ].filter(Boolean).join(' · ');
+}
+
+/** Komu je úkol určený: „jen Eva, Jakub" (do tří známých jmen), jinak „jen 5 lidem". */
+export function textKomu(t: PrekladFn, komu: readonly number[], jmena?: ReadonlyMap<number, string>): string {
+  const znama = jmena ? komu.map(id => jmena.get(id)).filter((x): x is string => !!x) : [];
+  if (znama.length === komu.length && komu.length <= 3) return t('jen {komu}', { komu: znama.map(j => j.split(' ')[0]).join(', ') });
+  return t('{n, plural, one {jen # člověku} few {jen # lidem} other {jen # lidem}}', { n: komu.length });
 }
 
 /** Věta náhledu dole v okně — z rozepsaného formuláře, ať je vidět, co lidé uvidí. */

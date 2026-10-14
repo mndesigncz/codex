@@ -1832,7 +1832,7 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
 
 const ID_ZA_BODY = 'odmeny.za_body_tymu';
 /** Kolik dnešních úkolů ukáže střední karta (zbytek „…a další", celé v L a v Úkolech). */
-const ZA_BODY_M = 4;
+const ZA_BODY_M = 3;
 
 /** Widget Úkoly za body dnes: souhrn dne, čekající k uznání, dnešní úkoly s lidmi a volnými místy. */
 function ZaBodyTymu({ velikost, nahled }: WidgetProps) {
@@ -1877,19 +1877,20 @@ function ZaBodyTymu({ velikost, nahled }: WidgetProps) {
         <p className="t-meta min-w-0" data-za-body-souhrn>{textSouhrnuZaBody(t, souhrnZaBody(ukoly))}</p>
         {tlacitko}
       </div>
-      {fronta.length > 0 && (
-        <div className="mt-3">
-          <FrontaZaBody items={fronta} smiUznat={smiUznat} strop={L ? undefined : 2} />
-        </div>
-      )}
+      {/* Dnešní úkoly první (hlavní údaj karty — na telefonu nesmí skončit pod „Zobrazit vše"), čekající pod nimi;
+          že něco čeká, říká už chip v hlavičce. */}
       {ukoly.length > 0 ? (
-        <div className="mt-3">
-          {fronta.length > 0 && <p className="t-label">{t('Dnes')}</p>}
+        <div className="mt-2">
           <ul className="list" data-za-body-seznam>{videt.map(u => <RadekUkoluDnes key={u.nabidka.id} u={u} />)}</ul>
           {ukoly.length > videt.length && <p className="t-meta mt-1">{aDalsich(t, ukoly.length - videt.length)}</p>}
         </div>
       ) : (
         <p className="t-meta mt-3">{t('Dnes se žádný úkol za body nedá vzít.')}</p>
+      )}
+      {fronta.length > 0 && (
+        <div className="mt-3">
+          <FrontaZaBody items={fronta} smiUznat={smiUznat} strop={L ? undefined : 2} />
+        </div>
       )}
       {okna}
     </Widget>

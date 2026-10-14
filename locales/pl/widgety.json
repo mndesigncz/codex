@@ -2556,7 +2556,7 @@
   "Nesouhlasy s tresty": "Sprzeciwy wobec kar",
   "Tresty v týmu": "Kary w zespole",
   "Co kdo pokazil a co za to dostal — body dolů, krácení prémie nebo napomenutí; nesouhlasy k vyřízení a návrhy z docházky, uzávěrek a hodnocení.": "Kto co zawalił i co za to dostał — minus punkty, obniżenie premii lub upomnienie; sprzeciwy do rozpatrzenia i propozycje z ewidencji, rozliczeń i ocen.",
-  "Kdykoli": "W dowolnym momencie",
+  "Kdykoli": "Kiedykolwiek",
   "Jednorázově": "Jednorazowo",
   "Každý den": "Codziennie",
   "Vybrané dny": "Wybrane dni",
@@ -2642,5 +2642,7 @@
   "Dnes se žádný úkol za body nedá vzít.": "Dziś nie można wziąć żadnego zadania za punkty.",
   "Úkoly za body dnes": "Zadania za punkty dziś",
   "Volitelné úkoly s body na dnešek — kdo si co vzal, kdo co splnil, kolik míst zbývá a co čeká na uznání.": "Zadania dobrowolne z punktami na dziś — kto co wziął, kto co wykonał, ile miejsc zostało i co czeka na zatwierdzenie.",
-  "Volitelné úkoly s body — kdo chce, vezme si úkol („Beru si\"), splní ho a dostane body. Opakování nastavíš sám: jednou, každý den, vybrané dny, týdně, měsíčně nebo každých pár dní.": "Zadania dobrowolne z punktami — kto chce, bierze zadanie („Biorę”), wykonuje je i dostaje punkty. Powtarzanie ustawiasz sam: raz, codziennie, w wybrane dni, co tydzień, co miesiąc albo co kilka dni."
+  "Volitelné úkoly s body — kdo chce, vezme si úkol („Beru si\"), splní ho a dostane body. Opakování nastavíš sám: jednou, každý den, vybrané dny, týdně, měsíčně nebo každých pár dní.": "Zadania dobrowolne z punktami — kto chce, bierze zadanie („Biorę”), wykonuje je i dostaje punkty. Powtarzanie ustawiasz sam: raz, codziennie, w wybrane dni, co tydzień, co miesiąc albo co kilka dni.",
+  "Všechny úkoly za body": "Wszystkie zadania za punkty",
+  "jen {komu}": "tylko {komu}"
 }

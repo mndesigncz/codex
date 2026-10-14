@@ -20,7 +20,8 @@ import { useMoney } from '../CurrencyProvider';
 import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import { URL_UKOLY_TYMU, obnovNavic, useNabidkaNavic, useNavic, useUkolyZaBody } from './data';
 import { stavNabidky } from './logika';
-import { NabidkaNavicOkno } from './NabidkaNavicOkno';
+import { NabidkaNavicOkno, vyberCleny } from './NabidkaNavicOkno';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { metaUkolu, podrobnostiUkolu } from './popisyZaBody';
 import { ARG_ZA_BODY, cekajiciZUkolu, souhrnZaBody } from './zaBody';
 import { ChipVolna, FrontaZaBody, LideUkolu, textSouhrnuZaBody } from './ZaBodyDnes';
@@ -60,6 +61,9 @@ export function SpravaNabidky({ dnesni = false, onNovy }: {
   const dnesniUkoly = new Map((dnesData.data?.ukoly ?? []).map(u => [u.nabidka.id, u]));
   const fronta = cekajiciZUkolu(cekajici.data?.items ?? []);
   const novy = () => (onNovy ? onNovy() : setOkno({ polozka: null }));
+  // Jména u „jen Eva, Jakub" — /api/teams jen tehdy, když nějaký úkol je určený vybraným lidem.
+  const clenove = useDataWidgetu(polozky.some(n => n.targetUsers.length > 0) ? '/api/teams' : null, vyberCleny);
+  const jmena = new Map((clenove.data ?? []).map(c => [c.id, c.jmeno]));
 
   const smazat = async () => {
     if (!mazani || mazu) return;
@@ -112,7 +116,8 @@ export function SpravaNabidky({ dnesni = false, onNovy }: {
           {smi && <Button variant="secondary" size="sm" icon="plus" className="tap-target" onClick={novy}>{t('Nový úkol za body')}</Button>}
         </div>
       </div>
-      <p className="t-meta mt-1 text-pretty">{t('Volitelné úkoly s body — kdo chce, vezme si úkol („Beru si"), splní ho a dostane body. Opakování nastavíš sám: jednou, každý den, vybrané dny, týdně, měsíčně nebo každých pár dní.')}</p>
+      {/* V Úkolech totéž říká podtitulek hlavičky — na telefonu by tu byly čtyři řádky navíc nad seznamem. */}
+      {!dnesni && <p className="t-meta mt-1 text-pretty">{t('Volitelné úkoly s body — kdo chce, vezme si úkol („Beru si"), splní ho a dostane body. Opakování nastavíš sám: jednou, každý den, vybrané dny, týdně, měsíčně nebo každých pár dní.')}</p>}
       {dnesni && dnesData.data && (dnesData.data.ukoly.length > 0 || fronta.length > 0) && (
         <div className="mt-3 space-y-3">
           <p className="t-meta" data-za-body-souhrn>{t('Dnes')}: {textSouhrnuZaBody(t, souhrnZaBody(dnesData.data.ukoly))}</p>
@@ -128,7 +133,9 @@ export function SpravaNabidky({ dnesni = false, onNovy }: {
           hint={smi ? t('Vypiš první — třeba „Vytřít sklad · +20 b · každý pátek".') : t('Vedení zatím nic nevypsalo.')} className="mt-2"
           action={smi ? <Button variant="secondary" size="sm" icon="plus" onClick={novy}>{t('Nový úkol za body')}</Button> : undefined} />
       ) : (
-        <ul className="list mt-3" data-sprava-seznam>
+        <>
+        {dnesni && fronta.length > 0 && <p className="t-label mt-4">{t('Všechny úkoly za body')}</p>}
+        <ul className={`list ${dnesni && fronta.length > 0 ? '' : 'mt-3'}`} data-sprava-seznam>
           {polozky.map(n => (
             <ListRow key={n.id} akceVRadku
               lead={<span aria-hidden className="well grid h-9 w-9 shrink-0 place-items-center text-black/55"><Icon name="tag" size={16} /></span>}
@@ -136,10 +143,10 @@ export function SpravaNabidky({ dnesni = false, onNovy }: {
               meta={metaUkolu(t, n, money)}
               detail={dnesni ? (
                 <>
-                  <span className="block">{[n.description, podrobnostiUkolu(t, n)].filter(Boolean).join(' — ')}</span>
+                  <span className="block">{[n.description, podrobnostiUkolu(t, n, jmena)].filter(Boolean).join(' — ')}</span>
                   {dnesniUkoly.get(n.id) ? <LideUkolu u={dnesniUkoly.get(n.id)!} /> : null}
                 </>
-              ) : [n.description, podrobnostiUkolu(t, n)].filter(Boolean).join(' — ') || undefined}
+              ) : [n.description, podrobnostiUkolu(t, n, jmena)].filter(Boolean).join(' — ') || undefined}
               right={chipStavu(n) ?? (dnesni && dnesniUkoly.get(n.id) ? <ChipVolna u={dnesniUkoly.get(n.id)!} /> : dnesni && dnesData.data && n.active ? <Chip tone="muted" size="sm">{t('Dnes ne')}</Chip> : undefined)}
               // `!flex-none`: na telefonu `.list-actions:only-child > :first-child` natáhne první prvek ocasu přes
               // řádek a „···" by stálo vlevo pod textem; takhle drží vpravo (jako Switch v Katalogu odměn).
@@ -154,6 +161,7 @@ export function SpravaNabidky({ dnesni = false, onNovy }: {
               ) : undefined} />
           ))}
         </ul>
+        </>
       )}
       {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
       {okno && (

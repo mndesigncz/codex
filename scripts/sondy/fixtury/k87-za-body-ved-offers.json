@@ -1,0 +1,109 @@
+{
+ "offers": [
+  {
+   "description": "Sto kusů do schránek v ulici.",
+   "bonusCzk": null,
+   "autoApprove": false,
+   "active": true,
+   "validFrom": "PRED6",
+   "validTo": null,
+   "maxPerDay": null,
+   "recurrence": "interval",
+   "recDays": [],
+   "recInterval": 3,
+   "capacity": 2,
+   "requirePhoto": false,
+   "targetUsers": [],
+   "createdAt": "2026-10-01T08:00:00.000Z",
+   "id": 5,
+   "title": "Rozvézt letáky po okolí",
+   "points": 30
+  },
+  {
+   "description": "Včetně rohů za regály.",
+   "bonusCzk": null,
+   "autoApprove": false,
+   "active": true,
+   "validFrom": null,
+   "validTo": null,
+   "maxPerDay": 1,
+   "recurrence": "dny",
+   "recDays": [
+    1,
+    3,
+    5
+   ],
+   "recInterval": null,
+   "capacity": 1,
+   "requirePhoto": true,
+   "targetUsers": [],
+   "createdAt": "2026-10-01T08:00:00.000Z",
+   "id": 1,
+   "title": "Vytřít sklad a chodbu",
+   "points": 20
+  },
+  {
+   "description": null,
+   "bonusCzk": null,
+   "autoApprove": true,
+   "active": true,
+   "validFrom": null,
+   "validTo": null,
+   "maxPerDay": 1,
+   "recurrence": "kdykoli",
+   "recDays": [],
+   "recInterval": null,
+   "capacity": null,
+   "requirePhoto": false,
+   "targetUsers": [],
+   "createdAt": "2026-10-01T08:00:00.000Z",
+   "id": 2,
+   "title": "Umýt výlohu zvenku",
+   "points": 15
+  },
+  {
+   "description": null,
+   "bonusCzk": null,
+   "autoApprove": false,
+   "active": true,
+   "validFrom": null,
+   "validTo": null,
+   "maxPerDay": 1,
+   "recurrence": "tydne",
+   "recDays": [],
+   "recInterval": null,
+   "capacity": 2,
+   "requirePhoto": false,
+   "targetUsers": [
+    16,
+    17
+   ],
+   "createdAt": "2026-10-01T08:00:00.000Z",
+   "id": 3,
+   "title": "Odvézt sklo do sběru",
+   "points": 10
+  },
+  {
+   "description": null,
+   "bonusCzk": 300,
+   "autoApprove": false,
+   "active": false,
+   "validFrom": null,
+   "validTo": null,
+   "maxPerDay": 1,
+   "recurrence": "mesicne",
+   "recDays": [],
+   "recInterval": null,
+   "capacity": 1,
+   "requirePhoto": false,
+   "targetUsers": [],
+   "createdAt": "2026-10-01T08:00:00.000Z",
+   "id": 4,
+   "title": "Generální úklid lednic",
+   "points": 50
+  }
+ ],
+ "smi": {
+  "nabidka": true
+ }
+}

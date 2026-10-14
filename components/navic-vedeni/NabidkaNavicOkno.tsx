@@ -26,8 +26,9 @@ import { NadPlochou } from './UznatNavic';
 import { formularZNabidky, krokBoduUkolu, prepniDen, teloFormulare, type FormularZaBody } from './zaBody';
 import { denKratce, vetaNahledu } from './popisyZaBody';
 
-interface Clen { id: number; jmeno: string }
-const vyberCleny = (raw: unknown): Clen[] => (Array.isArray((raw as { members?: unknown } | null)?.members) ? (raw as { members: any[] }).members : [])
+export interface Clen { id: number; jmeno: string }
+/** Členové z /api/teams (sdílená mezipaměť widgetů) — výběr „Komu" a jména ve správě. */
+export const vyberCleny = (raw: unknown): Clen[] => (Array.isArray((raw as { members?: unknown } | null)?.members) ? (raw as { members: any[] }).members : [])
   .map(m => ({ id: Number(m?.id), jmeno: String(m?.name ?? '') }))
   .filter(m => Number.isFinite(m.id) && m.id > 0 && m.jmeno)
   .sort((a, b) => a.jmeno.localeCompare(b.jmeno, 'cs'));
@@ -156,7 +157,8 @@ export function NabidkaNavicOkno({ polozka, predvyplneno, onClose, onHotovo, nad
             </fieldset>
           )}
           {f.opakovani === 'interval' ? (
-            <div className="grid grid-cols-2 gap-3">
+            // Užší sloupec pro číslo: datum vedle potřebuje na 320 px celou šířku zbytku, jinak se useká rok.
+            <div className="grid grid-cols-[2fr_3fr] gap-3">
               <Field id="nabidka-interval" label={t('Každých kolik dní')} hint={t('2–90')}>
                 <Input id="nabidka-interval" type="number" inputMode="numeric" min={2} max={90} step={1} value={f.interval}
                   onChange={e => zmen({ interval: e.target.value.replace(/\D/g, '') })} className="tabular-nums" />
@@ -164,7 +166,7 @@ export function NabidkaNavicOkno({ polozka, predvyplneno, onClose, onHotovo, nad
               <Field id="nabidka-od" label={t('Počítá se od')}>
                 <Input id="nabidka-od" type="date" value={f.od} onChange={e => zmen({ od: e.target.value, ...(f.do && e.target.value && f.do < e.target.value ? { do: e.target.value } : {}) })} className="appearance-none min-w-0" />
               </Field>
-              <Field id="nabidka-do" label={t('Platí do')} hint={t('Nepovinné.')} className="col-span-2 sm:col-span-1">
+              <Field id="nabidka-do" label={t('Platí do')} hint={t('Nepovinné.')} className="col-span-2">
                 <Input id="nabidka-do" type="date" value={f.do} min={f.od || undefined} onChange={e => zmen({ do: e.target.value })} className="appearance-none min-w-0" />
               </Field>
             </div>
