@@ -123,6 +123,8 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
   const pocty = poctyFiltru(items);
   const videt = L ? filtrujTresty(items, filtr) : items.slice(0, RADKU_M);
 
+  // Vyjádření jen ve velké kartě: střední se nad 300 px zkracuje pod „Zobrazit vše" a dva řádky
+  // vlastního textu by vytlačily nepotvrzené tresty pod odlesk (vyjádření nese i detail).
   const radek = (tr: Trest) => {
     const zruseno = tr.status === 'zruseno';
     return (
@@ -134,7 +136,7 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
           {tr.givenByName && <> · {t('dal(a) {jmeno}', { jmeno: tr.givenByName })}</>}
         </>}
         detail={zruseno ? (tr.cancelNote ? t('Zrušeno: {poznamka}', { poznamka: tr.cancelNote }) : undefined)
-          : tr.response ? t('Tvoje vyjádření: {text}', { text: tr.response.length > 90 ? `${tr.response.slice(0, 90)}…` : tr.response }) : undefined}
+          : L && tr.response ? t('Tvoje vyjádření: {text}', { text: tr.response.length > 90 ? `${tr.response.slice(0, 90)}…` : tr.response }) : undefined}
         right={<StavTrestuChip trest={tr} />}
         value={<span className={zruseno ? 'line-through text-black/45' : undefined} data-dopad>{tr.points ? bodyDolu(t, tr.points) : tr.bonusCut ? `−${money(tr.bonusCut)}` : t('Napomenutí')}</span>}
         valueMeta={tr.points && tr.bonusCut ? <span className={zruseno ? 'line-through' : undefined}>{t('krácení {castka}', { castka: money(tr.bonusCut) })}</span>
