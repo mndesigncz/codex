@@ -2,7 +2,7 @@
 // weights once; from then on points award themselves and only need editing
 // when the employer disagrees with the outcome.
 
-import { parseSteps, stepPenalty, stepPlus, type Step } from './steps';
+import { parseSteps, stepPenalty, stepPlus, type Step } from './steps.ts';
 
 /** Why a step was skipped. Excused reasons don't cost points. */
 export const SKIP_REASONS: { id: string; label: string; excused: boolean }[] = [
@@ -48,42 +48,56 @@ export interface RunScore {
 }
 
 /**
- * The whole automatic-points arithmetic in one place.
- *   + basePoints for completing the run at all (team points_config)
- *   + per-step plus for every done step (by weight)
+ * The whole automatic-points arithmetic in one place. The result goes into the
+ * per-item ledger (shift_review_items) as an ADJUSTMENT on top of the base:
+ * the base for completing the run is already counted once per completed run in
+ * totalPoints() (lib/pointsBalance.ts: `procedures × pt.procedure`), so it must
+ * not be part of this number too (k89: it was, and every run paid its base twice).
+ *   + completion bonus: up to `bonusMax` (the team's „body za postup“),
+ *     proportional to the weighted share of steps done — a 38-step closing list
+ *     and a 13-step opening list are each worth at most the same bonus, not
+ *     one point per checkbox (k89: a 38-step list used to pay +40)
  *   − per-step penalty for every step that was neither done nor excused
- * An excused skip (not needed / missing supplies) costs nothing.
+ * An excused skip (not needed / missing supplies) costs nothing and does not
+ * lower the bonus share either.
  */
 export function scoreRun(
   items: any,
   checked: number[],
   skipped: number[],
   skipReasons: SkipReasons,
-  basePoints: number,
+  bonusMax: number,
 ): RunScore {
   const steps: Step[] = parseSteps(items);
-  let points = basePoints;
+  let penalty = 0;
+  let plusDone = 0, plusCounted = 0;
   let done = 0, missed = 0, excusedSkips = 0, unexcusedSkips = 0;
   let flagged = false;
 
   steps.forEach((step, i) => {
     if (checked.includes(i)) {
       done++;
-      points += stepPlus(step);
+      plusDone += stepPlus(step);
+      plusCounted += stepPlus(step);
       return;
     }
     const skip = skipReasons[String(i)];
     const isSkip = skipped.includes(i);
     if (isSkip && skip && isExcused(skip.reason)) {
       excusedSkips++;
-      return; // excused — no penalty
+      return; // excused — no penalty, not counted against the bonus
     }
+    plusCounted += stepPlus(step);
     if (isSkip) unexcusedSkips++;
     else missed++;
-    points -= stepPenalty(step);
+    penalty += stepPenalty(step);
     if (step.weight === 'key') flagged = true;
   });
   if (unexcusedSkips > 0) flagged = true;
+
+  const max = Number.isFinite(bonusMax) && bonusMax > 0 ? bonusMax : 0;
+  const bonus = plusCounted > 0 ? Math.round(max * plusDone / plusCounted) : 0;
+  const points = bonus - penalty;
 
   const parts = [`${done}/${steps.length} kroků`];
   if (excusedSkips) parts.push(`${excusedSkips}× omluvené přeskočení`);
