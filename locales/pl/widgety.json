@@ -2617,7 +2617,7 @@
   "{n, plural, one {# úkol} few {# úkoly} other {# úkolů}}": "{n, plural, one {# zadanie} few {# zadania} many {# zadań} other {# zadania}}",
   "{n, plural, one {# volný} few {# volné} other {# volných}}": "{n, plural, one {# wolne} few {# wolne} many {# wolnych} other {# wolnego}}",
   "vše obsazeno": "wszystko zajęte",
-  "{n} vzato": "{n} wziętych",
+  "{n} vzato": "wzięte: {n}",
   "{n} hotovo": "{n} gotowe",
   "až +{n} b": "do +{n} pkt",
   "Zatím si ho nikdo nevzal.": "Nikt go jeszcze nie wziął.",
