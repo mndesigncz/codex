@@ -1,0 +1,15 @@
+{
+ "stranka": "vedeni.odmeny",
+ "polozky": [
+  { "id": "tresty-tymu", "widget": "odmeny.tresty_tymu", "velikost": "L" },
+  { "id": "nastroj", "widget": "nastroj", "velikost": "L" }
+ ],
+ "dostupne": ["odmeny.tresty_tymu", "odmeny.navic_tymu", "odmeny.zadosti", "hodnoceni.nehodnocene", "odmeny.vytky_tymu", "odmeny.pochvaly"],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}

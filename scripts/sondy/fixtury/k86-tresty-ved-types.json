@@ -1,0 +1,9 @@
+{
+ "types": [
+  { "id": 1, "title": "Pozdní příchod", "description": "Víc než 10 minut po začátku směny.", "points": 10, "bonusCut": null, "active": true, "createdAt": "" },
+  { "id": 2, "title": "Manko v kase", "description": null, "points": 20, "bonusCut": 200, "active": true, "createdAt": "" },
+  { "id": 3, "title": "Nezavřená lednice / sklad", "description": null, "points": 15, "bonusCut": null, "active": true, "createdAt": "" },
+  { "id": 4, "title": "Mobil za barem", "description": "Telefon při obsluze hostů.", "points": 5, "bonusCut": null, "active": false, "createdAt": "" }
+ ],
+ "smi": { "sazebnik": true }
+}

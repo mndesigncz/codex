@@ -1,0 +1,15 @@
+{
+ "stranka": "vedeni.prehled",
+ "polozky": [
+  { "id": "ceka", "widget": "prehled.ceka_na_tebe", "velikost": "L" },
+  { "id": "tresty-tymu", "widget": "odmeny.tresty_tymu", "velikost": "M" }
+ ],
+ "dostupne": ["prehled.ceka_na_tebe", "odmeny.tresty_tymu", "odmeny.navic_tymu"],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}

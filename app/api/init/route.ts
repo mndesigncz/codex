@@ -2873,6 +2873,73 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS extra_offers_team ON extra_offers (team_id, active)`);
     // ---- konec Navíc ----
 
+    // ---- Tresty (kolo 10): co člověk pokazil a co za to dostal (zrcadlo Navíc) ----
+    // penalties: prohřešek a trest. Body dolů → point_awards kind 'trest' (záporné,
+    // award_id), krácení prémie → wage_adjustments source 'trest' (záporné,
+    // adjustment_id). status plati | zruseno (zrušený vrátí body i krácení, záznam
+    // zůstane). seen_at = člověk potvrdil, response/disputed = vyjádření.
+    // source_key = klíč návrhu z dat (pozde:<time_entry>, manko:<closing>, vytka:<item>).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS penalties (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        given_by INTEGER,
+        day TEXT NOT NULL,
+        shift_id INTEGER,
+        closing_id INTEGER,
+        task_id INTEGER,
+        type_id INTEGER,
+        type_title TEXT,
+        text TEXT NOT NULL,
+        photo_url TEXT,
+        points INTEGER NOT NULL DEFAULT 0,
+        bonus_cut INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'plati',
+        source TEXT NOT NULL DEFAULT 'rucne',
+        source_key TEXT,
+        award_id INTEGER,
+        adjustment_id INTEGER,
+        seen_at TIMESTAMP,
+        response TEXT,
+        response_at TIMESTAMP,
+        disputed BOOLEAN NOT NULL DEFAULT FALSE,
+        dispute_handled_at TIMESTAMP,
+        cancelled_by INTEGER,
+        cancelled_at TIMESTAMP,
+        cancel_note TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS penalties_team_day ON penalties (team_id, day)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS penalties_team_user ON penalties (team_id, user_id, day)`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS penalties_source_key ON penalties (team_id, source_key) WHERE source_key IS NOT NULL`);
+    // penalty_types: sazebník typických prohřešků s body a krácením.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS penalty_types (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        points INTEGER NOT NULL DEFAULT 0,
+        bonus_cut INTEGER,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        archived_at TIMESTAMP,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS penalty_types_team ON penalty_types (team_id, active)`);
+    // penalty_dismissed: návrhy z dat, které vedení zahodilo (už se nenabídnou).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS penalty_dismissed (
+        team_id INTEGER NOT NULL,
+        source_key TEXT NOT NULL,
+        dismissed_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, source_key)
+      )`);
+    // ---- konec Tresty ----
+
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

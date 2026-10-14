@@ -109,6 +109,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stav: 'hotovo',
   },
   // Data: GET /api/attendance?days=N → entries[{employeeId,employeeName,clockIn,clockOut}], roster.hourlyRate
+  // Kolo 10 (tresty, balík V): u člověka s pozdním příchodem „Dát trest za pozdní příchod" v „···" (tresty.udelit;
+  // nevyřízený příchod podle GET /api/tresty/navrhy, klíč `pozde:<id záznamu>`).
   {
     id: 'dochazka.souhrn_hodin',
     oblast: 'dochazka',
@@ -119,7 +121,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.dochazka'],
-    opravneni: { vse: ['dochazka.zobrazit'], nektere: [], pole: { kc_u_cloveka_razeni_nejvic_mzdy: 'finance.mzdy' } },
+    opravneni: { vse: ['dochazka.zobrazit'], nektere: [], pole: { kc_u_cloveka_razeni_nejvic_mzdy: 'finance.mzdy', 'akce:trest_za_pozde': 'tresty.udelit' } },
     tarif: 'zdarma',
     nastaveni: [
       {

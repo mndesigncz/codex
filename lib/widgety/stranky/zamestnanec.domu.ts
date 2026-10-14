@@ -13,6 +13,7 @@ export const STRANKA: DefiniceStranky = {
     'dochazka.moje_pichacky',
     'moje.nejblizsi_smena',
     'moje-smeny.navic',
+    'moje-smeny.tresty',
     'uzaverky.predavka',
     'klient.objednavky_od_stolu',
     'klient.dnesni_rezervace',
@@ -42,6 +43,9 @@ export const STRANKA: DefiniceStranky = {
     // konec směny → pomalejší věci (výdělek, zpětná vazba). Dvě malé dlaždice vedle sebe, ne dvacet
     // karet pod sebou; situační widgety (akce, sdílená nabídka) jsou v galerii, ne v základu.
     'typ:zamestnanec': [
+      // Kolo 10 (balík Z): „Moje tresty" úplně nahoře jako malá karta — v klidu se kreslí, jen když
+      // je co potvrdit (bez nepotvrzeného trestu ji plocha vyřadí z mřížky, žádná díra).
+      { w: 'moje-smeny.tresty', s: 'S' },
       { w: 'dochazka.moje_pichacky', s: 'M' },
       { w: 'moje.nejblizsi_smena', s: 'M' },
       // Kolo 9 (N1): „Navíc" hned za směnou — zapsat, co bylo nad rámec, je věc konce směny, ne konce měsíce.

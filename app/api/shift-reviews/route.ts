@@ -79,18 +79,19 @@ function coworkerIdsFor(dayRows: any[], employeeId: number, date: string): numbe
   return Array.from(new Set(pool.map(r => r.employee_id as number)));
 }
 
-interface ItemMark { points: number; note: string | null; flagged: boolean }
+interface ItemMark { id: number | null; points: number; note: string | null; flagged: boolean }
 
 async function itemMarks(employeeId: number, date: string) {
   let rows: any[] = [];
   try {
     rows = await sql`
-      SELECT kind, ref_id, points, note, flagged FROM shift_review_items
+      SELECT id, kind, ref_id, points, note, flagged FROM shift_review_items
       WHERE employee_id = ${employeeId} AND work_date = ${date}`;
   } catch { /* table missing */ }
   return (kind: string, refId: number): ItemMark | null => {
     const r = rows.find((x: any) => x.kind === kind && x.ref_id === refId);
-    return r ? { points: r.points ?? 0, note: r.note ?? null, flagged: r.flagged === true } : null;
+    // id položky: trest za výtku (kolo 10) z něj skládá klíč vytka:<id>.
+    return r ? { id: r.id == null ? null : Number(r.id), points: r.points ?? 0, note: r.note ?? null, flagged: r.flagged === true } : null;
   };
 }
 

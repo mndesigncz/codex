@@ -14,7 +14,16 @@
 // nadpisem, názvem 30 px a výhodami v limetkovém boxu → Stat, pruh pokroku a Well
 // (MojeUrovenObsah, stejná podoba jako widget Moje úroveň a body na Domů). Dvě
 // červeně tónované karty „Něco je potřeba napravit" → jeden widget Zpětná vazba.
+//
+// Kolo 10 (balík Z): odkaz z oznámení o trestu `/employee/shifts?view=rewards&arg=tresty`
+// otevře nad stránkou detail nejnovějšího nepotvrzeného trestu (když žádný není — oznámení
+// o zrušení vede na tutéž adresu — toho, se kterým se naposled něco stalo). Okno se kreslí
+// tady, ne ve widgetu: osobní rozložení widget Moje tresty mít nemusí a odkaz musí fungovat
+// i tak. Layout argument nástroji nepředává, čte se z adresy (useSearchParams, jako Navíc
+// u vedení); stejný odkaz podruhé (nový objekt parametrů) okno otevře znovu.
 
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, EmptyState, ErrorState, Skeleton } from '../ui';
 import { ProGate } from '../Pro';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
@@ -22,6 +31,10 @@ import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { MojeUrovenObsah, NaStranceOdmen } from '../widgety/oblasti/odmeny';
 import { vyberOdmeny } from '@/lib/odmenyPrehled';
 import { useT } from '@/lib/i18n/client';
+import { urlTresty } from '@/lib/tresty';
+import { DetailTrestu } from '../tresty/DetailTrestu';
+import { useDataTresty } from '../tresty/data';
+import { ARG_TRESTY, trestKOtevreni } from '../tresty/logika';
 
 export default function MyRewards() {
   const t = useT('zamestnanec');
@@ -59,6 +72,7 @@ function MyRewardsInner() {
   // Widgety na téhle ploše nekreslí odkaz „Odměny ›" — vedl by sem (Zpětná vazba, Moje úroveň).
   return (
     <NaStranceOdmen.Provider value>
+      <TrestZOznameni />
       <PlochaWidgetu
         stranka="zamestnanec.odmeny"
         hlavicka={{
@@ -70,4 +84,25 @@ function MyRewardsInner() {
       />
     </NaStranceOdmen.Provider>
   );
+}
+
+/** Detail trestu z odkazu oznámení (`?view=rewards&arg=tresty`). */
+function TrestZOznameni() {
+  const q = useSearchParams();
+  const zAdresy = q?.get('view') === 'rewards' && q.get('arg') === ARG_TRESTY;
+  const [ceka, setCeka] = useState(false);
+  const [otevreny, setOtevreny] = useState<number | null>(null);
+  // Nová adresa (nový objekt parametrů) = nový hluboký odkaz.
+  useEffect(() => { if (zAdresy) setCeka(true); }, [q, zAdresy]);
+  // Data až s odkazem — bez něj si je drží widget Moje tresty (stejná adresa, sdílená mezipaměť).
+  const data = useDataTresty(ceka || otevreny != null ? urlTresty() : null);
+  const items = useMemo(() => data.data?.items ?? [], [data.data]);
+  useEffect(() => {
+    if (!ceka || !data.data) return;
+    setCeka(false);
+    const tr = trestKOtevreni(data.data.items);
+    if (tr) setOtevreny(tr.id);
+  }, [ceka, data.data]);
+  const trest = otevreny != null ? items.find(x => x.id === otevreny) ?? null : null;
+  return <DetailTrestu trest={trest} vsechny={items} onClose={() => setOtevreny(null)} />;
 }

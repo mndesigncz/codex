@@ -107,6 +107,15 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'navic.nabidka.pridat': 'Přidána položka nabídky navíc',
   'navic.nabidka.upravit': 'Upravena položka nabídky navíc',
   'navic.nabidka.smazat': 'Smazána položka nabídky navíc',
+  'tresty.udelit': 'Udělen trest',
+  'tresty.upravit': 'Upraven trest',
+  'tresty.zrusit': 'Zrušen trest',
+  'tresty.ponechat': 'Trest platí i po nesouhlasu',
+  'tresty.vyjadreni': 'Vyjádření k trestu',
+  'tresty.navrh.zahodit': 'Zahozen návrh trestu',
+  'tresty.sazebnik.pridat': 'Přidána položka sazebníku trestů',
+  'tresty.sazebnik.upravit': 'Upravena položka sazebníku trestů',
+  'tresty.sazebnik.smazat': 'Smazána položka sazebníku trestů',
   // docházka (kolo 7: ruční oprava s důvodem)
   'dochazka.upravit': 'Ručně upraven záznam docházky',
   'dochazka.pridat': 'Ručně přidán záznam docházky',
@@ -289,6 +298,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   reward: 'odmeny', wage: 'odmeny', points: 'odmeny', vyplata: 'odmeny',
   // navíc (kolo 9): patří k odměnám — body a prémie
   navic: 'odmeny',
+  // tresty (kolo 10): body dolů a krácení prémie — k odměnám
+  tresty: 'odmeny', penalty: 'odmeny', penalty_type: 'odmeny',
   // týmové výzvy (kolo 8)
   vyzva: 'odmeny',
   // hosté (Managero client)

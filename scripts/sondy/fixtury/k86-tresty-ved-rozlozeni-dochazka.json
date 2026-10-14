@@ -1,0 +1,15 @@
+{
+ "stranka": "vedeni.dochazka",
+ "polozky": [
+  { "id": "souhrn", "widget": "dochazka.souhrn_hodin", "velikost": "M", "nastaveni": { "obdobi": "30_dni" } },
+  { "id": "nastroj", "widget": "nastroj", "velikost": "L" }
+ ],
+ "dostupne": ["dochazka.souhrn_hodin"],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}
