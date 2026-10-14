@@ -133,6 +133,7 @@ export const ZELENE = [
   'k73-sirky',
   'tisk-nahled',
   'ctecka',
+  'k88-ctecka',
   'nakup-seznam',
   'sirka-sklad',
   'k82-sklad-jednotky',

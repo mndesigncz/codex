@@ -28,11 +28,14 @@ import { rozpoznejQr } from '@/lib/kuponQr';
 import OdkazCtecka from './OdkazCtecka';
 import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
 import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
+import CekaNaZaplaceni, { ParovaniHosta } from './CekaNaZaplaceni';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
 
-export default function CardScan({ onToast, onChange }: { onToast: (m: string) => void; onChange?: () => void }) {
+// seznamParovani: false = seznam „Čeká na zaplacení“ kreslí rodič (Příjem ho má vidět i se sbalenou kartičkou);
+// onParovani pak dá rodiči vědět, že se má seznam načíst hned (po skenu, po připsání z účtenky).
+export default function CardScan({ onToast, onChange, seznamParovani = true, onParovani }: { onToast: (m: string) => void; onChange?: () => void; seznamParovani?: boolean; onParovani?: () => void }) {
   const smiPoukaz = useOpravneni().ma('poukazy.uplatnit');
   const [rezim, setRezim] = useState<'karta' | 'poukaz'>('karta');
   const money = useMoney();
@@ -52,6 +55,11 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   // Klíč akce (opakování po výpadku sítě se připíše jednou) a upozornění po akci (vypršelá karta, nevešlá razítka).
   const klicAkce = useKlicAkce();
   const [upoz, setUpoz] = useState<{ expiredCount?: number; lost?: number } | null>(null);
+  // Párování s účtem z pokladny: po skenu a po připsání z účtenky se seznam čekajících načte hned.
+  const [obnovaParovani, setObnovaParovani] = useState(0);
+  const onParovaniRef = useRef(onParovani);
+  onParovaniRef.current = onParovani;
+  useEffect(() => { if (obnovaParovani > 0) onParovaniRef.current?.(); }, [obnovaParovani]);
   // Náhled kuponu z QR nebo kódu, který obsluha ještě neuplatnila.
   const [cp, setCp] = useState<any | null>(null);
   // Uplatnění jde přes okno s náhledem (útrata, varování, ověření věku): KuponUplatnitOkno.
@@ -101,6 +109,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
       setHit(x); setCode(fmt(norm)); setUpoz(null);
+      if (x.parovani) setObnovaParovani(n => n + 1);
     } catch (e: any) { setErr(e.message); setHit(null); }
     setBusy('');
   };
@@ -120,6 +129,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
       klicAkce.hotovo();
       onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setAmount(''); setBill(null); setPredplaceno(''); setUctenka(''); setUpoz({ expiredCount: x.expiredCount, lost: x.lost }); onChange?.();
+      if (action === 'bill') setObnovaParovani(n => n + 1);
     } catch (e: any) {
       klicAkce.pochybe(status);
       setErr(status == null ? 'Nepodařilo se spojit se serverem. Zkontroluj, jestli akce neprošla, a zkus to znovu — nezdvojí se.' : e.message);
@@ -184,6 +194,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               {hit.nextTierAt && <span className="t-meta">do „{hit.nextTierLabel}" ještě {hit.nextTierUnit === 'spend' ? money(Math.max(0, hit.nextTierAt - (hit.spend ?? 0))) : czCount(Math.max(0, hit.nextTierAt - hit.visits), NAVSTEVA)}</span>}
             </div>
           )}
+          {hit.parovani && <ParovaniHosta parovani={hit.parovani} onZmena={() => setObnovaParovani(n => n + 1)} />}
           <RazitkoKarty campaigns={hit.campaigns ?? []} />
           <UpozorneniRazitek expiredCount={upoz?.expiredCount} lost={upoz?.lost} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -219,7 +230,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
           )}
           {hit.bills?.length > 0 && (
             <div>
-              <p className="t-label mb-1.5">Dnešní účty z pokladny</p>
+              <p className="t-label mb-1.5">{hit.parovani ? 'Nebo vyber účet hned' : 'Dnešní účty z pokladny'}</p>
               <div className="flex flex-wrap gap-1.5">
                 {hit.bills.map((bl: any) => (
                   <button key={bl.bill_id} type="button" aria-pressed={bill === bl.bill_id} disabled={bl.awarded}
@@ -265,6 +276,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
       )}
       {cam && !hit && !cp && rezim === 'karta' && <Camera onCode={c => { setCam(false); void resolve(c); }} onForeign={() => setErr('Tohle není QR z Managera (kartička ani kupon). Zkus jiný.')} onError={m => { setCam(false); setErr(m); }} />}
       {err && rezim === 'karta' && <p role="alert" className="note note-danger">{err}</p>}
+      {rezim === 'karta' && seznamParovani && <CekaNaZaplaceni obnovit={obnovaParovani} onToast={onToast} />}
       {uplatnuji && (
         <KuponUplatnitOkno kod={uplatnuji.kod} onZavrit={() => setUplatnuji(null)}
           onHotovo={m => {

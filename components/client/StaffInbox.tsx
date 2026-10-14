@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Card, Chip, EmptyState, ListRow, Menu, Modal, Skeleton, Toast, type ChipTone, type MenuItem } from '../ui';
 import CardScan from './CardScan';
+import CekaNaZaplaceni from './CekaNaZaplaceni';
 import { RES_STATUS } from '@/lib/clientSlots';
 import { TON_REZERVACE, type StavRezervace } from '@/lib/klientPrehled';
 import { czCount, type CzNoun } from '@/lib/czech';
@@ -97,6 +98,7 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
   const beeped = useRef<Set<number>>(new Set());
   const [hlaska, setHlaska] = useState<string | null>(null);
   const [odmitam, setOdmitam] = useState<any | null>(null);
+  const [obnovaParovani, setObnovaParovani] = useState(0);
   const toast = (m: string) => { if (onToast) onToast(m); else setHlaska(m); };
 
   // Nová objednávka, kterou jsme ještě neviděli → krátké pípnutí (kiosk na baru bývá bez očí).
@@ -223,8 +225,10 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
         <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
           <Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
         </summary>
-        <div className="mt-2"><CardScan onToast={toast} onChange={compact ? undefined : reload} /></div>
+        <div className="mt-2"><CardScan onToast={toast} onChange={compact ? undefined : reload} seznamParovani={false} onParovani={() => setObnovaParovani(n => n + 1)} /></div>
       </details>
+      {/* Kartičky naskenované před zaplacením (pokladna Storyous): vidět i se sbalenou kartičkou. */}
+      <CekaNaZaplaceni obnovit={obnovaParovani} onToast={toast} />
       {news.length > 0 && (
         // Bílá karta s počtem v Chipu: tónovaná plocha by na stránce s „Čeká na tebe" byla druhá (DP §6.3).
         <Card pad="none" aria-labelledby="h-nove">
