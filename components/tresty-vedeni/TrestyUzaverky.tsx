@@ -53,23 +53,34 @@ export function TrestyUzaverky({ uzaverka, onZmena }: {
   );
 }
 
-/** Tlačítko „Dát trest" s předvyplněným oknem (manko, výtka). Bez tresty.udelit se nekreslí. */
-export function TrestTlacitko({ predvolby, popisek, nadOkny = true, onUlozeno, className = '' }: {
+/**
+ * Tlačítko „Dát trest" s předvyplněným oknem (manko, výtka). Bez tresty.udelit se nekreslí.
+ * S `vyrizeno` (den a klíč návrhu) zmizí, když za totéž už platný trest je — server by druhý
+ * odmítl („Za tohle už trest je."). Čte stejnou adresu jako sekce Tresty na směně (jedna mezipaměť).
+ */
+export function TrestTlacitko({ predvolby, popisek, nadOkny = true, onUlozeno, vyrizeno, className = '' }: {
   /** Předvolby se čtou až při klepnutí (návrh klíče výtky se mohl mezitím dohledat). */
   predvolby: PredvolbyTrestu | (() => PredvolbyTrestu);
   popisek?: string;
   nadOkny?: boolean;
   onUlozeno?: () => void;
+  vyrizeno?: { day: string; sourceKey: string };
   className?: string;
 }) {
   const t = useT('widgety');
   const { nacteno, ma } = useOpravneni();
   const [okno, setOkno] = useState<PredvolbyTrestu | null>(null);
-  if (!(nacteno && ma('tresty.udelit'))) return null;
+  const smi = nacteno && ma('tresty.udelit');
+  const dne = useTresty(smi && vyrizeno && ma('tresty.zobrazit_tym') ? urlTresty({ scope: 'team', day: vyrizeno.day }) : null);
+  const uzJe = !!vyrizeno && (dne.data?.items ?? []).some(x => x.sourceKey === vyrizeno.sourceKey && x.status === 'plati');
+  if (!smi) return null;
+  // Okno zůstává připojené i po udělení (tlačítko zmizí): drží toast „Trest udělen".
   return (
     <>
-      <Button variant="secondary" size="sm" icon="warning" className={`tap-target ${className}`}
-        onClick={() => setOkno(typeof predvolby === 'function' ? predvolby() : predvolby)}>{popisek ?? t('Dát trest')}</Button>
+      {!uzJe && (
+        <Button variant="secondary" size="sm" icon="warning" className={`tap-target ${className}`}
+          onClick={() => setOkno(typeof predvolby === 'function' ? predvolby() : predvolby)}>{popisek ?? t('Dát trest')}</Button>
+      )}
       <DatTrest open={!!okno} predvolby={okno} nadOkny={nadOkny} onClose={() => setOkno(null)} onUlozeno={() => onUlozeno?.()} />
     </>
   );

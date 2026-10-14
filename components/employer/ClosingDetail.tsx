@@ -375,6 +375,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                     {diff < 0 && c.created_by ? (
                       <div className="mb-1.5 flex justify-end" data-trest-za-manko>
                         <TrestTlacitko popisek={t('Dát trest za manko')} onUlozeno={onChanged}
+                          vyrizeno={{ day: String(c.shift_date ?? c.date).slice(0, 10), sourceKey: `manko:${id}` }}
                           predvolby={{
                             userId: Number(c.created_by), jmeno: c.author_name ?? undefined, day: String(c.shift_date ?? c.date).slice(0, 10), closingId: id,
                             text: textNavrhu({ druh: 'manko', castka: -diff, minuty: null, poznamka: null }, money), sourceKey: `manko:${id}`, druhNavrhu: 'manko',

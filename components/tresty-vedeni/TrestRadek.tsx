@@ -16,14 +16,18 @@ import { fmtDatum } from '@/lib/i18n/format';
 import { Avatar, Button, Chip, ListRow, Menu } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 
-/** Tón a text chipu stavu — texty z lib/tresty (česky) jako klíče t(). */
+/**
+ * Tón a text chipu stavu — texty z lib/tresty (česky) jako klíče t(). „Vzato na vědomí" je u vedení
+ * tlumené, ne zelené: trest vzatý na vědomí není úspěch k oslavě (brief: `bad` jen Nepotvrzeno,
+ * jinak tlumené tóny; Nesouhlasí zůstává čekací — vedení na něj má reagovat).
+ */
 export function chipStavuTrestu(t: PrekladFn, x: Trest): { tone: 'wait' | 'ok' | 'bad' | 'muted'; text: string } {
   const s = stavTrestu(x);
   switch (s.text) {
     case 'Zrušeno': return { tone: s.tone, text: t('Zrušeno') };
     case 'Nesouhlasí': return { tone: s.tone, text: t('Nesouhlasí') };
     case 'Nepotvrzeno': return { tone: s.tone, text: t('Nepotvrzeno') };
-    default: return { tone: s.tone, text: t('Vzato na vědomí') };
+    default: return { tone: 'muted', text: t('Vzato na vědomí') };
   }
 }
 
