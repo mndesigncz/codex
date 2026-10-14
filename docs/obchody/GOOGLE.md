@@ -46,9 +46,11 @@ Ztráta upload klíče se řeší „Request upload key reset" v Play Console (j
 
 **Firebase (jen pro push přes FCM)**: <https://console.firebase.google.com> > nový projekt „managero" > přidej dvě Android aplikace
 (`app.managero.app`, `app.managero.client`) > stáhni dva soubory `google-services.json`. Bez Firebase Analytics a Crashlytics
-(přitáhly by reklamní ID a změnily Data safety). Soubory **nejsou v repu**, jdou jen do GitHub secrets a na server se nahrává
-klíč servisního účtu pro odesílání (`FCM_SERVICE_ACCOUNT_JSON`, base64, jen na hostingu). Bez tohoto kroku aplikace běží, jen
-nepřijímá push.
+(přitáhly by reklamní ID a změnily Data safety). Soubory `google-services.json` **nejsou v repu**, jdou jen do GitHub secrets.
+Na server (Vercel > Environment Variables) patří dvě proměnné přesně s těmito názvy (čte je `lib/nativniPush.ts`):
+`FCM_PROJECT_ID` (Project ID z Firebase > Project settings) a `FCM_SERVICE_ACCOUNT` (Project settings > Service accounts >
+Generate new private key: **celý obsah staženého JSON** jako text, ne base64; zalomení v `private_key` klidně jako `\n`).
+Bez nich aplikace běží, jen nepřijímá push. Všechny proměnné serveru: `APPLE.md`, oddíl 12.
 
 **GitHub secrets** (repo > Settings > Secrets and variables > Actions), pro `MANAGERO` a `CLIENT` zvlášť:
 `ANDROID_KEYSTORE_B64_<APP>` (`base64 -i managero-upload.jks`), `ANDROID_KEYSTORE_PASSWORD_<APP>`, `ANDROID_KEY_ALIAS_<APP>`,
@@ -81,11 +83,12 @@ Create app: název, jazyk **Czech (cs-CZ)**, **App** (ne hra), **Free**, souhlas
 
 1. **První AAB nahraj ručně**: Testing > Internal testing > Create new release > nahraj AAB > Save > Review > Start rollout. Tím
    vznikne podpis aplikace; teprve potom funguje API. Přidej testery (e-maily, do 100). Interní test **nejde do recenze**.
-2. **Odkazy App Links**: Test and release > **App integrity > App signing**: zkopíruj **SHA-256** podpisového klíče. Potom:
-   `node apps/scripts/well-known.mjs assetlinks --sha=managero:AA:BB:…,client:CC:DD:… > assetlinks.json` a ulož na web jako
-   `https://www.managero.app/.well-known/assetlinks.json` (200, bez přesměrování, JSON). Ověření:
+2. **Odkazy App Links**: Test and release > **App integrity > App signing**: zkopíruj **SHA-256** z „App signing key certificate"
+   (klíč Googlu, ne upload klíč) u obou aplikací. Zapiš je do `apps/apps.json` (`android.sha256.managero`, `.client`) a z kořene repa
+   spusť `node apps/scripts/well-known.mjs zapis` (nebo jednorázově `--sha=managero:AA:BB:…,client:CC:DD:…`). Zapíše
+   `public/.well-known/assetlinks.json`; dokud v něm je `{{SHA256_MANAGERO}}` / `{{SHA256_CLIENT}}`, odkazy nefungují a
+   `node scripts/check-well-known.mjs --release` neprojde. Commit, nasazení webu, ověření (200, bez přesměrování):
    `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://www.managero.app&relation=delegate_permission/common.handle_all_urls`.
-   Do `apps/apps.json` (`android.sha256`) otisky také zapiš.
 
 ## 5. App content (u každé aplikace)
 
@@ -120,16 +123,18 @@ Možnost požádat o smazání: **ano** (mazání v aplikaci + webová stránka)
 | Finance | Jiné finanční údaje (sazby, mzdy, tržby a uzávěrky podniku) | ano | ne | povinné pro vedení |
 | Zprávy | Jiné zprávy v aplikaci (chat) | ano | ne | volitelné |
 | | Hodnocení návštěvy (text, vidí ho jen podnik) | ne | ano | volitelné |
-| Fotky a videa | Fotky | ano | ne | volitelné |
-| Zvuk | Hlasové zprávy | ano | ne | volitelné |
-| Soubory | Dokumenty v příloze chatu | ano | ne | volitelné |
+| Fotky a videa | Fotky a videa (účtenky, položky, příloha chatu) | ano | ne | volitelné |
+| Soubory | Dokumenty a jiné soubory v příloze chatu | ano | ne | volitelné |
 | Aktivita v aplikaci | Interakce, auditní záznam, docházka / rezervace, věrnostní deník | ano | ano | povinné |
 | Nákupy | Historie objednávek u podniku (ne nákupy přes Google) | ne | ano | povinné |
 | Zařízení a ID | Token pro push (FCM), IP adresa (omezení pokusů o přihlášení, maže se po dni) | ano | ano | povinné / automaticky |
 | Poloha | Přesná poloha jen při objednávce od stolu se ověří v okamžiku a neukládá (ukládá se vzdálenost) | ne | ano (přiznej konzervativně) | volitelné |
 | Kontakty, kalendář, zdraví | nic | ne | ne | |
 
-Platební údaje se nesbírají (karta je jen u Stripe na webu, v obalu se Stripe nenačte). Formulář **změň po každé nové funkci**
+**Zvuk se nesbírá**: aplikace nenahrává (žádné oprávnění `RECORD_AUDIO`, u client je výslovně odebrané). Zvukový soubor jde do
+chatu poslat jen jako obecnou přílohu ze zařízení, proto spadá pod „Soubory". Kdybyste chtěli být přísnější, přiznejte
+Zvuk > Jiné zvukové soubory se stejným účelem. Platební údaje se nesbírají (karta je jen u Stripe na webu, v obalu se Stripe
+nenačte). Formulář **změň po každé nové funkci**
 (např. analytika, veřejné recenze).
 
 ## 6. Listing (texty a grafika)
@@ -138,8 +143,8 @@ Vše je v `apps/play-store/<app>/metadata/android/<cs-CZ|en-US>/`: `title.txt` (
 `full_description.txt` (do 4000), `changelogs/default.txt`, `images/icon.png` (512x512), `images/featureGraphic.png` (1024x500),
 `images/phoneScreenshots/`, `sevenInchScreenshots/`, `tenInchScreenshots/` (po vygenerování skriptem). Kontrola: 
 `node apps/scripts/kontrola-listingu.mjs --jen=play --release`. Pravidla Google: žádné emoji, ceny, „zdarma", slevy, superlativy
-a zmínky jiné platformy; popis nesmí slibovat funkci, která v buildu není (porovnej s `CHECKLIST.md`). Rozhraní je zatím jen česky
-a anglický popis to říká.
+a zmínky jiné platformy; popis nesmí slibovat funkci, která v buildu není (porovnej s `CHECKLIST.md`). Rozhraní se řídí jazykem
+telefonu (čeština, angličtina, němčina, slovenština, polština; mimo češtinu strojový překlad), popisy to říkají.
 
 Snímky (ne v gitu): `node apps/scripts/snimky.mjs --app=vse --obchod=play --base=http://localhost:3505` (postup serveru je v
 `APPLE.md`, oddíl 6). Telefon 1080x2160, tablet 7" 1200x1920, tablet 10" 1600x2560.
@@ -181,7 +186,7 @@ Bez fastlane vše vyplníš a nahraješ ručně v Play Console ze souborů v `ap
 | Platby mimo Play Billing nebo navádění k platbě | v obalu žádné ceny ani odkazy na platbu (server vrací 403), v listingu a snímcích také ne |
 | Uživatelský obsah bez nahlášení a blokace | nahlášení zprávy, smazání zprávy, blokace v chatu (Managero) |
 | Zbytečná oprávnění | jen dle `po-cap-add.mjs`; zkontroluj sloučený manifest |
-| Minimální funkčnost („jen WebView") | push, sdílení, skener QR, Face ID, App Links + skutečně použitelný obsah po přihlášení |
+| Minimální funkčnost („jen WebView") | push, sdílení souborů, skener QR (Naskenovat) a kód podniku, karta bez sítě, odkazy v Custom Tabs, App Links + skutečně použitelný obsah po přihlášení (Face ID neuvádět, přepínač v Nastavení zatím není) |
 | Zavádějící metadata | žádné superlativy, ceny a funkce, které nejsou; žádné cizí logo |
 | Pád nebo ANR při startu, offline chyba | `offline.html` přes `errorPath`, Pre-launch report, zkouška bez sítě |
 | Zastaralý targetSdk, 16 KB stránky | targetSdk 36 nastaví skript; Capacitor 8 a aktuální AGP 16 KB splňují, ověř v Play Console |

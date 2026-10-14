@@ -52,10 +52,13 @@ developer.apple.com > Certificates, Identifiers & Profiles:
 2. Totéž pro `app.managero.client` (popis `Managero client`): **Push Notifications**, **Associated Domains**.
 3. **Sign in with Apple** zatím NEzaškrtávej. Aplikace přihlašuje jen e-mailem a heslem, takže guideline 4.8 Sign in with Apple
    nevyžaduje. Povinné by se stalo, až by přibylo přihlášení Googlem nebo Facebookem.
-4. **Klíč pro push (APNs)**: Keys > **+** > zaškrtni *Apple Push Notifications service (APNs)* > stáhni `.p8` (jednou!). Jeden klíč
-   obslouží obě aplikace. Do prostředí serveru (Vercel > Settings > Environment Variables) přidej `APNS_KEY_ID`, `APNS_TEAM_ID`
-   a obsah klíče do `APNS_PRIVATE_KEY`. Server rozliší aplikaci podle bundle ID (`apns-topic`). Bez tohoto kroku push v iOS
-   nefunguje (aplikace se chová normálně, jen bez oznámení).
+4. **Klíč pro push (APNs)**: Keys > **+** > zaškrtni *Apple Push Notifications service (APNs)*, prostředí **Sandbox & Production**
+   > stáhni `.p8` (jednou!). Jeden klíč obslouží obě aplikace i obě prostředí. Do prostředí serveru (Vercel > Settings >
+   Environment Variables, Production) přidej přesně tyhle názvy (čte je `lib/nativniPush.ts`):
+   `APNS_KEY_ID` (10 znaků z názvu klíče), `APNS_TEAM_ID` (Team ID) a `APNS_KEY_P8` (celý obsah souboru `.p8` včetně řádků
+   `-----BEGIN PRIVATE KEY-----`; zalomení klidně jako `\n`). Volitelně `APNS_TOPIC_MANAGERO` a `APNS_TOPIC_CLIENT`, jen kdyby se
+   bundle ID lišilo od `app.managero.app` / `app.managero.client`. Bez těchto proměnných push v iOS nefunguje (aplikace se chová
+   normálně, jen bez oznámení). Seznam všech proměnných: oddíl 12.
 5. Certifikáty podpisu nemusíš zakládat ručně: v Xcode stačí „Automatically manage signing" (krok 4).
 
 ## 3. Záznamy v App Store Connect (pro obě aplikace)
@@ -94,7 +97,11 @@ Co `po-cap-add.mjs` doplní (nemusíš nic ručně v Info.plist):
 - App Transport Security zapnuté bez výjimek;
 - **usage strings** česky a anglicky (`cs.lproj` a `en.lproj/InfoPlist.strings`): kamera, poloha při používání, Face ID,
   a u Managero navíc fotky. Nic, co aplikace nepoužívá;
-- `App.entitlements`: Push (`aps-environment`), Associated Domains `applinks:www.managero.app`, `webcredentials:www.managero.app`;
+- `App.entitlements`: Push (`aps-environment`), Associated Domains `applinks:www.managero.app`, `webcredentials:www.managero.app`.
+  `aps-environment` je `development` (Run z Xcode, sandbox APNs). Při **exportu archivu** pro App Store Connect / TestFlight ho Xcode
+  podle distribučního profilu přepíše na `production` sám; ladicí binárka pošle serveru `env: 'sandbox'` (podle
+  `window.Capacitor.DEBUG`), vydaná `production`, takže push funguje v obou. Kdo podepisuje **ručně** distribučním profilem
+  (fastlane match bez automatiky), spustí `APS_ENV=production node ../scripts/po-cap-add.mjs <app> ios`;
 - `PrivacyInfo.xcprivacy` (bez sledování, sbíraná data podle oddílu 7);
 - v Xcode projektu: soubory zařazené, `TARGETED_DEVICE_FAMILY` (client jen iPhone), iOS 15+, bez Mac Catalyst a Vision Pro, verze.
 
@@ -105,10 +112,11 @@ V Xcode (otevřený `App.xcodeproj`), target **App**:
 2. **Signing & Capabilities**: vyber **Team**, nech zaškrtnuté *Automatically manage signing*. Capabilities Push Notifications
    a Associated Domains už jsou v souboru entitlements. Pokud je Xcode nabídne přidat, přidej.
 3. **Universal links (soubor na webu)**: server musí na `https://www.managero.app/.well-known/apple-app-site-association` vracet
-   JSON s tvým Team ID, bez přesměrování a s `Content-Type: application/json`. Ověř:
-   `curl -I https://www.managero.app/.well-known/apple-app-site-association` (200, bez přesměrování) a potom
-   `https://app-site-association.cdn-apple.com/a/v1/www.managero.app` (cache Applu, po změně čekej hodiny). Generátor obsahu:
-   `node apps/scripts/well-known.mjs aasa <TEAMID>`.
+   JSON s tvým Team ID, bez přesměrování a s `Content-Type: application/json`. V repu je soubor se zástupným polem `{{TEAM_ID}}`
+   (s ním odkazy nefungují). Doplnění z kořene repa: `node apps/scripts/well-known.mjs zapis --team=<TEAMID>` (zapíše
+   `public/.well-known/apple-app-site-association` i `assetlinks.json`, vypíše, co ještě chybí), commit a nasazení webu.
+   Ověř: `curl -I https://www.managero.app/.well-known/apple-app-site-association` (200, bez přesměrování) a potom
+   `https://app-site-association.cdn-apple.com/a/v1/www.managero.app` (cache Applu, po změně čekej hodiny).
    Pozor na `www`: `managero.app` bez `www` jen přesměrovává a universal link by nefungoval. `NEXTAUTH_URL` musí být
    `https://www.managero.app`, jinak vytištěné QR kódy míří na apex a nikdy neotevřou aplikaci.
 4. **Zkouška na telefonu**: připoj iPhone kabelem, vyber ho nahoře místo simulátoru, Run. Projdi kontrolní seznam níž.
@@ -116,10 +124,15 @@ V Xcode (otevřený `App.xcodeproj`), target **App**:
 Zkouška na skutečném zařízení (simulátor push ani kameru neumí věrně):
 - přihlášení, **úplné zabití aplikace do 2 sekund po přihlášení a znovu spuštění**: musíš zůstat přihlášený (cookie se na disk
   zapisuje se zpožděním; když se ztrácí, hlas to hned, řeší se to jinak);
-- push: přijde token na server (`/api/native/push`), doručí se oznámení, klepnutí otevře správnou stránku;
-- sken QR (Managero: karta hosta u kasy; client: QR stolu a kód podniku);
-- karta bez sítě (client), režim v letadle při studeném startu ukáže „Nejsi připojený" a ne bílou obrazovku;
-- poloha při objednávce (client), odhlášení, smazání účtu (až je v aplikaci), otáčení iPadu, přepnutí do pozadí a zpět.
+- push: přijde token na server (`/api/native/push`, z Xcode s `env: sandbox`), doručí se oznámení, klepnutí otevře správnou stránku;
+- sken QR (Managero: karta hosta u kasy; client: tlačítko **Naskenovat** uprostřed spodního doku, QR stolu i podniku) a
+  **Zadat kód podniku** (`cafe-demo`);
+- karta bez sítě (client): otevři Moje (kartička se uloží), zapni režim v letadle, aplikaci zabij a spusť: „Nejsi připojený"
+  a pod tím kartička s QR a kódem (ne bílá obrazovka);
+- soubory: export CSV nebo kartička jako obrázek otevře sdílecí list se souborem (Uložit do Souborů, Fotky); odkaz ven
+  (mapa, dodavatel) se otevře v prohlížeči uvnitř aplikace, ne v Safari; fotka účtenky ve správě se otevře přes sdílecí list;
+- Managero: „Vytvořit účet" na přihlášení vede na „Účet podniku založíte na webu" (bez odkazu na web a platbu);
+- poloha při objednávce (client), odhlášení, smazání účtu (Nastavení / Moje > Účet a soukromí), otáčení iPadu, přepnutí do pozadí a zpět.
 
 ## 5. Archivace a TestFlight
 
@@ -158,8 +171,7 @@ propojená s identitou (účet) a slouží jen k funkci aplikace (*App Functiona
 | Contact Info: Name | jméno účtu | ano | ano |
 | Contact Info: Email Address | e-mail (přihlášení, e-maily) | ano | ano |
 | Contact Info: Phone Number | telefon, nepovinný | ano | ano |
-| User Content: Photos or Videos | fotky účtenek a položek, příloha chatu | ano | ne |
-| User Content: Audio Data | hlasové zprávy v chatu | ano | ne |
+| User Content: Photos or Videos | fotky účtenek a položek, fotka nebo video v příloze chatu | ano | ne |
 | User Content: Other User Content | zprávy chatu, nápady, úkoly, poznámky k rezervaci a objednávce, hodnocení | ano | ano |
 | Identifiers: User ID | číslo účtu | ano | ano |
 | Identifiers: Device ID | token pro push (APNs) | ano | ano |
@@ -167,7 +179,10 @@ propojená s identitou (účet) a slouží jen k funkci aplikace (*App Functiona
 | Financial Info: Other Financial Info | hodinové sazby zaměstnanců, tržby a uzávěrky podniku | ano | ne |
 | Location: Precise Location | poloha při objednávce od stolu se jen ověří a neukládá (ukládá se vzdálenost), u Managero poloha podniku | ano | ano |
 
-Platební údaje (Payment Info) se **nesbírají**: karta je jen u Stripe na webu, v obalu se Stripe nenačte.
+**Audio Data se nesbírají**: aplikace nenahrává zvuk a nemá oprávnění k mikrofonu (`NSMicrophoneUsageDescription` není).
+Zvukový soubor jde do chatu poslat jen jako obecnou přílohu ze zařízení (spadá pod Other User Content); kdybyste chtěli být
+přísnější, přiznejte Audio Data se stejným účelem. Platební údaje (Payment Info) se **nesbírají**: karta je jen u Stripe na webu,
+v obalu se Stripe nenačte.
 Diagnostika: žádný crash reporter v repu, serverové logy hostingu (IP): rozhodni s právníkem, zda přiznat *Other Diagnostic Data*.
 Polohu přiznej konzervativně (Apple definice „collection" je těsná). Právní zařazení (kdo je správce a kdo zpracovatel) nechej
 zkontrolovat právníkem. Stejná tabulka je ve `PrivacyInfo.xcprivacy`, kterou vytvoří `po-cap-add.mjs`.
@@ -232,9 +247,9 @@ Po schválení vydáš ručně (u větších změn *Phased release*). Po schvál
 
 | Guideline | Riziko u nás | Prevence |
 |---|---|---|
-| 4.2 Minimum functionality | obal nad webem | nativní push, skener QR, karta bez sítě, universal links, sdílení, Face ID zámek (client), push, foto dokladů a kiosk na iPadu (Managero); vyjmenováno v poznámkách pro recenzenta |
+| 4.2 Minimum functionality | obal nad webem | nativní push, skener QR (Naskenovat) a kód podniku, karta bez sítě z úložiště aplikace, universal links, sdílení souborů přes sdílecí list, odkazy v prohlížeči uvnitř aplikace (client); push, skener karet u kasy, foto dokladů a kiosk na iPadu (Managero); vyjmenováno v poznámkách pro recenzenta. Face ID zámek v popisech NEuvádět, dokud nebude přepínač v Nastavení (most `zamek` je hotový, UI ne) |
 | 2.1 App completeness | demo účet nefunguje, prázdný adresář, server nedostupný | oddíl 9, projdi poznámky jako recenzent na čistém telefonu |
-| 3.1.1 / 3.1.3 Platby | předplatné Managero se kupuje přes Stripe na webu | v obalu žádné ceny, tlačítka ani odkazy na platbu (server vrací 403, UI je skryté), poznámka B2B (3.1.3(c)); u client žádné platby (3.1.3(e)). **Riziko zůstává**: samoobslužná registrace mikropodniku může recenzent číst jako prodej jednotlivci. Rozhodnutí majitele před odesláním |
+| 3.1.1 / 3.1.3 Platby | předplatné Managero se kupuje přes Stripe na webu | v obalu žádné ceny, tlačítka ani odkazy na platbu (server vrací 403, UI je skryté), poznámka B2B (3.1.3(c)); u client žádné platby (3.1.3(e)). Založení podniku v obalu není: `/register` vede na „Účet podniku založíte na webu" bez odkazu a `/api/register` z obalu vrací 403 (3.1.3(f)); poznámky pro recenzenta to vysvětlují |
 | 5.1.1(v) Mazání účtu | musí být v aplikaci | oddíl 9, jmenuj v poznámkách, kde to je |
 | 5.1.1(i) Zásady soukromí | stránky musí být veřejné | `/soukromi`, `/podminky`, `/podpora`; právník zkontroluje text |
 | 5.1.1 Účel oprávnění | prázdné nebo obecné texty | konkrétní věty (`po-cap-add.mjs`), kamera a poloha až při použití |
@@ -249,3 +264,25 @@ Po schválení vydáš ručně (u větších změn *Phased release*). Po schvál
 
 Když přijde zamítnutí: odpověz v **Resolution Center** s odkazem na konkrétní krok a snímek. U 4.2 nevyvolávej spor, raději
 doplň nativní funkci nebo lépe popiš existující. Nová verze nepotřebuje nový zápis metadat, jen build.
+
+## 12. Proměnné prostředí serveru pro aplikace (Vercel > Settings > Environment Variables)
+
+Nic z toho nepatří do repa. Názvy jsou přesně ty, které čte kód; jiný název (třeba `APNS_PRIVATE_KEY`) se tiše ignoruje.
+
+| Proměnná | Co | Kde vzít | Čte |
+|---|---|---|---|
+| `APNS_KEY_ID` | ID klíče APNs (10 znaků) | developer.apple.com > Keys | `lib/nativniPush.ts` |
+| `APNS_TEAM_ID` | Team ID | Membership details | `lib/nativniPush.ts` |
+| `APNS_KEY_P8` | celý obsah `AuthKey_XXXX.p8` | stažený klíč (jednou) | `lib/nativniPush.ts` |
+| `APNS_TOPIC_MANAGERO`, `APNS_TOPIC_CLIENT` | volitelně jiné bundle ID | | `lib/nativniPush.ts` |
+| `FCM_PROJECT_ID` | ID projektu Firebase | Firebase > Project settings | `lib/nativniPush.ts` |
+| `FCM_SERVICE_ACCOUNT` | JSON klíč servisního účtu (celý text, ne base64) | Firebase > Project settings > Service accounts > Generate new private key | `lib/nativniPush.ts` |
+| `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `APPLE_PASS_CERT_P12_BASE64`, `APPLE_PASS_CERT_PASSWORD`, `APPLE_WWDR_CERT_PEM` | karta v Apple Wallet (volitelné; bez nich se tlačítko neukáže) | Identifiers > Pass Type IDs, certifikát .p12, Apple WWDR G4 | `lib/walletKonfig.ts` |
+| `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_WALLET_PRIVATE_KEY` | karta v Google Wallet (volitelné) | Google Pay & Wallet Console, servisní účet | `lib/walletKonfig.ts` |
+| `MODERACE_EMAIL` | kam jde nahlášený obsah (lhůta 24 h); bez něj `FIRMA_EMAIL_PODPORY` | vaše schránka | `lib/moderace.ts` |
+| `FIRMA_NAZEV`, `FIRMA_ICO`, `FIRMA_ADRESA`, `FIRMA_EMAIL_PODPORY`, `FIRMA_REGION_DAT` | údaje provozovatele na právních stránkách | | `lib/firma.ts` |
+| `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL` | `https://www.managero.app` (s `www`) | | odkazy, QR, e-maily |
+| `RESEND_API_KEY`, `EMAIL_FROM` | e-maily (i eskalace nahlášení) | Resend | `lib/email.ts` |
+
+Mimo server (jen na Macu nebo v GitHub secrets): `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`, `REVIEW_*` (fastlane,
+viz `apps/app-store/README.md`), `APS_ENV=production` jen při ručním podepisování.

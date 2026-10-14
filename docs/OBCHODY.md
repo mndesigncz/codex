@@ -28,7 +28,8 @@ Xcode, Gradle) se dělají zvlášť; tady je to, co musí umět server a web, a
    `scripts/check-smazani.mjs` hlídá, že nová tabulka s odkazem na uživatele nebo podnik má rozhodnutí.
 4. **Právní stránky** z jedné konfigurace firmy (`lib/firma.ts`). Bez vyplněných údajů zůstanou viditelná pole `{{NAZEV_FIRMY}}`,
    `{{ICO}}`, `{{ADRESA}}`, `{{EMAIL_PODPORY}}`, `{{REGION_DAT}}` a stránka sama varuje, že jde o návrh.
-5. **Moderace**: nahlášení zprávy a nápadu, blokace uživatele, smazání zprávy, přehled nahlášených v Nastavení (`tym.odebrat`).
+5. **Moderace**: nahlášení zprávy a nápadu, blokace uživatele, smazání zprávy, přehled nahlášených v Nastavení (`tym.odebrat`);
+   každé nahlášení jde e-mailem provozovateli (`MODERACE_EMAIL`, jinak `FIRMA_EMAIL_PODPORY`) a do správy `/admin/nahlaseni` se lhůtou 24 h.
 6. **Hosté**: zapomenuté heslo (token 256 bitů, v databázi jen otisk, platí hodinu, jednou; stejná odpověď pro existující i neexistující e-mail),
    souhlas s novinkami podniků (výchozí NE, opt-in při registraci a v profilu, odhlášení tamtéž), role po přihlášení,
    demo účty `scripts/seed-recenzent.mjs`.
@@ -39,10 +40,11 @@ Xcode, Gradle) se dělají zvlášť; tady je to, co musí umět server a web, a
 ## Co musí udělat člověk
 
 - **Apple Developer** (organizace, D-U-N-S), Team ID do `public/.well-known/apple-app-site-association` (`{{TEAM_ID}}`), klíč APNs `.p8`.
-- **Google Play Console**, otisky podpisových certifikátů do `public/.well-known/assetlinks.json` (`{{SHA256}}`), servisní účet FCM.
+- **Google Play Console**, otisky podpisových certifikátů do `public/.well-known/assetlinks.json` (`{{SHA256_MANAGERO}}`, `{{SHA256_CLIENT}}`;
+  obojí zapíše `node apps/scripts/well-known.mjs zapis --team=… --sha=…`), servisní účet FCM.
 - Před odesláním: `node scripts/check-well-known.mjs --release` (zástupná pole jsou pak chyba).
 - **Právník**: zásady, podmínky, doba reakce na hlášení (podmínky slibují do 24 hodin v pracovní dny), role správce a zpracovatele.
-- **Prostředí (Vercel)**: `FIRMA_NAZEV`, `FIRMA_ICO`, `FIRMA_ADRESA`, `FIRMA_EMAIL_PODPORY`, `FIRMA_REGION_DAT`;
+- **Prostředí (Vercel)**: `FIRMA_NAZEV`, `FIRMA_ICO`, `FIRMA_ADRESA`, `FIRMA_EMAIL_PODPORY`, `FIRMA_REGION_DAT`, `MODERACE_EMAIL`;
   nativní push `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_KEY_P8`, volitelně `APNS_TOPIC_MANAGERO`, `APNS_TOPIC_CLIENT`; `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT`.
   `NEXTAUTH_URL` a `NEXT_PUBLIC_APP_URL` musí být `https://www.managero.app` (QR kódy a odkazy v e-mailech jinak míří na apex).
 - **Migrace**: po nasazení spustit `/api/init` (přidá `users.deleted_at`, `users.terms_accepted_at`, `password_resets`,
@@ -55,8 +57,7 @@ Xcode, Gradle) se dělají zvlášť; tady je to, co musí umět server a web, a
 
 - Registrace hosta dál při existujícím e-mailu odpoví 409 (ověření e-mailem chybí); omezeno limitem podle IP.
 - Blokace skryje zprávy i vedení podniku (vedení lze nahlásit správci platformy).
-- Odkazy „otevřít jako host“ ve správě klienta (`window.open('/client/…')`) vedou v provozní aplikaci na zavřenou část webu
-  (brána je přesměruje na úvod). Obal je má otevírat v systémovém prohlížeči (`allowNavigation` jen pro stránky aplikace,
-  `lib/stahni.ts otevriVeSystemu`); veřejné stránky podniků jsou přístupné i bez přihlášení.
+- Odkaz „Stránka pro hosty“ ve správě klienta otevírá celou adresu přes `otevriVeSystemu` (v obalu prohlížeč v aplikaci); obecně
+  nová okna a cizí odkazy v obalu řeší most (`cilOdkazu`, plugin Browser).
 - Účet vlastníka podniku se z webu (`/smazat-ucet`) nesmaže; to jde jen v aplikaci, kde se potvrzuje i smazání podniku.
 - `@capacitor/*` se do webu neimportuje; existenci pluginů (`window.Capacitor.Plugins`) při `server.url` je třeba ověřit na zařízení.
