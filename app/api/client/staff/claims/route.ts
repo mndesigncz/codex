@@ -78,8 +78,14 @@ export async function PATCH(req: NextRequest) {
   const p = await ensureProfile(ctx.teamId);
   if (await jeClenBlokovan(ctx.teamId, host.id)) return NextResponse.json({ error: `${host.name} je ve věrnostním programu zablokovaný. Body ani razítka se mu nepřipisují.` }, { status: 403 });
   await join(host.id, ctx.teamId);
+  // Zábor jako u samočinného párování: když se zrovna páruje samo, obsluha nepřipíše druhý účet témuž hostovi.
+  const [z] = await sql`UPDATE client_bill_claims SET stav = 'paruji', updated_at = NOW() WHERE id = ${id} AND team_id = ${ctx.teamId} AND stav = 'ceka' RETURNING id` as any[];
+  if (!z) return NextResponse.json({ error: 'Tenhle host se právě páruje s účtem. Obnov seznam.' }, { status: 409 });
   const r = await pripisZUctu({ teamId: ctx.teamId, customer: host, billId, staffId: ctx.meId, profil: p, claimId: id, zdroj: 'vyber' });
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  if (!r.ok) {
+    await sql`UPDATE client_bill_claims SET stav = 'ceka', updated_at = NOW() WHERE id = ${id} AND stav = 'paruji'`;
+    return NextResponse.json({ error: r.error }, { status: r.status });
+  }
   const mena = await menaPodniku(ctx.teamId);
   const veta = vetaSparovano(r.total, r.body, r.kredit, mena.money);
   audit(ctx.teamId, ctx.meId, 'client.parovani', 'client', host.id, `${host.name}: ${veta} (vybrala obsluha)`);

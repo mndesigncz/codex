@@ -93,6 +93,7 @@ export default async function ({ eq, ok }: Testy) {
   ok('vrácení: zrušená nebo vrácená účtenka se nepřipíše', /refunded === true \|\| radek\.deleted === true/.test(jadro));
   ok('ruční cesta používá jádro (scan route, action bill)', scan.includes('pripisZUctu(') && !scan.includes('INSERT INTO client_bill_awards (team_id, bill_id, customer_id, done_at'));
   ok('výběr u čekajícího párování používá jádro', claims.includes('pripisZUctu('));
+  ok('výběr obsluhy si párování zabere (souběh se samočinným párováním nepřipíše dva účty)', /SET stav = 'paruji'[\s\S]*AND stav = 'ceka' RETURNING id[\s\S]*pripisZUctu\(/.test(claims));
   ok('párování běží po každé synchronizaci pokladny', mirror.includes('parujCekajici'));
   ok('sken v podniku s pokladnou založí párování a vynutí synchronizaci na pozadí', scan.includes('zalozParovani(') && scan.includes('after(() => synchronizujPoSkenu'));
   ok('vynucená synchronizace nejde pod 20 s (zámek pokladny)', /Math\.max\(20, Math\.round\(opts\.throttleSec\)\)/.test(mirror));
