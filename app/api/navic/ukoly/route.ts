@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
-import { resolveActingUser } from '@/lib/kioskActing';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import { limitNabidkyVycerpan, seradUkoly, stavUkolu, terminNabidky, urcenoPro, type NabidkaNavic, type UkolNavic } from '@/lib/navic';
-import { obsazenostTerminu, predMigraci, tvarNabidky } from '../_spolecne';
+import { kdoJednaNavic, obsazenostTerminu, predMigraci, tvarNabidky } from '../_spolecne';
 
 // Volitelné úkoly za body (kolo 11): nabídka navíc s opakováním a kapacitou.
 //
@@ -59,7 +58,7 @@ export async function GET(req: NextRequest) {
   const smi = { zapsat: c.role.opravneni.has('navic.zapsat'), nabidka: c.role.opravneni.has('navic.nabidka'), tym: smiTym };
   const tym = q.get('scope') === 'team' && smiTym;
   const den = DEN.test(q.get('day') ?? '') ? q.get('day')! : pragueToday();
-  const kdo = await resolveActingUser(c.meId, typNaUcet(c.role.typ), c.teamId, q.get('actingAs'), req);
+  const kdo = await kdoJednaNavic(c, q.get('actingAs'), req);
   try {
     const nabidky = (await nactiNabidky(c.teamId)).filter(n => tym || urcenoPro(n, kdo));
     const ukoly: UkolNavic[] = [];
@@ -86,7 +85,9 @@ export async function POST(req: NextRequest) {
   const akce = b?.akce;
   if (akce !== 'vzit' && akce !== 'vratit') return chyba('Neznámá akce.', 400);
   const den = DEN.test(b?.day ?? '') ? b.day : pragueToday();
-  const kdo = await resolveActingUser(c.meId, typNaUcet(c.role.typ), c.teamId, b?.actingAs, req);
+  const kdo = await kdoJednaNavic(c, b?.actingAs, req);
+  // Tablet nesmí zabrat úkol sám za sebe — jen za vybraného člověka.
+  if (typNaUcet(c.role.typ) === 'kiosk' && kdo === c.meId) return chyba('Vyber, kdo jsi.', 403);
   try {
     const [n] = await nactiNabidky(c.teamId, offerId);
     if (!n) return chyba('Úkol už v nabídce není.', 404);

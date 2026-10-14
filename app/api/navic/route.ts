@@ -10,7 +10,7 @@ import {
   jeStavNavic, limitNabidkyVycerpan, nabidkaPlatna, normalizujBody, terminNabidky, urcenoPro, normalizujPoznamku, normalizujPremii, posunDni, uznaniPlatne, validujZapis,
 } from '@/lib/navic';
 import { menaPodniku } from '@/lib/menaPodniku';
-import { nactiNavic, obsazenostTerminu, oznamRozhodnuti, oznamUznavajicim, predMigraci, tvarNabidky, tvarNavic, zaborHotovo, zalozOdmenu } from './_spolecne';
+import { kdoJednaNavic, nactiNavic, obsazenostTerminu, oznamRozhodnuti, oznamUznavajicim, predMigraci, tvarNabidky, tvarNavic, zaborHotovo, zalozOdmenu } from './_spolecne';
 
 // „Navíc" (kolo 9, N1): co člověk na směně udělal nad rámec povinností.
 //
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   if (!smiZapsat && !smiTym) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
   const q = req.nextUrl.searchParams;
   const ucet = typNaUcet(c.role.typ);
-  const actingId = await resolveActingUser(c.meId, ucet, c.teamId, q.get('actingAs'), req);
+  const actingId = await kdoJednaNavic(c, q.get('actingAs'), req);
   const scope = q.get('scope') === 'team' && smiTym ? 'team' : 'mine';
   const stav = q.get('status');
   if (stav && !jeStavNavic(stav)) return chyba('Neznámý stav.', 400);
@@ -105,21 +105,8 @@ export async function POST(req: NextRequest) {
   let b: any;
   try { b = await req.json(); } catch { return chyba('Neplatný požadavek.', 400); }
   const ucet = typNaUcet(c.role.typ);
-  let actingId = await resolveActingUser(c.meId, ucet, c.teamId, b?.actingAs, req);
-  // Tablet hned po odchodu: resolveActingUser bere jen odpíchnuté, ale navíc se
-  // píše až po odchodu. Kdo z tohoto podniku odešel za poslední 3 hodiny, smí.
-  const chceZa = Number(b?.actingAs);
-  if (ucet === 'kiosk' && actingId === c.meId && Number.isInteger(chceZa) && chceZa > 0 && chceZa !== c.meId
-    && c.teamId && await jeUcetTabletu(c.meId, c.teamId) && await jeClenem(chceZa, c.teamId)) {
-    try {
-      const [r] = await sql`
-        SELECT 1 AS ok FROM time_entries
-        WHERE employee_id = ${chceZa} AND (team_id = ${c.teamId} OR team_id IS NULL)
-          AND clock_out IS NOT NULL AND clock_out >= NOW() - INTERVAL '3 hours'
-        LIMIT 1`;
-      if (r) actingId = chceZa;
-    } catch { /* bez docházky zůstane tablet sám za sebe */ }
-  }
+  // Tablet: odpíchnutý, nebo kdo odešel za poslední 3 hodiny (kdoJednaNavic).
+  const actingId = await kdoJednaNavic(c, b?.actingAs, req);
   // Za koho se zapisuje: sám za sebe (i tablet za vybraného), nebo vedení za člena.
   const cilovy = Number.isInteger(Number(b?.userId)) && Number(b.userId) > 0 ? Number(b.userId) : actingId;
   if (cilovy !== actingId && !smiUznat) return chyba('Zapsat navíc za jiného člověka smí jen ten, kdo navíc uznává.', 403);

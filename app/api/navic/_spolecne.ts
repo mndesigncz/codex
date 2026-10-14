@@ -4,6 +4,9 @@
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { typNaUcet } from '@/lib/opravneni';
+import { jeUcetTabletu, resolveActingUser } from '@/lib/kioskActing';
+import { jeClenem } from '@/lib/tenant';
 import { oznameniNovyZapis, oznameniRozhodnuti, rozsahTerminu, type NabidkaNavic, type Navic, type StavNavic } from '@/lib/navic';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -198,5 +201,29 @@ export async function zaborHotovo(teamId: number, offerId: number, termin: strin
       ON CONFLICT (offer_id, termin, user_id) DO UPDATE SET status = 'hotovo', work_id = ${workId}, updated_at = NOW()`;
   } catch (e) {
     if (!predMigraci(e)) console.error('navic: zábor hotovo', e);
+  }
+}
+
+/**
+ * Za koho jedná tablet u „navíc" a úkolů za body: jako resolveActingUser (jen
+ * odpíchnutý), a navíc kdo z tohoto podniku odešel za poslední 3 hodiny — navíc
+ * se zapisuje a úkoly za body se dodělávají právě po odchodu (souhrn na tabletu).
+ * Mimo tablet vždy volající.
+ */
+export async function kdoJednaNavic(c: { meId: number; teamId: number; role: { typ: string } }, actingAs: unknown, req: Request): Promise<number> {
+  const ucet = typNaUcet(c.role.typ as any);
+  const actingId = await resolveActingUser(c.meId, ucet, c.teamId, actingAs, req);
+  const chceZa = Number(actingAs);
+  if (ucet !== 'kiosk' || actingId !== c.meId || !Number.isInteger(chceZa) || chceZa <= 0 || chceZa === c.meId) return actingId;
+  if (!c.teamId || !(await jeUcetTabletu(c.meId, c.teamId)) || !(await jeClenem(chceZa, c.teamId))) return actingId;
+  try {
+    const [r] = await sql`
+      SELECT 1 AS ok FROM time_entries
+      WHERE employee_id = ${chceZa} AND (team_id = ${c.teamId} OR team_id IS NULL)
+        AND clock_out IS NOT NULL AND clock_out >= NOW() - INTERVAL '3 hours'
+      LIMIT 1`;
+    return r ? chceZa : actingId;
+  } catch {
+    return actingId;
   }
 }

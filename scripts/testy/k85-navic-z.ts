@@ -66,7 +66,8 @@ export default function ({ eq, ok }: Testy) {
   ok('katalog: rychlý filtr obdobi (tento / minulý měsíc)', !!w && w.rychlyFiltr === 'obdobi' && (w.nastaveni ?? []).some(n => n.klic === 'obdobi' && n.typ === 'vyber' && n.moznosti.map(m => m.id).join(',') === 'tento,minuly'));
   const domu = stranka('zamestnanec.domu')!.vychozi['typ:zamestnanec'] ?? [];
   const iDomu = domu.findIndex(x => x.w === 'moje-smeny.navic');
-  eq('Domů: Navíc hned za Nejbližší směnou (M)', [iDomu > 0 && domu[iDomu - 1].w, domu[iDomu]?.s], ['moje.nejblizsi_smena', 'M']);
+  // Kolo 11: mezi směnou a Navíc jsou Úkoly za body (obojí věc konce směny, úkoly za body první).
+  eq('Domů: Navíc hned za Úkoly za body, ty hned za Nejbližší směnou (M)', [iDomu > 1 && domu[iDomu - 1].w, iDomu > 1 && domu[iDomu - 2].w, domu[iDomu]?.s], ['ukoly.za_body', 'moje.nejblizsi_smena', 'M']);
   const odmeny = stranka('zamestnanec.odmeny')!.vychozi['typ:zamestnanec'] ?? [];
   eq('Odměny: Navíc jako velká sekce za nástrojem', [odmeny.find(x => x.w === 'moje-smeny.navic')?.s, odmeny.findIndex(x => x.w === 'moje-smeny.navic') > odmeny.findIndex(x => x.w === 'nastroj')], ['L', true]);
   ok('Moje směny: Navíc mezi doporučenými', stranka('zamestnanec.moje_smeny')!.doporucene.includes('moje-smeny.navic'));

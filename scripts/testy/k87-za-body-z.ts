@@ -60,7 +60,7 @@ export default function ({ eq, ok }: Testy) {
   const domu = stranka('zamestnanec.domu')!.vychozi['typ:zamestnanec']!;
   const iZaBody = domu.findIndex(p => p.w === 'ukoly.za_body');
   const iSmena = domu.findIndex(p => p.w === 'moje.nejblizsi_smena');
-  ok('Domů: Úkoly za body (M) ve výchozím rozložení hned u Nejbližší směny (nejvýš o jedno místo dál — za Navíc)', iZaBody > iSmena && iZaBody - iSmena <= 2 && domu[iZaBody].s === 'M');
+  ok('Domů: Úkoly za body (M) ve výchozím rozložení hned za Nejbližší směnou, před Navíc', iZaBody === iSmena + 1 && domu[iZaBody].s === 'M' && iZaBody < domu.findIndex(p => p.w === 'moje-smeny.navic'));
   ok('Domů: Úkoly za body nad Úkoly na dnes (vidět bez posouvání)', iZaBody < domu.findIndex(p => p.w === 'ukoly.dnes'));
   const smena = stranka('kiosk.smena')!.vychozi['typ:kiosk']!;
   ok('Tablet: Úkoly za body ve výchozí Směně', smena.some(p => p.w === 'ukoly.za_body'));
