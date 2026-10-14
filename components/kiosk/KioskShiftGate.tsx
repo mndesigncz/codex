@@ -32,7 +32,9 @@ import { apiMessage, okJson } from '@/lib/api';
 import { URL_NAVIC, type NabidkaNavic } from '@/lib/navic';
 import { NabidkaChipy } from '../navic/NabidkaChipy';
 import { ZapsatNavic } from '../navic/ZapsatNavic';
-import { obnovNavic, urlNavicMine, useDataNavic } from '../navic/data';
+import { obnovNavic, urlNavicMine, urlUkolyZaBody, useDataNavic, useUkolyZaBody } from '../navic/data';
+import { nastavOsobuTabletu } from '../navic/osobaTabletu';
+import { UkolyZaBody } from '../navic/UkolyZaBody';
 
 export interface RosterMember {
   id: number;
@@ -371,6 +373,11 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   useEffect(() => { activeRef.current = active; }, [active]);
+  // Kolo 11: widget „Úkoly za body" na Směně ukazuje úkoly vybraného člověka — přes malé úložiště
+  // (components/navic/osobaTabletu), ať widget nemusí tahat tenhle soubor (bcrypt, fronta) ani provider.
+  const vyzadejOsobu = useCallback(async () => { const a = await requireActive(); return a ? { id: a.id, jmeno: a.name } : null; }, [requireActive]);
+  useEffect(() => { nastavOsobuTabletu(active ? { id: active.id, jmeno: active.name } : null, vyzadejOsobu); }, [active, vyzadejOsobu]);
+  useEffect(() => () => nastavOsobuTabletu(null, null), []);
 
   // ---- Bez internetu: fronta a její odeslání ----
   const maOtisk = useCallback((id: number) => !!otisky.current[String(id)], []);
@@ -981,6 +988,10 @@ export function SouhrnPoOdchodu() {
   // kdo právě odešel (actingAs = jeho id, nikdy bez něj), „Napsat…" otevře okno s klávesnicí tabletu.
   // Nabídka se načte až s otevřeným souhrnem (jedna odpověď /api/navic za vybraného člověka).
   const navic = useDataNavic(souhrn ? urlNavicMine(souhrn.id) : null);
+  // Kolo 11: úkoly za body toho, kdo odešel (UkolyZaBody s actingAs, jen „Hotovo" — po směně se nic nebere).
+  // Holé pilulky z /api/navic zůstávají jen jako záloha, kdyby /api/navic/ukoly nic nevrátilo (starší server, chyba).
+  const zaBody = useUkolyZaBody(souhrn ? urlUkolyZaBody(souhrn.id) : null);
+  const ukolyZaBody = zaBody.data ?? [];
   const [navicOkno, setNavicOkno] = useState(false);
   const [navicZapisuji, setNavicZapisuji] = useState<number | null>(null);
   const [navicHotovo, setNavicHotovo] = useState<string | null>(null);
@@ -1052,8 +1063,16 @@ export function SouhrnPoOdchodu() {
             ) : (
               <>
                 <p className="t-card">{t('Udělal(a) jsi dnes něco navíc?')}</p>
-                <p className="t-meta mt-0.5 text-pretty">{t('Klepni na položku, nebo to napiš — vedení to uvidí a může to ocenit.')}</p>
-                {navic.data && navic.data.nabidka.length > 0 && (
+                {ukolyZaBody.length > 0 ? (
+                  <>
+                    <p className="t-meta mt-0.5 text-pretty">{t('Úkoly za body: klepni na Hotovo u toho, co jsi udělal(a), nebo napiš vlastní věc.')}</p>
+                    <div className="mt-2" data-za-body-tablet>
+                      <UkolyZaBody ukoly={ukolyZaBody} actingAs={souhrn.id} jmeno={souhrn.jmeno} poOdchodu velke
+                        onZapsano={item => { setZastaveno(true); setNavicHotovo(item.status === 'uznano' ? t('Zapsáno a uznáno: +{n} b. Díky!', { n: item.points ?? 0 }) : t('Zapsáno, díky! Vedení to uzná.')); }} />
+                    </div>
+                  </>
+                ) : <p className="t-meta mt-0.5 text-pretty">{t('Klepni na položku, nebo to napiš — vedení to uvidí a může to ocenit.')}</p>}
+                {ukolyZaBody.length === 0 && navic.data && navic.data.nabidka.length > 0 && (
                   <NabidkaChipy className="mt-3" nabidka={navic.data.nabidka} dnesniZapisy={navic.data.items.filter(z => z.day === dnes)}
                     vybrane={navicZapisuji} onVyber={n => void zapisZNabidky(n)} money={money} velke />
                 )}

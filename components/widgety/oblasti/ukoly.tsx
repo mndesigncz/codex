@@ -23,12 +23,15 @@
 //  - ukoly.tyden — týdenní tabule (TaskWeekBoard), přetahuje se jen vlastní zadané nebo
 //    s ukoly.upravit, odškrtává se jen dnešek a dřív.
 //  - ukoly.splneno_dnes — co dnes kdo dokončil (completedAt z API, kolo 69).
+//  - ukoly.za_body — volitelné úkoly za extra body (kolo 11, balík Z); komponenta žije
+//    v components/navic/UkolyZaBodyWidget (sdílí okno Zapsat navíc a data /api/navic/ukoly).
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 import { Chip, ListRow, Stat } from '../../ui';
 import { Icon } from '../../Icons';
 import TaskWeekBoard from '../../TaskWeekBoard';
+import { UkolyZaBodyWidget } from '../../navic/UkolyZaBodyWidget';
 import { PrilozFoto } from '../../ukoly/PrilozFoto';
 import { useCurrency } from '../../CurrencyProvider';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
@@ -492,4 +495,5 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'ukoly.podle_lidi': PodleLidi,
   'ukoly.tyden': Tyden,
   'ukoly.splneno_dnes': SplnenoDnes,
+  'ukoly.za_body': UkolyZaBodyWidget,
 };

@@ -166,5 +166,6 @@
   "{n} z {celkem} načtených záznamů odpovídá filtru.": "{n} von {celkem} geladenen Einträgen passen zum Filter.",
   "Organizace": "Organisation",
   "Nastavení organizace": "Organisationseinstellungen",
-  "Sdílení mezi podniky": "Teilen zwischen Betrieben"
+  "Sdílení mezi podniky": "Teilen zwischen Betrieben",
+  "{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}": "{n, plural, one {# Aufgabe für Punkte offen} other {# Aufgaben für Punkte offen}}"
 }

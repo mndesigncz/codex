@@ -46,7 +46,7 @@ export function prelozChybu(t: PrekladFn, chyba: string): string {
  * (na 320 px v polštině by „Zaskočit za kolegu na směnu · 50 b · 300 Kč" jinak přetekl).
  * Vyčerpaný denní limit pilulku vypne a řekne proč.
  */
-export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyber, money, velke = false, pas = false, label, className = '' }: {
+export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyber, money, velke = false, pas = false, obsazene, label, className = '' }: {
   nabidka: readonly NabidkaNavic[];
   /** Dnešní zápisy člověka — kvůli limitu za den (limitNabidkyVycerpan). */
   dnesniZapisy?: readonly Pick<Navic, 'offerId' | 'status'>[];
@@ -62,6 +62,11 @@ export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyb
    * pod „Zobrazit vše". Jinde (okno, velká karta, tablet) se pilulky zalamují.
    */
   pas?: boolean;
+  /**
+   * Úkoly za body, které jsou dnes plné (kapacita, kolo 11 — `obsazeneNabidky` z /api/navic/ukoly):
+   * pilulka se vypne a řekne „Obsazeno". Vybraná (úprava vlastního zápisu) zůstává zapnutá.
+   */
+  obsazene?: ReadonlySet<number>;
   label?: ReactNode;
   className?: string;
 }) {
@@ -72,16 +77,17 @@ export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyb
       {label && <p className="t-label mb-1.5">{label}</p>}
       <div className={pas ? 'flex gap-2 overflow-x-auto scroll-fade-x scrollbar-none snap-x snap-proximity -mx-1 px-1 py-0.5' : 'flex flex-wrap gap-2'}>
         {nabidka.map(n => {
-          const vycerpano = limitNabidkyVycerpan(n, dnesniZapisy);
           const je = vybrane === n.id;
+          const plno = !je && !!obsazene?.has(n.id);
+          const vycerpano = plno || limitNabidkyVycerpan(n, dnesniZapisy);
           return (
             <Button key={n.id} type="button" variant={je ? 'primary' : 'secondary'} size={velke ? 'lg' : 'md'}
               aria-pressed={je} disabled={vycerpano} data-nabidka={n.id}
-              title={vycerpano ? t('Dnes už zapsané (limit {n}× za den).', { n: n.maxPerDay ?? 1 }) : n.description ?? undefined}
+              title={plno ? t('Obsazeno — dnes to už má někdo vzaté.') : vycerpano ? t('Dnes už zapsané (limit {n}× za den).', { n: n.maxPerDay ?? 1 }) : n.description ?? undefined}
               icon={n.autoApprove ? 'check' : 'plus'}
               onClick={() => onVyber(n)}
               className={pas ? 'shrink-0 snap-start min-h-[44px]' : 'max-w-full !whitespace-normal h-auto min-h-[44px] py-2 text-left'}>
-              {popisekNabidky(n, money)}
+              {popisekNabidky(n, money)}{plno && <> · {t('Obsazeno')}</>}
             </Button>
           );
         })}

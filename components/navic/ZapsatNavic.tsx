@@ -29,8 +29,8 @@ import {
   type NabidkaNavic, type Navic,
 } from '@/lib/navic';
 import { NabidkaChipy, prelozChybu } from './NabidkaChipy';
-import { odmenaKratce, predvyplnitText } from './logika';
-import { obnovNavic, urlNavicMine, useDataNavic } from './data';
+import { chybiPovinnaFotka, obsazeneNabidky, odmenaKratce, predvyplnitText, urlUkolyZaBody } from './logika';
+import { obnovNavic, urlNavicMine, useDataNavic, useUkolyZaBody } from './data';
 
 export interface PredvolbyNavic {
   /** RRRR-MM-DD; výchozí dnes. */
@@ -40,6 +40,11 @@ export interface PredvolbyNavic {
   taskId?: number | null;
   text?: string | null;
   offerId?: number | null;
+  /**
+   * Úkol za body, ze kterého se zapisuje („Hotovo" v UkolyZaBody, kolo 11): kdyby v nabídce
+   * z /api/navic chyběl, okno z něj pořád ví body a jestli je fotka povinná.
+   */
+  nabidka?: NabidkaNavic | null;
 }
 
 export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId, jmeno, upravit = null, onUlozeno }: {
@@ -63,6 +68,9 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
   const data = useDataNavic(open ? urlNavicMine(actingAs) : null);
   const nabidka = data.data?.nabidka ?? [];
   const vedeni = data.data?.smi.uznat === true;
+  // Kolo 11: úkoly za body dnes — plné (kapacita) se v pilulkách vypnou s „Obsazeno". Sdílená adresa s widgetem.
+  const ukoly = useUkolyZaBody(open ? urlUkolyZaBody(actingAs) : null);
+  const obsazene = useMemo(() => obsazeneNabidky(ukoly.data ?? []), [ukoly.data]);
   const dnesni = useMemo(() => zapisyDne(data.data?.items ?? [], dnes).filter(z => !upravit || z.id !== upravit.id), [data.data, dnes, upravit]);
 
   const [text, setText] = useState('');
@@ -70,6 +78,7 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
   const [offerId, setOfferId] = useState<number | null>(null);
   const [fotka, setFotka] = useState<string | null>(null);
   const [chyba, setChyba] = useState<string | null>(null);
+  const [chybaFotky, setChybaFotky] = useState<string | null>(null);
   const [ukladam, setUkladam] = useState(false);
   const [nahravam, setNahravam] = useState(false);
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
@@ -85,12 +94,17 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
     setOfferId(z?.offerId ?? predvolby?.offerId ?? null);
     setFotka(z?.photoUrl ?? null);
     setChyba(null);
+    setChybaFotky(null);
     setUkladam(false);
     setNahravam(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const vybrana: NabidkaNavic | null = offerId != null ? nabidka.find(n => n.id === offerId) ?? null : null;
+  const vybrana: NabidkaNavic | null = offerId != null
+    ? nabidka.find(n => n.id === offerId) ?? (predvolby?.nabidka?.id === offerId ? predvolby.nabidka : null)
+    : null;
+  // Úkol „jen s fotkou": bez fotky by server vrátil 400 — řekne se to dřív, u tlačítka fotky.
+  const fotkaPovinna = vybrana?.requirePhoto === true;
   const vyberNabidku = (n: NabidkaNavic) => {
     if (offerId === n.id) { setOfferId(null); return; }
     setOfferId(n.id);
@@ -109,7 +123,7 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
       const fd = new FormData();
       fd.append('file', await compressImage(soubor));
       const d = await fetch('/api/upload', { method: 'POST', body: fd }).then(okJson);
-      if (platnaFotkaNavic(d?.url)) setFotka(d.url);
+      if (platnaFotkaNavic(d?.url)) { setFotka(d.url); setChybaFotky(null); }
       else setChyba(t('Fotku se nepodařilo nahrát.'));
     } catch (e) {
       setChyba(apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
@@ -130,6 +144,7 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
     // Stejná pravidla jako na serveru — hláška je vidět dřív, než požadavek odejde.
     const v = validujZapis(telo, dnes, vedeni);
     if (!v.ok) { setChyba(prelozChybu(t, v.chyba)); return; }
+    if (chybiPovinnaFotka(vybrana, fotka)) { setChybaFotky(t('Tenhle úkol chce fotku — vyfoť, co je hotové, jinak ho zapsat nejde.')); return; }
     setUkladam(true);
     setChyba(null);
     try {
@@ -175,13 +190,14 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
           {nabidka.length > 0 && (
             <div>
               <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} vybrane={offerId} onVyber={vyberNabidku} money={money}
-                label={t('Co se dá udělat navíc')} />
+                obsazene={obsazene} label={t('Co se dá udělat navíc')} />
               {vybrana && (
                 <p className="t-meta mt-2 text-pretty" data-vybrana-nabidka={vybrana.id}>
                   {vybrana.autoApprove
                     ? t('{odmena} — uzná se samo hned po zapsání.', { odmena: odmenaKratce(vybrana, money) || t('bez odměny') })
                     : t('{odmena} po uznání vedením.', { odmena: odmenaKratce(vybrana, money) || t('bez odměny') })}
                   {vybrana.description ? ` ${vybrana.description}` : ''}
+                  {vybrana.requirePhoto ? ` ${t('Bez fotky to zapsat nejde.')}` : ''}
                 </p>
               )}
             </div>
@@ -197,7 +213,7 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
               <Input id="navic-den" type="date" value={den} min={min} max={dnes} onChange={e => { setDen(e.target.value); if (chyba) setChyba(null); }} />
             </Field>
             <div className="min-w-0">
-              <p className="field-label">{t('Fotka (nepovinná)')}</p>
+              <p className="field-label">{fotkaPovinna ? t('Fotka (povinná)') : t('Fotka (nepovinná)')}</p>
               <input ref={vstup} type="file" accept="image/*" capture="environment" className="hidden" aria-hidden tabIndex={-1}
                 onChange={e => void nahraj(e.target.files?.[0] ?? null)} />
               {fotka ? (
@@ -208,10 +224,12 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
                   <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat fotku')} onClick={() => setFotka(null)} />
                 </div>
               ) : (
-                <Button variant="secondary" block icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="w-full">
+                <Button variant="secondary" block icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="w-full"
+                  aria-describedby={chybaFotky ? 'navic-fotka-chyba' : undefined}>
                   {t('Vyfotit / nahrát')}
                 </Button>
               )}
+              {chybaFotky && <p id="navic-fotka-chyba" role="alert" className="text-[13px] text-bad-ink mt-1.5 text-pretty" data-chyba-fotky>{chybaFotky}</p>}
             </div>
           </div>
           {upravit && (

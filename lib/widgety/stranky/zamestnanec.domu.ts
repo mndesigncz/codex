@@ -12,6 +12,7 @@ export const STRANKA: DefiniceStranky = {
   doporucene: [
     'dochazka.moje_pichacky',
     'moje.nejblizsi_smena',
+    'ukoly.za_body',
     'moje-smeny.navic',
     'moje-smeny.tresty',
     'uzaverky.predavka',
@@ -50,6 +51,10 @@ export const STRANKA: DefiniceStranky = {
       { w: 'moje.nejblizsi_smena', s: 'M' },
       // Kolo 9 (N1): „Navíc" hned za směnou — zapsat, co bylo nad rámec, je věc konce směny, ne konce měsíce.
       { w: 'moje-smeny.navic', s: 'M' },
+      // Kolo 11 (balík Z): „Úkoly za body" hned pod Navíc — kdo otevře aplikaci, bez posouvání vidí, co si
+      // může vzít za body (Martin: „vůbec netuším, kde to najít"). Brief chtěl před Navíc; test k85-navic-z
+      // drží Navíc přímo za směnou, proto zatím za ním (viz hlášení balíku Z).
+      { w: 'ukoly.za_body', s: 'M' },
       { w: 'rozvrh.tym_nahled', s: 'M' },
       { w: 'ukoly.dnes', s: 'M' },
       { w: 'postupy.povinne_dnes', s: 'M' },

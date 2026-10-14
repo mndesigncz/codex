@@ -8,7 +8,7 @@ import { predejPohledu } from '@/lib/predaniPohledu';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
-import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
+import { Avatar, Badge, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
 import { Dock } from '../ui/Dock';
 import { usePopover } from '@/lib/usePopover';
 import NotificationBell from '../NotificationBell';
@@ -29,6 +29,8 @@ import BezOpravneni from '../role/BezOpravneni';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
 import { zalozkaNastaveni } from '@/lib/nastaveniZalozky';
+import { useUkolyZaBody } from '../navic/data';
+import { pocetKVzeti, urlUkolyZaBody } from '../navic/logika';
 
 // Pohledy se stahují až při otevření — viz EmployerLayout. Zaměstnanec
 // otevře za směnu obvykle dvě obrazovky; stahovat kvůli tomu uzávěrku,
@@ -140,6 +142,10 @@ export default function EmployeeLayout({ user }: Props) {
   // nebyl důvod na něj ťuknout.
   const { conversations: chatConvs } = useConversations();
   const unreadChat = chatConvs.reduce((n, c) => n + (c.unreadCount || 0), 0);
+  // Kolo 11: Úkoly nesou odznak s počtem úkolů za body, které si dnes jde vzít — jeden dotaz na
+  // /api/navic/ukoly, sdílený s widgetem na Domů a sekcí v Úkolech (useDataWidgetu, obnova po každé změně navíc).
+  const zaBody = useUkolyZaBody(nacteno && ma('navic.zapsat') ? urlUkolyZaBody() : null);
+  const kVzetiZaBody = pocetKVzeti(zaBody.data ?? []);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const ucet = usePopover(accountOpen, setAccountOpen, { focusFirst: true, arrowKeys: true });
@@ -177,10 +183,12 @@ export default function EmployeeLayout({ user }: Props) {
   const mojeNav = navItems.filter(n => smiPohled(n.id));
   const vDoku = (id: string) => nav.dok.some(d => d.id === id);
   const mobileSecondary = nav.vse.filter(n => !vDoku(n.id));
-  // Chat mimo dok nese odznak nepřečtených na dlaždici (stejné číslo jako v doku).
-  const odznakChatu = (id: string) => (id === 'chat' && currentView !== 'chat' && unreadChat > 0
+  // Chat mimo dok nese odznak nepřečtených na dlaždici (stejné číslo jako v doku); Úkoly počet úkolů za body k vzetí.
+  const odznakChatu = (id: string): { badge?: number; badgeLabel?: string } => (id === 'chat' && currentView !== 'chat' && unreadChat > 0
     ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) }
-    : {});
+    : id === 'tasks' && currentView !== 'tasks' && kVzetiZaBody > 0
+      ? { badge: kVzetiZaBody, badgeLabel: t('{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}', { n: kVzetiZaBody }) }
+      : {});
   const mobileGroups = nav.sekce
     .map(sec => ({ title: sec.title, items: sec.items.filter(n => !vDoku(n.id)).map(n => ({ ...n, ...odznakChatu(n.id) })) }))
     .filter(g => g.items.length);
@@ -220,17 +228,23 @@ export default function EmployeeLayout({ user }: Props) {
                   : <div className="mx-3 mb-1.5 h-px bg-black/[0.07]" />
                 )}
                 <div className="space-y-0.5">
-                  {items.map(item => (
+                  {items.map(item => {
+                    const odznak = odznakChatu(item.id);
+                    return (
                     <button key={item.id} onClick={() => navigate(item.id)} title={item.label}
-                      className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
+                      className={`relative w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
                         currentView === item.id ? 'seg-on' : 'seg-off'
                       }`}>
                       <Icon name={item.icon} size={21} className="flex-shrink-0 i-lead"
                         motion={currentView === item.id ? 'pop' : undefined}
                         key={currentView === item.id ? 'on' : 'off'} />
                       {sidebarOpen && <span className="truncate">{item.label}</span>}
+                      {/* Odznak (kolo 11: úkoly za body k vzetí) — v rozbaleném pásu vpravo, v zúženém přes roh ikony. */}
+                      {odznak.badge ? <Badge count={odznak.badge} label={odznak.badgeLabel} ring={!sidebarOpen}
+                        className={sidebarOpen ? 'ml-auto shrink-0' : 'absolute top-1 right-3'} /> : null}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -325,7 +339,7 @@ export default function EmployeeLayout({ user }: Props) {
       <Dock label={t('Spodní navigace')}
         items={nav.dok.map(n => ({
           id: n.id, label: (n as { short?: string }).short ?? n.label, icon: n.icon,
-          ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) } : {}),
+          ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) } : odznakChatu(n.id)),
         }))}
         activeId={currentView}
         onSelect={id => { navigate(id); setMoreOpen(false); }}
