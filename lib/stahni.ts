@@ -52,20 +52,34 @@ function stahniVProhlizeci(nazev: string, blob: Blob): void {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+/**
+ * Zapíše soubor do mezipaměti aplikace (plugin Filesystem) a vrátí jeho `file://` adresu pro
+ * plugin Share. Bez pluginu (starší binárka) nebo při chybě null. Používá ho i přepis
+ * `navigator.share` v components/NativeBridge, aby sdílení se soubory nezahodilo soubor.
+ */
+export async function zapisDoCache(nazev: string, blob: Blob): Promise<string | null> {
+  const fs = plugin('Filesystem');
+  if (!fs) return null;
+  try {
+    const zapsan = await fs.writeFile({ path: bezpecnyNazev(nazev), data: await naBase64(blob), directory: 'CACHE' });
+    return zapsan?.uri ?? null;
+  } catch { return null; }
+}
+
+/** Zrušení sdílecího listu uživatelem (plugin Share) není chyba. */
+export const jeZruseni = (e: unknown): boolean => /cancel/i.test(String((e as any)?.message ?? e));
+
 /** Sdílení přes nativní pluginy: soubor do cache a systémový sdílecí list. */
 async function sdiletNativne(nazev: string, blob: Blob): Promise<boolean> {
-  const fs = plugin('Filesystem');
   const share = plugin('Share');
-  if (!fs || !share) return false;
+  if (!share) return false;
+  const uri = await zapisDoCache(nazev, blob);
+  if (!uri) return false;
   try {
-    const zapsan = await fs.writeFile({ path: nazev, data: await naBase64(blob), directory: 'CACHE' });
-    const uri = zapsan?.uri;
-    if (!uri) return false;
-    await share.share({ title: nazev, url: uri, dialogTitle: nazev });
+    await share.share({ title: nazev, files: [uri], dialogTitle: nazev });
     return true;
   } catch (e) {
-    // Zrušení sdílecího listu uživatelem není chyba.
-    return /cancel/i.test(String((e as any)?.message ?? e));
+    return jeZruseni(e);
   }
 }
 
@@ -121,11 +135,16 @@ export async function ulozZAdresy(url: string, nazev: string): Promise<VysledekU
   } catch { return 'nejde'; }
 }
 
-/** Otevře adresu v systémovém prohlížeči (obal), nebo v nové záložce (web). */
+/**
+ * Otevře adresu v prohlížeči uvnitř aplikace (obal: plugin Browser, tedy SFSafariViewController
+ * nebo Chrome Custom Tabs; aplikace se neopustí), nebo v nové záložce (web). Relativní cesta
+ * se doplní na celou adresu, prohlížeč v aplikaci jiné nebere.
+ */
 export function otevriVeSystemu(url: string): void {
   const browser = plugin('Browser');
-  if (jeObalKlient() && browser?.open) { void browser.open({ url }); return; }
-  window.open(url, '_blank', 'noopener');
+  const cela = (() => { try { return new URL(url, window.location.href).href; } catch { return url; } })();
+  if (jeObalKlient() && browser?.open) { void Promise.resolve(browser.open({ url: cela })).catch(() => window.open(cela, '_blank', 'noopener')); return; }
+  window.open(cela, '_blank', 'noopener');
 }
 
 /**

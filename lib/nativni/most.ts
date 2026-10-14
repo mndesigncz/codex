@@ -74,6 +74,50 @@ export function kodKarty(text: string | null | undefined): string | null {
   return /^[A-Z0-9]{8}$/.test(c) ? c : null;
 }
 
+/**
+ * Kód podniku napsaný rukou (pole „Zadat kód podniku“ v Managero client): slug podniku, nebo
+ * celá adresa podniku či stolu, kterou člověk opsal nebo vložil. Mezery a velká písmena nevadí.
+ * Vrací cestu `/client/<slug>…`, nebo null.
+ */
+export function cestaZKoduPodniku(text: string | null | undefined): string | null {
+  const t = String(text ?? '').trim();
+  if (!t) return null;
+  // „www.managero.app/client/x“ bez schématu, jak to lidé opisují z letáku.
+  const s = /^(www\.)?managero\.app\//i.test(t) ? `https://${t}` : t;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return cestaZQr(s);
+  const slug = s.replace(/^\/?client\//i, '').replace(/\s+/g, '-').replace(/\/+$/, '');
+  return cestaZQr(slug);
+}
+
+/**
+ * Kam s odkazem nebo novým oknem v obalu. Ve WebView nemá `target="_blank"` ani `window.open`
+ * kam se otevřít: iOS je pošle do Safari, kde chybí přihlášení (fotka účtenky skončí na 401),
+ * a cizí stránka by aplikaci opustila. Proto:
+ *  - `prohlizec`: cizí web, nebo veřejná stránka webu otevíraná do nového okna → systémový
+ *    prohlížeč v aplikaci (plugin Browser, SFSafariViewController / Custom Tabs);
+ *  - `soubor`: náš soubor z API (fotka, export) do nového okna nebo s `download` → stáhne se
+ *    s přihlášením a nabídne se sdílecím listem (lib/stahni.ts);
+ *  - `web`: obyčejná navigace uvnitř aplikace (nebo mailto:, tel:, které obslouží systém).
+ */
+export type CilOdkazu = { druh: 'web' } | { druh: 'prohlizec'; url: string } | { druh: 'soubor'; url: string; nazev: string };
+
+export function cilOdkazu(href: string | null | undefined, zaklad: string, opts: { noveOkno?: boolean; stahnout?: string | null } = {}): CilOdkazu {
+  let u: URL;
+  try { u = new URL(String(href ?? ''), zaklad); } catch { return { druh: 'web' }; }
+  let puvod = '';
+  try { puvod = new URL(zaklad).origin; } catch { /* bez základu */ }
+  const stahnout = opts.stahnout != null;
+  if ((u.protocol === 'blob:' || u.protocol === 'data:') && stahnout) return { druh: 'soubor', url: u.href, nazev: opts.stahnout || 'soubor' };
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return { druh: 'web' };
+  const nas = u.origin === puvod || (u.protocol === 'https:' && HOSTITELE.has(u.hostname));
+  if (!nas) return { druh: 'prohlizec', url: u.href };
+  const nazev = opts.stahnout || decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() ?? '') || 'soubor';
+  if (stahnout) return { druh: 'soubor', url: u.href, nazev };
+  if (!opts.noveOkno) return { druh: 'web' };
+  if (u.pathname.startsWith('/api/')) return { druh: 'soubor', url: u.href, nazev };
+  return { druh: 'prohlizec', url: u.href };
+}
+
 /** Je stránka jen pro veřejný kiosk (sdílený tablet)? Tam se nenastavuje push ani zámek. */
 export function jeKioskCesta(pathname: string | null | undefined): boolean {
   return /^\/kiosk(\/|$)/.test(String(pathname ?? ''));
@@ -85,6 +129,7 @@ export function jeKioskCesta(pathname: string | null | undefined): boolean {
 
 interface CapacitorOkno {
   Capacitor?: {
+    DEBUG?: boolean;
     isNativePlatform?: () => boolean;
     getPlatform?: () => string;
     Plugins?: Record<string, any>;
@@ -97,6 +142,14 @@ export const platforma = (): 'ios' | 'android' | 'web' => {
   const p = okno()?.Capacitor?.getPlatform?.();
   return p === 'ios' || p === 'android' ? p : 'web';
 };
+/**
+ * Ladicí binárka (iOS konfigurace Debug, tedy Run z Xcode). Capacitor to vkládá jako
+ * `window.Capacitor.DEBUG`. Ladicí binárka je podepsaná vývojovým profilem a token APNs je ze
+ * sandboxu; vydaná (Archive → TestFlight, App Store) má token produkční. Server podle toho volí
+ * api.sandbox.push.apple.com, nebo api.push.apple.com (lib/nativniPush.ts).
+ */
+export const jeLadiciBinarka = (): boolean => okno()?.Capacitor?.DEBUG === true;
+
 /** Nativní plugin podle jména (`PushNotifications`, `Share`…), nebo null. */
 export function plugin<T = any>(jmeno: string): T | null {
   const p = okno()?.Capacitor?.Plugins?.[jmeno];
@@ -127,7 +180,10 @@ export interface NativniApi {
   skenujQr: () => Promise<string | null>;
   /** Naskenuje QR podniku, stolu nebo kód podniku a otevře ho v aplikaci. Vrací false, když QR není náš. */
   skenujAOtevri: () => Promise<boolean>;
-  sdilej: (d: { title?: string; text?: string; url?: string }) => Promise<boolean>;
+  /** Systémový sdílecí list. Soubory (`files`) se nejdřív zapíšou do mezipaměti aplikace (plugin Filesystem). */
+  sdilej: (d: { title?: string; text?: string; url?: string; files?: File[] }) => Promise<boolean>;
+  /** Otevře adresu v prohlížeči uvnitř aplikace (plugin Browser), bez něj v systémovém prohlížeči. */
+  otevriVProhlizeci: (url: string) => void;
   haptika: (druh?: 'lehka' | 'stredni' | 'uspech' | 'chyba') => void;
   /** Zapne push: povolení (systémový dialog), registrace tokenu, zrušení volby „vypnuto“. Volat z kontextu. */
   zapniPush: () => Promise<VysledekPushe>;

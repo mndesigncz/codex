@@ -68,7 +68,7 @@ import { useOpravneni } from '../role/useOpravneni';
 import { NavigaceKontext, useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
-import { otevriNaTisk } from '@/lib/stahni';
+import { otevriNaTisk, otevriVeSystemu } from '@/lib/stahni';
 import PromoKody from './loyalty/KuponyPromo';
 
 // Nastavení účtu v okně: stejná obrazovka jako v administraci (profil, vzhled a jazyk, oznámení, zabezpečení),
@@ -181,7 +181,9 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
   // Odkaz z průvodce přechodem z Kartičky umí otevřít rovnou část Věrnosti (Kupony, Poukazy…).
   const [castVernosti, setCastVernosti] = useState<{ id: LoyaltySub; n: number } | null>(null);
   const otevriHosta = useCallback((q: string) => { setHledatHosta(q); prejdi('customers'); }, [prejdi]);
-  const strankaProHosty = () => { if (souhrn?.slug) window.open(`/client/${souhrn.slug}`, '_blank'); };
+  // Stránka pro hosty: v aplikaci Managero je /client zavřené (lib/obal.ts ho přesměruje na úvod), takže
+  // window.open s relativní cestou skončil na přehledu. Celá adresa v prohlížeči uvnitř aplikace (web: nová záložka).
+  const strankaProHosty = () => { if (souhrn?.slug) otevriVeSystemu(`/client/${encodeURIComponent(souhrn.slug)}`); };
 
   // Widgety na plochách Clientu navigují přes kontext. Záložky Clientu (klient:*),
   // Akce a Menu jsou tady, všechno ostatní jde dál do layoutu.

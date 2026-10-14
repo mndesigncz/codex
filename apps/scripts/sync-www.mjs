@@ -18,7 +18,11 @@ for (const klic of klice) {
   if (!app) { console.error(`neznámá aplikace: ${klic}`); process.exit(2); }
   const out = `${APPS}/${klic}/www`;
   mkdirSync(out, { recursive: true });
-  const offline = tpl.replaceAll('{{NAZEV}}', app.nazev).replaceAll('{{START_URL}}', app.vstupniUrl);
+  // Blok KARTA (offline kartička hosta) jen v hostovské aplikaci; v provozní se vypustí celý.
+  const sKartou = klic === 'client';
+  const offline = tpl
+    .replace(/<!--KARTA-->\n?([\s\S]*?)<!--\/KARTA-->\n?/g, (_, obsah) => (sKartou ? obsah : ''))
+    .replaceAll('{{NAZEV}}', app.nazev).replaceAll('{{START_URL}}', app.vstupniUrl);
   writeFileSync(`${out}/offline.html`, offline);
   writeFileSync(`${out}/index.html`, `<!doctype html>
 <html lang="cs"><head><meta charset="utf-8" />
