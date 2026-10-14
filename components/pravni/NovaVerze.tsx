@@ -76,7 +76,7 @@ export default function NovaVerze() {
   };
 
   return (
-    <Modal open onClose={pozdeji} size="sm" nadOkny
+    <Modal open onClose={pozdeji} size="md" nadOkny
       title={t('Aktualizovali jsme podmínky')}
       subtitle={t('Platí od {datum}. Než budeš pokračovat, potvrď je prosím.', { datum: fmtDatum(VERZE_PODMINEK, { jazyk: t.jazyk, styl: 'dlouze' }) })}
       footer={<>

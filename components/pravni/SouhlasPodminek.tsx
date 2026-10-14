@@ -36,9 +36,9 @@ export default function SouhlasPodminek({ id, checked, onChange, chyba, vek, cla
           className="mt-0.5 h-5 w-5 shrink-0 accent-[#16181A]" />
         <span className="text-pretty">{t('Souhlasím s podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.')}</span>
       </label>
-      <p className="flex flex-wrap items-center gap-x-1.5 pl-8 text-xs text-black/55">
+      {/* Bez oddělovače: v úzké kartě se odkazy zalomí pod sebe a tečka by visela na konci řádku. */}
+      <p className="flex flex-wrap items-center gap-x-4 pl-8 text-xs text-black/55">
         <Link href={odkazy.podminky} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center font-medium underline underline-offset-2">{t('Podmínky užívání')}</Link>
-        <span aria-hidden>·</span>
         <Link href={odkazy.soukromi} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center font-medium underline underline-offset-2">{t('Zásady ochrany osobních údajů')}</Link>
       </p>
       {vek && (

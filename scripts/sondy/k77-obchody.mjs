@@ -157,7 +157,7 @@ console.log('O3 Platby');
     await kUctu(p);
     t = await text(p);
     tvrdi('provoz: krok účtu bez cen a tarifů', !ZAKAZANO.test(t), t.slice(0, 160));
-    tvrdi('provoz: registrace odkazuje na podmínky a zásady', /Podmínkami užívání/.test(t) && /Zásady ochrany osobních údajů/.test(t));
+    tvrdi('provoz: registrace odkazuje na podmínky a zásady', /Podmínky užívání/.test(t) && /Zásady ochrany osobních údajů/.test(t));
     await vyplnUcet(p);
     await p.getByRole('button', { name: 'Založit podnik' }).click();
     await p.waitForURL(u => !u.pathname.startsWith('/register'), { timeout: 20000 }).catch(() => {});
@@ -364,11 +364,14 @@ console.log('O6 Reset hesla a O8 souhlas s novinkami');
   await p.getByLabel('Jméno').fill('Host Test');
   await p.getByLabel('E-mail').fill('host@priklad.cz');
   await p.getByLabel('Heslo', { exact: true }).fill('Dlouhe-Heslo-123');
+  // Spuštění (balík P): souhlas s podmínkami a věk jsou výslovná zaškrtnutí.
+  await p.getByLabel(/Souhlasím s podmínkami užívání/).check();
+  await p.getByLabel(/Je mi aspoň 15 let/).check();
   await p.getByRole('button', { name: 'Založit účet' }).click();
   await dokudVola(vola, v => v.path === '/api/client/register');
   const reg = vola.find(v => v.path === '/api/client/register');
   tvrdi('souhlas s novinkami: registrace pošle novinky:false a souhlas s podmínkami', reg?.telo.novinky === false && reg.telo.terms === true, JSON.stringify(reg?.telo));
-  tvrdi('registrace hosta odkazuje na podmínky a zásady', /Podmínkami užívání/.test(await p.evaluate(() => document.body.innerText)));
+  tvrdi('registrace hosta odkazuje na podmínky a zásady', /Podmínky užívání/.test(await p.evaluate(() => document.body.innerText)) && /Zásady ochrany osobních údajů/.test(await p.evaluate(() => document.body.innerText)));
   await ctx.close();
 
   // V profilu jde souhlas zapnout a vypnout (PATCH /api/client/me s novinky).
