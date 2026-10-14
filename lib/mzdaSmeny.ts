@@ -103,6 +103,8 @@ export async function bodyZaSmenu(teamId: number, employeeId: number, den: strin
     const [r] = await sql`
       SELECT COUNT(*)::int AS n FROM procedure_runs
       WHERE user_id = ${employeeId} AND status = 'completed' AND team_id = ${teamId}
+        -- prázdné dokončení (ani jeden odškrtnutý krok) základ nedostane — jako lib/pointsBalance (k89)
+        AND (COALESCE(total_items, 0) = 0 OR (jsonb_typeof(checked_items) = 'array' AND checked_items <> '[]'::jsonb))
         AND to_char((completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${den}`;
     procedures = r?.n ?? 0;
   } catch { /* tabulka chybí */ }

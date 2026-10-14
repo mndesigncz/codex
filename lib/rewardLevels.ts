@@ -84,7 +84,7 @@ export interface AutoPoints { total: number; lines: AutoPointLine[]; }
 export interface AutoPointsInput {
   hadShift?: boolean;
   tasks?: { state?: string }[];
-  procedures?: { skipped?: number[]; missing?: number[] }[];
+  procedures?: { skipped?: number[]; missing?: number[]; item?: unknown }[];
   closing?: { difference?: number | null } | null;
 }
 
@@ -97,7 +97,10 @@ export function computeAutoPoints(summary: AutoPointsInput, pt: PointsConfig): A
   const missedTasks = (summary.tasks ?? []).filter(t => t?.state === 'missed').length;
   push(`Nesplněné úkoly (${missedTasks}×)`, missedTasks * pt.taskMissed);
 
-  const procs = summary.procedures ?? [];
+  // Jen jedna srážka za krok (k89): průběh, který má vlastní řádek v shift_review_items
+  // (automatické hodnocení při dokončení nebo body od vedení), má kroky obodované tam —
+  // tady se počítají jen průběhy bez něj (rozdělané, nebo z doby před automatickým hodnocením).
+  const procs = (summary.procedures ?? []).filter(p => p?.item == null);
   const skippedSteps = procs.reduce((a, p) => a + (Array.isArray(p?.skipped) ? p.skipped.length : 0), 0);
   push(`Přeskočené kroky v postupech (${skippedSteps}×)`, skippedSteps * pt.procedureSkipped);
   const missedSteps = procs.reduce((a, p) => a + (Array.isArray(p?.missing) ? p.missing.length : 0), 0);

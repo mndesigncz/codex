@@ -6,11 +6,14 @@
 // jednou za každý dokončený průběh (procedures × pt.procedure), a (2) bod za každou
 // odškrtnutou položku (38 kroků zavíračky = +40). Po opravě nese řádek jen příplatek
 // za úplnost (nejvýš „body za postup“, úměrně hotovým krokům) a srážky za kroky.
+// Rozhodnutí majitele: „dokončený“ postup bez jediného odškrtnutého kroku = 0 bodů
+// (ani základ); při ručním hodnocení směny jen jedna srážka za krok; breakdownFor
+// jen z tohoto podniku jako breakdownForTeam.
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import { scoreRun } from '../../lib/procedureScoring.ts';
-import { DEFAULT_POINTS } from '../../lib/rewardLevels.ts';
+import { DEFAULT_POINTS, computeAutoPoints, normalizePoints } from '../../lib/rewardLevels.ts';
 
 const zdroj = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 const rozsah = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -38,9 +41,11 @@ export default function ({ eq, ok }: Testy) {
   const omluva = scoreRun(kroky(38, 2), rozsah(38).filter(i => i !== 28), [28], { '28': { reason: 'not_needed' } }, zaklad);
   eq('37/38 s 1 omluveným přeskočením: plný příplatek 10 (dřív 49)', [omluva.points, omluva.excusedSkips, omluva.flagged], [10, 1, false]);
 
-  // ---- prázdné dokončení: nic odškrtnuto, srážky 0 → řádek 0 (dřív +10 navíc k základu) ----
+  // ---- prázdné dokončení: nic odškrtnuto → řádek 0 a vlajka (dřív +10 navíc k základu) ----
   const prazdny = scoreRun(kroky(13), [], [], {}, zaklad);
-  eq('0/13 kroků, srážky 0: řádek 0 (dřív 10)', [prazdny.points, prazdny.missed], [0, 13]);
+  eq('0/13 kroků: řádek 0 a vlajka (dřív 10, bez vlajky)', [prazdny.points, prazdny.missed, prazdny.flagged], [0, 13, true]);
+  const prazdnyVychozi = scoreRun(kroky(13, 2, null), [], [], {}, zaklad);
+  eq('0/13 kroků s výchozími srážkami: pořád 0 — prázdné dokončení = 0 bodů, ne minus', [prazdnyVychozi.points, prazdnyVychozi.flagged], [0, true]);
   eq('0/13: poznámka beze změny', prazdny.summary, 'auto: 0/13 kroků, 13× nedokončeno');
 
   // ---- výchozí srážky (bez vlastní penalty): běžný −1, klíčový −3, příplatek úměrně ----
@@ -64,8 +69,19 @@ export default function ({ eq, ok }: Testy) {
     omluva,                                                                             // zavíračka 37/38
   ].map(r => r.points);
   eq('rozpis: řádky k postupům 0+10+10+0+10 (dřív 10+23+50+10+49 = 142)', radky, [0, 10, 10, 0, 10]);
-  const celkem = 7 * DEFAULT_POINTS.task + 5 * zaklad + 2 * DEFAULT_POINTS.closing + radky.reduce((a, b) => a + b, 0) + 10;
-  eq('rozpis: celkem 155 místo 267', celkem, 155);
+  // Základ jen za průběhy s aspoň jedním odškrtnutým krokem: 3 z 5 (dva byly prázdné).
+  const sZakladem = [0, 13, 38, 0, 37].filter(hotovo => hotovo > 0).length;
+  eq('rozpis: základ za 3 průběhy (prázdná dokončení bez základu)', sZakladem, 3);
+  const celkem = 7 * DEFAULT_POINTS.task + sZakladem * zaklad + 2 * DEFAULT_POINTS.closing + radky.reduce((a, b) => a + b, 0) + 10;
+  eq('rozpis: celkem 135 místo 267', celkem, 135);
+
+  // ---- ruční hodnocení směny: za krok jen jedna srážka ----
+  const pt = normalizePoints(null);
+  const prubeh = { skipped: [3], missing: [4, 5] };
+  const sRadkem = computeAutoPoints({ procedures: [{ ...prubeh, item: { points: 7 } }] }, pt);
+  eq('hodnocení směny: průběh s vlastním řádkem se v automatických bodech nesráží znovu', sRadkem.total, 0);
+  const bezRadku = computeAutoPoints({ procedures: [{ ...prubeh, item: null }] }, pt);
+  eq('hodnocení směny: průběh bez řádku (rozdělaný / starý) se sráží jako dřív: −2 − 2×4', bezRadku.total, -10);
 
   // ---- hlídání napojení: základ se počítá jen v totalPoints, route mu dává strop bonusu ----
   const zustatek = zdroj('lib/pointsBalance.ts');
@@ -76,4 +92,15 @@ export default function ({ eq, ok }: Testy) {
   ok('dokončení průběhu: scoreRun dostává body za postup jako strop bonusu', /scoreRun\(proc\?\.items, checked, skipped, skipReasons, cfg\.procedure\)/.test(route));
   ok('dokončení průběhu: zápis jen jednou na průběh (ON CONFLICT DO NOTHING)', /ON CONFLICT \(employee_id, work_date, kind, ref_id\) DO NOTHING/.test(route));
   ok('detail průběhu neukazuje „+1“ u každého kroku', !/stepPlus/.test(zdroj('components/procedures/DetailPrubehu.tsx')));
+
+  // ---- základ za postup všude stejně: prázdné dokončení se nepočítá, jen tento podnik ----
+  const prazdnePravidlo = /COALESCE\(total_items, 0\) = 0 OR \(jsonb_typeof\(checked_items\) = 'array' AND checked_items <> '\[\]'::jsonb\)/g;
+  eq('pointsBalance: pravidlo o prázdném postupu v breakdownFor i breakdownForTeam', (zustatek.match(prazdnePravidlo) ?? []).length, 2);
+  ok('mzdaSmeny (body za směnu): stejné pravidlo o prázdném postupu', prazdnePravidlo.test(zdroj('lib/mzdaSmeny.ts')));
+  const jedenUzivatel = zustatek.slice(zustatek.indexOf('export async function breakdownFor('), zustatek.indexOf('export async function breakdownForTeam('));
+  ok('breakdownFor: úkoly jen z tohoto podniku', /FROM tasks WHERE completed_by = \$\{userId\} AND status = 'done' AND \(team_id = \$\{teamId\} OR team_id IS NULL\)/.test(jedenUzivatel));
+  ok('breakdownFor: postupy jen z tohoto podniku', /status = 'completed' AND \(team_id = \$\{teamId\} OR team_id IS NULL\)/.test(jedenUzivatel));
+  eq('breakdownFor: uzávěrky jen z tohoto podniku (i v záložním dotazu)', (jedenUzivatel.match(/FROM cash_closings WHERE created_by = \$\{userId\}[^`]*team_id = \$\{teamId\} OR team_id IS NULL/g) ?? []).length, 2);
+  const profil = zdroj('app/api/employees/[id]/route.ts');
+  ok('profil zaměstnance: body přes breakdownFor + totalPoints, žádná vlastní kopie počítání', /breakdownFor\(teamId, employeeId\)/.test(profil) && /soucetBodu\(b, points\)/.test(profil) && !/FROM procedure_runs WHERE user_id/.test(profil));
 }

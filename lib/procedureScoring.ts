@@ -58,6 +58,8 @@ export interface RunScore {
  *     and a 13-step opening list are each worth at most the same bonus, not
  *     one point per checkbox (k89: a 38-step list used to pay +40)
  *   − per-step penalty for every step that was neither done nor excused
+ * A run "completed" with no step ticked at all scores 0 and is flagged (and
+ * totalPoints skips its base too — see the procedure_runs count there).
  * An excused skip (not needed / missing supplies) costs nothing and does not
  * lower the bonus share either.
  */
@@ -97,7 +99,12 @@ export function scoreRun(
 
   const max = Number.isFinite(bonusMax) && bonusMax > 0 ? bonusMax : 0;
   const bonus = plusCounted > 0 ? Math.round(max * plusDone / plusCounted) : 0;
-  const points = bonus - penalty;
+  // „Dokončeno“ bez jediného odškrtnutého kroku = 0 bodů (rozhodnutí majitele, k89):
+  // ani základ (ten totalPoints u prázdného průběhu nepočítá), ani srážky — jen vlajka,
+  // ať si toho vedení v hodnocení směny všimne.
+  const empty = steps.length > 0 && done === 0;
+  if (empty) flagged = true;
+  const points = empty ? 0 : bonus - penalty;
 
   const parts = [`${done}/${steps.length} kroků`];
   if (excusedSkips) parts.push(`${excusedSkips}× omluvené přeskočení`);
