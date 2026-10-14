@@ -7,7 +7,7 @@
 // Z2 Odměny 1280: velký widget — souhrn měsíce, filtr Vše / Čeká / Uznané, menu „···" u čekajícího
 //    (Upravit → PATCH /api/navic/1, Smazat → potvrzení → DELETE).
 // Z3 Moje směny 390: chip „navíc: 1" u včerejší směny, akce „Navíc" → okno se dnem směny → POST shiftId;
-//    Můj výdělek M: řádek „Navíc" z prémie source navic.
+//    Můj výdělek M: řádek „Navíc" z prémie source navic. Z3b: běžící směna v Nejbližší směně nabídne „Navíc".
 // Z4 Uzávěrka 390: po odeslání karta „Udělal(a) jsi dnes něco navíc?" s pilulkami, „Napsat vlastní" →
 //    okno s closingId z odpovědi → POST; karta zmizí.
 // Z5 Tablet 1024×1366: odchod Martina (PIN) → souhrn s blokem navíc; pilulka → POST s actingAs = 1
@@ -46,6 +46,8 @@ const text = async (loc) => ((await loc.count()) ? await loc.first().innerText()
 const dialogNavic = (p, nazev = 'Zapsat navíc') => p.getByRole('dialog', { name: nazev });
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const telo = (req) => { try { return req.postData() ? JSON.parse(req.postData()) : null; } catch { return null; } };
+/** Okno vyjíždí (pop-in se scale < 1): rect měřený uprostřed animace lže o pár procent — počkat na doběhnutí. */
+const poAnimaci = (loc) => loc.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(a => a.finished.catch(() => {}))));
 
 const NAVIC = () => nacti('k85-navic-z-navic');
 
@@ -114,6 +116,7 @@ for (const [nazev, volby] of [['390', { viewport: TEL, mobil: true }], ['1280', 
   tvrdi(`Z1 (${nazev}): pilulky nabídky — 3 položky, „Vytřít sklad a chodbu · 20 b", „Zaskočit… · 50 b · 300 Kč" (měna podniku)`, await pilulky.count() === 3
     && /Vytřít sklad a chodbu · 20 b/.test(await text(pilulky.nth(0))) && /Zaskočit za kolegu na směnu · 50 b · 300 Kč/.test(await text(pilulky.nth(2))), await text(w.locator('[data-nabidka-navic]')));
   tvrdi(`Z1 (${nazev}): „Umýt výlohu" je dnes vyčerpaná (limit 1× za den) — pilulka vypnutá`, await pilulky.nth(1).isDisabled());
+  await poAnimaci(w);
   const vyskyPilulek = await pilulky.evaluateAll(els => els.map(e => e.getBoundingClientRect().height));
   tvrdi(`Z1 (${nazev}): pilulky nabídky ≥ 44 px`, vyskyPilulek.every(v => v >= 44), JSON.stringify(vyskyPilulek));
   tvrdi(`Z1 (${nazev}): bez limetky ve widgetu (jediná limetka obrazovky není jeho)`, await w.locator('button.on-accent, .btn-accent').count() === 0);
@@ -144,6 +147,7 @@ for (const [nazev, volby] of [['390', { viewport: TEL, mobil: true }], ['1280', 
       && await dokud(() => d.getByRole('button', { name: 'Odebrat fotku' }).isVisible().catch(() => false), 3000) && await d.locator('img[alt="Náhled fotky"]').count() === 1);
     tvrdi('Z1 (390): vstup fotky otvírá fotoaparát (capture=environment)', (await d.locator('input[type=file]').getAttribute('capture')) === 'environment');
     tvrdi('Z1 (390): okno nepřetéká', await d.evaluate(el => el.scrollWidth <= el.clientWidth + 1) && await preteceni(p) <= 1, `přetečení ${await preteceni(p)} px`);
+    await poAnimaci(d);
     const cile = await d.getByRole('button').evaluateAll(els => els.filter(e => e.offsetParent !== null && !e.classList.contains('btn-icon')).map(e => [e.textContent.trim().slice(0, 20), e.getBoundingClientRect().height]));
     tvrdi('Z1 (390): tlačítka v okně ≥ 36 px (pilulky a hlavní ≥ 44)', cile.every(([, h]) => h >= 36), JSON.stringify(cile));
   }
@@ -288,6 +292,32 @@ for (const [nazev, volby] of [['390', { viewport: TEL, mobil: true }], ['1280', 
   await ctx.close();
 }
 
+// Z3b — Domů 390: běžící směna v Nejbližší směně nabídne „Navíc" (okno se shiftId a dnem směny).
+{
+  const podvrh = (req, json, stav) => {
+    const url = new URL(req.url());
+    if (url.pathname === '/api/shifts' && req.method() === 'GET' && url.searchParams.get('employeeId')) {
+      return json([{ id: 777, employeeId: 16, date: DNY.DNES, startTime: '00:00', endTime: '23:59', start_time: '00:00', end_time: '23:59', type: 'Ranní', typeLabel: 'Ranní', typeColor: '#C8F542', rating: null, note: null }]);
+    }
+    return podvrhZamestnanec(req, json, stav);
+  };
+  const { ctx, p, stav, chyby } = await kontext({ role: 'employee', viewport: TEL, mobil: true, fix: FIX_DOMU, mineData: BARISTA, dalsi: podvrh });
+  await otevri(p, '/employee/shifts?view=home', 'zamestnanec.domu');
+  const w = widgetLi(p, 'moje.nejblizsi_smena');
+  const navic = w.locator('[data-navic-smeny]');
+  tvrdi('Z3b (390): běžící směna („Právě probíhá") má akci „Navíc"', await dokud(() => navic.isVisible().catch(() => false), 6000) && /Právě probíhá/i.test(await text(w)) && await navic.getByRole('button', { name: 'Navíc' }).count() === 1, (await text(w)).replace(/\n/g, ' | ').slice(0, 160));
+  tvrdi('Z3b (390): bez zápisů ke směně není chip „navíc:"', !/navíc: /.test(await text(navic)));
+  await navic.getByRole('button', { name: 'Navíc' }).click();
+  const d = dialogNavic(p);
+  await dokud(() => d.isVisible().catch(() => false), 3000);
+  await d.getByLabel('Co bylo navíc?').fill('Zaskočila jsem za Jakuba na baru.');
+  await d.getByRole('button', { name: 'Zapsat', exact: true }).click();
+  const post = await dokud(async () => stav.zapisy?.find(z => z.m === 'POST' && z.path === '/api/navic'), 4000);
+  tvrdi('Z3b (390): POST nese shiftId 777 běžící směny a dnešní den', post?.telo?.shiftId === 777 && post?.telo?.day === DNY.DNES, JSON.stringify(post?.telo));
+  tvrdi('Z3b (390): bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------------------
 // Z4 — Uzávěrka 390: po odeslání karta „Udělal(a) jsi dnes něco navíc?" → okno s closingId → POST
 // ---------------------------------------------------------------------------
@@ -383,6 +413,7 @@ for (const [nazev, volby] of [['390', { viewport: TEL, mobil: true }], ['1280', 
   tvrdi('Z5 (tablet): nabídka se načte za vybraného (GET /api/navic?actingAs=1)', await dokud(() => (stav.cteni ?? []).some(u => u === '/api/navic?actingAs=1'), 4000), JSON.stringify(stav.cteni));
   const pilulky = souhrn.locator('[data-nabidka-navic] button');
   await dokud(() => pilulky.count().then(n => n === 3), 4000);
+  await poAnimaci(souhrn);
   const vyskyTabletu = [...await pilulky.evaluateAll(els => els.map(e => e.getBoundingClientRect().height)), (await souhrn.getByRole('button', { name: 'Napsat…' }).boundingBox())?.height ?? 0];
   // 43,99 px: kiosk-surface škáluje písmo a Chromium zaokrouhlí rect o setinu — cíl je 44 (min-h-[44px]).
   tvrdi('Z5 (tablet): tři pilulky nabídky, všechny ≥ 44 px, „Napsat…" ≥ 44 px', await pilulky.count() === 3 && vyskyTabletu.every(h => h >= 43.9), JSON.stringify(vyskyTabletu));
