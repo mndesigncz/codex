@@ -1,7 +1,8 @@
 // Stránka „Odměny" (vedení). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B7) plochu
 // zapnulo. Nástroj = žebříček, kalendář hodnocení a nastavení úrovní, bodování a katalogu odměn
 // (components/employer/RewardsView.tsx, přepínač částí v `aside` hlavičky); fronta „Žádosti
-// o odměny", která dřív visela nad žebříčkem, je teď widget.
+// o odměny", která dřív visela nad žebříčkem, je teď widget. Kolo 9 (N1): nástroj má navíc část „Navíc"
+// (nabídka „Co se dá udělat navíc") a výchozí rozložení dostalo široký widget Navíc v týmu (fronta + historie).
 //
 // Výchozí rozložení je z katalogu: co čeká na člověka (žádosti, nehodnocené směny, výtky) nahoře,
 // nástroj pod tím. Role bez odmeny.schvalovat nebo hodnoceni.zobrazit dostane totéž bez widgetů,
@@ -16,6 +17,7 @@ export const STRANKA: DefiniceStranky = {
   pristup: ['odmeny.zebricek', 'odmeny.katalog'],
   nastroj: { nazev: 'Žebříček a hodnocení', ikona: 'award', popis: 'Žebříček, kalendář hodnocení a nastavení úrovní, bodů a katalogu odměn.' },
   doporucene: [
+    'odmeny.navic_tymu',
     'odmeny.zadosti',
     'hodnoceni.nehodnocene',
     'hodnoceni.ohodnotit_smeny',
@@ -27,6 +29,7 @@ export const STRANKA: DefiniceStranky = {
       { w: 'odmeny.zadosti', s: 'M' },
       { w: 'hodnoceni.nehodnocene', s: 'S' },
       { w: 'odmeny.vytky_tymu', s: 'S' },
+      { w: 'odmeny.navic_tymu', s: 'L' },
       { w: 'nastroj' },
     ],
   },

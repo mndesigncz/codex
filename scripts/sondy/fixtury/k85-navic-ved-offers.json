@@ -1,0 +1,10 @@
+{
+ "offers": [
+  { "id": 1, "title": "Vytřít sklad a chodbu", "description": "Včetně rohů za regály.", "points": 20, "bonusCzk": null, "autoApprove": false, "active": true, "validFrom": null, "validTo": null, "maxPerDay": 1, "createdAt": "2026-09-01T08:00:00.000Z" },
+  { "id": 2, "title": "Umýt výlohu zvenku", "description": null, "points": 15, "bonusCzk": null, "autoApprove": true, "active": true, "validFrom": null, "validTo": null, "maxPerDay": 1, "createdAt": "2026-09-01T08:00:00.000Z" },
+  { "id": 3, "title": "Zaskočit za kolegu na směnu", "description": "Nahlásit, za koho.", "points": 50, "bonusCzk": 300, "autoApprove": false, "active": true, "validFrom": null, "validTo": null, "maxPerDay": null, "createdAt": "2026-09-01T08:00:00.000Z" },
+  { "id": 4, "title": "Odvézt sklo do sběru", "description": null, "points": 10, "bonusCzk": null, "autoApprove": false, "active": false, "validFrom": null, "validTo": null, "maxPerDay": null, "createdAt": "2026-08-01T08:00:00.000Z" },
+  { "id": 5, "title": "Letní zahrádka — složit nábytek", "description": "Jen do konce sezóny.", "points": 25, "bonusCzk": null, "autoApprove": false, "active": true, "validFrom": "PRED6", "validTo": "PRED3", "maxPerDay": 1, "createdAt": "2026-08-01T08:00:00.000Z" }
+ ],
+ "smi": { "nabidka": true }
+}

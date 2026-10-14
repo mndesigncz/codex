@@ -99,6 +99,14 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'vyzva.vyhlasit': 'Vyhlášena týmová výzva',
   'vyzva.smazat': 'Zrušena týmová výzva',
   'vyzva.splnena': 'Týmová výzva splněna',
+  // Navíc (kolo 9): zápis nad rámec povinností, uznání a nabídka
+  'navic.zapis': 'Zapsáno navíc',
+  'navic.uznano': 'Navíc uznáno',
+  'navic.odmitnuto': 'Navíc odmítnuto',
+  'navic.smazano': 'Zápis navíc smazán',
+  'navic.nabidka.pridat': 'Přidána položka nabídky navíc',
+  'navic.nabidka.upravit': 'Upravena položka nabídky navíc',
+  'navic.nabidka.smazat': 'Smazána položka nabídky navíc',
   // docházka (kolo 7: ruční oprava s důvodem)
   'dochazka.upravit': 'Ručně upraven záznam docházky',
   'dochazka.pridat': 'Ručně přidán záznam docházky',
@@ -279,6 +287,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   closing: 'uzaverky',
   // odměny, prémie, pochvaly
   reward: 'odmeny', wage: 'odmeny', points: 'odmeny', vyplata: 'odmeny',
+  // navíc (kolo 9): patří k odměnám — body a prémie
+  navic: 'odmeny',
   // týmové výzvy (kolo 8)
   vyzva: 'odmeny',
   // hosté (Managero client)

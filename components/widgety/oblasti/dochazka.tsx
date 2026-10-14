@@ -66,6 +66,7 @@ import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
+import { premieZaNavic } from '../../navic/logika';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useCurrency, useMoney, useSymbol } from '../../CurrencyProvider';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
@@ -704,6 +705,8 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
   const zKasy = pj?.ja.zKasy ?? 0;
   const spropitne = pj?.ja.spropitne ?? null;
   // Hrubý výdělek (mzda + příplatky + prémie) a co z něj ještě přijde: po odečtení dýška už dostaného z kasy a označených výplat.
+  // Kolo 9 (N1): prémie za uznané „navíc" (wage_adjustments source 'navic') jsou v s.upravy; tady se jen pojmenují.
+  const navicPremie = useMemo(() => premieZaNavic(upravy), [upravy]);
   const celkem = (s.mzda ?? 0) + (priplatky?.castka ?? 0) + s.upravy;
   const kVyplate = Math.round(celkem + (spropitne ?? 0) - zKasy - vyplacenoMesic);
   const datum = (d: string) => fmtDatum(d, { jazyk, styl: 'kratce' });
@@ -737,7 +740,7 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
         <Stat label={t('Prémie a srážky')} value={upravy.length ? sZnamenkem(s.upravy, money) : '—'} tone={s.upravy > 0 ? 'ok' : s.upravy < 0 ? 'bad' : 'muted'}
           note={upravy.length ? t('{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}', { n: upravy.length }) : t('zatím nic')} />
       </StatRow>
-      {(priplatky?.castka ?? 0) > 0 || zKasy > 0 || (tentoMesic?.vyplaty.length ?? 0) > 0 ? (
+      {(priplatky?.castka ?? 0) > 0 || zKasy > 0 || (tentoMesic?.vyplaty.length ?? 0) > 0 || (navicPremie.castka > 0 && velikost !== 'L') ? (
         <ul className="list mt-3">
           {priplatky && priplatky.castka > 0 && <ListRow title={t('Příplatky')} meta={priplatkySlovy(t, jazyk, priplatky)} value={`+${money(priplatky.castka)}`} />}
           {zKasy > 0 && (
@@ -747,13 +750,16 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
           {tentoMesic?.vyplaty.map(v => (
             <ListRow key={v.id} title={t('Vyplaceno {datum}', { datum: datum(v.paidAt) })} meta={`${v.method === 'ucet' ? t('na účet') : t('hotově')}${v.note ? ` · ${v.note}` : ''}`} value={`−${money(v.amount)}`} />
           ))}
+          {navicPremie.castka > 0 && velikost !== 'L' && (
+            <ListRow title={t('Navíc')} meta={t('{n, plural, one {# uznaný zápis} few {# uznané zápisy} other {# uznaných zápisů}} s prémií', { n: navicPremie.pocet })} value={`+${money(navicPremie.castka)}`} />
+          )}
         </ul>
       ) : null}
       {velikost === 'L' && upravy.length > 0 && (
         <ul className="list mt-3">
           {upravy.slice(0, 6).map(u => (
             <ListRow key={u.id} title={u.note || (Number(u.amount) > 0 ? t('Prémie') : t('Srážka'))}
-              meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : ''}`}
+              meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : u.source === 'navic' ? ` · ${t('za navíc')}` : ''}`}
               value={<span className={Number(u.amount) > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>} />
           ))}
         </ul>
@@ -1157,7 +1163,7 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
             <ul className="list">
               {upravy.map(u => (
                 <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
-                  meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : ''}`}
+                  meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : u.source === 'navic' ? ` · ${t('za navíc')}` : ''}`}
                   value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>}
                   actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat zápis')} loading={mazu === u.id} onClick={() => { void smaz(u.id); }} />} />
               ))}

@@ -1,0 +1,38 @@
+{
+ "items": [
+  {
+   "id": 1, "userId": 16, "userName": "Eva Testová", "userAvatar": "🙂", "reportedBy": null, "reportedByName": null,
+   "day": "VCERA", "shiftId": 702, "closingId": null, "taskId": null, "offerId": 1, "offerTitle": "Vytřít sklad a chodbu",
+   "text": "Vytřela jsem sklad i chodbu, včetně rohů za regály.", "photoUrl": null, "pointsProposed": 20,
+   "status": "ceka", "points": null, "bonusCzk": null, "decidedBy": null, "decidedByName": null, "decidedAt": null, "decisionNote": null,
+   "createdAt": "VCERAT19:40:00.000Z"
+  },
+  {
+   "id": 2, "userId": 16, "userName": "Eva Testová", "userAvatar": "🙂", "reportedBy": null, "reportedByName": null,
+   "day": "PRED3", "shiftId": 701, "closingId": null, "taskId": null, "offerId": null, "offerTitle": null,
+   "text": "Vyřešila jsem reklamaci dortu a zákazník odcházel spokojený.", "photoUrl": null, "pointsProposed": null,
+   "status": "uznano", "points": 30, "bonusCzk": 200, "decidedBy": 15, "decidedByName": "Martin Nemeškal", "decidedAt": "PRED2T09:10:00.000Z", "decisionNote": "Díky, přesně takhle.",
+   "createdAt": "PRED3T21:05:00.000Z"
+  },
+  {
+   "id": 3, "userId": 16, "userName": "Eva Testová", "userAvatar": "🙂", "reportedBy": null, "reportedByName": null,
+   "day": "PRED6", "shiftId": null, "closingId": null, "taskId": null, "offerId": null, "offerTitle": null,
+   "text": "Zůstala jsem o hodinu déle kvůli dodávce.", "photoUrl": null, "pointsProposed": null,
+   "status": "odmitnuto", "points": null, "bonusCzk": null, "decidedBy": 15, "decidedByName": "Martin Nemeškal", "decidedAt": "PRED5T08:00:00.000Z", "decisionNote": "Přesčas se platí v docházce, ne body.",
+   "createdAt": "PRED6T22:10:00.000Z"
+  },
+  {
+   "id": 4, "userId": 16, "userName": "Eva Testová", "userAvatar": "🙂", "reportedBy": null, "reportedByName": null,
+   "day": "DNES", "shiftId": null, "closingId": null, "taskId": null, "offerId": 2, "offerTitle": "Umýt výlohu zvenku",
+   "text": "Umytá výloha.", "photoUrl": null, "pointsProposed": 15,
+   "status": "uznano", "points": 15, "bonusCzk": null, "decidedBy": null, "decidedByName": null, "decidedAt": "DNEST10:00:00.000Z", "decisionNote": null,
+   "createdAt": "DNEST10:00:00.000Z"
+  }
+ ],
+ "nabidka": [
+  { "id": 1, "title": "Vytřít sklad a chodbu", "description": "Včetně rohů za regály.", "points": 20, "bonusCzk": null, "autoApprove": false, "active": true, "validFrom": null, "validTo": null, "maxPerDay": 1, "createdAt": "" },
+  { "id": 2, "title": "Umýt výlohu zvenku", "description": null, "points": 15, "bonusCzk": null, "autoApprove": true, "active": true, "validFrom": null, "validTo": null, "maxPerDay": 1, "createdAt": "" },
+  { "id": 3, "title": "Zaskočit za kolegu na směnu", "description": "Nahlásit, za koho.", "points": 50, "bonusCzk": 300, "autoApprove": false, "active": true, "validFrom": null, "validTo": null, "maxPerDay": null, "createdAt": "" }
+ ],
+ "smi": { "uznat": false, "nabidka": false, "tym": false, "zapsat": true }
+}

@@ -62,6 +62,8 @@ export const KIOSK_BILA_LISTINA: ReadonlySet<string> = new Set([
   'vyroba.vyrabet', 'navody.zobrazit', 'chat.pouzivat', 'chat.prime', 'objednavky.zobrazit', 'objednavky.vyridit',
   'rezervace.zobrazit', 'rezervace.usadit', 'vernost.karta', 'vernost.body_z_castky', 'vernost.platba_kreditem',
   'kupony.uplatnit', 'menu.vyprodano', 'akce.zobrazit', 'akce.checklist', 'odmeny.zebricek', 'rozvrh.nahled',
+  // Navíc (kolo 9): tablet zapisuje za vybraného člověka, jako plní úkoly.
+  'navic.zapsat',
 ]);
 
 /** Klíče, které nesmí nést výchozí role (tu dostane každý, kdo zná kód pro připojení). */

@@ -27,6 +27,12 @@ import { nextActiveId, IDLE_MS, ACTING_MAX_AGE_S, ACTING_OBNOVA_MS, obnovitCooki
 import bcrypt from 'bcryptjs';
 import { novyKlic } from '@/lib/idempotenceKlic';
 import { duvodProcNeOffline, poSynchronizaci, pridejDoFronty, rosterSFrontou, zastaraleVeFronte, type AkceFronty, type PolozkaFronty } from '@/lib/kioskOffline';
+import { useMoney } from '../CurrencyProvider';
+import { apiMessage, okJson } from '@/lib/api';
+import { URL_NAVIC, type NabidkaNavic } from '@/lib/navic';
+import { NabidkaChipy } from '../navic/NabidkaChipy';
+import { ZapsatNavic } from '../navic/ZapsatNavic';
+import { obnovNavic, urlNavicMine, useDataNavic } from '../navic/data';
 
 export interface RosterMember {
   id: number;
@@ -144,7 +150,7 @@ interface KioskShiftValue {
   punch: (member: RosterMember) => void;
   reload: () => Promise<void>;
   /** Souhrn směny toho, kdo právě odpíchl odchod (okno „díky za směnu"); null = nic. */
-  souhrn: { jmeno: string; data: SouhrnOdchodu } | null;
+  souhrn: { id: number; jmeno: string; data: SouhrnOdchodu } | null;
   zavriSouhrn: () => void;
   /** Tablet je bez internetu (prohlížeč to hlásí, nebo poslední načtení rozpisu spadlo na síti). */
   offline: boolean;
@@ -189,7 +195,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   // Souhrn po odchodu (kolo 7): místo toastu „nezapomeň na uzávěrku" okno s příchodem,
   // odchodem a odpracovaným časem. Kreslí ho SouhrnPoOdchodu uvnitř navigace tabletu
   // (KioskShell), aby „Vyplnit uzávěrku" mohlo přepnout záložku.
-  const [souhrn, setSouhrn] = useState<{ jmeno: string; data: SouhrnOdchodu } | null>(null);
+  const [souhrn, setSouhrn] = useState<{ id: number; jmeno: string; data: SouhrnOdchodu } | null>(null);
   // Hlášení tabletu jde přes sdílený Toast (role=status, dole uprostřed).
   // `id` odliší dvě stejná hlášení po sobě, jinak by druhé dostalo zbytek času prvního.
   const [flash, setFlash] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
@@ -473,7 +479,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
               // Shift summary jako Homebase / Square: „8:02–15:34 · 7 h 32 min" a cesta k uzávěrce.
               // Bez čitelné odpovědi (starší server) aspoň dřívější varování o uzávěrce.
               const data = souhrnOdchodu(vysledek?.entry, vysledek?.closingDone);
-              if (data) setSouhrn({ jmeno: member.name, data });
+              if (data) setSouhrn({ id: member.id, jmeno: member.name, data });
               else if (vysledek?.closingDone === false) showFlash(t('{jmeno}: odchod zaznamenán — nezapomeň vyplnit uzávěrku směny!', { jmeno: member.name }), 'bad');
             }
             if (msg) showFlash(msg, 'bad');
@@ -966,13 +972,41 @@ export function PunchDialog({ member, now, onClose, onDone }: {
 export function SouhrnPoOdchodu() {
   const t = useT('kiosk');
   const nav = useNavigace();
+  const money = useMoney();
   const { souhrn, zavriSouhrn } = useKioskShift();
   const [zbyva, setZbyva] = useState(SOUHRN_ZAVRIT_S);
   const [zastaveno, setZastaveno] = useState(false);
   const otevreno = souhrn != null;
+  // Kolo 9 (N1): „Udělal(a) jsi dnes něco navíc?" — pilulky nabídky zapíšou jedním klepnutím za toho,
+  // kdo právě odešel (actingAs = jeho id, nikdy bez něj), „Napsat…" otevře okno s klávesnicí tabletu.
+  // Nabídka se načte až s otevřeným souhrnem (jedna odpověď /api/navic za vybraného člověka).
+  const navic = useDataNavic(souhrn ? urlNavicMine(souhrn.id) : null);
+  const [navicOkno, setNavicOkno] = useState(false);
+  const [navicZapisuji, setNavicZapisuji] = useState<number | null>(null);
+  const [navicHotovo, setNavicHotovo] = useState<string | null>(null);
+  const [navicChyba, setNavicChyba] = useState<string | null>(null);
+  const dnes = pragueToday();
+  const zapisZNabidky = async (n: NabidkaNavic) => {
+    if (!souhrn || navicZapisuji != null) return;
+    setNavicZapisuji(n.id);
+    setNavicChyba(null);
+    setZastaveno(true);
+    try {
+      const d = await fetch(URL_NAVIC, {
+        method: 'POST', headers: JSON_HLAVICKA,
+        body: JSON.stringify({ text: n.title, offerId: n.id, day: dnes, actingAs: souhrn.id }),
+      }).then(okJson);
+      const uznano = d?.item?.status === 'uznano';
+      setNavicHotovo(uznano ? t('Zapsáno a uznáno: +{n} b. Díky!', { n: Number(d?.item?.points) || n.points }) : t('Zapsáno, díky! Vedení to uzná.'));
+      obnovNavic();
+    } catch (e) {
+      setNavicChyba(apiMessage(e, t('Zápis se neuložil.')));
+    }
+    setNavicZapisuji(null);
+  };
 
   // Nové okno = nový odpočet (dva odchody po sobě).
-  useEffect(() => { setZbyva(SOUHRN_ZAVRIT_S); setZastaveno(false); }, [souhrn]);
+  useEffect(() => { setZbyva(SOUHRN_ZAVRIT_S); setZastaveno(false); setNavicHotovo(null); setNavicChyba(null); setNavicOkno(false); }, [souhrn]);
   useEffect(() => {
     if (!otevreno || zastaveno) return;
     const tik = setInterval(() => setZbyva(n => n - 1), 1000);
@@ -1011,10 +1045,31 @@ export function SouhrnPoOdchodu() {
             <span className="t-meta text-pretty">{t('Za tuhle směnu ještě není vyplněná.')}</span>
           </p>
         )}
+        {navic.data?.smi.zapsat !== false && (
+          <div className="mt-4 pt-4 border-t border-[var(--surface-line)]" data-navic-tablet>
+            {navicHotovo ? (
+              <p className="note note-ok flex items-center gap-2" role="status"><Icon name="check" size={17} className="shrink-0" />{navicHotovo}</p>
+            ) : (
+              <>
+                <p className="t-card">{t('Udělal(a) jsi dnes něco navíc?')}</p>
+                <p className="t-meta mt-0.5 text-pretty">{t('Klepni na položku, nebo to napiš — vedení to uvidí a může to ocenit.')}</p>
+                {navic.data && navic.data.nabidka.length > 0 && (
+                  <NabidkaChipy className="mt-3" nabidka={navic.data.nabidka} dnesniZapisy={navic.data.items.filter(z => z.day === dnes)}
+                    vybrane={navicZapisuji} onVyber={n => void zapisZNabidky(n)} money={money} velke />
+                )}
+                <Button variant="secondary" size="lg" icon="pencil" className="mt-3" loading={navicZapisuji != null}
+                  onClick={() => { setZastaveno(true); setNavicOkno(true); }}>{t('Napsat…')}</Button>
+                {navicChyba && <p className="note note-danger text-sm mt-3" role="alert">{navicChyba}</p>}
+              </>
+            )}
+          </div>
+        )}
         <p className="mt-4 t-meta tabular-nums" aria-live="off">
           {zastaveno ? t('Okno zůstane otevřené, dokud ho nezavřeš.') : t('Zavře se samo za {n} s', { n: Math.max(0, zbyva) })}
         </p>
       </div>
+      <ZapsatNavic open={navicOkno} onClose={() => setNavicOkno(false)} actingAs={souhrn.id} jmeno={souhrn.jmeno} predvolby={{ day: dnes }}
+        onUlozeno={item => setNavicHotovo(item.status === 'uznano' ? t('Zapsáno a uznáno: +{n} b. Díky!', { n: item.points ?? 0 }) : t('Zapsáno, díky! Vedení to uzná.'))} />
     </Modal>
   );
 }

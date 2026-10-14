@@ -48,6 +48,7 @@ export const STRANKA: DefiniceStranky = {
     'postupy.povinne_dnes',
     'hodnoceni.ohodnotit_smeny',
     'odmeny.zebricek',
+    'odmeny.navic_tymu',
     'akce.nejblizsi',
     'klient.hoste_vernost',
     'klient.dnesni_rezervace',

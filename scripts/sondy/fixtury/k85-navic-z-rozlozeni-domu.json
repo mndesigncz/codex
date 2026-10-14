@@ -1,0 +1,16 @@
+{
+ "stranka": "zamestnanec.domu",
+ "polozky": [
+  { "id": "moje-nejblizsi-smena", "widget": "moje.nejblizsi_smena", "velikost": "M" },
+  { "id": "moje-smeny-navic", "widget": "moje-smeny.navic", "velikost": "M" },
+  { "id": "navic-male", "widget": "moje-smeny.navic", "velikost": "S" }
+ ],
+ "dostupne": ["moje.nejblizsi_smena", "moje-smeny.navic", "odkaz"],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

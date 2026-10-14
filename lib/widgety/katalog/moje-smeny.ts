@@ -76,4 +76,34 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
+  // Data: GET /api/navic (vlastní zápisy za 60 dní + platná nabídka), ?month= pro minulý měsíc; zápis POST /api/navic,
+  // úprava/smazání vlastního čekajícího PATCH/DELETE /api/navic/[id] — kolo 9 (N1, balík Z), okno components/navic/ZapsatNavic.
+  // Pozor: vlastní data (vedení vidí svoje; tým má widget odmeny.navic_tymu). Ikona `sparkle`: na Domů ani Odměnách
+  // zaměstnance ve výchozím rozložení není (AK-19).
+  {
+    id: 'moje-smeny.navic',
+    oblast: 'moje-smeny',
+    nazev: 'Navíc',
+    popis: 'Co jsi udělal(a) nad rámec směny — zápisy, uznané body a nabídka „Co se dá udělat navíc".',
+    ikona: 'sparkle',
+    velikosti: ['S', 'M', 'L'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni', 'zamestnanec'],
+    stranky: ['zamestnanec.domu', 'zamestnanec.moje_smeny', 'zamestnanec.odmeny', 'vedeni.moje_smeny'],
+    opravneni: { vse: [], nektere: ['navic.zapsat', 'navic.zobrazit_tym'], pole: { 'akce:zapsat': 'navic.zapsat' } },
+    tarif: 'zdarma',
+    nastaveni: [
+      {
+        klic: 'obdobi',
+        nazev: 'Měsíc',
+        typ: 'vyber',
+        moznosti: [{ id: 'tento', nazev: 'Tento' }, { id: 'minuly', nazev: 'Minulý' }],
+        vychozi: 'tento',
+      },
+    ],
+    rychlyFiltr: 'obdobi',
+    kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
 ];

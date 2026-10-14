@@ -16,6 +16,7 @@ export const STRANKA: DefiniceStranky = {
   nastroj: { nazev: 'Moje úroveň', ikona: 'award', popis: 'Moje úroveň, body, pokrok k další úrovni a výhody.' },
   doporucene: [
     'moje.zpetna_vazba',
+    'moje-smeny.navic',
     'odmeny.katalog',
     'moje.odkud_body',
     'odmeny.urovne',
@@ -26,6 +27,8 @@ export const STRANKA: DefiniceStranky = {
     'typ:zamestnanec': [
       { w: 'moje.zpetna_vazba', s: 'M' },
       { w: 'nastroj' },
+      // Kolo 9 (N1): sekce „Navíc" = velký widget s filtrem a měsícem (zápisy, body, nabídka).
+      { w: 'moje-smeny.navic', s: 'L' },
       { w: 'odmeny.katalog', s: 'L' },
       { w: 'moje.odkud_body', s: 'M' },
       { w: 'odmeny.urovne', s: 'M' },

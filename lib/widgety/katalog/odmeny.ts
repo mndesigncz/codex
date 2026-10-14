@@ -2,7 +2,7 @@
 //
 // Komponenty jsou v components/widgety/oblasti/odmeny.tsx, výpočty v lib/odmenyPrehled.ts.
 // Soubor patří balíku B7; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
-// Kolo 69 (B7): všech dvanáct widgetů je hotových. Triviální backend katalogu (vlastní body,
+// Kolo 69 (B7): všech dvanáct widgetů je hotových. Kolo 9 (N1, balík V): Navíc v týmu (odmeny.navic_tymu). Triviální backend katalogu (vlastní body,
 // úroveň a hodnocení i pro toho, kdo má žebříček — nález N12) je v app/api/rewards/route.ts;
 // Výtky v týmu tam navíc dostaly `flaggedUnseen` (kolik výtek člověk ještě nepotvrdil).
 import type { DefiniceWidgetu } from '../typy.ts';
@@ -171,6 +171,36 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: ['odmeny.schvalovat'], nektere: [] },
     tarif: 'pro',
     cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
+  // Data: GET /api/navic?scope=team&month=RRRR-MM (+ ?scope=team&status=ceka — všichni čekající) → items[], smi
+  // Kolo 9 (N1, balík V): co lidé na směně udělali navíc — fronta k uznání (Uznat / Odmítnout v řádku) a historie
+  // s odměnou; souhrn měsíce nahoře; „Zapsat za člena" (vedení zapíše a rovnou uzná). Čekající se ukážou i ze
+  // staršího měsíce. Jen s navic.zobrazit_tym; rozhodovat a zapisovat za člena jen s navic.uznat.
+  {
+    id: 'odmeny.navic_tymu',
+    oblast: 'odmeny',
+    nazev: 'Navíc v týmu',
+    popis: 'Co kdo udělal nad rámec povinností — čekající k uznání s body nebo prémií, uznané a odmítnuté za měsíc.',
+    ikona: 'star',
+    velikosti: ['M', 'L'],
+    vychoziVelikost: 'L',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.odmeny', 'vedeni.prehled'],
+    opravneni: { vse: ['navic.zobrazit_tym'], nektere: [], pole: { 'akce:uznat': 'navic.uznat', 'akce:zapsat_za_clena': 'navic.uznat' } },
+    tarif: 'pro',
+    nastaveni: [
+      {
+        klic: 'obdobi',
+        nazev: 'Měsíc',
+        typ: 'vyber',
+        moznosti: [{ id: 'tento', nazev: 'Tento' }, { id: 'minuly', nazev: 'Minulý' }],
+        vychozi: 'tento',
+      },
+    ],
+    rychlyFiltr: 'obdobi',
+    kostra: { M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'rewards', arg: 'navic' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → standings[{name,avatar,flagged,flaggedUnseen}] (flaggedUnseen od kola 69)

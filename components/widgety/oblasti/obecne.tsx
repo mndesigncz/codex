@@ -35,9 +35,11 @@
 
 import React, { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
+import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { ZDROJE_FRONT } from '@/lib/widgety/katalog/obecne';
+import { vyberNavic } from '@/lib/navic';
+import { otevriCastNavic } from '../../navic-vedeni/cast';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
 import { useDraft } from '@/lib/useDraft';
@@ -112,7 +114,7 @@ const ID_CEKA = 'prehled.ceka_na_tebe';
 
 type IdFronty =
   | 'volno' | 'vymeny' | 'uzaverky' | 'navrhy_skladu' | 'hlaseni' | 'odmeny'
-  | 'postupy' | 'navody' | 'rezervace' | 'objednavky' | 'slaba_hodnoceni';
+  | 'postupy' | 'navody' | 'rezervace' | 'objednavky' | 'slaba_hodnoceni' | 'navic';
 
 interface Fronta {
   id: IdFronty;
@@ -123,6 +125,8 @@ interface Fronta {
   pohled: string;
   /** Kolik v odpovědi čeká na rozhodnutí. Odkud se čte, určuje ZDROJE_FRONT v katalogu. */
   pocet: (raw: any) => number;
+  /** Vlastní otevření (místo holého onNavigate) — fronta, která cílí na část stránky. */
+  otevri?: (nav: Navigace) => void;
 }
 
 const FRONTY: readonly Fronta[] = [
@@ -186,6 +190,13 @@ const FRONTY: readonly Fronta[] = [
     text: (t, n) => t('{n, plural, one {# slabé hodnocení za týden} few {# slabá hodnocení za týden} other {# slabých hodnocení za týden}}', { n }),
     pocet: raw => Number(raw?.reviews?.low7) || 0,
   },
+  {
+    // Kolo 9 (N1): zápisy „navíc" čekající na uznání — proklik otevře Odměny › Navíc (otevriCastNavic).
+    id: 'navic', ikona: 'star', pohled: 'rewards',
+    text: (t, n) => t('{n, plural, one {# zápis navíc k uznání} few {# zápisy navíc k uznání} other {# zápisů navíc k uznání}}', { n }),
+    pocet: raw => vyberNavic(raw).filter(z => z.status === 'ceka').length,
+    otevri: nav => otevriCastNavic(nav),
+  },
 ];
 
 /** Názvy front z nastavení widgetu — do věty „Nenačetly se: …". */
@@ -211,7 +222,7 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
     const k = klicCasti(ID_CEKA, f.id);
     return !!k && vybrane.has(f.id) && smi(k);
   };
-  // Háčky v pevném pořadí, jedenáct front — každá má vlastní dotaz a mezipaměť
+  // Háčky v pevném pořadí, dvanáct front — každá má vlastní dotaz a mezipaměť
   // sdílenou s ostatními widgety (objednávky i sklad se tak neptají dvakrát).
   const stavy = [
     useFronta(FRONTY[0], zap(FRONTY[0])),
@@ -225,6 +236,7 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
     useFronta(FRONTY[8], zap(FRONTY[8])),
     useFronta(FRONTY[9], zap(FRONTY[9])),
     useFronta(FRONTY[10], zap(FRONTY[10])),
+    useFronta(FRONTY[11], zap(FRONTY[11])),
   ];
   const aktivni = FRONTY.map((f, i) => ({ f, s: stavy[i] })).filter(x => !x.s.vypnuto);
   const selhane = aktivni.filter(x => x.s.error);
@@ -262,7 +274,7 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
               const text = f.text(t, s.data ?? 0);
               // Proklik jen tam, kam divák smí; jinak číslo zůstane jako stav, bez odkazu.
               return nav.smiPohled(f.pohled)
-                ? <Button key={f.id} variant="secondary" size="sm" icon={f.ikona} onClick={() => nav.onNavigate(f.pohled)}>{text}</Button>
+                ? <Button key={f.id} variant="secondary" size="sm" icon={f.ikona} onClick={() => (f.otevri ? f.otevri(nav) : nav.onNavigate(f.pohled))}>{text}</Button>
                 : <Chip key={f.id} tone="wait" icon={f.ikona}>{text}</Chip>;
             })}
           </div>

@@ -67,6 +67,10 @@ export const AKCE_HLEDANI: AkceHledani[] = [
   { id: 'odmeny-ohodnotit', nazev: 'Ohodnotit směny', kde: 'Odměny', ikona: 'award', slova: ['body', 'hodnocení', 'žebříček'], stranka: 'rewards', rozhrani: V },
   { id: 'odmeny-katalog', nazev: 'Katalog odměn', kde: 'Odměny', ikona: 'gift', slova: ['vyměnit body', 'bonus', 'odměna'], stranka: 'rewards', rozhrani: VZ },
   { id: 'odmeny-pochvalit', nazev: 'Pochválit člena', kde: 'Odměny', ikona: 'award', slova: ['pochvala', 'body navíc', 'uznání', 'kudos', 'ocenit', 'poděkovat'], stranka: 'rewards', rozhrani: V },
+  // Kolo 9 (N1): „navíc" — fronta k uznání a nabídka u vedení (Odměny › Navíc), zápis u zaměstnance na Domů.
+  { id: 'navic-uznat', nazev: 'Navíc k uznání', kde: 'Odměny', ikona: 'star', slova: ['navíc', 'uznat', 'body navíc', 'nabídka navíc', 'co se dá udělat navíc', 'nad rámec'], stranka: 'rewards', arg: 'navic', rozhrani: V },
+  { id: 'navic-zapsat', nazev: 'Zapsat navíc', kde: 'Domů', ikona: 'star', slova: ['navíc', 'udělal jsem navíc', 'nad rámec', 'body'], stranka: 'home', arg: 'navic', rozhrani: Z },
+  { id: 'navic-zapsat-vedeni', nazev: 'Zapsat navíc', kde: 'Odměny', ikona: 'star', slova: ['navíc', 'za člena', 'nad rámec', 'body'], stranka: 'rewards', arg: 'navic', rozhrani: V },
   // Nastavení
   { id: 'nastaveni-pokladna', nazev: 'Nastavení › Pokladna', kde: 'Nastavení', ikona: 'trend', slova: ['kasa', 'propojit', 'pos', 'storyous', 'dotykačka'], stranka: 'settings', arg: 'pos', rozhrani: V },
   { id: 'nastaveni-notifikace', nazev: 'Nastavení › Notifikace', kde: 'Nastavení', ikona: 'bell', slova: ['oznámení', 'push', 'upozornění', 'e-mail'], stranka: 'settings', arg: 'notifications', rozhrani: VZ },

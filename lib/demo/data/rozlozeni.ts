@@ -19,6 +19,9 @@ export const ROZLOZENI_DEMA: Record<string, VychoziPolozka[]> = {
     { w: 'tym.clenove', s: 'S' },
     { w: 'rozvrh.dnesni_smeny', s: 'M' },
     { w: 'oznameni.nastenka', s: 'L' },
+    // Navíc (kolo 9) až pod první obrazovkou: první krok průvodce ukazuje na sklad.dochazi.
+    { w: 'prehled.ceka_na_tebe', s: 'L' },
+    { w: 'odmeny.navic_tymu', s: 'M' },
   ],
   'vedeni.rozvrh': [
     { w: 'nastroj' },

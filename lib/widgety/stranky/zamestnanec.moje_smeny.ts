@@ -24,6 +24,7 @@ export const STRANKA: DefiniceStranky = {
     'rozvrh.tym_nahled',
     'moje.schvalene_volno',
     'moje.minule_smeny',
+    'moje-smeny.navic',
     'uzaverky.kalendar',
     'rozvrh.vymeny',
     'moje.vydelek',
