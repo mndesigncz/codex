@@ -50,6 +50,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
   const [najit, setNajit] = useState<{ open: boolean; hned: boolean }>({ open: false, hned: false });
   const otevriNajit = () => setNajit({ open: true, hned: true });
   const popisNajit = sken.umi ? t('Naskenovat') : t('Zadat kód');
+  const ikonaNajit = sken.umi ? 'camera' : 'search';
   const active = (p: string) => path === p || (p !== '/client' && path?.startsWith(p));
   return (
     <div className="min-h-[100dvh] flex flex-col" style={{ background: 'var(--bg)', color: '#16181A' }}>
@@ -76,7 +77,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
               {/* Sken QR a kód podniku. Přihlášený má na telefonu tlačítko uprostřed spodního doku, tady jen od md. */}
               <button type="button" onClick={otevriNajit} aria-label={sken.umi ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}
                 className={`${me ? 'hidden md:inline-flex' : 'inline-flex'} tap-target items-center justify-center gap-1.5 rounded-full px-2.5 sm:px-3.5 py-2 text-sm font-medium seg-off transition`}>
-                <Icon name="camera" size={17} aria-hidden />
+                <Icon name={ikonaNajit} size={17} aria-hidden />
                 <span className="hidden sm:inline">{popisNajit}</span>
               </button>
               {/* Jazyk hosta: malá pilulka s globusem. Hostovská část je celá přeložená do všech pěti jazyků. */}
@@ -139,7 +140,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
               // Uprostřed doku, kde je palec: sken QR na stole (v aplikaci rovnou nativní skener).
               <button key="najit" type="button" onClick={otevriNajit} title={popisNajit}
                 className="flex flex-col items-center gap-1 rounded-2xl px-5 py-1.5 text-[#16181A] transition duration-200">
-                <span className="grid h-[30px] w-[30px] place-items-center rounded-full bg-[#C8F542] on-accent -mt-0.5" aria-hidden><Icon name="camera" size={18} strokeWidth={1.9} /></span>
+                <span className="grid h-[30px] w-[30px] place-items-center rounded-full bg-[#16181A] text-[#C8F542] -mt-0.5" aria-hidden><Icon name={ikonaNajit} size={18} strokeWidth={1.9} /></span>
                 <span className="text-[11px] leading-none font-medium">{popisNajit}</span>
               </button>
             ) : (

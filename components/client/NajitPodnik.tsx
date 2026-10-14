@@ -12,7 +12,7 @@
 // když host skener zavře, vidí pole pro kód, nemusí nic hledat.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button, Field, Input, Modal } from '../ui';
 import { cestaZKoduPodniku, cestaZQr } from '@/lib/nativni/most';
 import { useT } from '@/lib/i18n/client';
@@ -48,7 +48,20 @@ export default function NajitPodnik({ open, onClose, skenovatHned, jeObal }: {
   const [kameraZap, setKameraZap] = useState(false);
   const spusteno = useRef(false);
 
-  const otevri = useCallback((cesta: string) => { onClose(); router.push(cesta); }, [onClose, router]);
+  // Otevřené okno má vlastní záznam v historii (lib/useModal: Zpět zavře okno). Kdyby se okno zavřelo
+  // před navigací, jeho úklid by zavolal history.back() a navigaci zrušil. Proto se záznam okna NAHRADÍ
+  // stránkou podniku (Zpět pak vede na seznam) a okno se zavře, až se adresa opravdu změní.
+  const aktualni = usePathname();
+  const [cil, setCil] = useState<string | null>(null);
+  const otevri = useCallback((kam: string) => {
+    if (kam.split(/[?#]/)[0] === aktualni) { onClose(); setTimeout(() => router.replace(kam), 350); return; }
+    setCil(kam);
+    router.replace(kam);
+  }, [aktualni, onClose, router]);
+  useEffect(() => {
+    if (!cil) return;
+    if (aktualni === cil.split(/[?#]/)[0]) { setCil(null); onClose(); }
+  }, [aktualni, cil, onClose]);
 
   const skenuj = useCallback(async () => {
     setChyba('');

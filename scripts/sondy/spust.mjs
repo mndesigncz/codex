@@ -123,6 +123,7 @@ export const ZELENE = [
   'k71-role',
   'k74-demo',
   'k77-obchody',
+  'k88-klient-obal',
   'k73-pruvodce',
   'k76-jazyk',
   'k75-landing',
