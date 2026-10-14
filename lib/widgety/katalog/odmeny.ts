@@ -2,7 +2,7 @@
 //
 // Komponenty jsou v components/widgety/oblasti/odmeny.tsx, výpočty v lib/odmenyPrehled.ts.
 // Soubor patří balíku B7; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
-// Kolo 69 (B7): všech dvanáct widgetů je hotových. Kolo 9 (N1, balík V): Navíc v týmu (odmeny.navic_tymu). Triviální backend katalogu (vlastní body,
+// Kolo 69 (B7): všech dvanáct widgetů je hotových. Kolo 9 (N1, balík V): Navíc v týmu (odmeny.navic_tymu). Kolo 10 (balík V): Tresty v týmu (odmeny.tresty_tymu). Triviální backend katalogu (vlastní body,
 // úroveň a hodnocení i pro toho, kdo má žebříček — nález N12) je v app/api/rewards/route.ts;
 // Výtky v týmu tam navíc dostaly `flaggedUnseen` (kolik výtek člověk ještě nepotvrdil).
 import type { DefiniceWidgetu } from '../typy.ts';
@@ -201,6 +201,38 @@ export const WIDGETY: DefiniceWidgetu[] = [
     rychlyFiltr: 'obdobi',
     kostra: { M: 'seznam', L: 'seznam' },
     cil: { pohled: 'rewards', arg: 'navic' },
+    stav: 'hotovo',
+  },
+  // Data: GET /api/tresty?scope=team&month=RRRR-MM (+ ?scope=team&status=plati — všechny sporné) → items[], druhy, smi;
+  // GET /api/tresty/navrhy → navrhy[] (jen tresty.udelit)
+  // Kolo 10 (balík V): co kdo pokazil a co za to dostal — souhrn měsíce, Návrhy z dat (pozdní příchod, manko,
+  // výtka z hodnocení: Dát trest předvyplněně / Zahodit), sporné nahoře s vyjádřením (Trest platí dál / Zrušit),
+  // „···" Upravit / Zrušit, Dát trest. Jen s tresty.zobrazit_tym; udělovat, rozhodovat a návrhy jen s tresty.udelit.
+  // Ikona ne `warning`: tu má na Odměnách už Výtky v týmu (AK-19, ikona se ve výchozím rozložení neopakuje).
+  {
+    id: 'odmeny.tresty_tymu',
+    oblast: 'odmeny',
+    nazev: 'Tresty v týmu',
+    popis: 'Co kdo pokazil a co za to dostal — body dolů, krácení prémie nebo napomenutí; nesouhlasy k vyřízení a návrhy z docházky, uzávěrek a hodnocení.',
+    ikona: 'clipboard',
+    velikosti: ['M', 'L'],
+    vychoziVelikost: 'L',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.odmeny', 'vedeni.prehled'],
+    opravneni: { vse: ['tresty.zobrazit_tym'], nektere: [], pole: { 'akce:udelit': 'tresty.udelit', navrhy: 'tresty.udelit' } },
+    tarif: 'pro',
+    nastaveni: [
+      {
+        klic: 'obdobi',
+        nazev: 'Měsíc',
+        typ: 'vyber',
+        moznosti: [{ id: 'tento', nazev: 'Tento' }, { id: 'minuly', nazev: 'Minulý' }],
+        vychozi: 'tento',
+      },
+    ],
+    rychlyFiltr: 'obdobi',
+    kostra: { M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'rewards', arg: 'tresty' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → standings[{name,avatar,flagged,flaggedUnseen}] (flaggedUnseen od kola 69)

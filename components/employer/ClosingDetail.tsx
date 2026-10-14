@@ -34,6 +34,8 @@ import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 import { Poznamky } from '../Poznamky';
 import { NavicUzaverky } from '../navic-vedeni/NavicUzaverky';
+import { TrestTlacitko, TrestyUzaverky } from '../tresty-vedeni/TrestyUzaverky';
+import { textNavrhu } from '@/lib/tresty';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -369,6 +371,16 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       <span className="text-sm font-semibold">{diff === 0 ? t('Kasa sedí') : diff > 0 ? t('Přebytek') : t('Manko')}</span>
                       <span className="text-sm font-bold tabular-nums">{diff > 0 ? '+' : ''}{money(diff)}</span>
                     </div>
+                    {/* Kolo 10: manko → trest tomu, kdo uzávěrku dělal (návrh `manko:<id>` tím z widgetu zmizí). Jen s tresty.udelit. */}
+                    {diff < 0 && c.created_by ? (
+                      <div className="mb-1.5 flex justify-end" data-trest-za-manko>
+                        <TrestTlacitko popisek={t('Dát trest za manko')} onUlozeno={onChanged}
+                          predvolby={{
+                            userId: Number(c.created_by), jmeno: c.author_name ?? undefined, day: String(c.shift_date ?? c.date).slice(0, 10), closingId: id,
+                            text: textNavrhu({ druh: 'manko', castka: -diff, minuty: null, poznamka: null }, money), sourceKey: `manko:${id}`, druhNavrhu: 'manko',
+                          }} />
+                      </div>
+                    ) : null}
                   </div>
                 </Section>
               )}
@@ -612,6 +624,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
 
               {/* Kolo 9 (N1): co lidé z osádky ten den zapsali navíc — s Uznat / Odmítnout; bez oprávnění se nekreslí. */}
               <NavicUzaverky uzaverka={{ id, day: String(c.shift_date ?? c.date).slice(0, 10), lide: d.crew.map(p => p.id) }} onZmena={onChanged} />
+
+              {/* Kolo 10: tresty z téhle směny (svázané s uzávěrkou nebo ze dne u lidí z osádky). */}
+              <TrestyUzaverky uzaverka={{ id, day: String(c.shift_date ?? c.date).slice(0, 10), lide: d.crew.map(p => p.id) }} onZmena={onChanged} />
 
               {d.receipts.length > 0 && (
                 <Section title={t('Účtenky z toho dne')}>

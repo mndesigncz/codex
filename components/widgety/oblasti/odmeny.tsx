@@ -45,6 +45,12 @@
 // stejná adresa jako fronta v „Čeká na tebe") a slučují s měsícem — nesmí zmizet jen
 // proto, že jsou ze staršího měsíce.
 //
+// Kolo 10 (balík V) — Tresty v týmu (odmeny.tresty_tymu): co kdo pokazil a co za to dostal.
+// Souhrn měsíce, Návrhy z dat (pozdní příchod, manko, výtka — Dát trest předvyplněně / Zahodit),
+// seznam se spornými nahoře (vyjádření člověka, Trest platí dál / Zrušit trest), „···" Upravit /
+// Zrušit, „Dát trest" nahoře. Sporné se berou zvlášť (status=plati, stejná adresa jako fronta
+// v „Čeká na tebe") a slučují s měsícem. Okna a řádky jsou v components/tresty-vedeni.
+//
 // Data jen přes useDataWidgetu (sdílená mezipaměť — /api/rewards i /api/rewards/catalog
 // čte víc widgetů i stránka jedním dotazem), dotaz až při `nacteno && ma(klíč)` (spec §1.5).
 // V náhledu (galerie) se nic nezapisuje ani neotevírá.
@@ -79,6 +85,16 @@ import { NavicRadek, textOdmeny } from '../../navic-vedeni/NavicRadek';
 import { UznatNavic, type AkceNavic } from '../../navic-vedeni/UznatNavic';
 import { ZapsatZaClena } from '../../navic-vedeni/ZapsatZaClena';
 import { filtrujNavic, lideZeZapisu, mesicZNastaveni, poctyStavu, sloucCekajici, type FiltrStavu } from '../../navic-vedeni/logika';
+import { souhrnTrestu, urlTresty, type NavrhTrestu } from '@/lib/tresty';
+import { URL_TRESTY_PLATNE, useNavrhyTrestu, useTresty } from '../../tresty-vedeni/data';
+import { DatTrest } from '../../tresty-vedeni/DatTrest';
+import { TrestRadek } from '../../tresty-vedeni/TrestRadek';
+import { NavrhyTrestu } from '../../tresty-vedeni/NavrhyTrestu';
+import { useAkceTrestu } from '../../tresty-vedeni/AkceTrestu';
+import {
+  NAVRHU_M, filtrujTresty, lideZTrestu, mesicZNastaveni as mesicTrestu, poctyFiltru, predvolbyZNavrhu, sloucSporne,
+  type FiltrTrestu, type PredvolbyTrestu,
+} from '../../tresty-vedeni/logika';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { NavigaceKontext, useNavigace, useSmi } from '../NavigaceKontext';
@@ -1675,6 +1691,120 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
   );
 }
 
+// ---------------------------------------------------------------------------
+// Tresty v týmu (kolo 10 — balík V)
+// ---------------------------------------------------------------------------
+
+const ID_TRESTY = 'odmeny.tresty_tymu';
+
+/** Widget Tresty v týmu: souhrn měsíce, návrhy z dat, sporné nahoře s akcemi, ve velké kartě filtry. */
+function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tento' | 'minuly' }>) {
+  const t = useT('widgety');
+  const smi = useSmi();
+  const money = useMoney();
+  const { ok, ceka } = useBranaWidgetu(ID_TRESTY, ['tresty.zobrazit_tym']);
+  const dnes = pragueToday();
+  const mesic = mesicTrestu(nastaveni.obdobi, dnes);
+  const mesicni = useTresty(ok ? urlTresty({ scope: 'team', month: mesic }) : null);
+  const platne = useTresty(ok ? URL_TRESTY_PLATNE : null);
+  const smiUdelit = !nahled && smi(klicCasti(ID_TRESTY, 'akce:udelit') ?? 'tresty.udelit');
+  const navrhy = useNavrhyTrestu(ok && smi(klicCasti(ID_TRESTY, 'navrhy') ?? 'tresty.udelit'));
+  const [filtr, setFiltr] = useState<FiltrTrestu>('vse');
+  const [clovek, setClovek] = useState<string>('');
+  const [davam, setDavam] = useState<PredvolbyTrestu | null>(null);
+  const akce = useAkceTrestu();
+  const odkaz = useOdkazOdmeny();
+  // Odkaz vede rovnou na část Tresty (RewardsView čte `arg` z adresy po přechodu).
+  const odkazTresty = odkaz ? { ...odkaz, arg: 'tresty' } : undefined;
+
+  const vse = mesicni.data && platne.data ? sloucSporne(mesicni.data.items, platne.data.items) : null;
+  const souhrn = souhrnTrestu(mesicni.data?.items ?? [], mesic);
+  const sporu = (vse ?? []).filter(x => x.status === 'plati' && x.disputed && !x.disputeHandledAt).length;
+  const lide = useMemo(() => lideZTrestu(vse ?? []), [vse]);
+  const clovekId = clovek ? Number(clovek) : null;
+  const pocty = poctyFiltru(filtrujTresty(vse ?? [], { clovek: clovekId }));
+  const seznam = velikost === 'L' ? filtrujTresty(vse ?? [], { stav: filtr, clovek: clovekId }) : vse ?? [];
+  const strop = velikost === 'L' ? seznam.length : 5;
+  const videt = seznam.slice(0, strop);
+  const druhy = mesicni.data?.druhy ?? [];
+  const vsechnyNavrhy = navrhy.data ?? [];
+  const navrhyVidet = velikost === 'L' ? vsechnyNavrhy : vsechnyNavrhy.slice(0, NAVRHU_M);
+  const zNavrhu = (n: NavrhTrestu) => setDavam(predvolbyZNavrhu(n, druhy, money));
+
+  const souhrnText = [
+    nastaveni.obdobi === 'minuly' ? t('Minulý měsíc') : t('Tento měsíc'),
+    t('{n, plural, one {# trest} few {# tresty} other {# trestů}}', { n: souhrn.pocet }),
+    souhrn.body > 0 ? t('−{n} b', { n: cislo(souhrn.body) }) : null,
+    souhrn.kraceni > 0 ? t('krácení {castka}', { castka: money(souhrn.kraceni) }) : null,
+    sporu > 0 ? t('{n} nesouhlasí', { n: cislo(sporu) }) : null,
+  ].filter(Boolean);
+  const tlacitko = smiUdelit && (
+    <Button variant="secondary" size="sm" icon="warning" onClick={() => setDavam({})}>{t('Dát trest')}</Button>
+  );
+  const okna = !nahled && (
+    <>
+      <DatTrest open={!!davam} predvolby={davam} onClose={() => setDavam(null)} />
+      {akce.okna}
+    </>
+  );
+  const blokNavrhu = navrhyVidet.length > 0 && (
+    <div className="mt-3" data-tresty-navrhy>
+      <p className="t-label">{t('Návrhy')}</p>
+      <NavrhyTrestu navrhy={navrhyVidet} onDat={zNavrhu} nahled={nahled || !smiUdelit} />
+      {vsechnyNavrhy.length > navrhyVidet.length && <p className="t-meta mt-1">{aDalsich(t, vsechnyNavrhy.length - navrhyVidet.length)}</p>}
+    </div>
+  );
+
+  return (
+    <Widget nacteni={ceka ? CEKA : [mesicni, platne]} odkaz={odkazTresty}
+      doplnek={sporu > 0 ? <Chip tone="wait" size="sm">{t('{n} nesouhlasí', { n: cislo(sporu) })}</Chip> : undefined}
+      prazdno={vse && vse.length === 0 && vsechnyNavrhy.length === 0 ? (
+        <div className="space-y-3" data-tresty-prazdno>
+          <p className="t-meta text-pretty">{t('Tento měsíc bez trestů. Když něco nevyjde, dej trest nebo napomenutí odsud, z profilu člena, z uzávěrky nebo z docházky.')}</p>
+          {tlacitko}
+          {okna}
+        </div>
+      ) : undefined}>
+      {/* Dát trest nahoře vedle souhrnu: dole by ho u dlouhého seznamu schovalo zkrácení „Zobrazit vše". */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="t-meta min-w-0" data-tresty-souhrn>{souhrnText.join(' · ')}</p>
+        {tlacitko}
+      </div>
+      {blokNavrhu}
+      {velikost === 'L' && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Segmented size="sm" ariaLabel={t('Stav trestů')} value={filtr} onChange={setFiltr}
+            options={[
+              { id: 'plati', label: t('Platné'), count: pocty.plati || undefined },
+              { id: 'spor', label: t('Nesouhlasí'), count: pocty.spor || undefined },
+              { id: 'zruseno', label: t('Zrušené'), count: pocty.zruseno || undefined },
+              { id: 'vse', label: t('Vše') },
+            ]} />
+          {lide.length > 1 && (
+            <Select aria-label={t('Člověk')} value={clovek} onChange={e => setClovek(e.target.value)} className="!w-auto max-w-full">
+              <option value="">{t('Všichni')}</option>
+              {lide.map(l => <option key={l.id} value={l.id}>{l.jmeno}</option>)}
+            </Select>
+          )}
+        </div>
+      )}
+      {navrhyVidet.length > 0 && videt.length > 0 && <p className="t-label mt-3">{t('Tresty')}</p>}
+      {videt.length === 0 ? (
+        <p className="t-meta mt-3">{filtr === 'spor' ? t('Nikdo s trestem nenesouhlasí.') : vse && vse.length === 0 ? t('Tento měsíc bez trestů.') : t('Pro tenhle filtr tu nic není.')}</p>
+      ) : (
+        <ul className="list mt-1" data-tresty-seznam>
+          {videt.map(x => (
+            <TrestRadek key={x.id} x={x} smiUdelit={smiUdelit} pracuji={akce.pracuji === x.id}
+              onPlatiDal={akce.platiDal} onZrusit={akce.zrusit} onUpravit={akce.upravit} />
+          ))}
+        </ul>
+      )}
+      {seznam.length > videt.length && <p className="t-meta mt-2">{aDalsich(t, seznam.length - videt.length)}</p>}
+      {okna}
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'hodnoceni.ohodnotit_smeny': OhodnotitSmeny,
   'hodnoceni.nehodnocene': NehodnoceneSmeny,
@@ -1688,6 +1818,7 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'odmeny.katalog': KatalogOdmen,
   'odmeny.urovne': Urovne,
   'odmeny.navic_tymu': NavicTymu,
+  'odmeny.tresty_tymu': TrestyTymu,
   'moje.uroven': MojeUrovenWidget,
   'moje.zpetna_vazba': ZpetnaVazba,
   'moje.hodnoceni_smen': HodnoceniSmen,

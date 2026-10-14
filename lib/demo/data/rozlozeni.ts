@@ -22,6 +22,8 @@ export const ROZLOZENI_DEMA: Record<string, VychoziPolozka[]> = {
     // Navíc (kolo 9) až pod první obrazovkou: první krok průvodce ukazuje na sklad.dochazi.
     { w: 'prehled.ceka_na_tebe', s: 'L' },
     { w: 'odmeny.navic_tymu', s: 'M' },
+    // Tresty (kolo 10) až úplně na konci: průvodce prodejní stránky míří na widgety výš a pořadí je jeho scénář.
+    { w: 'odmeny.tresty_tymu', s: 'M' },
   ],
   'vedeni.rozvrh': [
     { w: 'nastroj' },

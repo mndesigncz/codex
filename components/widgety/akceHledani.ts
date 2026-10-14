@@ -71,6 +71,9 @@ export const AKCE_HLEDANI: AkceHledani[] = [
   { id: 'navic-uznat', nazev: 'Navíc k uznání', kde: 'Odměny', ikona: 'star', slova: ['navíc', 'uznat', 'body navíc', 'nabídka navíc', 'co se dá udělat navíc', 'nad rámec'], stranka: 'rewards', arg: 'navic', rozhrani: V },
   { id: 'navic-zapsat', nazev: 'Zapsat navíc', kde: 'Domů', ikona: 'star', slova: ['navíc', 'udělal jsem navíc', 'nad rámec', 'body'], stranka: 'home', arg: 'navic', rozhrani: Z },
   { id: 'navic-zapsat-vedeni', nazev: 'Zapsat navíc', kde: 'Odměny', ikona: 'star', slova: ['navíc', 'za člena', 'nad rámec', 'body'], stranka: 'rewards', arg: 'navic', rozhrani: V },
+  // Kolo 10: tresty — Odměny › Tresty (sazebník; widget Tresty v týmu s Dát trest, nesouhlasy a návrhy je na ploše nad ním).
+  { id: 'tresty-dat', nazev: 'Dát trest', kde: 'Odměny', ikona: 'warning', slova: ['trest', 'potrestat', 'napomenutí', 'výtka', 'průšvih', 'pokuta', 'body dolů', 'krácení prémie'], stranka: 'rewards', arg: 'tresty', rozhrani: V },
+  { id: 'tresty-sazebnik', nazev: 'Sazebník trestů', kde: 'Odměny', ikona: 'clipboard', slova: ['sazebník', 'tresty', 'prohřešky', 'pozdní příchod', 'manko', 'pokuta'], stranka: 'rewards', arg: 'tresty', rozhrani: V },
   // Nastavení
   { id: 'nastaveni-pokladna', nazev: 'Nastavení › Pokladna', kde: 'Nastavení', ikona: 'trend', slova: ['kasa', 'propojit', 'pos', 'storyous', 'dotykačka'], stranka: 'settings', arg: 'pos', rozhrani: V },
   { id: 'nastaveni-notifikace', nazev: 'Nastavení › Notifikace', kde: 'Nastavení', ikona: 'bell', slova: ['oznámení', 'push', 'upozornění', 'e-mail'], stranka: 'settings', arg: 'notifications', rozhrani: VZ },

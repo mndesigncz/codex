@@ -19,6 +19,7 @@ import { Button, Chip, EmptyState, ErrorState, ListRow, Modal, Segmented, Skelet
 import ShiftReviewModal from './ShiftReviewModal';
 import { PochvalaOkno } from '../widgety/oblasti/odmeny';
 import { NavicClena } from '../navic-vedeni/NavicClena';
+import { TrestyClena } from '../tresty-vedeni/TrestyClena';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtHM } from '@/lib/i18n/format';
@@ -176,6 +177,9 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
 
                 {/* Kolo 9 (N1): co člověk udělal navíc — tento měsíc, poslední zápisy, čekající jde uznat odsud. */}
                 <NavicClena clovek={{ id: e.id, jmeno: e.name }} onZmena={load} />
+
+                {/* Kolo 10: tresty člena — tento měsíc, poslední tři s chipem a akcemi, Dát trest předvyplněně. */}
+                <TrestyClena clovek={{ id: e.id, jmeno: e.name }} onZmena={load} />
 
                 {flaggedItems.length > 0 && (
                   <section aria-labelledby="profil-napravit">
