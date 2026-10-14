@@ -2613,6 +2613,8 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS content_reports_team ON content_reports (team_id, status)`);
+    // Kdy šlo nahlášení provozovateli platformy (eskalace e-mailem, lib/moderaceDb.ts); NULL = neodešlo.
+    await ddl(sql`ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS user_blocks (
         blocker_id INTEGER NOT NULL,

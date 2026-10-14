@@ -134,6 +134,11 @@ export function odkazovyZaklad(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.managero.app').replace(/\/+$/, '');
 }
 
+/** Provozní e-mail pro správce platformy (eskalace nahlášeného obsahu, lib/moderaceDb.ts). */
+export async function sendSpravaEmail(to: string, subject: string, html: string): Promise<SendResult> {
+  return send({ label: 'Managero správa', to, subject, html });
+}
+
 /** E-mail s odkazem na nové heslo. Odkaz platí hodinu a jde použít jednou. */
 export async function sendPasswordResetEmail(to: string, name: string, cesta: string): Promise<SendResult> {
   const url = `${odkazovyZaklad()}${cesta}`;

@@ -7,6 +7,7 @@
 // síť, takže stačí: podmínky se zákazem nevhodného obsahu, nahlášení, blokace,
 // smazání zprávy a pohled vedení na nahlášené. Hostovský obsah (poznámka
 // k rezervaci, hodnocení) vidí jen podnik, žádný host-host obsah není.
+// Nové nahlášení jde navíc provozovateli platformy (eskalace níž, /admin/nahlaseni).
 
 export type DruhObsahu = 'zprava' | 'napad';
 
@@ -68,4 +69,65 @@ export function smiSmazatZpravu(v: { meId: number; autorId: number; moderator: b
 /** Blokovat jde jiného člověka, ne sebe. */
 export function smiZablokovat(meId: number, cilId: number): boolean {
   return Number.isInteger(cilId) && cilId > 0 && cilId !== meId;
+}
+
+// ---- Eskalace na provozovatele platformy ------------------------------------------------
+//
+// Podmínky slibují, že hlášení vyřídíme do 24 hodin. Vedení podniku nahlášení dostane hned,
+// jenže to je stejný podnik, jehož člen obsah napsal, a o víkendu nemusí nikdo reagovat.
+// Proto jde každé nové nahlášení zároveň provozovateli (e-mail z prostředí) a správce platformy
+// ho vidí ve správě (/admin/nahlaseni) se lhůtou; vyřídit ho tam může i on.
+
+/** Lhůta na vyřízení nahlášení (podmínky, lib/pravni/texty.ts). */
+export const LHUTA_NAHLASENI_HODIN = 24;
+
+const JE_EMAIL = /^[^@\s{}<>,;]+@[^@\s{}<>,;]+\.[^@\s{}<>,;]+$/;
+
+/**
+ * Kam poslat upozornění provozovateli: `MODERACE_EMAIL`, jinak e-mail podpory `FIRMA_EMAIL_PODPORY`.
+ * Zástupné pole (`{{EMAIL_PODPORY}}`) ani nesmysl se nepoužije; bez adresy vrací null.
+ */
+export function kontaktModerace(env: Record<string, string | undefined>): string | null {
+  for (const k of ['MODERACE_EMAIL', 'FIRMA_EMAIL_PODPORY']) {
+    const v = String(env[k] ?? '').trim();
+    if (JE_EMAIL.test(v)) return v;
+  }
+  return null;
+}
+
+export type StavLhuty = { stav: 'vyrizeno' } | { stav: 'v_lhute'; zbyvaHodin: number } | { stav: 'po_lhute'; poHodin: number };
+
+/**
+ * Kde je nahlášení vůči lhůtě. `stariHodin` počítá databáze (`NOW() - created_at`), ať se do toho
+ * nepletou časové zóny sloupce bez zóny.
+ */
+export function stavLhuty(status: string, stariHodin: number | null): StavLhuty {
+  if (status !== 'open') return { stav: 'vyrizeno' };
+  const h = Number(stariHodin);
+  if (!Number.isFinite(h)) return { stav: 'po_lhute', poHodin: 0 };
+  const zbyva = LHUTA_NAHLASENI_HODIN - h;
+  if (zbyva > 0) return { stav: 'v_lhute', zbyvaHodin: Math.max(1, Math.ceil(zbyva)) };
+  return { stav: 'po_lhute', poHodin: Math.floor(-zbyva) };
+}
+
+const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * E-mail provozovateli o novém nahlášení. Schválně BEZ obsahu zprávy a bez jmen: soukromá
+ * zpráva nemá ležet v cizí schránce. Obsah (opis) uvidí správce po přihlášení ve správě.
+ */
+export function emailEskalace(v: { id: number; podnik: string; druh: DruhObsahu; duvod: string; odkaz: string }): { subject: string; html: string } {
+  const co = v.druh === 'zprava' ? 'zpráva v chatu' : 'nápad';
+  return {
+    subject: `Nahlášený obsah #${v.id}: ${nazevDuvodu(v.duvod)} (${v.podnik})`,
+    html: `
+      <div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto;padding:28px;background:#F1F4EC;color:#16181A;border-radius:20px;">
+        <h1 style="font-size:20px;margin:0 0 8px;">Nové nahlášení obsahu</h1>
+        <p style="color:#5c6353;font-size:14px;margin:0 0 6px;">Podnik: <b>${esc(v.podnik)}</b></p>
+        <p style="color:#5c6353;font-size:14px;margin:0 0 6px;">Co: ${esc(co)} · důvod: ${esc(nazevDuvodu(v.duvod))}</p>
+        <p style="color:#5c6353;font-size:14px;">Slíbili jsme vyřízení do ${LHUTA_NAHLASENI_HODIN} hodin. Vedení podniku o nahlášení ví; když ho nevyřídí, vyřiď ho ve správě platformy.</p>
+        <a href="${esc(v.odkaz)}" style="display:inline-block;margin-top:8px;background:#C8F542;color:#16181A;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:bold;">Otevřít nahlášení</a>
+        <p style="color:#8a917f;font-size:12px;margin-top:22px;">Obsah zprávy v e-mailu schválně není. Uvidíš ho po přihlášení správce.</p>
+      </div>`,
+  };
 }

@@ -1,33 +1,34 @@
 WHAT THIS APP IS
-Managero is a B2B operations app for cafes and restaurants (shift rota, time tracking, stock, end-of-day closing, tasks, team chat). It is used by business owners/managers and their employees. Guests of these venues use a SEPARATE app, "Managero client" (app.managero.client), which is not part of this submission. The interface is currently Czech only.
+Managero is a B2B operations app for cafes and restaurants (schedule, time tracking, stock, end-of-day closing, tasks, team chat) for owners, managers and employees. Guests use a SEPARATE app, "Managero client", not part of this submission.
+The interface follows the device language (Czech original; English, German, Slovak, Polish machine-translated). Labels below: Czech (English).
 
 HOW TO SIGN IN
-Demo credentials are in the Demo Account fields (manager role, sees everything). A second, employee-role account:
+The Demo Account fields contain the owner of a fictional venue "Café Demo" (manager role, sees everything). A second account has the employee role:
   e-mail:   {{REVIEW_MANAGERO_EMPLOYEE_USER}}
   password: {{REVIEW_MANAGERO_EMPLOYEE_PASSWORD}}
-Both accounts are pre-verified, have no 2FA and belong to a fictional venue "Café Demo". The data is reset before every submission.
-There is no public sign-up for guests. Employees join a venue with an invitation code from their manager.
+No 2FA. All Café Demo data is fictional, prepared for the review. Guest accounts do not work here; the app says so.
+
+NO SIGN-UP AND NO PURCHASES IN THE APP (guidelines 3.1.1 and 3.1.3(f))
+Managero is a free companion app to our paid web service for businesses. No purchases, prices, plans, links or calls to action to buy.
+A business cannot be created in the app: "Vytvořit účet" (Create account) only explains that business accounts are created on the web, with no link. People join an existing business with a team code or invitation. Employees never pay.
 
 WHERE TO FIND THINGS (manager account)
-- Navigation: Přehled (home dashboard of widgets), Rozvrh (shift rota; "Generovat" proposes shifts, then "Zveřejnit"), Sklad (stock and shopping list), Úkoly, Chat, Uzávěrky (end-of-day closing; stays locked until required tasks are done).
-- Account menu, item "Managero client": management of the guest-facing side (reservations, table orders, loyalty, coupons, events). This is a management screen; the guest app itself is a separate app.
-- Employee account: Přehled, Moje směny, Úkoly, Postupy, Chat.
-- Kiosk mode for a shared iPad: created by the manager in Settings, then open the app on an iPad and pick a name (no password on the shared device).
+- Navigation (bottom bar + "Více" (More) on iPhone, side bar on iPad): "Přehled" (Overview), "Rozvrh" (Schedule; "Vygenerovat rozvrh" (Generate schedule)), "Sklad" (Stock), "Úkoly" (Tasks), "Chat", "Uzávěrky" (Closings).
+- Account menu (avatar): "Tým" (Team), "Nastavení" (Settings), "Managero client" (managing the guest side: reservations, orders, loyalty).
+- Shared bar iPad: "Tým" (Team) > "Tablet" sets a tablet sign-in; signed in with it, the iPad shows the kiosk where staff tap their name to clock in.
+- Employee account: "Přehled" (Overview), "Moje směny" (My shifts), "Úkoly" (Tasks), "Postupy" (Procedures), "Chat".
 
 NATIVE FEATURES (guideline 4.2)
-Push notifications through APNs (new shift, rota change, low stock, chat message), camera and photo library for receipt and stock photos, native share sheet for exports (rota, shopping list), iPad kiosk layout. Notification categories can be switched off in Settings.
-
-PAYMENTS (guideline 3.1.1 / 3.1.3(c))
-The app contains no purchases, no prices and no links to purchase. Business subscriptions are agreed directly between us and the business (B2B enterprise service, guideline 3.1.3(c)) outside the app. Employees never pay anything.
+APNs push (new shift, schedule change, low stock, chat; categories in Settings), native QR scanner for guest cards and coupons at the till, camera and photos for receipts and stock, share sheet with real files for exports (CSV, printable documents), universal links (invitations), iPad kiosk layout, external links in an in-app Safari view.
 
 USER-GENERATED CONTENT (guideline 1.2)
-Team chat exists only inside one business: members are invited by the business owner, who can remove members and delete messages. There is no public content and no contact with strangers.
+Chat and ideas exist only inside one business. Members can report content and block people; the owner removes members and content ("Nastavení" > "Nahlášený obsah", Settings > Reported content). Every report also reaches us, the platform operator, and is handled within 24 hours. No public content.
 
 ACCOUNT DELETION (guideline 5.1.1(v))
-Settings > Account > "Smazat účet" deletes the signed-in account inside the app. Deleting a business owner account requires closing or handing over the business first; the app explains it.
+"Nastavení" > "Data a soukromí" > "Smazat účet" (Settings > Data and privacy > Delete account), inside the app. An owner with other members must hand over or delete the business first; the app explains it.
 
 PERMISSIONS
-Camera and photo library (receipt and stock photos), location (only when the manager sets the venue position), notifications. Each has a purpose string and is requested at the moment of use.
+Camera and photos (receipts, stock, guest cards), location only when setting the venue position, notifications after an in-app explanation. All requested at the moment of use.
 
 CONTACT
 If anything does not work, please reply in App Store Connect; we answer within one working day.

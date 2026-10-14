@@ -16,7 +16,7 @@ WHO IT IS FOR
 Owners and managers who want their venue under control, and baristas and cooks who want to know when they work and what to do.
 
 NOTES
-• The app interface is currently available in Czech only.
+• The app follows your phone's language: Czech, English, German, Slovak or Polish (translations other than Czech are machine-made).
 • You need a venue account or an invitation from management to sign in. You can delete your account inside the app.
 • Guests of venues use the separate app Managero client.
 

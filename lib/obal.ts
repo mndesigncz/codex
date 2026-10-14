@@ -57,6 +57,14 @@ export type RozhodnutiObalu =
 
 export const ZPRAVA_PLATBY_V_OBALU = 'Předplatné se v aplikaci nespravuje.';
 
+/**
+ * Registrace nového podniku v provozní aplikaci není (Apple 3.1.3(f): účet služby se zakládá mimo
+ * aplikaci, aplikace na nákup ani neodkazuje). Stránka `/register` se v obalu přesměruje na krátké
+ * vysvětlení bez odkazu a API registrace odmítne. Zaměstnanci se dál připojují kódem (`/join`).
+ */
+export const CESTA_PODNIK_NA_WEBU = '/zalozit-podnik';
+export const ZPRAVA_REGISTRACE_V_OBALU = 'Účet podniku založíte na webu managero.app.';
+
 /** Veřejné právní a podpůrné stránky — musí jít otevřít z obou aplikací bez přihlášení. */
 export const PRAVNI_STRANKY = ['/soukromi', '/podminky', '/podpora', '/smazat-ucet'];
 
@@ -104,6 +112,8 @@ export function rozhodniObal(vstup: { obal: Obal; pathname: string; method?: str
     if (/^\/api\/billing\/(checkout|portal|upgrade)(\/|$)/.test(pathname)) {
       return { akce: 'api', status: 403, zprava: ZPRAVA_PLATBY_V_OBALU };
     }
+    // Založení podniku jen na webu (v hostovské aplikaci API stejně neprojde, viz níž).
+    if (jeTrasa(pathname, '/api/register')) return { akce: 'api', status: 403, zprava: ZPRAVA_REGISTRACE_V_OBALU };
     if (obal === 'client') {
       if (PROVOZNI_API_HOSTA.some(p => jeTrasa(pathname, p))) return { akce: 'api', status: 404, zprava: 'Nenalezeno.' };
       if (jeTrasa(pathname, '/api/client')) return { akce: 'pustit' };
@@ -129,6 +139,7 @@ export function rozhodniObal(vstup: { obal: Obal; pathname: string; method?: str
   // obal === 'managero': hostovské stránky ne (prodejní stránka `/` se řeší v app/page.tsx,
   // kde se bez přihlášení přesměruje na /login).
   if (jeHostovskaStranka(pathname)) return { akce: 'presmerovat', kam: '/' };
+  if (pathname === '/register' || pathname.startsWith('/register/')) return { akce: 'presmerovat', kam: CESTA_PODNIK_NA_WEBU };
   return { akce: 'pustit' };
 }
 

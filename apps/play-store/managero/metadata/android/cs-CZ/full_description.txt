@@ -16,7 +16,7 @@ PRO KOHO
 Pro majitele a manažery, kteří chtějí mít provoz pod kontrolou, i pro baristy a kuchaře, kteří chtějí vědět, kdy pracují a co mají dělat.
 
 POZNÁMKY
-• Aplikace je zatím dostupná v češtině.
+• Aplikace mluví jazykem telefonu: česky, anglicky, německy, slovensky nebo polsky (jiné než české texty jsou strojový překlad).
 • K přihlášení je potřeba účet podniku nebo pozvánka od vedení. Účet lze smazat přímo v aplikaci.
 • Hosté podniků používají samostatnou aplikaci Managero client.
 

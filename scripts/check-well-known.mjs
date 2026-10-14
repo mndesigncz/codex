@@ -8,8 +8,9 @@
 // JSON, obsahovat OBĚ aplikace (app.managero.app a app.managero.client), mít pro ně
 // disjunktní cesty (každý odkaz otevře právě jednu aplikaci) a servírovat se jako
 // application/json BEZ přesměrování: middleware je nesmí chytat (matcher) a next.config.js
-// musí nastavit Content-Type (soubor nemá příponu). Zástupná pole {{TEAM_ID}} a {{SHA256}}
-// se doplní po založení účtů u Applu a Googlu; s --release jsou chybou.
+// musí nastavit Content-Type (soubor nemá příponu). Zástupná pole {{TEAM_ID}}
+// (a {{SHA256_MANAGERO}}, {{SHA256_CLIENT}}) se doplní po založení účtů u Applu a Googlu
+// příkazem `node apps/scripts/well-known.mjs zapis --team=… --sha=…`; s --release jsou chybou.
 
 import { readFileSync } from 'node:fs';
 
@@ -40,26 +41,30 @@ if (aasa) {
   if (release && /\{\{/.test(JSON.stringify(aasa))) chyby.push('AASA: zbývá zástupné pole {{TEAM_ID}} (--release)');
 }
 
-// Jediný zdroj pravdy je apps/apps.json (linkCesty): commitnutý AASA musí být přesně to, co z něj vygeneruje
-// apps/scripts/well-known.mjs (jen s {{TEAM_ID}} místo skutečného Team ID). Jinak by se cesty iOS a Androidu rozešly.
-if (aasa) {
+// Jediný zdroj pravdy je apps/apps.json (linkCesty, android.sha256): commitnuté soubory musí být přesně to,
+// co z něj vygeneruje apps/scripts/well-known.mjs (`zapis`), dokud jsou v nich zástupná pole. Po doplnění Team ID
+// a otisků se porovnává jen struktura (níž). Obnova: node apps/scripts/well-known.mjs zapis [--team=…] [--sha=…]
+const { execFileSync } = await import('node:child_process');
+const vygeneruj = (druh) => JSON.parse(execFileSync('node', ['apps/scripts/well-known.mjs', druh, '--zastupne'], { encoding: 'utf8' }));
+if (aasa && /\{\{/.test(JSON.stringify(aasa))) {
   try {
-    const { execFileSync } = await import('node:child_process');
-    const vygenerovano = JSON.parse(execFileSync('node', ['apps/scripts/well-known.mjs', 'aasa', 'AAAAAAAAAA'], { encoding: 'utf8' }).replaceAll('AAAAAAAAAA', '{{TEAM_ID}}'));
-    const ted = JSON.stringify(aasa);
-    if (!release && JSON.stringify(vygenerovano) !== ted && !/\{\{/.test(ted)) { /* po doplnění Team ID se porovnává jen struktura níže */ }
-    else if (JSON.stringify(vygenerovano) !== ted) chyby.push('AASA: public/.well-known/apple-app-site-association neodpovídá apps/apps.json; obnov: node apps/scripts/well-known.mjs aasa AAAAAAAAAA | sed "s/AAAAAAAAAA/{{TEAM_ID}}/g" > public/.well-known/apple-app-site-association');
+    if (JSON.stringify(vygeneruj('aasa')) !== JSON.stringify(aasa)) chyby.push('AASA: public/.well-known/apple-app-site-association neodpovídá apps/apps.json; obnov: node apps/scripts/well-known.mjs zapis');
   } catch (e) { chyby.push(`AASA: generátor apps/scripts/well-known.mjs selhal (${String(e.message).split('\n')[0]})`); }
 }
 
 const links = json('public/.well-known/assetlinks.json');
+if (links && /\{\{/.test(JSON.stringify(links))) {
+  try {
+    if (JSON.stringify(vygeneruj('assetlinks')) !== JSON.stringify(links)) chyby.push('assetlinks.json neodpovídá apps/apps.json (android.sha256); obnov: node apps/scripts/well-known.mjs zapis');
+  } catch (e) { chyby.push(`assetlinks.json: generátor selhal (${String(e.message).split('\n')[0]})`); }
+}
 if (links) {
   const balicky = links.map(x => x.target?.package_name);
   for (const b of BALICKY) if (!balicky.includes(b)) chyby.push(`assetlinks.json: chybí balíček ${b}`);
   for (const x of links) {
     if (x.target?.namespace !== 'android_app') chyby.push('assetlinks.json: namespace musí být android_app');
     if (!Array.isArray(x.target?.sha256_cert_fingerprints) || !x.target.sha256_cert_fingerprints.length) chyby.push(`assetlinks.json: ${x.target?.package_name} nemá otisk certifikátu`);
-    if (release && JSON.stringify(x).includes('{{')) chyby.push(`assetlinks.json: ${x.target?.package_name} má zástupný otisk {{SHA256}} (--release)`);
+    if (release && JSON.stringify(x).includes('{{')) chyby.push(`assetlinks.json: ${x.target?.package_name} má zástupný otisk místo SHA-256 z Play App Signing (--release)`);
   }
 }
 
@@ -75,4 +80,4 @@ if (chyby.length) {
   for (const c of chyby) console.error(`  ✗ ${c}`);
   process.exit(1);
 }
-console.log(`.well-known: struktura v pořádku${release ? ', zástupná pole vyplněná' : ' (zástupná pole {{TEAM_ID}} a {{SHA256}} se doplní před vydáním)'}.`);
+console.log(`.well-known: struktura v pořádku${release ? ', zástupná pole vyplněná' : ' (zástupná pole {{TEAM_ID}}, {{SHA256_MANAGERO}} a {{SHA256_CLIENT}} se doplní před vydáním: node apps/scripts/well-known.mjs zapis --team=… --sha=…)'}.`);

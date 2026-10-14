@@ -118,14 +118,21 @@ function ios() {
   zapis(`${IOS}/App/en.lproj/InfoPlist.strings`, strings(1));
 
   // ---- Entitlements ---------------------------------------------------------------------------
-  // aps-environment: při exportu pro App Store Xcode sám přepíše development na production.
+  // aps-environment: `development` pro Run z Xcode (ladicí binárka, vývojový profil, sandbox APNs).
+  // Při exportu archivu pro App Store Connect, TestFlight nebo Ad Hoc ho Xcode podle distribučního
+  // profilu sám přepíše na `production` (automatické podepisování, i build_app ve Fastfile).
+  // Ověření po exportu: `codesign -d --entitlements - Payload/App.app` musí ukázat production.
+  // Při RUČNÍM podepisování distribučním profilem (fastlane match appstore bez automatiky) spusť
+  // skript s APS_ENV=production, jinak Xcode ohlásí nesoulad s profilem.
+  // Server pozná sandboxový token sám: ladicí binárka posílá env 'sandbox' (components/NativeBridge).
+  const aps = process.env.APS_ENV === 'production' ? 'production' : 'development';
   const domeny = [`applinks:${spolecne.domena}`, `webcredentials:${spolecne.domena}`];
   zapis(`${IOS}/App/App.entitlements`, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 \t<key>aps-environment</key>
-\t<string>development</string>
+\t<string>${aps}</string>
 \t<key>com.apple.developer.associated-domains</key>
 \t<array>
 ${domeny.map(d => `\t\t<string>${d}</string>`).join('\n')}
