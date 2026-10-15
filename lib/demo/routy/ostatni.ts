@@ -84,7 +84,7 @@ export const ostatni: Obsluha = (p, k) => {
   // ---- Výchozí způsob počítání bodů (kolo 91) pro okno postupu a úkolu ----
   if (cesta === '/api/body/vychozi' && metoda === 'GET') {
     const n = nastaveniRezimu(null);
-    return ok({ postupy: { ...n.postupy, zaklad: BODY.procedure }, ukoly: { ...n.ukoly, zaklad: BODY.task }, uzaverky: { ...n.uzaverky, zaklad: BODY.closing }, denniStrop: n.denniStrop, stropOd: n.stropOd });
+    return ok({ postupy: { ...n.postupy, zaklad: BODY.procedure }, ukoly: { ...n.ukoly, zaklad: BODY.task }, uzaverky: { ...n.uzaverky, zaklad: BODY.closing }, stropZap: n.stropZap, denniStrop: n.denniStrop, stropZdroje: n.stropZdroje, stropOd: n.stropOd });
   }
   // ---- Přepočet bodů zpětně (kolo 91): náhled dopadu a historie jen v paměti ukázky ----
   if (cesta === '/api/body/prepocet') {

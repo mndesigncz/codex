@@ -40,7 +40,7 @@ export default function ({ eq, ok }: Testy) {
   eq('do minusu jen ten, kdo z nuly a víc klesne pod nulu', s.doMinusu.map(d => d.uid), [2]);
 
   // ---- přepočet se stropem: změna řádku se promítne do dne a strop ji ořízne ----
-  const n = { denniStrop: 30, stropOd: null };
+  const n = { stropZap: true, denniStrop: 30, stropOd: null };
   // den: 2 průběhy po (základ 10 + řádek), uzávěrka 15 → plus = 10+6 + 10+6 + 15 = 47
   const den0 = { den: '2026-10-10', plus: 47, minus: 0, nahrazeno: false };
   const pred = ucinnyDen(den0, n);
@@ -60,7 +60,8 @@ export default function ({ eq, ok }: Testy) {
   ok('přepočet nemění updated_at (řádek zůstává „nedotčený“ pro další přepočet)', !/SET points = x\.p, srazka = x\.s, note = x\.n, updated_at/.test(db));
   ok('výchozí podniku: položka s vlastním způsobem se přeskočí', (db.match(/prepisPolozky\?\.rezim != null\) continue;/g) ?? []).length === 2);
   ok('staré hodnoty se uloží do body_prepocty dřív, než se řádky přepíšou', db.indexOf('INSERT INTO body_prepocty') < db.indexOf('UPDATE shift_review_items AS s SET points = x.p'));
-  ok('strop zpětně = stropOd null', /stropOd: rozsah\.zpetneStrop \? null : n0\.stropOd/.test(db));
+  ok('strop zpětně = odjakživa, změna stropu platí ode dne uložení', /n1\.stropOd = rozsah\.zpetneStrop \? null : stropSeZmenil\(n0, n1\) \? pragueToday\(\) : n0\.stropOd/.test(db));
+  ok('starší ruční hodnocení: převod jen s volbou, id do body_prepocty, vrácení zpět na NULL', /pravidla\.starsiHodnoceni === true/.test(db) && /predchozi \|\| \$\{JSON\.stringify\(\{ hodnoceni: ids \}\)\}/.test(db) && /SET nahradit_auto = NULL WHERE team_id = \$\{teamId\} AND id = ANY\(\$\{hodnoceni\}\) AND nahradit_auto = TRUE/.test(db));
 
   // ---- vrácení ----
   ok('vrátit jde jen poslední přepočet', /ORDER BY id DESC LIMIT 1/.test(db) && /Vrátit jde jen poslední přepočet\./.test(db));

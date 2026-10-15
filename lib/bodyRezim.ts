@@ -49,24 +49,41 @@ export interface PrepisRezimu {
   zaklad: number | null;
 }
 
+/**
+ * Zdroje bodů, které může podnik do denního stropu započítat (Martin: „chci mít možnost
+ * si nastavit všechno custom“). Srážky a tresty platí vždy mimo strop.
+ *  postupy, ukoly, uzaverky  — automatické body za dokončenou věc (základ + automatický řádek)
+ *  hodnoceni                 — automatické body z hodnocení směny (nesplněný úkol, kasa sedí…)
+ *  automaticke               — dochvilnost, výročí nástupu, narozeniny (point_awards kind 'auto')
+ *  navic                     — uznané zápisy Navíc bez nabídky (point_awards kind 'navic')
+ *  za_body                   — úkoly za body / nabídka Navíc (kind 'navic' se zápisem k nabídce)
+ *  pochvaly                  — pochvaly od vedení (kind 'vedeni')
+ *  vyzvy                     — týmové výzvy a poděkování mezi kolegy (kind 'vyzva', 'kolega')
+ *  rucne                     — ruční body vedení: body z ručního hodnocení směny a ruční body k položce
+ */
+export type ZdrojStropu = 'postupy' | 'ukoly' | 'uzaverky' | 'hodnoceni' | 'automaticke' | 'navic' | 'za_body' | 'pochvaly' | 'vyzvy' | 'rucne';
+export const ZDROJE_STROPU: ZdrojStropu[] = ['postupy', 'ukoly', 'uzaverky', 'hodnoceni', 'automaticke', 'navic', 'za_body', 'pochvaly', 'vyzvy', 'rucne'];
+/** Výchozí: jen automatické body za práci na směně. */
+export const VYCHOZI_ZDROJE_STROPU: ZdrojStropu[] = ['postupy', 'ukoly', 'uzaverky', 'hodnoceni'];
+/** Zdroje, které ruční hodnocení směny nahrazuje (automatické body dne). */
+export const AUTOMATICKE_ZDROJE: ZdrojStropu[] = ['postupy', 'ukoly', 'uzaverky', 'hodnoceni'];
+
 export interface NastaveniRezimu {
   postupy: PravidloRezimu;
   ukoly: PravidloRezimu;
   uzaverky: PravidloRezimu;
-  /** Denní strop automatických bodů na člověka; 0 = bez stropu. Výchozí 30. */
+  /** Denní strop zapnutý? Výchozí NE — nasazení nesmí nikomu nic zastropovat. */
+  stropZap: boolean;
+  /** Hodnota stropu na člověka a den (nabídne se 30). Platí jen se stropZap. */
   denniStrop: number;
-  /** Od kterého dne strop platí (YYYY-MM-DD); null = odjakživa („Přepočítat zpětně“). */
+  /** Které zdroje se do stropu počítají. */
+  stropZdroje: ZdrojStropu[];
+  /** Od kterého dne strop platí (YYYY-MM-DD) — den, kdy ho podnik zapnul nebo změnil; null = odjakživa (přepočet zpětně). */
   stropOd: string | null;
 }
 
 export const VYCHOZI_STROP = 30;
 export const MAX_STROP = 500;
-/**
- * Den nasazení stropu. Podnik, který strop nikdy neuložil, ho má od tohoto dne —
- * nasazení tak nezmění body za dny před ním. Zpětně (odjakživa) ho zapne až
- * „Přepočítat zpětně“ v nastavení bodů (uloží stropOd = null).
- */
-export const VYCHOZI_STROP_OD = '2026-10-16';
 
 export const VYCHOZI_PRAVIDLO: PravidloRezimu = { rezim: 'kombinace', bonus: false, zaPolozku: 1, srazka: 1 };
 
@@ -87,30 +104,44 @@ export function normalizujPravidlo(raw: any): PravidloRezimu {
   };
 }
 
-/** Nastavení z teams.points_config (klíče rezim, denniStrop, denniStropOd). */
+export function normalizujZdroje(raw: unknown): ZdrojStropu[] {
+  if (!Array.isArray(raw)) return [...VYCHOZI_ZDROJE_STROPU];
+  return ZDROJE_STROPU.filter(z => raw.includes(z));
+}
+
+/** Nastavení z teams.points_config (klíče rezim, denniStropZap, denniStrop, stropZdroje, denniStropOd). */
 export function nastaveniRezimu(pointsConfig: any): NastaveniRezimu {
   const pc = pointsConfig && typeof pointsConfig === 'object' ? pointsConfig : {};
   const rz = pc.rezim && typeof pc.rezim === 'object' ? pc.rezim : {};
-  let stropOd: string | null = VYCHOZI_STROP_OD;
-  if (Object.prototype.hasOwnProperty.call(pc, 'denniStropOd')) {
-    stropOd = typeof pc.denniStropOd === 'string' && DEN.test(pc.denniStropOd) ? pc.denniStropOd : null;
-  }
   return {
     postupy: normalizujPravidlo(rz.postupy),
     ukoly: normalizujPravidlo(rz.ukoly),
     uzaverky: normalizujPravidlo(rz.uzaverky),
+    stropZap: pc.denniStropZap === true,
     denniStrop: celeOd0(pc.denniStrop, VYCHOZI_STROP, MAX_STROP),
-    stropOd,
+    stropZdroje: normalizujZdroje(pc.stropZdroje),
+    stropOd: typeof pc.denniStropOd === 'string' && DEN.test(pc.denniStropOd) ? pc.denniStropOd : null,
   };
 }
 
 /** Klíče, které nastavení zapisuje zpátky do points_config (vedle sazebníku). */
-export function doPointsConfig(n: NastaveniRezimu): { rezim: Record<DruhBodu, PravidloRezimu>; denniStrop: number; denniStropOd: string | null } {
+export function doPointsConfig(n: NastaveniRezimu): {
+  rezim: Record<DruhBodu, PravidloRezimu>; denniStropZap: boolean; denniStrop: number; stropZdroje: ZdrojStropu[]; denniStropOd: string | null;
+} {
   return {
     rezim: { postupy: normalizujPravidlo(n.postupy), ukoly: normalizujPravidlo(n.ukoly), uzaverky: normalizujPravidlo(n.uzaverky) },
+    denniStropZap: n.stropZap === true,
     denniStrop: celeOd0(n.denniStrop, VYCHOZI_STROP, MAX_STROP),
+    stropZdroje: normalizujZdroje(n.stropZdroje),
     denniStropOd: n.stropOd && DEN.test(n.stropOd) ? n.stropOd : null,
   };
+}
+
+/** Změnil se strop (zapnutí, hodnota, zdroje)? Pak platí od dne uložení (nebo zpětně přepočtem). */
+export function stropSeZmenil(a: Pick<NastaveniRezimu, 'stropZap' | 'denniStrop' | 'stropZdroje'>, b: Pick<NastaveniRezimu, 'stropZap' | 'denniStrop' | 'stropZdroje'>): boolean {
+  if (a.stropZap !== b.stropZap) return true;
+  if (!a.stropZap) return false;
+  return a.denniStrop !== b.denniStrop || normalizujZdroje(a.stropZdroje).join() !== normalizujZdroje(b.stropZdroje).join();
 }
 
 export function normalizujPrepis(raw: any): PrepisRezimu | null {
@@ -231,46 +262,53 @@ function bodyPolozek(hotovo: number, celkem: number, p: UcinnePravidlo, zakladPo
 // ---------------------------------------------------------------------------
 // Denní strop a přednost ručního hodnocení
 
-/** Automatické body člověka za jeden den, sečtené zvlášť plus a minus. */
+/** Body člověka za jeden den: automatické zvlášť plus a minus, k tomu co jde do stropu. */
 export interface DenBodu {
   uid: number;
   den: string | null;
+  /** Automatické body dne (postupy, úkoly, uzávěrky, automatické hodnocení) — plus a srážky. */
   plus: number;
   minus: number;
   /** Vedení ten den ohodnotilo ručně a ruční body nahrazují automatické. */
   nahrazeno: boolean;
+  /** Kolik z `plus` patří zdrojům započítaným do stropu (chybí = celé plus). */
+  vStropu?: number;
+  /** Plusové body ostatních zdrojů započítaných do stropu (Navíc, pochvaly, ruční…). */
+  jine?: number;
 }
 
 export interface UcinnyDen {
-  /** Kolik se z automatických bodů dne opravdu započítá. */
+  /** Kolik se ze sledovaných bodů dne opravdu započítá. */
   efektivni: number;
-  /** Kolik nasbíral bez stropu a bez ručního hodnocení (plus + minus). */
+  /** Kolik nasbíral bez stropu a bez ručního hodnocení. */
   nasbirano: number;
   /** efektivni − nasbirano (≤ 0, když strop nebo ruční hodnocení něco ubraly). */
   uprava: number;
   zastropovano: boolean;
 }
 
-/** Platí strop pro den? Den bez data (staré řádky) se nestropuje. */
-export function stropPlati(den: string | null, n: Pick<NastaveniRezimu, 'denniStrop' | 'stropOd'>): boolean {
-  if (!den || !(n.denniStrop > 0)) return false;
+/** Platí strop pro den? Vypnutý strop nikdy; den bez data (staré řádky) se nestropuje. */
+export function stropPlati(den: string | null, n: Pick<NastaveniRezimu, 'stropZap' | 'denniStrop' | 'stropOd'>): boolean {
+  if (!den || !n.stropZap || !(n.denniStrop > 0)) return false;
   return n.stropOd == null || den >= n.stropOd;
 }
 
 /**
- * Jedno místo pravidla „nejvýš X bodů za den“: plus se sečte nejvýš do stropu,
- * srážky platí vždy. Ruční hodnocení dne, které nahrazuje automatické, z dne nechá 0.
+ * Jedno místo pravidla „nejvýš X bodů za den“: plus zdrojů ve stropu se sečte nejvýš do
+ * stropu, srážky platí vždy. Ruční hodnocení dne, které nahrazuje automatické, z automatických
+ * bodů dne nechá 0 (ostatní zdroje zůstávají).
  */
-export function ucinnyDen(d: Pick<DenBodu, 'den' | 'plus' | 'minus' | 'nahrazeno'>, n: Pick<NastaveniRezimu, 'denniStrop' | 'stropOd'>): UcinnyDen {
+export function ucinnyDen(d: Pick<DenBodu, 'den' | 'plus' | 'minus' | 'nahrazeno' | 'vStropu' | 'jine'>, n: Pick<NastaveniRezimu, 'stropZap' | 'denniStrop' | 'stropOd'>): UcinnyDen {
   const plus = Math.max(0, Math.round(d.plus) || 0);
   const minus = Math.min(0, Math.round(d.minus) || 0);
-  const nasbirano = plus + minus;
-  if (d.nahrazeno) return { efektivni: 0, nasbirano, uprava: -nasbirano, zastropovano: false };
-  if (stropPlati(d.den, n) && plus > n.denniStrop) {
-    const efektivni = n.denniStrop + minus;
-    return { efektivni, nasbirano, uprava: efektivni - nasbirano, zastropovano: true };
-  }
-  return { efektivni: nasbirano, nasbirano, uprava: 0, zastropovano: false };
+  const vStropu = d.vStropu == null ? plus : Math.max(0, Math.round(d.vStropu) || 0);
+  const jine = Math.max(0, Math.round(d.jine ?? 0) || 0);
+  const nasbirano = plus + minus + jine;
+  const autoUprava = d.nahrazeno ? -(plus + minus) : 0;
+  const veStropu = (d.nahrazeno ? 0 : vStropu) + jine;
+  const stropUprava = stropPlati(d.den, n) && veStropu > n.denniStrop ? n.denniStrop - veStropu : 0;
+  const uprava = autoUprava + stropUprava;
+  return { efektivni: nasbirano + uprava, nasbirano, uprava, zastropovano: stropUprava < 0 };
 }
 
 /** Plus a minus jednoho automatického řádku: se známou srážkou přesně, u starých řádků podle znaménka. */
@@ -283,9 +321,13 @@ export function rozdelRadek(points: number, srazka: number | null | undefined): 
   return p >= 0 ? { plus: p, minus: 0 } : { plus: 0, minus: p };
 }
 
-/** Ruční hodnocení směny nahrazuje automatické body dne? Jen když to vedení zvolilo a dalo body nebo hvězdy. */
-export function hodnoceniNahrazuje(r: { nahradit_auto?: boolean | null; points?: number | null; rating?: number | null } | null | undefined): boolean {
-  if (!r || r.nahradit_auto !== true) return false;
+/**
+ * Ruční hodnocení směny nahrazuje automatické body dne? Jen když to vedení zvolilo a dalo body
+ * nebo hvězdy. Starší hodnocení (nahradit_auto NULL) jen s `starsi` (volba přepočtu zpětně).
+ */
+export function hodnoceniNahrazuje(r: { nahradit_auto?: boolean | null; points?: number | null; rating?: number | null } | null | undefined, starsi = false): boolean {
+  if (!r) return false;
+  if (!(r.nahradit_auto === true || (starsi && r.nahradit_auto == null))) return false;
   return (Number(r.points) || 0) !== 0 || (Number(r.rating) || 0) > 0;
 }
 

@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
     zaznamu: v.souhrn.zaznamu,
     lidi: v.souhrn.lidi,
     celkem: v.souhrn.celkem,
+    hodnoceni: v.hodnoceni ?? 0,
     doMinusu: v.souhrn.doMinusu.map(d => ({ ...d, jmeno: jmeno(d.uid) })),
     clenove: v.souhrn.clenove.sort((a, b) => Math.abs(b.po - b.pred) - Math.abs(a.po - a.pred)).slice(0, 12).map(d => ({ ...d, jmeno: jmeno(d.uid) })),
   };
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
     const id = await provedPrepocet(c.teamId, c.meId, rozsah, pravidla, v);
     const znamenko = nahled.celkem > 0 ? '+' : '';
     await audit(c.teamId, c.meId, 'points.prepocet', 'body_prepocty', id,
-      `${rozsah.typ === 'podnik' ? 'výchozí podniku' : rozsah.typ === 'postup' ? `postup #${rozsah.id}` : `úkol #${rozsah.id}`}: ${nahled.zaznamu} záznamů, ${nahled.lidi} lidí, ${znamenko}${nahled.celkem} b`);
+      `${rozsah.typ === 'podnik' ? 'výchozí podniku' : rozsah.typ === 'postup' ? `postup #${rozsah.id}` : `úkol #${rozsah.id}`}: ${nahled.zaznamu} záznamů, ${nahled.lidi} lidí, ${znamenko}${nahled.celkem} b${nahled.hodnoceni ? `, ${nahled.hodnoceni} starších hodnocení nahrazuje` : ''}`);
     return NextResponse.json({ ok: true, id, nahled, historie: await historiePrepoctu(c.teamId) });
   } catch {
     return NextResponse.json({ error: 'Přepočet se nepodařilo uložit. Spusť /api/init.' }, { status: 500 });

@@ -23,6 +23,8 @@ export type RozsahPrepoctu =
 
 export interface NahledPrepoctu {
   zaznamu: number; lidi: number; celkem: number;
+  /** Kolik starších ručních hodnocení by začalo nahrazovat automatické body. */
+  hodnoceni?: number;
   doMinusu: { uid: number; jmeno: string | null; pred: number; po: number }[];
   clenove: { uid: number; jmeno: string | null; pred: number; po: number }[];
 }
@@ -40,7 +42,7 @@ export async function provedPrepocet(rozsah: RozsahPrepoctu, pravidla: Record<st
 const znam = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
 
 /** Zaškrtávátko „Přepočítat zpětně body“ pod formulářem (celý řádek je jedno zaškrtávací tlačítko). */
-export function PrepocetZpetne({ checked, onChange, hint }: { checked: boolean; onChange: (v: boolean) => void; hint?: string }) {
+export function PrepocetZpetne({ checked, onChange, hint, nazev }: { checked: boolean; onChange: (v: boolean) => void; hint?: string; nazev?: string }) {
   const t = useT('sprava');
   return (
     <button type="button" role="checkbox" aria-checked={checked} onClick={() => onChange(!checked)} data-prepocet-zpetne
@@ -50,7 +52,7 @@ export function PrepocetZpetne({ checked, onChange, hint }: { checked: boolean; 
         <Icon name="check" size={14} strokeWidth={3} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-[#16181A]">{t('Přepočítat zpětně body')}</span>
+        <span className="block text-sm font-semibold text-[#16181A]">{nazev ?? t('Přepočítat zpětně body')}</span>
         <span className="block text-xs text-black/50 mt-0.5 text-pretty">
           {hint ?? t('Automatické body se nastaví podle téhle změny, jako by platila odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.')}
         </span>
@@ -87,6 +89,11 @@ export function OknoNahledu({ open, nahled, chyba, ukladam, onPotvrdit, onZrusit
           : !nahled ? <div aria-busy className="space-y-2"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-16" /></div>
           : <>
             <p className="text-[15px] font-semibold text-[#16181A] text-pretty">{vetaDopadu(t, nahled)}</p>
+            {!!nahled.hodnoceni && (
+              <p className="text-sm text-[#16181A] text-pretty" data-starsi-hodnoceni>
+                {t('{n, plural, one {# starší ruční hodnocení směny začne} few {# starší ruční hodnocení směn začnou} other {# starších ručních hodnocení směn začne}} nahrazovat automatické body dne.', { n: nahled.hodnoceni })}
+              </p>
+            )}
             {nahled.doMinusu.length > 0 && (
               <div className="note note-danger text-sm" role="alert">
                 <p className="font-semibold">{t('Zůstatek by klesl pod nulu:')}</p>

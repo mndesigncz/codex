@@ -7,7 +7,7 @@ import type { Testy } from './_testy.ts';
 import { scoreRun } from '../../lib/procedureScoring.ts';
 import {
   bodyPostupu, bodyUkolu, bodyUzaverky, nastaveniRezimu, normalizujPrepis, ucinnePravidlo, doPointsConfig,
-  povinneZPoznamky, VYCHOZI_PRAVIDLO, VYCHOZI_STROP, VYCHOZI_STROP_OD, type PravidloRezimu,
+  povinneZPoznamky, stropSeZmenil, VYCHOZI_PRAVIDLO, VYCHOZI_STROP, VYCHOZI_ZDROJE_STROPU, type PravidloRezimu,
 } from '../../lib/bodyRezim.ts';
 import { parseStep, serializeStep, krokBody } from '../../lib/steps.ts';
 
@@ -22,10 +22,11 @@ export default function ({ eq, ok }: Testy) {
   // ---- výchozí nastavení: kombinace, strop 30 od dne nasazení ----
   const n = nastaveniRezimu({});
   eq('výchozí: všechny druhy „kombinace“ bez bonusu', [n.postupy.rezim, n.ukoly.rezim, n.uzaverky.rezim, n.postupy.bonus], ['kombinace', 'kombinace', 'kombinace', false]);
-  eq('výchozí denní strop 30', n.denniStrop, VYCHOZI_STROP);
-  eq('strop bez uloženého data platí od nasazení (historie beze změny)', n.stropOd, VYCHOZI_STROP_OD);
-  eq('„zpětně“ uloží stropOd = null (odjakživa)', nastaveniRezimu({ denniStropOd: null }).stropOd, null);
-  eq('zápis do points_config: tři klíče vedle sazebníku', Object.keys(doPointsConfig({ ...n, stropOd: null })), ['rezim', 'denniStrop', 'denniStropOd']);
+  eq('výchozí: denní strop VYPNUTÝ (nasazení nic nezastropuje), nabídne se 30, zdroje jen automatické', [n.stropZap, n.denniStrop, n.stropZdroje], [false, VYCHOZI_STROP, VYCHOZI_ZDROJE_STROPU]);
+  eq('uložené nastavení stropu se přečte', nastaveniRezimu({ denniStropZap: true, denniStrop: 40, stropZdroje: ['postupy', 'navic', 'nesmysl'], denniStropOd: '2026-10-21' }), { ...n, stropZap: true, denniStrop: 40, stropZdroje: ['postupy', 'navic'], stropOd: '2026-10-21' });
+  eq('zápis do points_config: pět klíčů vedle sazebníku', Object.keys(doPointsConfig({ ...n, stropOd: null })), ['rezim', 'denniStropZap', 'denniStrop', 'stropZdroje', 'denniStropOd']);
+  ok('změna stropu: zapnutí, hodnota i zdroje; vypnutý s jinou hodnotou ne', stropSeZmenil(n, { ...n, stropZap: true }) && stropSeZmenil({ ...n, stropZap: true }, { ...n, stropZap: true, denniStrop: 40 })
+    && stropSeZmenil({ ...n, stropZap: true }, { ...n, stropZap: true, stropZdroje: ['postupy'] }) && !stropSeZmenil(n, { ...n, denniStrop: 40 }));
   eq('nesmysl v nastavení = výchozí', nastaveniRezimu({ rezim: { postupy: { rezim: 'xx', zaPolozku: -3 } }, denniStrop: 'a' }).postupy, VYCHOZI_PRAVIDLO);
 
   // ---- kombinace = dnešní hybrid beze změny (řádek i poznámka) ----

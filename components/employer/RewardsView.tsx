@@ -36,12 +36,11 @@ import { MAX_HODNOT, MAX_PRISPEVEK, VYCHOZI_HODNOTY, VYCHOZI_PRISPEVEK, nastaven
 import { DRUHY_AUTO, MAX_BODU_AUTO, MIN_SMEN_TYDNE, nastaveniAuto, type DruhAuto, type NastaveniAuto } from '@/lib/automatickeBody';
 import { KLIC_KALENDAR, UDALOST_KALENDAR, urlZebricku, vyberKatalog, vyberPoradi, type ObdobiZebricku, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
-import { doPointsConfig, nastaveniRezimu, MAX_STROP, type DruhBodu, type NastaveniRezimu, type PravidloRezimu } from '@/lib/bodyRezim';
+import { doPointsConfig, nastaveniRezimu, stropSeZmenil, MAX_STROP, type DruhBodu, type NastaveniRezimu, type PravidloRezimu, type ZdrojStropu } from '@/lib/bodyRezim';
+import { NastaveniStropu } from '../body-rezim/Strop';
 import { VolbaRezimu } from '../body-rezim/VolbaRezimu';
 import { HistoriePrepoctu, OknoNahledu, PrepocetZpetne, nactiNahled, provedPrepocet, type NahledPrepoctu, type RozsahPrepoctu } from '../body-rezim/Prepocet';
 import { nazevDruhu } from '../body-rezim/veta';
-import { fmtDatum } from '@/lib/i18n/format';
-import { useJazyk } from '@/lib/i18n/client';
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
 import EmployeeProfile from './EmployeeProfile';
@@ -277,7 +276,7 @@ function NastaveniBodu({ onUlozeno }: { onUlozeno: () => void }) {
 /** Způsob počítání a strop z GET /api/rewards (server posílá tvar NastaveniRezimu). */
 function rezimZOdpovedi(r: any): NastaveniRezimu {
   if (!r || typeof r !== 'object') return nastaveniRezimu(null);
-  return nastaveniRezimu({ rezim: { postupy: r.postupy, ukoly: r.ukoly, uzaverky: r.uzaverky }, denniStrop: r.denniStrop, denniStropOd: r.stropOd ?? null });
+  return nastaveniRezimu({ rezim: { postupy: r.postupy, ukoly: r.ukoly, uzaverky: r.uzaverky }, denniStropZap: r.stropZap === true, denniStrop: r.denniStrop, stropZdroje: r.stropZdroje, denniStropOd: r.stropOd ?? null });
 }
 
 const DRUHY: DruhBodu[] = ['postupy', 'ukoly', 'uzaverky'];
@@ -286,11 +285,14 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
   levels: RewardLevel[]; points: PointsConfig | null; dik?: NastaveniDiku; auto?: NastaveniAuto; rezim?: NastaveniRezimu; onUlozeno: () => void;
 }) {
   const t = useT('sprava');
-  const { jazyk } = useJazyk();
-  // Kolo 91: způsob počítání bodů podle druhu, denní strop a „Přepočítat zpětně“.
+  // Kolo 91: způsob počítání bodů podle druhu, denní strop (výchozí vypnutý, plně volitelný) a „Přepočítat zpětně“.
   const [rezim, setRezim] = useState<NastaveniRezimu>(vychoziRezim ?? nastaveniRezimu(null));
+  const [puvodniStrop, setPuvodniStrop] = useState<NastaveniRezimu>(vychoziRezim ?? nastaveniRezimu(null));
+  const [stropZap, setStropZap] = useState<boolean>((vychoziRezim ?? nastaveniRezimu(null)).stropZap);
   const [stropText, setStropText] = useState<string>(String((vychoziRezim ?? nastaveniRezimu(null)).denniStrop));
+  const [zdroje, setZdroje] = useState<ZdrojStropu[]>((vychoziRezim ?? nastaveniRezimu(null)).stropZdroje);
   const [zpetne, setZpetne] = useState(false);
+  const [starsi, setStarsi] = useState(false);
   const [nahled, setNahled] = useState<{ open: boolean; data: NahledPrepoctu | null; chyba: string | null }>({ open: false, data: null, chyba: null });
   const [obnovHistorii, setObnovHistorii] = useState(0);
   const [urovne, setUrovne] = useState<RewardLevel[]>(vychoziUrovne);
@@ -309,15 +311,16 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
   const odebratUroven = (i: number) => setUrovne(ls => ls.filter((_, idx) => idx !== i));
 
   const strop = Math.max(0, Math.min(MAX_STROP, Number.parseInt(stropText, 10) || 0));
-  const stropZmenen = strop !== (vychoziRezim ?? nastaveniRezimu(null)).denniStrop;
-  // Přepočet (náhled i provedení): s „zpětně“ všechny druhy a strop odjakživa, jinak jen nový strop od data, odkdy platí.
+  const stropTed = { stropZap, denniStrop: strop, stropZdroje: zdroje };
+  const stropZmenen = stropSeZmenil(puvodniStrop, stropTed);
+  // Přepočet (náhled i provedení): se „zpětně“ všechny druhy a strop odjakživa, jinak jen nový strop od dne uložení.
   const rozsahPrepoctu: RozsahPrepoctu = { typ: 'podnik', druhy: zpetne ? DRUHY : [], zpetneStrop: zpetne };
-  const pravidlaPrepoctu = { rezim: { postupy: rezim.postupy, ukoly: rezim.ukoly, uzaverky: rezim.uzaverky }, denniStrop: strop };
+  const pravidlaPrepoctu = { rezim: { postupy: rezim.postupy, ukoly: rezim.ukoly, uzaverky: rezim.uzaverky }, ...stropTed, starsiHodnoceni: zpetne && starsi };
 
   const ulozitNastaveni = async (stropOd: string | null) => {
     // Způsob počítání a strop (kolo 91) jedou v points_config vedle sazebníku — PATCH přepisuje
     // celý JSON, bez nich by se ztratily.
-    await odeslatNastaveni({ ...body, ...doPointsConfig({ ...rezim, denniStrop: strop, stropOd }) });
+    await odeslatNastaveni({ ...body, ...doPointsConfig({ ...rezim, ...stropTed, stropOd }) });
   };
   // Výsledek čte volající (ulozitNastaveni → ulozit / potvrditPrepocet, obojí v try s hláškou).
   const odeslatNastaveni = (body: PointsConfig & Record<string, unknown>) =>
@@ -360,10 +363,12 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
     try {
       // Přepočet první: uloží si předchozí pravidlo (kvůli vrácení) a teprve pak se uloží zbytek formuláře.
       await provedPrepocet(rozsahPrepoctu, pravidlaPrepoctu);
-      const stropOd = zpetne ? null : rezim.stropOd;
+      // Stejně jako server (lib/bodyPrepocetDb): zpětně = odjakživa, nový strop ode dneška, jinak beze změny.
+      const stropOd = zpetne ? null : stropZmenen ? pragueToday() : rezim.stropOd;
       await ulozitNastaveni(stropOd);
-      setRezim(r => ({ ...r, denniStrop: strop, stropOd }));
-      setZpetne(false);
+      setRezim(r => ({ ...r, ...stropTed, stropOd }));
+      setPuvodniStrop(p => ({ ...p, ...stropTed, stropOd }));
+      setZpetne(false); setStarsi(false);
       setNahled({ open: false, data: null, chyba: null });
       setObnovHistorii(n => n + 1);
       setToast(t('Body jsou přepočítané a nastavení uložené.'));
@@ -430,18 +435,14 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
           ))}
         </div>
         <div className="mt-3 border-t border-black/[0.06] pt-4 space-y-3">
-          <Field id="body-strop" label={t('Denní strop automatických bodů (b)')}
-            hint={t('Nejvýš kolik automatických bodů člověk dostane za jeden den (postupy, úkoly, uzávěrky, automatické hodnocení). Srážky platí vždy. Navíc, pochvaly a ruční body vedení se nepočítají. 0 = bez stropu.')}>
-            <Input id="body-strop" type="text" inputMode="numeric" value={stropText} className="!w-24 tabular-nums"
-              onChange={e => setStropText(e.target.value.replace(/\D/g, '').slice(0, 3))} />
-          </Field>
-          <p className="t-meta" data-strop-od>
-            {strop === 0 ? t('Bez stropu.')
-              : rezim.stropOd ? t('Strop platí od {datum}, starší dny jsou beze změny, dokud body nepřepočítáš zpětně.', { datum: fmtDatum(rezim.stropOd, { jazyk, styl: 'kratce' }) })
-              : t('Strop platí pro všechny dny (přepočítáno zpětně).')}
-          </p>
+          <NastaveniStropu zap={stropZap} onZap={setStropZap} hodnota={stropText} onHodnota={setStropText}
+            zdroje={zdroje} onZdroje={setZdroje} stropOd={rezim.stropOd} zmenen={stropZmenen} />
           <PrepocetZpetne checked={zpetne} onChange={setZpetne}
-            hint={t('Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.')} />
+            hint={t('Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop (když je zapnutý) začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.')} />
+          {zpetne && (
+            <PrepocetZpetne checked={starsi} onChange={setStarsi} nazev={t('I starší ruční hodnocení směn považovat za nahrazující')}
+              hint={t('Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).')} />
+          )}
         </div>
       </Card>
       <HistoriePrepoctu obnov={obnovHistorii} onVraceno={onUlozeno} />

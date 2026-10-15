@@ -5,8 +5,10 @@
 // nikdy ručně neupravilo (created_by NULL, ne rucne, poznámka „auto:…“, updated_at ≈
 // created_at). Ruční úpravy vedení zůstávají. U úkolů bez řádku se řádek doplní, když
 // nové pravidlo dá jiný výsledek než základ. Uzávěrky jen ty se snímkem povinných věcí.
-// Strop: „zpětně“ = strop platí odjakživa (denniStropOd = null). Ruční přednost se
-// respektuje sama — ruční řádky se nemění a den s ručním hodnocením zůstává nahrazený.
+// Strop: změna stropu (zapnutí, hodnota, zdroje) platí ode dne uložení; „zpětně“ = odjakživa
+// (denniStropOd = null). Ruční přednost se respektuje sama — ruční řádky se nemění a den
+// s ručním hodnocením zůstává nahrazený; volba `starsiHodnoceni` navíc převede starší ruční
+// hodnocení (nahradit_auto NULL) na nahrazující (vratné).
 //
 // Zůstatky lidí se počítají z řádků (lib/pointsBalance), takže po přepočtu sedí všude.
 // Před uložením se staré hodnoty řádků i nastavení uloží do body_prepocty.
@@ -14,13 +16,14 @@
 import { neon } from '@neondatabase/serverless';
 import { normalizePoints, type PointsConfig } from './rewardLevels';
 import { breakdownForTeam, totalPoints } from './pointsBalance';
-import { nactiDny, upravyZDnu } from './bodyDenDb';
+import { nactiDny, upravyZDnu, volbyZNastaveni } from './bodyDenDb';
+import { pragueToday } from './pragueTime';
 import { clenovePodniku } from './tenant';
 import { normalizeSkipReasons } from './procedureScoring';
 import { sanitizeSteps } from './steps';
 import {
   bodyPostupu, bodyUkolu, bodyUzaverky, doPointsConfig, jeZmena, nastaveniRezimu, normalizujPrepis, normalizujPravidlo,
-  povinneZPoznamky, rozdelRadek, souhrnDopadu, ucinnePravidlo, MAX_STROP,
+  povinneZPoznamky, rozdelRadek, souhrnDopadu, ucinnePravidlo, MAX_STROP, normalizujZdroje, stropSeZmenil,
   type DenBodu, type DruhBodu, type NastaveniRezimu, type PrepisRezimu, type SouhrnDopadu, type ZmenaRadku,
 } from './bodyRezim';
 
@@ -34,7 +37,11 @@ export type Rozsah =
 export interface PravidlaPrepoctu {
   /** Podnik: nové výchozí pravidlo a strop. */
   rezim?: Partial<Record<DruhBodu, unknown>>;
+  stropZap?: unknown;
   denniStrop?: unknown;
+  stropZdroje?: unknown;
+  /** Podnik, zpětně: i starší ruční hodnocení směn (nahradit_auto NULL) považovat za nahrazující. */
+  starsiHodnoceni?: unknown;
   /** Položka: nové přepsání (null = podle podniku). */
   bodyRezim?: unknown;
   /** Postup: kroky z editoru, které se ukládají spolu s přepočtem (váhy a body kroků už podle nich). */
@@ -50,6 +57,9 @@ export interface VysledekPrepoctu {
   /** Položka: staré a nové přepsání. */
   prepis0?: PrepisRezimu | null;
   prepis1?: PrepisRezimu | null;
+  /** Kolik starších ručních hodnocení by se převedlo na nahrazující. */
+  hodnoceni?: number;
+  starsi?: boolean;
 }
 
 const ints = (a: unknown): number[] => (Array.isArray(a) ? a.map(n => parseInt(String(n))).filter(n => Number.isFinite(n)) : []);
@@ -74,13 +84,18 @@ function navrzeneNastaveni(n0: NastaveniRezimu, pravidla: PravidlaPrepoctu, rozs
   if (rozsah.typ !== 'podnik') return n0;
   const rz = pravidla.rezim && typeof pravidla.rezim === 'object' ? pravidla.rezim : {};
   const strop = Number(pravidla.denniStrop);
-  return {
+  const n1: NastaveniRezimu = {
     postupy: rz.postupy !== undefined ? normalizujPravidlo(rz.postupy) : n0.postupy,
     ukoly: rz.ukoly !== undefined ? normalizujPravidlo(rz.ukoly) : n0.ukoly,
     uzaverky: rz.uzaverky !== undefined ? normalizujPravidlo(rz.uzaverky) : n0.uzaverky,
+    stropZap: typeof pravidla.stropZap === 'boolean' ? pravidla.stropZap : n0.stropZap,
     denniStrop: pravidla.denniStrop !== undefined && Number.isFinite(strop) && strop >= 0 ? Math.min(MAX_STROP, Math.round(strop)) : n0.denniStrop,
-    stropOd: rozsah.zpetneStrop ? null : n0.stropOd,
+    stropZdroje: pravidla.stropZdroje !== undefined ? normalizujZdroje(pravidla.stropZdroje) : n0.stropZdroje,
+    stropOd: n0.stropOd,
   };
+  // Zpětně = odjakživa; nový nebo změněný strop platí ode dne uložení; jinak beze změny.
+  n1.stropOd = rozsah.zpetneStrop ? null : stropSeZmenil(n0, n1) ? pragueToday() : n0.stropOd;
+  return n1;
 }
 
 /** Spočítá, které řádky se změní, a dopad na zůstatky. Nic nezapisuje. */
@@ -96,6 +111,7 @@ export async function spocitejPrepocet(teamId: number, rozsah: Rozsah, pravidla:
   const chciPostupy = rozsah.typ === 'postup' || (rozsah.typ === 'podnik' && rozsah.druhy.includes('postupy'));
   const chciUkoly = rozsah.typ === 'ukol' || (rozsah.typ === 'podnik' && rozsah.druhy.includes('ukoly'));
   const chciUzaverky = rozsah.typ === 'podnik' && rozsah.druhy.includes('uzaverky');
+  const starsi = rozsah.typ === 'podnik' && pravidla.starsiHodnoceni === true;
 
   if (rozsah.typ === 'postup') {
     const [p] = await sql`SELECT id, body_rezim FROM procedures WHERE id = ${rozsah.id} AND team_id = ${teamId}`;
@@ -195,7 +211,9 @@ export async function spocitejPrepocet(teamId: number, rozsah: Rozsah, pravidla:
   const clenove = await clenovePodniku(teamId);
   const uids = Array.from(new Set([...clenove.map(c => c.id), ...zmeny.map(z => z.uid)]));
   const rozpady = await breakdownForTeam(teamId, uids, null, raw);
-  const dny = await nactiDny(teamId, uids, pt, null, 0, true);
+  // Dny „po“: zdroje stropu a starší ruční hodnocení podle návrhu; změny řádků se dopočítají níž.
+  const dny = await nactiDny(teamId, uids, pt, null, volbyZNastaveni(n1, { strop: 0, vse: true, starsiNahrazuji: starsi }));
+  const veStropu = (kind: ZmenaRadku['kind']) => n1.stropZdroje.includes(kind === 'procedure' ? 'postupy' : kind === 'task' ? 'ukoly' : 'uzaverky');
   const klic = (uid: number, den: string | null) => `${uid}|${den ?? ''}`;
   const mapaDnu = new Map<string, DenBodu>(dny.map(d => [klic(d.uid, d.den), { ...d }]));
   const rozdilRadku = new Map<number, number>();
@@ -206,6 +224,7 @@ export async function spocitejPrepocet(teamId: number, rozsah: Rozsah, pravidla:
     const s0 = z.id == null ? { plus: 0, minus: 0 } : rozdelRadek(z.stare, z.stareSrazka);
     const s1 = rozdelRadek(z.nove, z.noveSrazka);
     d.plus += s1.plus - s0.plus; d.minus += s1.minus - s0.minus;
+    if (veStropu(z.kind)) d.vStropu = (d.vStropu ?? 0) + s1.plus - s0.plus;
     mapaDnu.set(k, d);
   }
   const upravy1 = upravyZDnu(Array.from(mapaDnu.values()), n1);
@@ -215,10 +234,18 @@ export async function spocitejPrepocet(teamId: number, rozsah: Rozsah, pravidla:
     const po = pred - (b?.dayAdjust ?? 0) + (upravy1.get(uid)?.uprava ?? 0) + (rozdilRadku.get(uid) ?? 0);
     return { uid, pred, po };
   });
-  return { zmeny, souhrn: souhrnDopadu(zmeny, dopad), n0, n1, raw, prepis0, prepis1 };
+  // Starší ruční hodnocení, která by se převedla na nahrazující (počet do náhledu).
+  let hodnoceni = 0;
+  if (starsi) {
+    try {
+      const [r] = await sql`SELECT COUNT(*)::int AS n FROM shift_reviews WHERE team_id = ${teamId} AND nahradit_auto IS NULL AND (COALESCE(points, 0) <> 0 OR COALESCE(rating, 0) > 0)`;
+      hodnoceni = Number(r?.n) || 0;
+    } catch { /* před migrací */ }
+  }
+  return { zmeny, souhrn: souhrnDopadu(zmeny, dopad), n0, n1, raw, prepis0, prepis1, hodnoceni, starsi };
 }
 
-const KLICE_NASTAVENI = ['rezim', 'denniStrop', 'denniStropOd'] as const;
+const KLICE_NASTAVENI = ['rezim', 'denniStropZap', 'denniStrop', 'stropZdroje', 'denniStropOd'] as const;
 
 /** Provede přepočet: uloží pravidlo, přepíše řádky a zapíše, co bylo předtím. Vrátí id přepočtu. */
 export async function provedPrepocet(teamId: number, kdo: number, rozsah: Rozsah, pravidla: PravidlaPrepoctu, v: VysledekPrepoctu): Promise<number> {
@@ -235,7 +262,7 @@ export async function provedPrepocet(teamId: number, kdo: number, rozsah: Rozsah
     predchozi.bodyRezim = v.prepis0 ?? null;
   }
   const radky = v.zmeny.filter(z => z.id != null).map(z => ({ id: z.id, p: z.stare, s: z.stareSrazka, n: z.stareNote, np: z.nove }));
-  const souhrnUlozeny = { zaznamu: v.souhrn.zaznamu, lidi: v.souhrn.lidi, celkem: v.souhrn.celkem, doMinusu: v.souhrn.doMinusu.length };
+  const souhrnUlozeny = { zaznamu: v.souhrn.zaznamu, lidi: v.souhrn.lidi, celkem: v.souhrn.celkem, doMinusu: v.souhrn.doMinusu.length, hodnoceni: v.hodnoceni ?? 0 };
   const [hlava] = await sql`
     INSERT INTO body_prepocty (team_id, kdo, rozsah, pravidla, predchozi, radky, souhrn)
     VALUES (${teamId}, ${kdo}, ${JSON.stringify(rozsah)}::jsonb, ${JSON.stringify({ ...(pravidla ?? {}), items: undefined })}::jsonb,
@@ -247,6 +274,15 @@ export async function provedPrepocet(teamId: number, kdo: number, rozsah: Rozsah
   if (rozsah.typ === 'podnik') {
     const nove = doPointsConfig(v.n1);
     await sql`UPDATE teams SET points_config = COALESCE(points_config, '{}'::jsonb) || ${JSON.stringify(nove)}::jsonb WHERE id = ${teamId}`;
+    // Starší ruční hodnocení → nahrazující; id se zapíšou kvůli vrácení.
+    if (v.starsi) {
+      const prevedena = await sql`
+        UPDATE shift_reviews SET nahradit_auto = TRUE
+        WHERE team_id = ${teamId} AND nahradit_auto IS NULL AND (COALESCE(points, 0) <> 0 OR COALESCE(rating, 0) > 0)
+        RETURNING id`;
+      const ids = (prevedena as any[]).map(r => Number(r.id));
+      if (ids.length) await sql`UPDATE body_prepocty SET predchozi = predchozi || ${JSON.stringify({ hodnoceni: ids })}::jsonb WHERE id = ${id}`;
+    }
   } else if (rozsah.typ === 'postup') {
     await sql`UPDATE procedures SET body_rezim = ${v.prepis1 ? JSON.stringify(v.prepis1) : null}::jsonb WHERE id = ${rozsah.id} AND team_id = ${teamId}`;
   } else {
@@ -328,6 +364,8 @@ export async function vratPrepocet(teamId: number, kdo: number, id: number): Pro
   const rozsah = rozsahZTela(posledni.rozsah);
   const pred = posledni.predchozi && typeof posledni.predchozi === 'object' ? posledni.predchozi : {};
   if (rozsah?.typ === 'podnik') {
+    const hodnoceni = (Array.isArray(pred.hodnoceni) ? pred.hodnoceni : []).map((n: unknown) => Number(n)).filter((n: number) => Number.isFinite(n));
+    if (hodnoceni.length) await sql`UPDATE shift_reviews SET nahradit_auto = NULL WHERE team_id = ${teamId} AND id = ANY(${hodnoceni}) AND nahradit_auto = TRUE`;
     const mel = pred.pointsConfig && typeof pred.pointsConfig === 'object' ? pred.pointsConfig : {};
     const chybelo = (Array.isArray(pred.chybelo) ? pred.chybelo : []).filter((k: unknown) => KLICE_NASTAVENI.includes(k as any)).map(String);
     await sql`UPDATE teams SET points_config = (COALESCE(points_config, '{}'::jsonb) - ${chybelo}::text[]) || ${JSON.stringify(mel)}::jsonb WHERE id = ${teamId}`;

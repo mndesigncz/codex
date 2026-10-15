@@ -23,7 +23,9 @@ export async function GET() {
     postupy: { ...n.postupy, zaklad: pt.procedure },
     ukoly: { ...n.ukoly, zaklad: pt.task },
     uzaverky: { ...n.uzaverky, zaklad: pt.closing },
+    stropZap: n.stropZap,
     denniStrop: n.denniStrop,
+    stropZdroje: n.stropZdroje,
     stropOd: n.stropOd,
   });
 }

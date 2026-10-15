@@ -128,8 +128,9 @@ export async function bodyZaSmenu(teamId: number, employeeId: number, den: strin
     try { const [t] = await sql`SELECT points_config FROM teams WHERE id = ${teamId}`; raw = t?.points_config ?? null; } catch { /* výchozí */ }
     const n = nastaveniRezimu(raw);
     const d = await denSurovy(teamId, employeeId, den, raw);
-    const vys = ucinnyDen({ ...d, plus: d.plus + closingPts }, n);
-    nasbirano = vys.nasbirano; total = vys.efektivni; strop = n.denniStrop; zastropovano = vys.zastropovano;
+    const vStropu = (d.vStropu ?? d.plus) + (n.stropZdroje.includes('uzaverky') ? closingPts : 0);
+    const vys = ucinnyDen({ ...d, plus: d.plus + closingPts, vStropu }, n);
+    nasbirano = vys.nasbirano; total = vys.efektivni; strop = n.stropZap ? n.denniStrop : 0; zastropovano = vys.zastropovano;
   } catch { /* bez stropu, jako dřív */ }
   return { tasks, procedures, taskPts, procPts, closingPts, total, nasbirano, strop, zastropovano, config };
 }

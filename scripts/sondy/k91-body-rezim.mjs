@@ -42,8 +42,8 @@ const preteceni = (p) => p.evaluate(() => {
 
 const BODY = { task: 5, procedure: 10, closing: 15, ratingStar: 4, taskMissed: -5, procedureSkipped: -2, procedureMissed: -4, closingMissing: -10, closingBalanced: 3 };
 const PRAV = (rezim = 'kombinace') => ({ rezim, bonus: false, zaPolozku: 1, srazka: 1 });
-const REZIM = { postupy: PRAV(), ukoly: PRAV(), uzaverky: PRAV(), denniStrop: 30, stropOd: '2026-10-16' };
-const NAHLED = { zaznamu: 23, lidi: 6, celkem: -84, doMinusu: [{ uid: 17, jmeno: 'Jakub Horák', pred: 12, po: -4 }], clenove: [{ uid: 16, jmeno: 'Eva Nováková', pred: 240, po: 198 }, { uid: 17, jmeno: 'Jakub Horák', pred: 12, po: -4 }] };
+const REZIM = { postupy: PRAV(), ukoly: PRAV(), uzaverky: PRAV(), stropZap: false, denniStrop: 30, stropZdroje: ['postupy', 'ukoly', 'uzaverky', 'hodnoceni'], stropOd: null };
+const NAHLED = { zaznamu: 23, lidi: 6, celkem: -84, hodnoceni: 4, doMinusu: [{ uid: 17, jmeno: 'Jakub Horák', pred: 12, po: -4 }], clenove: [{ uid: 16, jmeno: 'Eva Nováková', pred: 240, po: 198 }, { uid: 17, jmeno: 'Jakub Horák', pred: 12, po: -4 }] };
 const HISTORIE = [{ id: 7, kdo: 'Martin Novák', kdy: `${DNES} 09:12:00`, rozsah: { typ: 'podnik', druhy: ['postupy'], zpetneStrop: false }, souhrn: { zaznamu: 11, lidi: 3, celkem: -20, doMinusu: 0 }, vraceno: null, lzeVratit: true }];
 const FIX = (stranka) => ({ stranka, polozky: [{ id: 'nastroj', widget: 'nastroj', velikost: 'L' }], dostupne: [], tarifem: [], zdroj: 'aplikace', rozsah: 'typ:vedeni', zamceno: false, smiUpravit: true, smiVychozi: true, verze: 0 });
 
@@ -105,7 +105,7 @@ async function nastaveni(p) {
   const karta = await nastaveni(p);
   const veta = (d) => text(karta.locator(`[data-volba-rezimu="${d}"] [data-veta-rezimu]`));
   tvrdi('R1: karta má postupy, úkoly a uzávěrky; výchozí věta postupů = dnešní kombinace', (await karta.locator('[data-volba-rezimu]').count()) === 3 && /za úplnost až dalších 10 b/.test(await veta('postupy')), await veta('postupy'));
-  tvrdi('R1: strop 30 s datem platnosti', (await karta.locator('#body-strop').inputValue()) === '30' && /Strop platí od/.test(await text(karta.locator('[data-strop-od]'))), await text(karta.locator('[data-strop-od]')));
+  tvrdi('R1: denní strop je ve výchozím stavu vypnutý („Bez stropu.“, žádné zdroje)', /Bez stropu\./.test(await text(karta.locator('[data-strop-od]'))) && (await karta.locator('[data-zdroj-stropu]').count()) === 0, await text(karta.locator('[data-strop-od]')));
   await karta.locator('[data-volba-rezimu="postupy"]').getByRole('tab', { name: 'Za celek' }).click();
   tvrdi('R1: „Za celek“ → „Za celý postup 10 b, za nedokončený krok −1 b, klíčový −3 b.“', /Za celý postup 10 b, za nedokončený krok −1 b, klíčový −3 b\./.test(await veta('postupy')), await veta('postupy'));
   await karta.locator('[data-volba-rezimu="ukoly"]').getByRole('tab', { name: 'Za každý krok' }).click();
@@ -115,12 +115,16 @@ async function nastaveni(p) {
   // R2: bez přepočtu jen PATCH
   await p.getByRole('button', { name: 'Uložit nastavení' }).click();
   const patch = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/teams' && z.m === 'PATCH'), 4000);
-  tvrdi('R2: Uložit bez přepočtu = PATCH /api/teams s rezim (postupy celek, úkoly kroky), strop 30, datum platnosti beze změny', !!patch && /"rezim":\{"postupy":\{"rezim":"celek"/.test(patch.body) && /"ukoly":\{"rezim":"kroky"/.test(patch.body) && /"denniStrop":30,"denniStropOd":"2026-10-16"/.test(patch.body), patch?.body?.slice(-300));
+  tvrdi('R2: Uložit bez přepočtu = PATCH /api/teams s rezim (postupy celek, úkoly kroky), strop pořád vypnutý', !!patch && /"rezim":\{"postupy":\{"rezim":"celek"/.test(patch.body) && /"ukoly":\{"rezim":"kroky"/.test(patch.body) && /"denniStropZap":false,"denniStrop":30,"stropZdroje":\["postupy","ukoly","uzaverky","hodnoceni"\],"denniStropOd":null/.test(patch.body), patch?.body?.slice(-300));
   tvrdi('R2: … a žádný přepočet', !(stav.zapisy ?? []).some(z => z.path === '/api/body/prepocet'));
 
   // R3: přepočet zpětně s náhledem
   stav.zapisy = [];
-  await karta.locator('[data-prepocet-zpetne]').click();
+  await karta.locator('[data-prepocet-zpetne]').first().click();
+  // Volba „i starší ruční hodnocení“ se ukáže až se zpětným přepočtem, výchozí vypnutá.
+  const starsi = karta.getByRole('checkbox', { name: /I starší ruční hodnocení/ });
+  tvrdi('R3: se zpětným přepočtem volba „I starší ruční hodnocení směn považovat za nahrazující“, výchozí vypnutá', (await starsi.count()) === 1 && (await starsi.getAttribute('aria-checked')) === 'false');
+  await starsi.click();
   await p.getByRole('button', { name: 'Uložit nastavení' }).click();
   const okno = p.getByRole('dialog', { name: 'Přepočítat zpětně body' });
   await okno.waitFor({ timeout: 6000 });
@@ -129,14 +133,15 @@ async function nastaveni(p) {
   tvrdi('R3: náhled „Změní se 23 záznamů u 6 lidí, celkem −84 b.“', /Změní se 23 záznamů u 6 lidí, celkem −84 b\./.test(tOkno), tOkno.slice(0, 200));
   tvrdi('R3: náhled ukáže, komu by zůstatek klesl pod nulu (Jakub 12 → −4)', /Zůstatek by klesl pod nulu/.test(tOkno) && /Jakub Horák: 12 → -4 b/.test(tOkno), tOkno);
   const nahledPost = (stav.zapisy ?? []).find(z => z.path === '/api/body/prepocet');
-  tvrdi('R3: náhled = POST s nahled:true, všemi druhy a strop zpětně', !!nahledPost && /"druhy":\["postupy","ukoly","uzaverky"\],"zpetneStrop":true/.test(nahledPost.body) && /"nahled":true/.test(nahledPost.body), nahledPost?.body);
+  tvrdi('R3: náhled = POST s nahled:true, všemi druhy, strop zpětně a starsiHodnoceni', !!nahledPost && /"druhy":\["postupy","ukoly","uzaverky"\],"zpetneStrop":true/.test(nahledPost.body) && /"nahled":true/.test(nahledPost.body) && /"starsiHodnoceni":true/.test(nahledPost.body), nahledPost?.body);
+  tvrdi('R3: náhled řekne, kolik starších hodnocení začne nahrazovat', /4 starší ruční hodnocení směn začnou nahrazovat automatické body dne/.test(tOkno), tOkno);
   tvrdi('R3: dokud se nepotvrdí, nic se neuloží', !(stav.zapisy ?? []).some(z => z.path === '/api/teams'));
   await okno.screenshot({ path: OUT + 'k91-body-nahled-1280.png' });
   await okno.getByRole('button', { name: 'Přepočítat a uložit' }).click();
   const poradi = await dokud(() => { const z = (stav.zapisy ?? []).filter(x => x.path === '/api/body/prepocet' || x.path === '/api/teams'); return z.length >= 3 ? z : null; }, 5000);
   tvrdi('R3: potvrzení = přepočet (nahled:false) a pak PATCH s denniStropOd null', !!poradi && /"nahled":false/.test(poradi[1].body) && poradi[2].path === '/api/teams' && /"denniStropOd":null/.test(poradi[2].body), JSON.stringify(poradi?.map(z => z.path)));
   await dokud(async () => (await okno.count()) === 0, 3000);
-  tvrdi('R3: po uložení text „Strop platí pro všechny dny“', /Strop platí pro všechny dny/.test(await text(karta.locator('[data-strop-od]'))));
+  tvrdi('R3: strop zůstal vypnutý („Bez stropu.“)', /Bez stropu\./.test(await text(karta.locator('[data-strop-od]'))));
 
   // R4: vrátit přepočet
   const hist = p.locator('[data-historie-prepoctu]');
@@ -150,16 +155,27 @@ async function nastaveni(p) {
   await ctx.close();
 }
 
-// R5: změna stropu bez přepočtu ukáže dopad
+// R5: zapnutí stropu (hodnota a zdroje) bez přepočtu ukáže dopad a platí ode dne uložení
 {
   const { ctx, p, stav } = await kontext({ fix: FIX('vedeni.odmeny'), posunCasu: POSUN, dalsi: podvrh });
   const karta = await nastaveni(p);
-  await karta.locator('#body-strop').fill('40');
+  await karta.locator('[data-nastaveni-stropu]').getByRole('switch').click();
+  const zdroje = karta.locator('[data-zdroj-stropu]');
+  const zaskrtnute = async () => (await zdroje.evaluateAll(els => els.filter(e => e.getAttribute('aria-checked') === 'true').map(e => e.getAttribute('data-zdroj-stropu')))).join(',');
+  tvrdi('R5: zapnutý strop nabídne 30 a 10 zdrojů, zaškrtnuté jen automatické', (await zdroje.count()) === 10 && (await zaskrtnute()) === 'postupy,ukoly,uzaverky,hodnoceni', await zaskrtnute());
+  await karta.locator('[data-zdroj-stropu="navic"]').click();
+  await karta.getByLabel('Strop na člověka a den (b)').fill('40');
+  tvrdi('R5: text „Nový strop začne platit dnem uložení“', /Nový strop začne platit dnem uložení/.test(await text(karta.locator('[data-strop-od]'))));
+  await karta.screenshot({ path: OUT + 'k91-body-strop-1280.png' });
   await p.getByRole('button', { name: 'Uložit nastavení' }).click();
   const okno = p.getByRole('dialog', { name: 'Přepočítat zpětně body' });
   const je = await dokud(async () => (await okno.count()) > 0, 5000);
   const post = (stav.zapisy ?? []).find(z => z.path === '/api/body/prepocet');
-  tvrdi('R5: nový strop 40 bez přepočtu → náhled dopadu (druhy [], strop od data), ne rovnou uložení', je && !!post && /"druhy":\[\],"zpetneStrop":false/.test(post.body) && /"denniStrop":40/.test(post.body), post?.body);
+  tvrdi('R5: zapnutý strop 40 s Navíc bez přepočtu → náhled dopadu (druhy [], ne zpětně), ne rovnou uložení', je && !!post && /"druhy":\[\],"zpetneStrop":false/.test(post.body) && /"stropZap":true,"denniStrop":40,"stropZdroje":\["postupy","ukoly","uzaverky","hodnoceni","navic"\]/.test(post.body) && /"starsiHodnoceni":false/.test(post.body), post?.body);
+  await dokud(async () => /Změní se/.test(await text(okno)), 4000);
+  await okno.getByRole('button', { name: 'Přepočítat a uložit' }).click();
+  const patch = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/teams' && z.m === 'PATCH'), 5000);
+  tvrdi('R5: uložení zapíše strop s dnešním datem platnosti', !!patch && new RegExp(`"denniStropZap":true,"denniStrop":40,"stropZdroje":\\[[^\\]]*"navic"\\],"denniStropOd":"${DNES}"`).test(patch.body), patch?.body?.slice(-260));
   await ctx.close();
 }
 
@@ -202,7 +218,7 @@ async function nastaveni(p) {
   tvrdi('R7: „Za každý krok“ → u kroku pole vlastních plus bodů (placeholder +1)', await dokud(async () => (await editor.getByLabel('Vlastní body kroku 1 za splnění').count()) === 1, 2000)
     && (await editor.getByLabel('Vlastní body kroku 1 za splnění').getAttribute('placeholder')) === '+1');
   await editor.getByLabel('Vlastní body kroku 1 za splnění').fill('3');
-  await sekce.locator('[data-prepocet-zpetne]').click();
+  await sekce.locator('[data-prepocet-zpetne]').first().click();
   await sekce.screenshot({ path: OUT + 'k91-body-postup-1280.png' });
   await editor.getByRole('button', { name: 'Uložit změny' }).click();
   const okno = p.getByRole('dialog', { name: 'Přepočítat zpětně body' });
@@ -243,13 +259,15 @@ for (const tel of [false, true]) {
   const { ctx, p } = await kontext({ fix: FIX('vedeni.odmeny'), posunCasu: POSUN, dalsi: podvrh, viewport: TEL, mobil: true });
   const karta = await nastaveni(p);
   await karta.locator('[data-volba-rezimu="uzaverky"]').getByRole('tab', { name: 'Za celek' }).click();
+  await karta.locator('[data-nastaveni-stropu]').getByRole('switch').click();
   await karta.scrollIntoViewIfNeeded();
   let pr = await preteceni(p);
   tvrdi('R8 (390): karta Způsob počítání nepřetéká', pr.dokument <= 0 && pr.prvky.length === 0, JSON.stringify(pr));
   await karta.screenshot({ path: OUT + 'k91-body-nastaveni-390.png' });
-  const cil = await karta.locator('[data-prepocet-zpetne]').boundingBox();
-  tvrdi('R8 (390): „Přepočítat zpětně body“ má cíl aspoň 44 px', !!cil && cil.height >= 44, JSON.stringify(cil));
-  await karta.locator('[data-prepocet-zpetne]').click();
+  const cil = await karta.locator('[data-prepocet-zpetne]').first().boundingBox();
+  const cilZ = await karta.locator('[data-zdroj-stropu="navic"]').boundingBox();
+  tvrdi('R8 (390): „Přepočítat zpětně body“ i zdroj stropu mají cíl aspoň 44 px', !!cil && cil.height >= 44 && !!cilZ && cilZ.height >= 44, JSON.stringify([cil, cilZ]));
+  await karta.locator('[data-prepocet-zpetne]').first().click();
   await p.getByRole('button', { name: 'Uložit nastavení' }).click();
   const okno = p.getByRole('dialog', { name: 'Přepočítat zpětně body' });
   await okno.waitFor({ timeout: 6000 });
