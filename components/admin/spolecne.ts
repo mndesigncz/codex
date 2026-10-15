@@ -18,6 +18,7 @@ export const ZASAH_NAZEV: Record<string, string> = {
   'team.block': 'Pozastaven', 'team.unblock': 'Obnoven', 'team.plan': 'Tarif nastaven ručně',
   'team.trial': 'Zkušební doba prodloužena', 'team.note': 'Poznámka správce',
   'report.removed': 'Nahlášený obsah odstraněn', 'report.resolved': 'Nahlášení vyřízeno', 'report.dismissed': 'Nahlášení zamítnuto',
+  'retence.nahled': 'Náhled retence spočítán',
 };
 
 export interface Zasah { id: number; actor: string; action: string; teamId: number | null; teamName: string | null; detail: string | null; createdAt: string | null }

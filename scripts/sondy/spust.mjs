@@ -170,6 +170,10 @@ export const ZELENE = [
   'k87-za-body-z',
   'k87-za-body-ved',
   'k88-souhlas',
+  // spuštění, balík C: fyzické kartičky (správa, přiřazení u kasy, Moje)
+  'k90-karty',
+  'k90-bezpecnost',
+  'k90-host-data',
   'preteceni-vedeni',
   'preteceni-vedeni-tablet',
   'preteceni-zamestnanec',

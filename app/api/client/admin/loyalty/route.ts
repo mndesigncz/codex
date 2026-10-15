@@ -8,6 +8,7 @@ import { audit } from '@/lib/audit';
 import { radaPoDnech } from '@/lib/bodyPrehledy';
 import { cisloCs } from '@/lib/bodyPravidla';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -68,6 +69,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj(['vernost.upravit_body', 'vernost.kredit_upravit']);
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   // Kredit jsou peníze hosta u podniku, body jen odměna — ruční zásah do

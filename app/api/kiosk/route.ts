@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
-import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, roleClena, type Kontext } from '@/lib/opravneniDb';
 import { navic, systemovaRole } from '@/lib/opravneni';
 import { audit } from '@/lib/audit';
+import { novyPin } from '@/lib/pinTabletu';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,9 +41,8 @@ export async function POST(req: NextRequest) {
   const c = await pozaduj('kiosk.spravovat');
   if (jeOdpoved(c)) return c;
 
-  if (!(await teamIsPro(c.teamId))) {
-    return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
-  }
+  const tarif = await pozadujTarif(c.teamId, 'pro');
+  if (tarif) return tarif;
 
   const b = await req.json().catch(() => ({}));
   const email = String(b.email ?? '').trim().toLowerCase();
@@ -90,8 +90,10 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const userId = parseInt(b.userId);
   if (!Number.isFinite(userId)) return NextResponse.json({ error: 'Neplatný uživatel' }, { status: 400 });
-  const pin = b.pin === null || b.pin === '' ? null : String(b.pin).replace(/\D/g, '').slice(0, 6);
-  if (pin !== null && pin.length < 4) return NextResponse.json({ error: 'PIN musí mít 4–6 číslic.' }, { status: 400 });
+  // Nové PINy mají 6 číslic (lib/pinTabletu); staré čtyřmístné na tabletu fungují dál.
+  const novy = novyPin(b.pin);
+  if (!novy.ok) return NextResponse.json({ error: novy.chyba }, { status: 400 });
+  const pin = novy.pin;
 
   // Kolo 62: členství nebo zrcadlo (tablet helper vyloučí sám). PIN leží na
   // osobě, takže platí ve všech jejích podnicích — to je záměr, ne chyba.
@@ -108,6 +110,7 @@ export async function PATCH(req: NextRequest) {
   const pinHash = pin === null ? null : await bcrypt.hash(pin, 10);
   try {
     await sql`UPDATE users SET pin_hash = ${pinHash}, pin = NULL WHERE id = ${userId}`;
+    try { await sql`UPDATE users SET pin_delka = ${pin === null ? null : pin.length} WHERE id = ${userId}`; } catch { /* sloupec ještě není */ }
   } catch {
     // Sloupec pin_hash ještě nemusí existovat (chybí migrace) — ať zápis PINu
     // neselže, uloží se postaru a při první migraci se převede.

@@ -10,13 +10,19 @@ import { useState } from 'react';
 import { useLoad, PageHeader, ListRow, EmptyState, ErrorState, PageSkeleton, Chip, Button, Modal } from '@/components/ui';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { nazevDuvodu, LHUTA_NAHLASENI_HODIN, type StavLhuty } from '@/lib/moderace';
+import { nazevKategorieDsa, DRUH_WEB } from '@/lib/dsa';
 import { okJson } from '@/lib/api';
 
 interface Nahlaseni {
   id: number; teamId: number | null; teamName: string | null; kind: string; reason: string; detail: string | null;
   snapshot: string | null; status: string; createdAt: string | null; resolvedAt: string | null; escalatedAt: string | null;
   reporterName: string | null; reportedName: string | null; lhuta: StavLhuty;
+  /** Oznámení z veřejného formuláře /nahlasit (DSA): kontakt oznamovatele a odkaz na obsah. */
+  web?: { reporterEmail: string | null; reporterJmeno: string | null; url: string | null } | null;
 }
+
+const jeWeb = (n: Nahlaseni) => n.kind === DRUH_WEB;
+const coJe = (n: Nahlaseni) => jeWeb(n) ? 'formulář /nahlasit' : n.kind === 'zprava' ? 'zpráva v chatu' : 'nápad';
 
 const STAV: Record<string, { nazev: string; ton: 'ok' | 'muted' | 'bad' }> = {
   removed: { nazev: 'Obsah odstraněn', ton: 'ok' }, resolved: { nazev: 'Vyřízeno', ton: 'ok' }, dismissed: { nazev: 'Zamítnuto', ton: 'muted' },
@@ -35,7 +41,7 @@ export default function NahlaseniSprava() {
   const [chyba, setChyba] = useState<string | null>(null);
 
   // Dvě akce na řádku: odstranit, nebo ponechat (zamítnout). „Vyřízeno jinak“ je cesta vedení podniku.
-  const vyrid = async (n: Nahlaseni, akce: 'odstranit' | 'zamitnout') => {
+  const vyrid = async (n: Nahlaseni, akce: 'odstranit' | 'zamitnout' | 'vyreseno') => {
     setBezi(n.id); setChyba(null);
     try {
       await okJson(await fetch(`/api/admin/nahlaseni/${n.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ akce }) }));
@@ -56,22 +62,34 @@ export default function NahlaseniSprava() {
       ) : z.loading ? (
         <PageSkeleton tiles={2} />
       ) : z.data!.nahlaseni.length === 0 ? (
-        <EmptyState icon="inbox" title="Nic nahlášeného" hint="Sem přijde každé nahlášení zprávy v chatu nebo nápadu z kteréhokoli podniku." />
+        <EmptyState icon="inbox" title="Nic nahlášeného" hint="Sem přijde každé nahlášení zprávy v chatu nebo nápadu z kteréhokoli podniku a každé oznámení z veřejného formuláře /nahlasit." />
       ) : (
         <section className="card p-2 sm:p-3" aria-label={otevrena ? `Nahlášení, ${otevrena} otevřených` : 'Nahlášení'}>
           <ul className="list">
             {z.data!.nahlaseni.map(n => (
               <ListRow key={n.id}
-                title={<span className="flex flex-wrap items-center gap-x-2">{nazevDuvodu(n.reason)}
+                title={<span className="flex flex-wrap items-center gap-x-2">{jeWeb(n) ? nazevKategorieDsa(n.reason) : nazevDuvodu(n.reason)}
                   {n.teamId != null && <Link href={`/admin/teams/${n.teamId}`} className="font-normal text-black/60 underline-offset-2 hover:underline">{n.teamName ?? `podnik ${n.teamId}`}</Link>}</span>}
-                meta={`${n.createdAt ? dbTimeDayHM(n.createdAt) : '—'} · ${n.kind === 'zprava' ? 'zpráva v chatu' : 'nápad'}${n.escalatedAt ? ' · e-mail odešel' : n.status === 'open' ? ' · e-mail neodešel' : ''}`}
+                meta={`${n.createdAt ? dbTimeDayHM(n.createdAt) : '—'} · ${coJe(n)}${n.escalatedAt ? ' · e-mail odešel' : n.status === 'open' ? ' · e-mail neodešel' : ''}`}
                 detail={<>
-                  <span className="block">{n.reporterName ?? 'Neznámý'} nahlásil {n.reportedName ?? 'smazaný účet'}</span>
+                  {jeWeb(n) ? (
+                    <span className="block break-words">Oznámil {n.web?.reporterJmeno ?? n.reporterName ?? 'neznámý'}{n.web?.reporterEmail ? ` (${n.web.reporterEmail})` : ' bez e-mailu'}{n.web?.url ? <> · <a href={n.web.url} target="_blank" rel="noopener noreferrer nofollow" className="underline underline-offset-2">odkaz na obsah</a></> : null}</span>
+                  ) : (
+                    <span className="block">{n.reporterName ?? 'Neznámý'} nahlásil {n.reportedName ?? 'smazaný účet'}</span>
+                  )}
                   {n.snapshot ? <span className="block break-words">„{n.snapshot}“</span> : <span className="block">Obsah se nezachoval.</span>}
-                  {n.detail && <span className="block break-words mt-0.5">Poznámka: {n.detail}</span>}
+                  {n.detail && <span className="block break-words mt-0.5">{jeWeb(n) ? 'Vysvětlení' : 'Poznámka'}: {n.detail}</span>}
                 </>}
                 right={<ChipLhuty l={n.lhuta} status={n.status} />}
-                actions={n.status === 'open' ? (
+                actions={n.status === 'open' && jeWeb(n) ? (
+                  // Obsah z webového oznámení aplikace sama neodstraní (může být kdekoli): správce ho odstraní
+                  // ručně a tady zapíše rozhodnutí. Oznamovatel dostane e-mail s rozhodnutím (DSA čl. 16 odst. 5).
+                  <span className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="danger" className="max-sm:!h-11" onClick={() => void vyrid(n, 'odstranit')} loading={bezi === n.id} disabled={bezi != null} title="Obsah jsi odstranil nebo omezil; oznamovatel dostane rozhodnutí.">Obsah odstraněn</Button>
+                    <Button size="sm" variant="secondary" className="max-sm:!h-11" onClick={() => void vyrid(n, 'vyreseno')} disabled={bezi != null} title="Vyřízeno jinak, například s podnikem.">Vyřízeno jinak</Button>
+                    <Button size="sm" variant="secondary" className="max-sm:!h-11" onClick={() => void vyrid(n, 'zamitnout')} disabled={bezi != null} title="Obsah není nezákonný, zůstane.">Ponechat</Button>
+                  </span>
+                ) : n.status === 'open' ? (
                   <span className="flex flex-wrap gap-2">
                     <Button size="sm" variant="danger" className="max-sm:!h-11" onClick={() => setOdstranit(n)} disabled={bezi != null}>Odstranit obsah</Button>
                     <Button size="sm" variant="secondary" className="max-sm:!h-11" onClick={() => void vyrid(n, 'zamitnout')} loading={bezi === n.id} disabled={bezi != null} title="Obsah pravidla neporušuje, zůstane.">Ponechat</Button>

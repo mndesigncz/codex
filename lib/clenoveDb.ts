@@ -10,6 +10,7 @@ import { audit } from './audit';
 import { posliKupon } from './kuponyRozeslani';
 import { jeVidetelnyHostum, stavKuponu } from './kuponyPravidla';
 import type { PrijemceZpravy } from './zpravyKanaly';
+import { souhlasyPrijemcu } from './consentsDb';
 import { maKampane } from './stamps';
 import { tierForMember, tierRulesFromProfile } from './clientSlots';
 import { efektivniSleva } from './slevy';
@@ -226,9 +227,13 @@ export async function nactiPrijemce(teamId: number, ids?: number[]): Promise<Pri
         SELECT m.customer_id AS id, us.name, us.email, us.lang, us.notif_prefs AS prefs, m.blocked
         FROM client_memberships m JOIN users us ON us.id = m.customer_id
         WHERE m.team_id = ${teamId}`) as any[];
+  // Souhlas s novinkami TOHOTO podniku (spuštění, balík G). Bez tabulky souhlasů (před migrací) zůstane
+  // `souhlas` nevyplněný a filtry vezmou globální souhlas jako dřív.
+  const souhlasy = await souhlasyPrijemcu(teamId, rows.map(r => Number(r.id))).catch(() => null);
   return rows.map(r => ({
     id: Number(r.id), name: String(r.name ?? ''), email: r.email ?? null, lang: r.lang ?? null,
     blocked: r.blocked === true, prefs: r.prefs && typeof r.prefs === 'object' ? r.prefs : null,
+    souhlas: souhlasy?.get(Number(r.id)),
   }));
 }
 

@@ -17,6 +17,7 @@ import { ulozKartu } from '@/lib/offlineKarta';
 import { pragueDaySafe } from '@/lib/pragueTime';
 import UcetHosta from './UcetHosta';
 import KartaNastroje from './KartaNastroje';
+import KartickyHosta from './KartickyHosta';
 import MamPoukaz from './MamPoukaz';
 import HostHistorie from './loyalty/HostHistorie';
 import HostPoukazy from './loyalty/HostPoukazy';
@@ -75,6 +76,8 @@ export default function MyPage() {
     <div className="space-y-8 sm:space-y-10">
       <MemberCard name={d.me?.name} card={card} />
       {card?.code && <KartaNastroje karta={card} podniky={(d.memberships ?? []).map((m: any) => ({ slug: m.slug, name: m.name }))} />}
+      {/* Plastové karty od podniků (spuštění, balík C): připojené karty a „Mám plastovou kartu“. */}
+      <KartickyHosta />
 
       {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
 

@@ -6,8 +6,8 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { stavPravidel, ulozKoncept, zahodKoncept } from '@/lib/pravidlaVerze';
 import { KLICE_KONCEPTU } from '@/lib/bodyPravidla';
-import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 import { PUT as ulozPravidlaProfilu } from '../../profile/route';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -21,7 +21,8 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const ctx = await pozaduj('vernost.pravidla');
   if (jeOdpoved(ctx)) return ctx;
-  if (!(await teamIsMax(ctx.teamId))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const action = String(b.action ?? '');
 

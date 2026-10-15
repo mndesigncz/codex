@@ -13,8 +13,9 @@ import { cistyJazyk } from '@/lib/i18n/config';
 import { cistaZeme, PREDVOLBY_ZEMI } from '@/lib/i18n/zeme';
 import { normalizujNavKonfig } from '@/lib/navigace';
 import { cistyIco, cistyDic, cistyPrah, pragySedi } from '@/lib/podnikProfil';
-import { cistePevneNaklady, pevneNakladyZDb, type PevnyNaklad } from '@/lib/financeWidgety';
+import { cistePevneNaklady } from '@/lib/financeWidgety';
 import { cilMarze } from '@/lib/recepturyPrehled';
+import { nastaveniZRadku } from '@/lib/nastaveniPodniku';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,10 +41,21 @@ export async function GET() {
     const teamId = dbUser?.team_id ?? null;
     if (!teamId) return NextResponse.json({ team: null });
 
-    // Core columns only — never depend on newer optional columns here, so a
-    // pending migration can NEVER make a team look like it disappeared.
-    const [team] = await sql`SELECT id, name, owner_id, join_code, created_at FROM teams WHERE id = ${teamId}`;
-    if (!team) return NextResponse.json({ team: null });
+    // Výkon (spuštění, balík S): dřív tu bylo osmnáct dotazů za sebou, teď
+    // jeden řádek týmu (`SELECT *` vrátí jen sloupce, které už existují —
+    // chybějící sloupec před migrací nic nerozbije, viz lib/nastaveniPodniku)
+    // a role, připnutý odkaz a členové souběžně.
+    const [teamRows, r, pinnedRows, clenove] = await Promise.all([
+      sql`SELECT * FROM teams WHERE id = ${teamId}`,
+      roleClena(me.id, Number(teamId)),
+      sql`SELECT token, title, kind FROM share_links WHERE team_id = ${teamId} AND pinned = TRUE AND enabled = TRUE LIMIT 1`
+        .catch(() => [] as Record<string, unknown>[]),
+      // Sazby se načtou vždy a níž se skryjí podle finance.mzdy — jinak by
+      // dotaz na členy musel čekat na roli.
+      clenovePodniku(teamId, { sSazbou: true }),
+    ]);
+    const radek = teamRows[0] as Record<string, unknown> | undefined;
+    if (!radek) return NextResponse.json({ team: null });
 
     // Kolo 67: nastavení podniku (měna, uzávěrky, přehledy, tarif…) čte každý
     // člen — stojí na nich jeho vlastní obrazovky i tablet. Citlivá pole jen
@@ -52,133 +64,13 @@ export async function GET() {
     // finance.nastaveni), podrobnosti předplatného
     // (predplatne.zobrazit). Kdo v podniku není členem (host se zrcadlem
     // team_id), neprojde vůbec — dřív tu dostal i join kód.
-    const r = await roleClena(me.id, Number(teamId));
     if (!r) return NextResponse.json({ team: null });
     const ma = (k: string) => r.opravneni.has(k);
+    const team = nastaveniZRadku(radek, ma('finance.zobrazit') || ma('finance.nastaveni'));
     if (!ma('tym.pozvat')) team.join_code = null;
 
-    // Optional/newer columns fetched defensively; missing column ⇒ safe default.
-    let payDailyCash = false;
-    let closingRequiresShift = true;
-    let payoutFromRegister = true;
-    let showTeamSchedule = true;
-    try {
-      const [extra] = await sql`SELECT pay_daily_cash, closing_requires_shift FROM teams WHERE id = ${teamId}`;
-      payDailyCash = !!extra?.pay_daily_cash;
-      closingRequiresShift = extra?.closing_requires_shift !== false;
-    } catch { /* columns not migrated yet */ }
-    try {
-      const [extra] = await sql`SELECT payout_from_register FROM teams WHERE id = ${teamId}`;
-      payoutFromRegister = extra?.payout_from_register !== false;
-    } catch { /* column not migrated yet */ }
-    try {
-      const [extra] = await sql`SELECT show_team_schedule FROM teams WHERE id = ${teamId}`;
-      showTeamSchedule = extra?.show_team_schedule !== false;
-    } catch { /* column not migrated yet */ }
-
-    // Do cash tips physically stay in the drawer? Drives the expected-cash math.
-    let tipsInDrawer = false;
-    let drawerFloat: number | null = null;
-    try {
-      const [extra] = await sql`SELECT drawer_float FROM teams WHERE id = ${teamId}`;
-      drawerFloat = extra?.drawer_float ?? null;
-    } catch { /* not migrated */ }
-    try {
-      const [extra] = await sql`SELECT tips_in_drawer FROM teams WHERE id = ${teamId}`;
-      tipsInDrawer = extra?.tips_in_drawer === true;
-    } catch { /* column not migrated yet */ }
-
-    let dashboardConfig: any = {};
-    try {
-      const [dc] = await sql`SELECT dashboard_config FROM teams WHERE id = ${teamId}`;
-      dashboardConfig = dc?.dashboard_config && typeof dc.dashboard_config === 'object' ? dc.dashboard_config : {};
-    } catch { /* column not migrated yet */ }
-
-    let levelsConfig: any = [];
-    let pointsConfig: any = {};
-    try {
-      const [rc] = await sql`SELECT levels_config, points_config FROM teams WHERE id = ${teamId}`;
-      levelsConfig = Array.isArray(rc?.levels_config) ? rc.levels_config : [];
-      pointsConfig = rc?.points_config && typeof rc.points_config === 'object' ? rc.points_config : {};
-    } catch { /* columns not migrated yet */ }
-
-    // Business/localization settings (defensive — safe defaults before migration).
-    let biz = { currency: 'CZK', locale: 'cs-CZ', week_start: 1, labor_target_pct: null as number | null,
-                low_stock_default: 5, critical_stock_default: 2, business_type: null as string | null,
-                address: null as string | null, country: null as string | null, ico: null as string | null, dic: null as string | null, ico_dic_ok: false };
-    try {
-      const [b] = await sql`
-        SELECT currency, locale, week_start, labor_target_pct, low_stock_default, critical_stock_default, business_type
-        FROM teams WHERE id = ${teamId}`;
-      if (b) biz = {
-        ...biz,
-        currency: b.currency || 'CZK',
-        locale: b.locale || 'cs-CZ',
-        week_start: b.week_start ?? 1,
-        labor_target_pct: b.labor_target_pct ?? null,
-        low_stock_default: b.low_stock_default ?? 5,
-        critical_stock_default: b.critical_stock_default ?? 2,
-        business_type: b.business_type ?? null,
-      };
-    } catch { /* columns not migrated yet */ }
-    // Cílová marže na položku (kolo 7): vlastní dotaz, sloupec přibývá s /api/init. NULL = výchozí 65 %.
-    let marginTargetPct: number | null = null;
-    try {
-      const [b] = await sql`SELECT margin_target_pct FROM teams WHERE id = ${teamId}`;
-      marginTargetPct = cilMarze(b?.margin_target_pct);
-    } catch { /* column not migrated yet */ }
-    // Adresa a země přibyly s průvodcem; vlastní dotaz, ať jejich chybějící sloupce
-    // (před /api/init) nevezmou ostatní nastavení.
-    try {
-      const [b] = await sql`SELECT address, country FROM teams WHERE id = ${teamId}`;
-      biz.address = b?.address ?? null;
-      biz.country = b?.country ?? null;
-    } catch { /* columns not migrated yet */ }
-    // Pevné náklady (kolo 81): zvlášť, ať chybějící sloupec nevezme ostatní nastavení.
-    // Nájem a energie jsou finanční údaje podniku: dostane je jen role, která vidí Finance
-    // nebo je nastavuje (stejně jako sazby jen s finance.mzdy), ne každý člen.
-    let fixedCosts: PevnyNaklad[] = [];
-    if (ma('finance.zobrazit') || ma('finance.nastaveni')) {
-      try {
-        const [b] = await sql`SELECT fixed_costs FROM teams WHERE id = ${teamId}`;
-        fixedCosts = pevneNakladyZDb(b?.fixed_costs);
-      } catch { /* column not migrated yet */ }
-    }
-    // IČO a DIČ (kolo 73): taky zvlášť, sloupce přibydou až s DDL.
-    try {
-      // sql.query (ne šablona): sloupce teams.ico a teams.dic přibudou až s DDL z poznámky ke kolu 73; do té doby je kontrola schématu (check-sql) nezná.
-      const [b] = await sql.query('SELECT ico, dic FROM teams WHERE id = $1', [teamId]);
-      biz.ico = b?.ico ?? null;
-      biz.dic = b?.dic ?? null;
-      biz.ico_dic_ok = true;
-    } catch { /* columns not migrated yet */ }
-
-    // Lokalizace podniku (kolo 76): jazyk, země, formát času, pásmo, navigace.
-    // Zvlášť a defenzivně: před migrací sloupců se všechno chová jako dřív.
-    let lokalizace: Record<string, unknown> = { default_lang: 'cs', country: null, time_format: '24', timezone: 'Europe/Prague', nav_config: null };
-    try {
-      const [l] = await sql`SELECT country, default_lang, timezone, time_format, nav_config FROM teams WHERE id = ${teamId}`;
-      if (l) lokalizace = {
-        default_lang: cistyJazyk(l.default_lang) ?? 'cs',
-        country: cistaZeme(l.country) ?? null,
-        time_format: l.time_format === '12' ? '12' : '24',
-        timezone: l.timezone || 'Europe/Prague',
-        nav_config: normalizujNavKonfig(l.nav_config),
-      };
-    } catch { /* columns not migrated yet */ }
-
     // Plan & trial — resolved server-side so every client agrees on the label.
-    let planRow: any = null;
-    try {
-      [planRow] = await sql`
-        SELECT plan, plan_override, trial_ends_at, subscription_status, subscription_interval, current_period_end,
-               cancel_at_period_end, trial_end, max_offer_until, stripe_subscription_id, had_subscription
-        FROM teams WHERE id = ${teamId}`;
-    } catch {
-      try { [planRow] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`; }
-      catch { /* columns not migrated yet ⇒ grandfathered pro */ }
-    }
-    const planInfoPlne = planInfoOf(planRow);
+    const planInfoPlne = planInfoOf(radek);
     // Tarif a zkušební doba zůstávají všem (podle nich UI zamyká funkce);
     // stav plateb, období a nabídky jen tomu, kdo předplatné vidí.
     const planInfo = ma('predplatne.zobrazit') ? planInfoPlne : {
@@ -187,13 +79,9 @@ export async function GET() {
     };
 
     // The link pinned to every dashboard (employer, employees, kiosk).
-    let pinnedShare: { token: string; title: string | null; kind: string } | null = null;
-    try {
-      const [ps] = await sql`
-        SELECT token, title, kind FROM share_links
-        WHERE team_id = ${teamId} AND pinned = TRUE AND enabled = TRUE LIMIT 1`;
-      if (ps) pinnedShare = { token: ps.token, title: ps.title ?? null, kind: ps.kind };
-    } catch { /* not migrated yet */ }
+    const ps = pinnedRows[0];
+    const pinnedShare: { token: string; title: string | null; kind: string } | null = ps
+      ? { token: String(ps.token), title: (ps.title as string | null) ?? null, kind: String(ps.kind) } : null;
 
     // Členství NEBO zrcadlo (kolo 62): člen přepnutý do jiného podniku tu
     // dřív zmizel. Role, pozice a sazba jsou z členství v TOMHLE podniku.
@@ -206,7 +94,6 @@ export async function GET() {
     // obnovení stránky zmizela z výběru i ze štítku. Bere se z roleClena,
     // aby seznam říkal totéž, co pak platí na serveru (včetně vlastníka
     // a náhrady podle typu účtu, když role v členství chybí).
-    const clenove = await clenovePodniku(teamId, { sSazbou: sazby });
     const role = await Promise.all(clenove.map(c => roleClena(c.id, Number(teamId)).catch(() => null)));
     const members = clenove.map((c, i) => {
       const rc = role[i];
@@ -225,9 +112,9 @@ export async function GET() {
     return NextResponse.json({
       planInfo,
       pinnedShare,
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, show_team_schedule: showTeamSchedule, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, fixed_costs: fixedCosts, ...biz, margin_target_pct: marginTargetPct, ...lokalizace },
+      team,
       members,
-      isOwner: team?.owner_id === me.id,
+      isOwner: Number(team.owner_id) === me.id,
     });
   } catch (e) {
     // Never surface a 500 as "no team"; report a real error the UI can show.

@@ -6,6 +6,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, LIMITS, SHARE_LIMIT_MSG } from '@/lib/plan';
 import { makeToken, normalizeExcluded, normalizeTheme } from '@/lib/share';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,17 +101,12 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const me = await spravce();
   if (jeOdpoved(me)) return me;
+  const tarif = await pozadujTarif(me.teamId, 'pro');
+  if (tarif) return tarif;
 
   const b = await request.json();
   const theme = normalizeTheme(b.theme);
   try {
-
-  {
-    const plan = await teamPlan(sql, me.teamId);
-    if (PLAN_ENFORCED && plan.effective === 'free') {
-      return NextResponse.json({ error: 'Vlastní vzhled sdílených stránek je součástí plánu Pro.' }, { status: 403 });
-    }
-  }
     await sql`UPDATE teams SET share_theme = ${JSON.stringify(theme)}::jsonb WHERE id = ${me.teamId}`;
     return NextResponse.json({ ok: true, theme });
   } catch {

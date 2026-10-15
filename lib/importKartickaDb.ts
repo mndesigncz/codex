@@ -19,6 +19,7 @@ import crypto from 'node:crypto';
 import { sql } from './client';
 import { audit } from './audit';
 import type { RadekImportu } from './importKarticka';
+import { prevezmiCislaKaret } from './kartyFyzickeDb';
 
 export const MAX_DAVKA = 500;
 
@@ -47,6 +48,10 @@ export interface VysledekDavky {
   razitkaBezKampane: number;
   plneKarty: number;
   zarazenoDoSkupin: number;
+  /** Čísla starých karet uložená jako plastové karty podniku (stará karta funguje u kasy dál). */
+  kartyPrevzate?: number;
+  /** Čísla, která v podniku už patří jinému hostovi (nepřepisují se). */
+  kartyKolize?: number;
   chyby: { radek: number; duvod: string }[];
 }
 
@@ -319,6 +324,14 @@ export async function importujDavku(
     }
   }
 
+  // --- Čísla starých karet → plastové karty podniku (i u přeskočených členů: karta má fungovat dál) ---
+  if (kandidati.some(k => k.r.cisloKarty)) {
+    try {
+      const k = await prevezmiCislaKaret(teamId, userId, kandidati.map(x => ({ customerId: x.id, cislo: x.r.cisloKarty })));
+      vysl.kartyPrevzate = k.ulozeno; vysl.kartyKolize = k.kolize;
+    } catch { /* karty jsou bonus: import členů a zůstatků nesmí shodit */ }
+  }
+
   // --- Záznam pro vrácení ---
   if (zapsane.length) {
     const pred = zapsane.map(k => {
@@ -378,6 +391,8 @@ export async function vratImport(teamId: number, userId: number, importId: numbe
     await sql`DELETE FROM client_memberships WHERE team_id = ${teamId} AND customer_id = ANY(${nove})`;
     if (kampan) await sql`DELETE FROM client_stamp_progress WHERE team_id = ${teamId} AND campaign_id = ${kampan} AND customer_id = ANY(${nove})`;
     await sql`DELETE FROM client_group_members WHERE team_id = ${teamId} AND customer_id = ANY(${nove})`;
+    // Plastové karty převzaté z čísel starých karet: s členstvím zmizí i ony.
+    await sql`DELETE FROM client_card_aliases WHERE team_id = ${teamId} AND zdroj = 'import' AND customer_id = ANY(${nove})`.catch(() => {});
   }
   for (const u of upravene) {
     const p = u.pred ?? {};

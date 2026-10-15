@@ -133,6 +133,8 @@ export const zaklad: Obsluha = (p, k) => {
     : ok({ ok: true });
   // Brána nové verze podmínek (spuštění, balík P) se v ukázce nemontuje; kdyby se zeptala, souhlas je aktuální.
   if (cesta === '/api/account/souhlas') return metoda === 'GET' ? ok({ potreba: false }) : ok({ ok: true });
+  // Ověření e-mailu (spuštění, balík S): ukázka nic neposílá, banner se neukáže.
+  if (cesta === '/api/account/overeni-emailu') return metoda === 'GET' ? ok({ stav: 'nenabizi', email: null }) : chyba('V ukázce se e-maily neposílají.', 400);
   if (cesta === '/api/opening-hours') return metoda === 'GET' ? ok({ openingHours: OTEVIRACI_DOBA }) : ok({ ok: true, openingHours: OTEVIRACI_DOBA });
   if (cesta === '/api/notifications') {
     if (metoda === 'PATCH') { s.notifikace.forEach(n => { n.is_read = true; }); return ok(); }

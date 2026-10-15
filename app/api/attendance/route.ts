@@ -9,9 +9,11 @@ import { notifyUser, notifyUsers } from '@/lib/push';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
+import { pinKratky } from '@/lib/pinTabletu';
 import { vyberSmenuPichacek, type SmenaPichacek, type ZamekObdobi } from '@/lib/dochazkaPrehled';
 import { hlaskaZamku, zamekDne } from '@/lib/dochazkaZaznamy';
 import { VYCHOZI_PRAVIDLA_PICHANI, normalizujPravidlaPichani, overPolohu, parsePoloha, pravidloUcinne, type PravidlaPichani } from '@/lib/geoPichani';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 // Kolo 8 (R8-2): uzavřené výplatní období (payroll_locks) se v docházce nemění — PATCH, DELETE i ruční
 // POST končí 409 s hláškou, kam jít (Výplatní listina). GET nese `breakAfter` (pauza = dva záznamy),
@@ -244,6 +246,28 @@ export async function GET(req: NextRequest) {
         }
       }
     } catch { /* bez pin_hash zůstává starý sloupec pin */ }
+    // Délka PINu (spuštění, balík S): nové PINy mají 6 číslic, staré 4místné
+    // platí dál. Tablet podle délky kreslí tečky, vedení (dochazka.piny) vidí
+    // „doporučujeme 6 číslic". Neznámá délka (otisk z doby před sloupcem
+    // pin_delka) se doporučuje změnit taky — staré PINy byly skoro vždy 4.
+    // Zaměstnanec bez těch oprávnění délku nevidí.
+    if (otiskyProTablet || opr.has('dochazka.piny')) {
+      try {
+        const ids = (roster as any[]).filter(r => r.hasPin === true).map(r => Number(r.id));
+        if (ids.length) {
+          const rows = await sql`
+            SELECT id, COALESCE(pin_delka, CASE WHEN pin IS NOT NULL AND pin <> '' THEN length(pin) END) AS delka
+            FROM users WHERE id = ANY(${ids})`;
+          const delky = new Map((rows as any[]).map(r => [Number(r.id), r.delka == null ? null : Number(r.delka)]));
+          for (const r of roster as any[]) {
+            if (r.hasPin !== true) continue;
+            const d = delky.get(Number(r.id)) ?? null;
+            r.pinDelka = d;
+            if (opr.has('dochazka.piny')) r.pinKratky = pinKratky(d);
+          }
+        }
+      } catch { /* bez sloupce pin_delka se délka neukazuje */ }
+    }
 
     // Inline watchdog: the shop kiosk polls this endpoint all day, so every
     // roster load doubles as the hourly check that Vercel's daily-cron limit
@@ -434,6 +458,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const c = await pozaduj(null);
   if (jeOdpoved(c)) return c;
+  // Kiosk je v tarifu Pro: účet tabletu bez Pro nepíchá (rozhraní tabletu ukazuje zámek).
+  // Vlastní píchnutí z telefonu a zápis za kolegu z aplikace vedení zůstávají ve Zdarma.
+  if (c.role.typ === 'kiosk') {
+    const tarif = await pozadujTarif(c.teamId, 'pro');
+    if (tarif) return tarif;
+  }
   const opr = c.role.opravneni;
 
   const b = await req.json().catch(() => ({}));
@@ -517,6 +547,9 @@ export async function POST(req: NextRequest) {
     let okPin = false;
     if (empPinHash) {
       okPin = await bcrypt.compare(given, empPinHash);
+      // Délku si server zapamatuje po prvním správném zadání (otisk ji neprozradí):
+      // vedení pak ví, kdo má ještě starý 4místný PIN.
+      if (okPin) { try { await sql`UPDATE users SET pin_delka = ${given.length} WHERE id = ${employeeId} AND pin_delka IS DISTINCT FROM ${given.length}`; } catch { /* sloupec ještě není */ } }
     } else if (emp.pin) {
       // Starý čitelný PIN. Porovná se časově konstantně a hned se převede na
       // hash, aby další přihlášení už čitelný nepotřebovalo.
@@ -526,6 +559,7 @@ export async function POST(req: NextRequest) {
         try {
           const nh = await bcrypt.hash(given, 10);
           await sql`UPDATE users SET pin_hash = ${nh}, pin = NULL WHERE id = ${employeeId}`;
+          try { await sql`UPDATE users SET pin_delka = ${given.length} WHERE id = ${employeeId}`; } catch { /* sloupec ještě není */ }
         } catch { /* převod počká na příště */ }
       }
     }

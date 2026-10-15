@@ -4,6 +4,7 @@
 // kdo filtr splňuje, je v lib/clenoveFiltr.ts a sdílí ho seznam, export, hromadné
 // akce i dynamické skupiny.
 import { NextRequest, NextResponse } from 'next/server';
+import { oznamOduvodneni } from '@/lib/dsaDb';
 import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
@@ -117,6 +118,13 @@ export async function PATCH(req: NextRequest) {
   if (typeof b.blocked === 'boolean' && b.blocked !== (m.blocked === true)) {
     await sql`UPDATE client_memberships SET blocked = ${b.blocked}, blocked_at = ${b.blocked ? new Date().toISOString() : null} WHERE team_id = ${ctx.teamId} AND customer_id = ${id}`;
     await audit(ctx.teamId, ctx.meId, 'client.clen.blokace', 'client', id, `${m.name}: ${b.blocked ? 'zablokován' : 'odblokován'}`);
+    // DSA čl. 17 (spuštění, balík G): zablokovaný host se dozví, že a proč. Důvod může dodat správce
+    // (`duvod`), jinak obecný. Doručení je doplněk, blokace už platí.
+    if (b.blocked) {
+      const [t] = await sql`SELECT COALESCE(NULLIF(share_theme->>'businessName', ''), name) AS business FROM teams WHERE id = ${ctx.teamId}`.catch(() => []) as any[];
+      const duvod = typeof b.duvod === 'string' && b.duvod.trim() ? b.duvod.trim().slice(0, 200) : 'porušení pravidel věrnostního programu podniku';
+      await oznamOduvodneni(id, { druh: 'blokace_clena', duvod, podnik: t?.business ? String(t.business) : null, kdo: 'podnik' });
+    }
   }
   const [novy] = await sql`SELECT blocked FROM client_memberships WHERE team_id = ${ctx.teamId} AND customer_id = ${id}`;
   return NextResponse.json({ ok: true, blocked: novy?.blocked === true });

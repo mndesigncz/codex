@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runPosSync } from '@/lib/posSync';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -13,6 +14,8 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   const c = await pozaduj('pokladna.synchronizovat');
   if (jeOdpoved(c)) return c;
+  const tarif = await pozadujTarif(c.teamId, 'max');
+  if (tarif) return tarif;
   const force = (await req.json().catch(() => ({})))?.force === true;
   try {
     const r = await runPosSync(c.teamId, c.meId, force);

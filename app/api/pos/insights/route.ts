@@ -15,12 +15,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
 import { billsOfDays } from '@/lib/posMirror';
-import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueHourOf, pragueDayOf, dayPlus, businessDayOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { podilSlev, slevyNadPrah } from '@/lib/financeWidgety';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -34,9 +34,8 @@ export async function GET(req: NextRequest) {
   const u = { team_id: c.teamId };
   const jmena = c.role.opravneni.has('finance.trzby_lide');
   const mzdy = c.role.opravneni.has('finance.mzdy');
-  if (!(await teamIsPro(u.team_id))) {
-    return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
-  }
+  const tarif = await pozadujTarif(u.team_id, 'pro');
+  if (tarif) return tarif;
   // Texty rad ukazují částky a prahy v měně podniku, ne natvrdo v korunách.
   const mena = await menaPodniku(u.team_id);
   const conn = await getConnection(u.team_id);

@@ -5,6 +5,7 @@ import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved, type Kontext } from '@/lib/opravneniDb';
 import { getConnection, listDesks } from '@/lib/storyous';
 import { randomBytes } from 'crypto';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 /** Tajný kód stolu do QR: bez něj odkaz z domova objednat nedovolí. */
 /** Souřadnice na plánku: procenta 0–100, null = stůl na plánku není. */
@@ -37,6 +38,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('stoly.upravit');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   if (b.action === 'import') {
@@ -66,6 +69,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const ctx = await pozaduj('stoly.upravit');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   // Nový kód zneplatní vytištěné QR na stole — to je rozhodnutí toho, kdo

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from '@/lib/team';
@@ -8,6 +8,7 @@ import { normalizujEmail, vypadaJakoEmail } from '@/lib/emailAdresa';
 import { CILE_ID, TYPY_ID, VELIKOSTI_TYMU, type Odpovedi } from '@/lib/pruvodce/typy';
 import { HLASKA_BEZ_SOUHLASU, souhlasZTela } from '@/lib/pravni/verze';
 import { zapisSouhlas } from '@/lib/pravni/souhlasDb';
+import { posliOvereni } from '@/lib/overeniEmailuDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,6 +128,10 @@ export async function POST(request: Request) {
     await sql`
       INSERT INTO conversations (team_id, type, name)
       VALUES (${team.id}, 'team', 'Týmový chat')`;
+
+    // Ověření e-mailu (spuštění, balík S): odkaz na 48 h po odeslání odpovědi;
+    // nic neblokuje, bez RESEND_API_KEY se nenabízí (lib/overeniEmailu).
+    after(() => posliOvereni(Number(user.id)).then(() => undefined));
 
     return NextResponse.json({ ok: true, user, joinCode: team.join_code });
   } catch (error) {

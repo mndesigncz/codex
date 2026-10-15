@@ -124,7 +124,7 @@ async function mappedItemRaw(id: number, teamId: number | null, tymy: number[]) 
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName"
       FROM inventory_items i LEFT JOIN users u ON u.id = i.updated_by
-      WHERE i.id = ${id}`;
+      WHERE i.id = ${id} AND i.team_id = ${teamId}`;
     if (!row) return row;
     const item: any = {
       ...row,
@@ -152,7 +152,7 @@ async function mappedItemRaw(id: number, teamId: number | null, tymy: number[]) 
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName"
       FROM inventory_items i LEFT JOIN users u ON u.id = i.updated_by
-      WHERE i.id = ${id}`;
+      WHERE i.id = ${id} AND i.team_id = ${teamId}`;
     return row;
   }
 }

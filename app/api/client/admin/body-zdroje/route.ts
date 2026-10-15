@@ -3,9 +3,9 @@
 // a jen v plánu Max jako ostatní pravidla věrnosti.
 import { NextRequest, NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
-import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 import { normalizujZdroje } from '@/lib/bodyZdroje';
 import { nactiZdroje, ulozZdroje } from '@/lib/bodyZdrojeDb';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -19,7 +19,8 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const ctx = await pozaduj('vernost.pravidla');
   if (jeOdpoved(ctx)) return ctx;
-  if (!(await teamIsMax(ctx.teamId))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const v = normalizujZdroje(b);
   if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 400 });

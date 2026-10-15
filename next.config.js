@@ -64,7 +64,8 @@ function bezpecnostniHlavicky({ ramovatSam }) {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data:",
-        "connect-src 'self' https://api.storyous.com https://login.storyous.com https://blob.vercel-storage.com https://api.stripe.com https://checkout.stripe.com https://merchant-ui-api.stripe.com https://r.stripe.com",
+        // https://vercel.com: přímé nahrávání velkých souborů do Vercel Blob (/api/blob, lib/nahrajSoubor).
+        "connect-src 'self' https://api.storyous.com https://login.storyous.com https://blob.vercel-storage.com https://vercel.com https://api.stripe.com https://checkout.stripe.com https://merchant-ui-api.stripe.com https://r.stripe.com",
         // 'self': prodejní stránka vkládá ukázku /demo jako <iframe> téhož
         // původu. Ostatní trasy zůstávají nerámovatelné (X-Frame-Options
         // DENY a frame-ancestors 'none' výše), takže 'self' tu nic dalšího neotevírá.

@@ -7,6 +7,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { normalizePlan, EMPTY_PLAN } from '@/lib/floorplan';
 import { sanitizeSvg } from '@/lib/svgSanitize';
 import { audit } from '@/lib/audit';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -27,6 +28,8 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const ctx = await pozaduj('stoly.upravit');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   await ensureProfile(u.team_id);
   const b = await req.json().catch(() => ({}));
@@ -59,6 +62,8 @@ export async function PUT(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('stoly.upravit');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const form = await req.formData().catch(() => null);
   const file = form?.get('file');

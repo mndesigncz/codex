@@ -66,7 +66,8 @@ export const CESTA_PODNIK_NA_WEBU = '/zalozit-podnik';
 export const ZPRAVA_REGISTRACE_V_OBALU = 'Účet podniku založíte na webu managero.app.';
 
 /** Veřejné právní a podpůrné stránky — musí jít otevřít z obou aplikací bez přihlášení. */
-export const PRAVNI_STRANKY = ['/soukromi', '/podminky', '/podpora', '/smazat-ucet'];
+// `/nahlasit` (spuštění, balík G): oznámení nezákonného obsahu podle DSA musí jít i z aplikace hosta.
+export const PRAVNI_STRANKY = ['/soukromi', '/podminky', '/podpora', '/smazat-ucet', '/nahlasit'];
 
 export function jePravniStranka(cesta: string): boolean {
   const c = cesta.replace(/^\/en(?=\/|$)/, '') || '/';
@@ -91,7 +92,7 @@ const PROVOZNI_API_HOSTA = ['/api/client/admin', '/api/client/staff'];
 
 // Co smí hostovská aplikace volat mimo /api/client. Seznam je úzký schválně:
 // co tu není, hostovi nepatří.
-const API_HOSTA_OBECNE = ['/api/auth', '/api/push', '/api/native', '/api/notifications', '/api/account'];
+const API_HOSTA_OBECNE = ['/api/auth', '/api/push', '/api/native', '/api/notifications', '/api/account', '/api/nahlasit'];
 
 /**
  * Rozhodne, jestli aplikace s daným obalem smí na cestu.

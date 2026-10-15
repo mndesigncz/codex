@@ -2,38 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { put } from '@vercel/blob';
 import { neon } from '@neondatabase/serverless';
+import { MAX_BYTES, povolenyTyp, cistyNazev, HLASKA_TYP } from '@/lib/nahravaniPravidla';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-/** Chat attachments and receipts are photos and documents, not archives. */
-const MAX_BYTES = 10 * 1024 * 1024;
 /** Postgres fallback cap — base64 grows ~33 %, keep rows sane. */
 const MAX_DB_BYTES = 4 * 1024 * 1024;
 
-// Co se do chatu, účtenek a návodů nahrává: fotky, PDF, kancelářské
-// dokumenty a text. Spustitelné soubory, archivy, HTML a SVG ne. Servírování
-// je i tak zamčené (typ se nebere od nahrávajícího, sandbox CSP), ale co sem
-// nepatří, nemá se ani uložit — ani do úložiště, ani do zálohy.
-const POVOLENE = new Set([
-  'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/heic', 'image/heif',
-  'application/pdf', 'text/plain', 'text/csv',
-  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.oasis.opendocument.text', 'application/vnd.oasis.opendocument.spreadsheet',
-  // Z telefonu do chatu: krátké video a hlasová zpráva.
-  'video/mp4', 'video/quicktime', 'video/webm', 'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/webm', 'audio/ogg', 'audio/wav',
-]);
-// Některé prohlížeče u dokumentů typ nepošlou vůbec. Pak rozhodne přípona.
-const PODLE_PRIPONY: Record<string, string> = {
-  pdf: 'application/pdf', txt: 'text/plain', csv: 'text/csv',
-  doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  odt: 'application/vnd.oasis.opendocument.text', ods: 'application/vnd.oasis.opendocument.spreadsheet',
-  heic: 'image/heic', heif: 'image/heif', mov: 'video/quicktime', m4a: 'audio/mp4', mp3: 'audio/mpeg',
-};
-const ZAKAZANE_PRIPONY = /\.(exe|msi|bat|cmd|com|scr|ps1|sh|js|mjs|jar|apk|dmg|html?|svg|xml|php|zip|rar|7z)$/i;
+// Co se smí nahrát (typy, přípony, limit) je v lib/nahravaniPravidla.ts —
+// stejná pravidla platí pro přímé nahrávání do úložiště (./primo).
 
 // The blob store is PRIVATE (receipts and chat photos are internal), so every
 // file — blob or DB fallback — is addressed as /api/upload/<id> and served by
@@ -60,15 +39,11 @@ export async function POST(request: NextRequest) {
         { status: 413 },
       );
     }
-    const pripona = (f.name || '').toLowerCase().split('.').pop() ?? '';
-    let mime = (f.type || '').toLowerCase().split(';')[0].trim().slice(0, 100);
-    if (!mime || mime === 'application/octet-stream') mime = PODLE_PRIPONY[pripona] ?? 'application/octet-stream';
-    if (!POVOLENE.has(mime) || ZAKAZANE_PRIPONY.test(f.name || '')) {
-      return NextResponse.json({ error: 'Tenhle typ souboru nejde nahrát. Vezmu fotky, PDF, text a dokumenty Word nebo Excel.' }, { status: 415 });
-    }
+    const mime = povolenyTyp(f.name, f.type);
+    if (!mime) return NextResponse.json({ error: HLASKA_TYP }, { status: 415 });
     // Název od uživatele se ukazuje v chatu, ale do cesty v úložišti jde
     // jen očištěný: bez lomítek, bez „..", bez řídicích znaků.
-    const filename = (f.name || 'soubor').replace(/[\u0000-\u001f\u007f/\\]+/g, '_').replace(/\.\.+/g, '.').slice(0, 200) || 'soubor';
+    const filename = cistyNazev(f.name);
     const type = mime.startsWith('image/') ? 'image' : 'file';
     const u = { team_id: c.teamId };
 

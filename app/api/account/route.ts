@@ -7,6 +7,7 @@ import { hit, clear } from '@/lib/rateLimit';
 import { smazUcet, hesloSedi } from '@/lib/smazaniUctuDb';
 import { cistyJazyk } from '@/lib/i18n/config';
 import { cistePrefsUctu } from '@/lib/nastaveniUcet';
+import { zvysVerziRelace, ponechSoucasneZarizeni } from '@/lib/authRelace';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +83,11 @@ export async function PATCH(request: Request) {
     }
     const hash = await bcrypt.hash(newPassword, 10);
     await sql`UPDATE users SET password_hash = ${hash} WHERE id = ${id}`;
-    return NextResponse.json({ ok: true, message: 'Heslo bylo změněno.' });
+    // Ostatní zařízení se odhlásí (nová verze relace), tohle zůstane přihlášené
+    // s přepsanou cookie (lib/authRelace). Bez sloupce se jen změní heslo.
+    const verze = await zvysVerziRelace(id);
+    const ponechano = verze != null ? await ponechSoucasneZarizeni(verze) : true;
+    return NextResponse.json({ ok: true, message: 'Heslo bylo změněno.', odhlasenoJinde: verze != null, ponechano });
   }
 
   // Validation for provided fields

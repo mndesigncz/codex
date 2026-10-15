@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { LogoMark } from './Icons';
 import PravniOdkazy from './pravni/PravniOdkazy';
 import { HLASKA_ROLE_V_PROVOZU } from '@/lib/obal';
+import { navratPoPrihlaseni } from '@/lib/navratPoPrihlaseni';
 
 import { Button } from './ui';
 import JazykMenu from './ui/JazykMenu';
@@ -34,7 +35,14 @@ export default function LoginForm() {
       const result = await signIn('credentials', { email, password, redirect: false });
       // OBAL_ROLE vrací server jen po správném hesle: účet hosta v aplikaci pro podniky.
       if (result?.error) setError(result.error === 'OBAL_ROLE' ? HLASKA_ROLE_V_PROVOZU : t('Nesprávný email nebo heslo.'));
-      else { router.push('/'); router.refresh(); }
+      else {
+        // Návrat tam, odkud přihlášení přišlo (odkaz na zálohu, pozvánka, e-mail):
+        // jen místní cesta, cizí adresa skončí na úvodu (lib/navratPoPrihlaseni).
+        const kam = navratPoPrihlaseni(searchParams.get('callbackUrl') ?? searchParams.get('next'), window.location.origin);
+        // Odkaz na zálohu je stránka z API (HTML ze serveru), ne stránka aplikace: plné načtení.
+        if (kam.startsWith('/api/')) window.location.assign(kam);
+        else { router.push(kam); router.refresh(); }
+      }
     } catch {
       setError(t('Chyba při přihlášení.'));
     } finally {

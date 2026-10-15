@@ -5,6 +5,7 @@ import { sendBackupEmail, odkazovyZaklad } from '@/lib/email';
 import { pragueToday } from '@/lib/pragueTime';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { cestaOdkazuZalohy, podepisOdkazZalohy, PLATNOST_ODKAZU_DNI } from '@/lib/pravni/zalohaOdkaz';
+import { poDavkach } from '@/lib/cronDavky';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -41,16 +42,17 @@ export async function GET(request: Request) {
     let sent = 0, failed = 0, teamsNotified = 0;
     // Selhání u jednoho podniku nesmí shodit ostatní — proto try po podnicích.
     const problems: string[] = [];
-    for (const team of teams as any[]) {
+    // Po dávkách (lib/cronDavky): pět podniků souběžně, s hlídáním času.
+    const zpracujPodnik = async (team: any): Promise<void> => {
       try {
         const ids = await clenoveSOpravnenim(Number(team.id), 'data.zaloha');
-        if (!ids.length) continue;
+        if (!ids.length) return;
         const prijemci = await sql`
           SELECT DISTINCT email FROM users
           WHERE id = ANY(${ids}::int[]) AND email IS NOT NULL`;
-        if (!prijemci.length) continue;
+        if (!prijemci.length) return;
         const token = podepisOdkazZalohy(Number(team.id), tajemstvi);
-        if (!token) continue;
+        if (!token) return;
         const odkaz = `${zaklad}${cestaOdkazuZalohy(token)}`;
         teamsNotified++;
         for (const e of prijemci) {
@@ -64,7 +66,9 @@ export async function GET(request: Request) {
         failed++;
         problems.push(`${team.name}: odkaz se nepodařilo poslat — ${String((err as any)?.message ?? err).slice(0, 80)}`);
       }
-    }
+    };
+    const davky = await poDavkach(teams as any[], zpracujPodnik, { soubezne: 5, rozpocetMs: 50_000 });
+    if (davky.nestihnuto) { failed += davky.nestihnuto; problems.push(`${davky.nestihnuto} podniků se do limitu nestihlo — dostanou odkaz zítra`); }
 
     const ok = failed === 0 && (sent > 0 || teamsNotified === 0);
     if (!ok) console.error('backup: part failed', { sent, failed, problems });

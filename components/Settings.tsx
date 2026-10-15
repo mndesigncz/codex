@@ -10,6 +10,8 @@ import { useObal } from './ObalProvider';
 import PravniOdkazy from './pravni/PravniOdkazy';
 import NahlasenyObsah from './moderace/NahlasenyObsah';
 import Zablokovani from './moderace/Zablokovani';
+import { OvereniEmailuNastaveni } from './auth/OvereniEmailu';
+import ZamekAplikace from './ucet/ZamekAplikace';
 import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
 import type { Jazyk } from '@/lib/i18n/config';
 import SekceVzhled from './settings/SekceVzhled';
@@ -422,7 +424,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
       });
       const data = await res.json();
       if (res.ok) {
-        setPwdMsg(data.message ? t(data.message) : t('Heslo bylo změněno.'));
+        // Server zvýšil verzi relace: ostatní telefony a počítače se odhlásí, tenhle ne.
+        setPwdMsg(data.odhlasenoJinde ? t('Heslo bylo změněno. Ostatní zařízení jsou odhlášená.') : data.message ? t(data.message) : t('Heslo bylo změněno.'));
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
@@ -732,6 +735,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                 <Button type="submit" variant="accent" block loading={savingPwd}>{t('Změnit heslo')}</Button>
               </div>
             </form>
+            <OvereniEmailuNastaveni />
+            <ZamekAplikace obal="karta" />
             <Zablokovani />
             </div>
           ) : section === 'privacy' ? (

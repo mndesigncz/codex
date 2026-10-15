@@ -35,20 +35,20 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     const body = await req.json();
     // One statement per field — no dynamic SQL assembly.
     if (body.title !== undefined) {
-      await sql`UPDATE planning_cards SET title = ${String(body.title).slice(0, 200)} WHERE id = ${id}`;
+      await sql`UPDATE planning_cards SET title = ${String(body.title).slice(0, 200)} WHERE id = ${id} AND team_id = ${me.teamId}`;
     }
     if (body.description !== undefined) {
       const d = body.description ? String(body.description).slice(0, 2000) : null;
-      await sql`UPDATE planning_cards SET description = ${d} WHERE id = ${id}`;
+      await sql`UPDATE planning_cards SET description = ${d} WHERE id = ${id} AND team_id = ${me.teamId}`;
     }
     if (body.column !== undefined) {
-      await sql`UPDATE planning_cards SET "column" = ${String(body.column).slice(0, 40)} WHERE id = ${id}`;
+      await sql`UPDATE planning_cards SET "column" = ${String(body.column).slice(0, 40)} WHERE id = ${id} AND team_id = ${me.teamId}`;
     }
     if (body.position !== undefined) {
-      await sql`UPDATE planning_cards SET position = ${Number(body.position) || 0} WHERE id = ${id}`;
+      await sql`UPDATE planning_cards SET position = ${Number(body.position) || 0} WHERE id = ${id} AND team_id = ${me.teamId}`;
     }
 
-    const [card] = await sql`SELECT * FROM planning_cards WHERE id = ${id}`;
+    const [card] = await sql`SELECT * FROM planning_cards WHERE id = ${id} AND team_id = ${me.teamId}`;
     return NextResponse.json(card);
   } catch {
     return NextResponse.json({ error: 'Nepodařilo se upravit kartu' }, { status: 500 });
@@ -65,7 +65,7 @@ export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: s
     if (!(await ownedByTeam(id, me.teamId))) {
       return NextResponse.json({ error: 'Karta nenalezena' }, { status: 404 });
     }
-    await sql`DELETE FROM planning_cards WHERE id = ${id}`;
+    await sql`DELETE FROM planning_cards WHERE id = ${id} AND team_id = ${me.teamId}`;
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Nepodařilo se smazat kartu' }, { status: 500 });

@@ -13,6 +13,7 @@ import { popisZmen, vetaZmen, kuponyCsv, claimyCsv } from '@/lib/kuponyZmeny';
 import { pragueToday } from '@/lib/pragueTime';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { audit } from '@/lib/audit';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -75,6 +76,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('kupony.spravovat');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const f = normalizujKupon(b);
@@ -100,6 +103,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const ctx = await pozaduj('kupony.spravovat');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   if (Array.isArray(b.ids)) return hromadne(u, b);

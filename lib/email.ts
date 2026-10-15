@@ -177,6 +177,25 @@ export async function sendAccountDeleteEmail(to: string, name: string, cesta: st
   });
 }
 
+/** Potvrzení e-mailu vedení po registraci podniku (spuštění, balík S). Odkaz platí 48 hodin. */
+export async function sendEmailVerification(to: string, name: string, cesta: string): Promise<SendResult> {
+  const url = `${odkazovyZaklad()}${cesta}`;
+  return send({
+    label: 'Managero',
+    to,
+    subject: 'Potvrďte e-mail pro Managero',
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; background: #F1F4EC; color: #16181A; border-radius: 20px;">
+        <h1 style="font-size: 22px; margin: 0 0 8px;">Potvrďte e-mail</h1>
+        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, díky za registraci podniku. Potvrďte prosím, že tahle adresa patří vám — budou na ni chodit faktury, zálohy a obnovení hesla. Odkaz platí 48 hodin.</p>
+        <a href="${escHtml(url)}" style="display: inline-block; margin-top: 8px; background: #C8F542; color: #16181A; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">Potvrdit e-mail</a>
+        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud jste se neregistrovali, e-mail ignorujte.</p>
+        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(url)}</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendTeamInvitation(to: string, teamName: string, inviterName: string, token: string, jazyk: Jazyk = 'cs'): Promise<SendResult> {
   const url = `${APP_URL()}/join?token=${encodeURIComponent(token)}`;
   return send({
@@ -286,5 +305,41 @@ export async function sendNovinkyEmail(
   return send({
     label, to, subject, html, replyTo,
     headers: { 'List-Unsubscribe': `<${odhlasitUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+  });
+}
+
+/**
+ * Právní a provozní e-mail jednomu člověku (spuštění, balík G): potvrzení a rozhodnutí o oznámení
+ * nezákonného obsahu (DSA čl. 16), odůvodnění omezení (čl. 17), upozornění před anonymizací
+ * neaktivního účtu (retence). Obsah skládají lib/dsa.ts a lib/retence.ts; tady se jen odešle.
+ */
+export async function sendPravniEmail(to: string, subject: string, html: string): Promise<SendResult> {
+  return send({ label: 'Managero', to, subject, html });
+}
+
+/**
+ * E-mail vlastníkovi podniku k předplatnému (spuštění, balík G): nezdařená platba
+ * (`invoice.payment_failed`) a konec zkušebního období za 3 dny (`trial_will_end`).
+ * Dřív šlo jen oznámení v aplikaci — a kdo aplikaci zrovna neotevřel, o platbě nevěděl.
+ */
+export async function sendPlatbaEmail(to: string, v: { druh: 'platba_selhala' | 'konec_zkousky'; podnik: string; jmeno: string; zruseno?: boolean; pokus?: number | null }): Promise<SendResult> {
+  const odkaz = `${odkazovyZaklad()}/employer/overview?view=settings&tab=billing`;
+  const selhala = v.druh === 'platba_selhala';
+  const subject = selhala ? `Platba předplatného se nezdařila — ${v.podnik}` : `Zkušební období končí za 3 dny — ${v.podnik}`;
+  const text = selhala
+    ? `Platbu předplatného podniku ${v.podnik} se nepodařilo strhnout${v.pokus && v.pokus > 1 ? ` (${v.pokus}. pokus)` : ''}. Stripe to během několika dní zkusí znovu. Zkontrolujte prosím kartu v Nastavení → Předplatné → Spravovat předplatné, ať podnik nepřijde o placené funkce.`
+    : v.zruseno
+      ? `Zkušební období podniku ${v.podnik} končí za 3 dny. Předplatné máte zrušené, nic se nestrhne a po skončení zkoušky se podnik vrátí na tarif Zdarma.`
+      : `Zkušební období podniku ${v.podnik} končí za 3 dny. Potom se z karty strhne první platba. Tarif změníte nebo předplatné zrušíte v Nastavení → Předplatné.`;
+  return send({
+    label: 'Managero Předplatné', to, subject,
+    html: `
+      <div style="font-family:-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:28px;background:#F1F4EC;color:#16181A;border-radius:20px;">
+        <h1 style="font-size:20px;margin:0 0 8px;">${escHtml(selhala ? 'Platba se nezdařila' : 'Zkušební období končí')}</h1>
+        <p style="color:#5c6353;font-size:14px;">Dobrý den${v.jmeno ? `, ${escHtml(v.jmeno)}` : ''}.</p>
+        <p style="color:#5c6353;font-size:14px;">${escHtml(text)}</p>
+        <a href="${escHtml(odkaz)}" style="display:inline-block;margin-top:8px;background:#C8F542;color:#16181A;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:bold;">Otevřít Předplatné</a>
+        <p style="color:#8a917f;font-size:12px;margin-top:22px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(odkaz)}</p>
+      </div>`,
   });
 }

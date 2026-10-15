@@ -238,5 +238,9 @@
   "Ťukni na sebe a zaznamenej příchod.": "Tap yourself to record your arrival.",
   "Žádné položky": "No items",
   "Žádné úkoly": "No tasks",
-  "Úkoly za body: klepni na Hotovo u toho, co jsi udělal(a), nebo napiš vlastní věc.": "Tasks for points: tap Done on what you did, or write your own thing."
+  "Úkoly za body: klepni na Hotovo u toho, co jsi udělal(a), nebo napiš vlastní věc.": "Tasks for points: tap Done on what you did, or write your own thing.",
+  "PIN musí mít 6 číslic.": "The PIN must have 6 digits.",
+  "Nový PIN má 6 číslic.": "A new PIN has 6 digits.",
+  "Doporučujeme změnit PIN na 6 číslic.": "We recommend changing the PIN to 6 digits.",
+  "Moc špatných PINů. Zkus to za {n} s.": "Too many wrong PINs. Try again in {n} s."
 }

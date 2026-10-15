@@ -8,6 +8,7 @@ import { hit, clear } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
 import { hashTokenu, jePlatny, vypadaJakoToken, hesloStaci } from '@/lib/jednorazovyToken';
 import { klicPoctadla } from '@/lib/ucetEmail';
+import { zvysVerziRelace } from '@/lib/authRelace';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +43,8 @@ export async function POST(request: Request) {
   if (!u) return NextResponse.json({ error: NEPLATNY }, { status: 400 });
 
   await sql`UPDATE users SET password_hash = ${await bcrypt.hash(heslo, 12)} WHERE id = ${userId}`;
+  // Obnovené heslo odhlásí všechna zařízení — kdo heslo znal, už se nedostane dál.
+  await zvysVerziRelace(userId);
   // Ostatní nevyužité odkazy téhož účtu přestanou platit a zamčené přihlášení se uvolní.
   try { await sql`UPDATE password_resets SET used_at = NOW() WHERE user_id = ${userId} AND used_at IS NULL`; } catch { /* nevadí */ }
   await clear(`login:${String(u.email).toLowerCase()}`);

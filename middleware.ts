@@ -87,7 +87,19 @@ export async function middleware(req: NextRequest) {
   // Jinak by pozastavený podnik neměl jak otevřít /login a přihlásit se jinak.
   if (!/^\/(api|employer|employee|kiosk|client)(\/|$)/.test(req.nextUrl.pathname)) return NextResponse.next();
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return NextResponse.next();
+  if (!token) {
+    // Stránka aplikace bez přihlášení: na přihlášení s návratem (callbackUrl),
+    // ať odkaz z e-mailu po přihlášení vede zpátky (spuštění, balík S). Layouty
+    // by jinak přesměrovaly na holé /login a cíl by se ztratil.
+    if (req.method === 'GET' && /^\/(employer|employee|kiosk)(\/|$)/.test(req.nextUrl.pathname)) {
+      const url = req.nextUrl.clone();
+      url.pathname = '/login';
+      url.search = '';
+      url.searchParams.set('callbackUrl', `${req.nextUrl.pathname}${req.nextUrl.search}`);
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
   const cesta = req.nextUrl.pathname;
   if (VYJIMKY.some(v => cesta === v || cesta.startsWith(v + '/') || cesta.startsWith(v))) {
     // Přepnutí podniku: zapamatovaný aktivní tým je od téhle chvíle starý.

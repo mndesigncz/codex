@@ -70,12 +70,13 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { otevriNaTisk, otevriVeSystemu } from '@/lib/stahni';
 import PromoKody from './loyalty/KuponyPromo';
+import KartickySprava from './KartickySprava';
 
 // Nastavení účtu v okně: stejná obrazovka jako v administraci (profil, vzhled a jazyk, oznámení, zabezpečení),
 // jen se stahuje až při otevření, ať ho Client nenese s každým načtením.
 const NastaveniUctu = dynamic(() => import('../Settings'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
 
-type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
+type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'cards' | 'brand' | 'settings';
 
 /** Záložky Clientu a klíče, které je otevírají (stačí kterýkoli; null = každý s klient.prehled). */
 const TABS: { id: Tab; label: string; icon: string; klice: readonly string[] | null }[] = [
@@ -87,6 +88,8 @@ const TABS: { id: Tab; label: string; icon: string; klice: readonly string[] | n
   { id: 'events', label: 'Akce', icon: 'calendar', klice: ['akce.zobrazit'] },
   { id: 'customers', label: 'Zákazníci', icon: 'users', klice: ['zakaznici.zobrazit', 'zakaznici.recenze', 'zakaznici.zpravy'] },
   { id: 'loyalty', label: 'Věrnost', icon: 'gift', klice: ['vernost.zobrazit', 'kupony.spravovat', 'kupony.uplatnit'] },
+  // Fyzické kartičky (spuštění, balík C): dávky k tisku, karty, blokace a náhrada (KartickySprava).
+  { id: 'cards', label: 'Kartičky', icon: 'card', klice: ['vernost.zobrazit'] },
   { id: 'brand', label: 'Vzhled', icon: 'sparkle', klice: ['klient.vzhled'] },
   { id: 'settings', label: 'Nastavení', icon: 'settings', klice: ['klient.nastaveni'] },
 ];
@@ -98,7 +101,7 @@ const NAV_SECTIONS: { title: string | null; ids: Tab[] }[] = [
   { title: null, ids: ['overview'] },
   { title: 'Dnešek', ids: ['reservations', 'orders'] },
   { title: 'Podnik', ids: ['tables', 'menu', 'events'] },
-  { title: 'Hosté', ids: ['customers', 'loyalty'] },
+  { title: 'Hosté', ids: ['customers', 'loyalty', 'cards'] },
   { title: 'Nastavení', ids: ['brand', 'settings'] },
 ];
 const DOCK: Tab[] = ['overview', 'reservations', 'orders'];
@@ -298,6 +301,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
                 {tab === 'events' && <EventsView user={(user ?? {}) as { id?: string }} oznam={oznam} />}
                 {tab === 'customers' && <ZakazniciStranka oznam={oznam} hledat={hledatHosta} />}
                 {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} promos={<PromoKody oznam={oznam} />} oznam={oznam} otevriCast={castVernosti} />}
+                {tab === 'cards' && <KartickySprava oznam={oznam} />}
                 {tab === 'brand' && <div className="p-4 sm:p-6"><BrandTab toast={t => oznam(t)} onChange={obnovSouhrn} /></div>}
                 {tab === 'settings' && <div className="p-4 sm:p-6"><SettingsTab oznam={oznam} onChange={obnovSouhrn} /></div>}
               </ErrorBoundary>

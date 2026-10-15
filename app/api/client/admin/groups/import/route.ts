@@ -7,6 +7,7 @@ import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
 import { radkyProSkupinu, sparujSClenyPodniku } from '@/lib/clenoveSeznam';
 import { audit } from '@/lib/audit';
 import { normalizujPravidla } from '@/lib/clenoveFiltr';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -16,6 +17,8 @@ const MAX_ZNAKU = 600_000;
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.skupiny');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   // Párování podle e-mailu a telefonu by jinak šlo zneužít k ověřování, kdo je členem: smí jen ten, kdo kontakty vidí.
   if (!ctx.role.opravneni.has('zakaznici.kontakty')) return NextResponse.json({ error: 'Přidávat členy ze souboru smí jen ten, kdo vidí kontakty hostů.' }, { status: 403 });
   await zajistiSchemaClenu();

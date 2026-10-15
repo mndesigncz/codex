@@ -16,8 +16,8 @@ import {
 } from '@/lib/bodyPravidla';
 import { pragueToday } from '@/lib/pragueTime';
 import { menaPodniku } from '@/lib/menaPodniku';
-import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 import { zapisVerzi } from '@/lib/pravidlaVerze';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -99,7 +99,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: `Na ${[...chybi].map(k => NAZEV_SKUPINY[k]).join(' ani ')} nemáš oprávnění.` }, { status: 403 });
   }
   // Tarif až po oprávnění — kdo na úpravu nemá právo, nemá co řešit tarif.
-  if (!(await teamIsMax(u.team_id))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
+  const tarif = await pozadujTarif(u.team_id, 'max');
+  if (tarif) return tarif;
   // Sloupce pravidel se zajistí dřív než čtení profilu, ať „před" v historii změn a výchozí hodnoty nejsou prázdné.
   try { await zajistiUrovne(); await zajistiBodyPravidla(); } catch { /* bez nich se pravidla nových polí neuloží, ostatní ano */ }
   const cur = await ensureProfile(u.team_id);

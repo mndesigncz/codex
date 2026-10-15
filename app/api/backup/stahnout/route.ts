@@ -7,7 +7,8 @@ import { hit } from '@/lib/rateLimit';
 import { audit } from '@/lib/audit';
 import { escHtml } from '@/lib/email';
 import { pragueToday } from '@/lib/pragueTime';
-import { overOdkazZalohy } from '@/lib/pravni/zalohaOdkaz';
+import { overOdkazZalohy, cestaOdkazuZalohy } from '@/lib/pravni/zalohaOdkaz';
+import { prihlaseniSNavratem } from '@/lib/navratPoPrihlaseni';
 import { dumpTeam, POPIS_VYNECHANEHO } from '../_data';
 
 export const dynamic = 'force-dynamic';
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   const meId = Number((session?.user as { id?: unknown } | undefined)?.id);
   if (!session?.user || !Number.isFinite(meId)) {
-    return stranka('Nejdřív se přihlas', 'Zálohu stáhne jen přihlášený člověk s oprávněním „Dostávat zálohu dat“. Přihlas se a otevři odkaz z e-mailu znovu.', 401, { href: '/login', popis: 'Přihlásit se' });
+    return stranka('Nejdřív se přihlas', 'Zálohu stáhne jen přihlášený člověk s oprávněním „Dostávat zálohu dat“. Přihlas se a stažení se po přihlášení otevře samo.', 401, { href: prihlaseniSNavratem(cestaOdkazuZalohy(token!)), popis: 'Přihlásit se' });
   }
 
   let smi = false;

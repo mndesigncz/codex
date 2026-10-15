@@ -13,6 +13,7 @@ import { jeSpravcePodleDb } from './superadminDb';
 import { zajistiClenstvi, clenstviUzivatele, prepniTym } from './tenant';
 import { obalZUserAgent, rolePatriDoObalu } from './obal';
 import { cistyJazyk } from './i18n/config';
+import { verzeRelace, relaceOdvolana, RELACE_ODVOLANA } from './authVerze';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -49,7 +50,9 @@ async function ensureEmployerTeam(userId: number, name: string, currentTeamId: n
 // stránka čte relaci i několikrát za sebou a pět vteřin zpoždění po změně
 // role je proti třiceti dnům zanedbatelné. update() ji obchází.
 const STAV_TTL_MS = 5_000;
-const stavCache = new Map<number, { at: number; v: { role: string; teamId: number | null } | 'smazan' }>();
+// sv = users.session_version (lib/authVerze); null = sloupec ještě není, relace se pak neodvolává.
+type StavUzivatele = { role: string; teamId: number | null; sv: number | null };
+const stavCache = new Map<number, { at: number; v: StavUzivatele | 'smazan' }>();
 /**
  * Zahodí zapamatovaný stav — volá se tam, kde se role nebo podnik právě
  * změnily (přepnutí podniku, změna role, odebrání člena). Bez toho by token
@@ -58,7 +61,7 @@ const stavCache = new Map<number, { at: number; v: { role: string; teamId: numbe
  * že se databáze neptáme při každém požadavku dvakrát.
  */
 export function zneplatniStav(userId: number): void { stavCache.delete(userId); }
-async function stavUzivatele(id: number, cerstve: boolean): Promise<{ role: string; teamId: number | null } | 'smazan' | null> {
+async function stavUzivatele(id: number, cerstve: boolean): Promise<StavUzivatele | 'smazan' | null> {
   if (!Number.isFinite(id)) return 'smazan';
   const c = stavCache.get(id);
   if (!cerstve && c && Date.now() - c.at < STAV_TTL_MS) return c.v;
@@ -67,15 +70,25 @@ async function stavUzivatele(id: number, cerstve: boolean): Promise<{ role: stri
     // Smazaný (anonymizovaný) účet řádek v users má, ale nese `deleted_at`: pro
     // relaci je to totéž co neexistující. Před migrací sloupec chybí — dotaz se
     // pak opakuje bez něj, ať výpadek migrace neshodí čtení relace všem.
+    // Verze relace (session_version) jede v témž dotazu — kontrola odhlášení
+    // ostatních zařízení tak nestojí ani jeden dotaz navíc. Bez sloupce
+    // (před migrací) se čte jako dřív a relace se neodvolává.
     let u: any;
     let smazan = false;
+    let sv: number | null = null;
     try {
-      [u] = await sql`SELECT team_id, role, deleted_at FROM users WHERE id = ${id}`;
+      [u] = await sql`SELECT team_id, role, deleted_at, session_version FROM users WHERE id = ${id}`;
       smazan = !!u?.deleted_at;
+      sv = u ? verzeRelace(u.session_version) : null;
     } catch {
-      [u] = await sql`SELECT team_id, role FROM users WHERE id = ${id}`;
+      try {
+        [u] = await sql`SELECT team_id, role, deleted_at FROM users WHERE id = ${id}`;
+        smazan = !!u?.deleted_at;
+      } catch {
+        [u] = await sql`SELECT team_id, role FROM users WHERE id = ${id}`;
+      }
     }
-    const v = u && !smazan ? { role: String(u.role), teamId: u.team_id == null ? null : Number(u.team_id) } : 'smazan' as const;
+    const v = u && !smazan ? { role: String(u.role), teamId: u.team_id == null ? null : Number(u.team_id), sv } : 'smazan' as const;
     if (stavCache.size > 5000) stavCache.clear();
     stavCache.set(id, { at: Date.now(), v });
     return v;
@@ -163,6 +176,14 @@ export const authOptions: NextAuthOptions = {
           const [l] = await sqlJ`SELECT lang FROM users WHERE id = ${user.id}`;
           lang = cistyJazyk(l?.lang);
         } catch { /* sloupec ještě není */ }
+        // Verze relace do tokenu (lib/authVerze): po změně hesla jinde je
+        // tenhle token starý a callback jwt ho odhlásí. Bez sloupce 0.
+        let sv = 0;
+        try {
+          const sqlV = neon(process.env.DATABASE_URL!);
+          const [r] = await sqlV`SELECT session_version FROM users WHERE id = ${user.id}`;
+          sv = verzeRelace(r?.session_version);
+        } catch { /* sloupec ještě není */ }
         return {
           id: String(user.id),
           name: user.name,
@@ -173,6 +194,7 @@ export const authOptions: NextAuthOptions = {
           teamId,
           superadmin,
           lang,
+          sv,
         } as any;
       },
     }),
@@ -186,6 +208,7 @@ export const authOptions: NextAuthOptions = {
         token.teamId = (user as any).teamId;
         token.superadmin = (user as any).superadmin === true;
         token.lang = cistyJazyk((user as any).lang);
+        token.sv = verzeRelace((user as any).sv);
       }
       // session.update() volá PROHLÍŽEČ. Smí proto obnovit jen to, co je
       // kosmetické — jméno a avatar. Příslušnost k týmu odsud přijímat nelze:
@@ -210,6 +233,10 @@ export const authOptions: NextAuthOptions = {
           // Účet zmizel: relace nese prázdnou roli a žádná routa ji nepustí.
           token.role = null; token.teamId = null; token.superadmin = false;
         } else if (u) {
+          // Heslo se mezitím změnilo (nebo obnovilo) na jiném zařízení: tenhle
+          // token je starší verze. Výjimka = NextAuth smaže cookie relace
+          // a getServerSession vrátí null — člověk je odhlášený, ne zamčený.
+          if (relaceOdvolana(token.sv, u.sv)) throw new Error(RELACE_ODVOLANA);
           token.teamId = u.teamId; token.role = u.role;
           // Správce se ověřuje znovu jen u toho, kdo jím je, nebo při update():
           // ostatní za to neplatí dotazem navíc.

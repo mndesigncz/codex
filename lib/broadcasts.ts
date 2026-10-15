@@ -24,11 +24,12 @@ import { SEGMENTY, jeSegment, stitekPublika, vyberClenu, spoctiSegmenty, type Cl
 import { ctiKombinaci, sloucMnoziny, stitekKombinace } from './skupinyPravidla';
 import { ZPRAV_DENNE, DUPLICITA_MS, textOznameni, klicLimituZprav, simpleHash, type PrilohaZpravy, type VstupZpravy } from './zpravyPravidla';
 import {
-  dosahZpravy, jeKanal, posilaEmail, posilaPush, procNedostaneEmail, type KanalyZpravy, type DosahZpravy,
+  dosahZpravy, jeKanal, posilaEmail, posilaPush, procNedostaneEmail, procNedostanePush, type KanalyZpravy, type DosahZpravy,
 } from './zpravyKanaly';
 import { odkazOdhlaseni, sestavEmailZpravy, predmetZpravy } from './zpravyEmail';
 import { sendNovinkyEmail, odkazovyZaklad } from './email';
 import { cistyJazyk } from './i18n/config';
+import { icoPodniku } from './consentsDb';
 
 /** Kolik e-mailů pošle jedna dávka a jak dlouho smí dávky v jednom volání běžet. */
 export const DAVKA_EMAILU = 10;
@@ -231,7 +232,7 @@ export async function nactiPrilohu(teamId: number, couponId: number | null, prom
   return { priloha: null };
 }
 
-async function profilPodniku(teamId: number): Promise<{ slug: string | null; podnik: string; jazykPodniku: string | null }> {
+async function profilPodniku(teamId: number): Promise<{ slug: string | null; podnik: string; jazykPodniku: string | null; ico: string | null }> {
   const [p] = await sql`SELECT slug FROM client_profiles WHERE team_id = ${teamId}`;
   let podnik = 'náš podnik'; let jazyk: string | null = null;
   try {
@@ -239,7 +240,7 @@ async function profilPodniku(teamId: number): Promise<{ slug: string | null; pod
     if (t?.business) podnik = String(t.business);
     jazyk = t?.default_lang ?? null;
   } catch { /* před migrací */ }
-  return { slug: p?.slug ?? null, podnik, jazykPodniku: jazyk };
+  return { slug: p?.slug ?? null, podnik, jazykPodniku: jazyk, ico: await icoPodniku(teamId) };
 }
 
 /** Příloha zprávy (kupon nebo promo kód), která pořád platí; jinak null a zpráva odejde bez ní. */
@@ -252,12 +253,12 @@ async function prilohaRadku(row: any): Promise<PrilohaZpravy | null> {
 
 /** Pošle jeden e-mail členovi. Vrací, zda odešel. Chyby se nepropagují. */
 async function posliEmailClenovi(
-  row: any, p: PrijemceSDetaily, kontext: { podnik: string; odkaz: string; priloha: PrilohaZpravy | null; jazykPodniku: string | null }, zkusebni = false,
+  row: any, p: PrijemceSDetaily, kontext: { podnik: string; odkaz: string; priloha: PrilohaZpravy | null; jazykPodniku: string | null; ico?: string | null }, zkusebni = false,
 ): Promise<{ sent: boolean; error: string | null }> {
   if (!p.email) return { sent: false, error: 'Člen nemá e-mail.' };
-  const odh = odkazOdhlaseni(odkazovyZaklad(), p.id);
+  const odh = odkazOdhlaseni(odkazovyZaklad(), p.id, Number(row.team_id));
   const mail = sestavEmailZpravy({
-    podnik: kontext.podnik, title: String(row.title), body: row.body ? String(row.body) : null, odkaz: kontext.odkaz,
+    podnik: kontext.podnik, ico: kontext.ico ?? null, title: String(row.title), body: row.body ? String(row.body) : null, odkaz: kontext.odkaz,
     kuponNazev: kontext.priloha?.kupon?.title ?? null, promoKod: kontext.priloha?.promo?.code ?? null,
     odhlasitStranka: odh.stranka, jazyk: cistyJazyk(p.lang) ?? cistyJazyk(kontext.jazykPodniku) ?? 'cs', zkusebni,
   });
@@ -282,9 +283,13 @@ async function deliver(row: any, rozpocetMs: number, idsOverride?: number[]): Pr
   // Příloha, která mezitím přestala platit, se vynechá; zpráva sama odejde.
   const priloha = await prilohaRadku(row);
   const text = textOznameni(String(row.title), row.body ? String(row.body) : null, priloha);
-  const r = posilaPush(kanal) && ids.length
-    ? await notifyUsers(ids, { ...text, link: linkFor(row.link_kind, p?.slug ?? null), type: 'info', category: 'novinky' })
+  // Oznámení jen členům se souhlasem s novinkami TOHOTO podniku (spuštění, balík G); souhlas s jiným
+  // podnikem nestačí. Kdo souhlas nemá, počítá se mezi ztlumené.
+  const pushIds = prijemci.filter(x => procNedostanePush(x) === null).map(x => x.id);
+  const odeslano = posilaPush(kanal) && pushIds.length
+    ? await notifyUsers(pushIds, { ...text, link: linkFor(row.link_kind, p?.slug ?? null), type: 'info', category: 'novinky' })
     : { doruceno: 0, ztlumeno: 0 };
+  const r = { doruceno: odeslano.doruceno, ztlumeno: odeslano.ztlumeno + (posilaPush(kanal) ? ids.length - pushIds.length : 0) };
   const dosah = dosahZpravy(prijemci, kanal);
   const emailIds = posilaEmail(kanal) ? prijemci.filter(x => procNedostaneEmail(x) === null).map(x => x.id) : [];
   // Kurzor fronty e-mailů běží přes celý seznam příjemců (stabilní pořadí); souhlas se ověřuje až v dávce.
@@ -318,12 +323,12 @@ async function davkaEmailu(row: any): Promise<number> {
   const cast = vsichni.slice(pos, pos + DAVKA_EMAILU)
     .map(id => zpusobili.get(id))
     .filter((x): x is PrijemceSDetaily => !!x && posilaEmail(kanal) && procNedostaneEmail(x) === null);
-  const { slug, podnik, jazykPodniku } = await profilPodniku(teamId);
+  const { slug, podnik, jazykPodniku, ico } = await profilPodniku(teamId);
   const priloha = await prilohaRadku(row);
   const odkaz = `${odkazovyZaklad()}${linkFor(row.link_kind, slug)}`;
   let ok = 0, chyb = 0;
   for (const x of cast) {
-    const odeslano = await posliEmailClenovi(row, x, { podnik, odkaz, priloha, jazykPodniku });
+    const odeslano = await posliEmailClenovi(row, x, { podnik, odkaz, priloha, jazykPodniku, ico });
     if (odeslano.sent) ok++; else chyb++;
     // Resend bez navýšeného limitu přijímá dva požadavky za vteřinu.
     await new Promise(res => setTimeout(res, 550));
@@ -423,7 +428,7 @@ export async function zkusebniZprava(userId: number, teamId: number, data: Vstup
   if ('chyba' in n) return { ok: false, chyba: n.chyba };
   const [u] = await sql`SELECT id, email, lang FROM users WHERE id = ${userId}`;
   if (!u) return { ok: false, chyba: 'Nepodařilo se zjistit, komu zkoušku poslat.' };
-  const { slug, podnik, jazykPodniku } = await profilPodniku(teamId);
+  const { slug, podnik, jazykPodniku, ico } = await profilPodniku(teamId);
   const out: VysledekZkousky = { push: false, email: null, adresa: u.email ? String(u.email) : null };
   if (posilaPush(data.channels)) {
     const text = textOznameni(predmetZpravy(data.title, true), data.body, n.priloha);
@@ -432,10 +437,10 @@ export async function zkusebniZprava(userId: number, teamId: number, data: Vstup
     out.push = true;
   }
   if (posilaEmail(data.channels)) {
-    const row = { title: data.title, body: data.body || null };
+    const row = { title: data.title, body: data.body || null, team_id: teamId };
     out.email = u.email
       ? await posliEmailClenovi(row, { id: userId, email: String(u.email), lang: u.lang ?? null, name: '', blocked: false, prefs: null },
-          { podnik, odkaz: `${odkazovyZaklad()}${linkFor(data.linkKind, slug)}`, priloha: n.priloha, jazykPodniku }, true)
+          { podnik, odkaz: `${odkazovyZaklad()}${linkFor(data.linkKind, slug)}`, priloha: n.priloha, jazykPodniku, ico }, true)
       : { sent: false, error: 'Tvůj účet nemá e-mail.' };
   }
   return { ok: true, v: out };

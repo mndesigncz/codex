@@ -14,6 +14,7 @@ import { overKampan } from '@/lib/stampsPlan';
 import { audit } from '@/lib/audit';
 import { pragueToday, dbTimeDayHM } from '@/lib/pragueTime';
 import { razitkaCsv, udalostiCsv, DRUH_UDALOSTI } from '@/lib/razitkaPravidla';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -122,6 +123,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('vernost.kampane');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const v = overKampan(b);
@@ -150,6 +153,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const ctx = await pozaduj('vernost.kampane');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);

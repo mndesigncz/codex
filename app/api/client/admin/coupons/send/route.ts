@@ -8,6 +8,7 @@ import { cistiPublikum } from '@/lib/kuponyPublikum';
 import { jeVidetelnyHostum, stavKuponu } from '@/lib/kuponyPravidla';
 import { pragueToday } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -28,6 +29,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('kupony.spravovat');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const id = parseInt(String(b.id), 10);
   const [c] = await sql`SELECT * FROM client_coupons WHERE id = ${id} AND team_id = ${ctx.teamId} AND kind = 'offer'`;
