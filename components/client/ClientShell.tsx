@@ -59,10 +59,12 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
           <div className="mx-auto max-w-5xl px-3 sm:px-6 h-16 flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Na 320 px se značka, dvě záložky a účet do řádku nevešly a stránka
                 se dala odrolovat do strany. Slovo „client" jde na telefonu pryč,
-                celý nápis až pod 360 px — logo zůstává vždy. */}
+                celý nápis až pod 360 px — logo zůstává vždy. Nepřihlášený má navíc
+                Podniky, Zadat kód a Přihlásit: na 390 px to vyšlo na pixel a se širším
+                písmem (Linux v CI) Přihlásit vyčuhovalo — nápis u něj až od 440 px. */}
             <Link href="/client" className="tap-target flex items-center gap-2 shrink-0" aria-label="Managero client">
               <LogoMark size={32} />
-              <span className="hidden min-[360px]:inline font-bold tracking-tight leading-none">Managero <span className="hidden sm:inline text-black/45 font-semibold">client</span></span>
+              <span className={`hidden ${me ? 'min-[360px]:inline' : 'min-[440px]:inline'} font-bold tracking-tight leading-none`}>Managero <span className="hidden sm:inline text-black/45 font-semibold">client</span></span>
             </Link>
             <nav className="ml-auto flex items-center gap-0.5 sm:gap-1 min-w-0" aria-label={t('Zákaznická navigace')}>
               {/* Na mobilu žijí záložky ve spodním docku jako ve zbytku

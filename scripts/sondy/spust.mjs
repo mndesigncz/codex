@@ -243,7 +243,13 @@ if (process.env.GITHUB_ACTIONS === 'true') {
   const kod = (s) => s.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
   for (const r of spadle.slice(0, 10)) {
     const radky = r.out.split('\n');
-    const pricina = radky.filter(l => l.startsWith('✗')).slice(0, 5);
+    // ✗ řádek i odsazené řádky pod ním (nálezy přetečení, viníci) — bez nich anotace neřekne kde.
+    const pricina = [];
+    radky.forEach((l, i) => {
+      if (!l.startsWith('✗') || pricina.length >= 30) return;
+      pricina.push(l);
+      for (let j = i + 1; j < radky.length && /^\s+\S/.test(radky[j]) && pricina.length < 30; j++) pricina.push(radky[j]);
+    });
     const text = (pricina.length ? pricina : radky.filter(Boolean).slice(-8)).join('\n').slice(0, 1800);
     console.log(`::error title=Sonda ${r.jmeno}::${kod(text || 'spadla bez výpisu')}`);
   }
