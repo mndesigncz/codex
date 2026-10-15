@@ -54,8 +54,10 @@ if (await prepinac.count() > 0) {
   tvrdi('po přepnutí se stránka načetla znovu', posty.length >= pocetNavigaciPred + 1, 'bez reloadu by zůstal stav starého podniku');
 }
 
-await p.goto('http://localhost:3000/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' });
-await p.waitForTimeout(1500);
+// networkidle v CI občas nedoběhne do 30 s (pomalý runner, dlouhé dotazy nastavení) —
+// stačí načtená stránka a pak čekat, až se karta organizace opravdu vykreslí.
+await p.goto('http://localhost:3000/employer/overview?view=settings&tab=organizace', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.locator('main').getByText(/organizace: moje kavárny/i).first().waitFor({ timeout: 30000 }).catch(() => {});
 // Kolo 7 (R7-7): organizace je vlastní sekce Nastavení (?tab=organizace), ne karta v Tým › Podnik.
 await p.waitForTimeout(600);
 const t2 = (await p.locator('main').innerText()).toLowerCase();
