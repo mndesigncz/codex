@@ -177,5 +177,10 @@
   "Čeká na schválení": "Czeka na zatwierdzenie",
   "Čt|den": "Cz",
   "Žádný postup nečeká na schválení.": "Żaden proces nie czeka na zatwierdzenie.",
-  "−{n} b.": "−{n} pkt"
+  "−{n} b.": "−{n} pkt",
+  "Dopad se nepodařilo spočítat.": "Nie udało się obliczyć skutku.",
+  "Emoji a čas jsou nepovinné. Důležitost kroku řídí body: splněný krok přidá (klíčový +2, běžný +1, drobný 0), nesplněný nic neubere. Vlastní body kroku mají přednost.": "Emoji i czas są opcjonalne. Ważność kroku steruje punktami: wykonany krok dodaje (kluczowy +2, zwykły +1, drobny 0), niewykonany nic nie odejmuje. Własne punkty kroku mają pierwszeństwo.",
+  "Emoji a čas jsou nepovinné. Důležitost kroku řídí srážky: nedokončený krok strhne (klíčový −3, běžný −1, drobný 0). Vlastní minus body mají přednost.": "Emoji i czas są opcjonalne. Ważność kroku steruje potrąceniami: niedokończony krok odejmuje (kluczowy −3, zwykły −1, drobny 0). Własne punkty ujemne mają pierwszeństwo.",
+  "Vlastní body kroku {n} za splnění": "Własne punkty kroku {n} za wykonanie",
+  "Body za postup": "Punkty za procedurę"
 }

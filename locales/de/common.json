@@ -168,5 +168,20 @@
   "Nastavení organizace": "Organisationseinstellungen",
   "Sdílení mezi podniky": "Teilen zwischen Betrieben",
   "{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}": "{n, plural, one {# Aufgabe für Punkte offen} other {# Aufgaben für Punkte offen}}",
-  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Passwort geändert. Deine anderen Geräte wurden abgemeldet."
+  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Passwort geändert. Deine anderen Geräte wurden abgemeldet.",
+  "Kombinace": "Kombiniert",
+  "Podle podniku": "Wie im Betrieb",
+  "Postupy": "Abläufe",
+  "Za celek": "Fürs Ganze",
+  "Za každý krok": "Pro Schritt",
+  "Za celý postup {z} b, za nedokončený krok −1 b, klíčový −3 b.": "{z} P für den ganzen Ablauf, −1 P für einen offenen Schritt, −3 für einen wichtigen.",
+  "Za celý úkol {z} b, za nesplněnou položku checklistu −{s} b.": "{z} P für die ganze Aufgabe, −{s} P für jeden offenen Checklistenpunkt.",
+  "Za dokončení celku navíc +{z} b.": "Fürs Fertigstellen zusätzlich +{z} P.",
+  "Za dokončený postup {z} b a za úplnost až dalších {z} b; za nedokončený krok −1 b, klíčový −3 b.": "{z} P für einen fertigen Ablauf und bis zu {z} P mehr für Vollständigkeit; −1 P für einen offenen Schritt, −3 für einen wichtigen.",
+  "Za každou splněnou položku checklistu +{p} b, nesplněná nic neubere. Úkol bez checklistu: {z} b.": "+{p} P für jeden erledigten Checklistenpunkt, ein offener zieht nichts ab. Aufgabe ohne Checkliste: {z} P.",
+  "Za každou splněnou povinnou věc dne +{p} b, nesplněná nic neubere.": "+{p} P für jede erledigte Pflichtsache des Tages, eine offene zieht nichts ab.",
+  "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "+1 P für jeden erledigten Schritt, +2 für einen wichtigen (eigene Punkte des Schritts gehen vor), ein offener zieht nichts ab.",
+  "Za splněný úkol {z} b, položky checklistu se nepočítají.": "{z} P für eine erledigte Aufgabe, Checklistenpunkte zählen nicht.",
+  "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "{z} P für den Abschluss, Pflichtsachen des Tages zählen nicht.",
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} P für den Abschluss, −{s} P für jede offene Pflichtsache des Tages."
 }

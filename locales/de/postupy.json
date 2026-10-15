@@ -177,5 +177,10 @@
   "Čeká na schválení": "Wartet auf Genehmigung",
   "Čt|den": "Do",
   "Žádný postup nečeká na schválení.": "Kein Ablauf wartet auf Freigabe.",
-  "−{n} b.": "−{n} Pkt."
+  "−{n} b.": "−{n} Pkt.",
+  "Dopad se nepodařilo spočítat.": "Auswirkung konnte nicht berechnet werden.",
+  "Emoji a čas jsou nepovinné. Důležitost kroku řídí body: splněný krok přidá (klíčový +2, běžný +1, drobný 0), nesplněný nic neubere. Vlastní body kroku mají přednost.": "Emoji und Zeit sind optional. Die Wichtigkeit steuert die Punkte: ein erledigter Schritt bringt (wichtig +2, normal +1, klein 0), ein offener zieht nichts ab. Eigene Punkte des Schritts gehen vor.",
+  "Emoji a čas jsou nepovinné. Důležitost kroku řídí srážky: nedokončený krok strhne (klíčový −3, běžný −1, drobný 0). Vlastní minus body mají přednost.": "Emoji und Zeit sind optional. Die Wichtigkeit steuert die Abzüge: ein offener Schritt zieht ab (wichtig −3, normal −1, klein 0). Eigene Minuspunkte gehen vor.",
+  "Vlastní body kroku {n} za splnění": "Eigene Punkte für Schritt {n} bei Erledigung",
+  "Body za postup": "Punkte für den Ablauf"
 }

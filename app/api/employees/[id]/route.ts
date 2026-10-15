@@ -208,7 +208,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     // Celkové body a úroveň (standing) zůstávají — body jsou vidět i
     // v žebříčku. Z čeho se skládají hodnocení, jen s hodnoceni.zobrazit.
     breakdown: hodnoceni
-      ? { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints, autoPoints, itemPoints, ratedShifts, flagged, awards, awardCount }
+      ? { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints, autoPoints, itemPoints, ratedShifts, flagged, awards, awardCount, dayAdjust: b.dayAdjust }
       : { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints: null, autoPoints: null, itemPoints: null, ratedShifts: null, flagged: null, awards: null, awardCount: null },
     shifts: { upcoming, recent },
     reviews: hodnoceni ? reviews : [], items: hodnoceni ? items : [],

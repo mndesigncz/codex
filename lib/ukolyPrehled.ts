@@ -8,6 +8,7 @@
 // `npm test` pustí přímo v Node (scripts/testy/k69-b6a.ts).
 
 import { pragueDaySafe, dayPlus, parseDbTime } from './pragueTime.ts';
+import { normalizujPrepis, type PrepisRezimu } from './bodyRezim.ts';
 
 // ---------------------------------------------------------------------------
 // Úkoly (GET /api/tasks → pole ve tvaru shape() z app/api/tasks/route.ts)
@@ -46,6 +47,8 @@ export interface Ukol {
   requireBeforeClosing?: boolean;
   /** Kolo 7: splní se jen s fotkou (server vymáhá — widget ani tablet to neobejdou). */
   requirePhoto?: boolean;
+  /** Kolo 91: způsob počítání bodů / vlastní body úkolu (null = podle podniku). */
+  bodyRezim?: PrepisRezimu | null;
   /** Kolo 7: fotka ze splnění (`/api/upload/<id>`), nebo null. Po vrácení mezi nehotové zůstává. */
   completionPhoto?: string | null;
 }
@@ -96,6 +99,7 @@ export function vyberUkoly(raw: unknown): Ukol[] {
     requirePhoto: t?.requirePhoto === true,
     // Jen vlastní adresa nahraného souboru — cizí URL by obrázek načetla odjinud.
     completionPhoto: platnaFotka(t?.completionPhoto) ? t.completionPhoto : null,
+    bodyRezim: normalizujPrepis(t?.bodyRezim),
   })).filter(t => Number.isFinite(t.id));
 }
 

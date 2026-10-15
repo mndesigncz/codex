@@ -33,6 +33,9 @@ import DetailPrubehu from './DetailPrubehu';
 import { useProcedures } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, cisloZTextu, MAX_JEDNOTKA, type Step } from '@/lib/steps';
+import { normalizujPrepis, normalizujPravidlo, ucinnePravidlo, type PrepisRezimu, type PravidloRezimu } from '@/lib/bodyRezim';
+import { VolbaRezimuPolozky } from '../body-rezim/VolbaRezimu';
+import { OknoNahledu, PrepocetZpetne, nactiNahled, provedPrepocet, type NahledPrepoctu } from '../body-rezim/Prepocet';
 import { okJson, apiMessage } from '@/lib/api';
 import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
 import { Poznamky, type AutorNaTabletu } from '../Poznamky';
@@ -78,6 +81,8 @@ interface Procedure extends PostupApi {
   items: any[];
   icon: string;
   color?: string;
+  /** Kolo 91: způsob počítání bodů u postupu (null = podle podniku). */
+  bodyRezim?: unknown;
 }
 
 const dnyTydne = (t: PrekladFn) => [t('Po', {}, 'den'), t('Út', {}, 'den'), t('St', {}, 'den'), t('Čt', {}, 'den'), t('Pá', {}, 'den'), t('So', {}, 'den'), t('Ne', {}, 'den')];
@@ -383,6 +388,7 @@ export default function Procedures({ user }: Props) {
           key={editing?.id ?? 'new'}
           initial={editing}
           smiPovinny={smiVytvorit || smiUpravit}
+          smiPrepocet={smi('odmeny.nastaveni')}
           navrh={!smiVytvorit && !editing}
           onClose={() => setEditorOpen(false)}
           onSaved={(saved) => {
@@ -520,11 +526,13 @@ function ProcedureDetail({
 }
 
 function ProcedureEditor({
-  initial, smiPovinny, navrh, onClose, onSaved,
+  initial, smiPovinny, smiPrepocet, navrh, onClose, onSaved,
 }: {
   initial: Procedure | null;
   /** Povinnost před uzávěrkou nastaví jen ten, kdo zakládá nebo upravuje (návrh ji API zahodí). */
   smiPovinny: boolean;
+  /** Přepočítat body zpětně smí jen ten, kdo smí měnit nastavení bodů (odmeny.nastaveni). */
+  smiPrepocet: boolean;
   /** Ukládá se jako návrh ke schválení (postupy.navrhnout bez postupy.vytvorit). */
   navrh: boolean;
   onClose: () => void;
@@ -550,6 +558,19 @@ function ProcedureEditor({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Kolo 91: způsob počítání bodů u postupu, výchozí podniku a přepočet zpětně.
+  const [bodyRezim, setBodyRezim] = useState<PrepisRezimu | null>(() => normalizujPrepis(initial?.bodyRezim));
+  const [vychozi, setVychozi] = useState<(PravidloRezimu & { zaklad: number }) | null>(null);
+  const [prepocitat, setPrepocitat] = useState(false);
+  const [nahled, setNahled] = useState<{ open: boolean; data: NahledPrepoctu | null; chyba: string | null }>({ open: false, data: null, chyba: null });
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/body/vychozi').then(okJson)
+      .then(d => { if (alive && d?.postupy) setVychozi({ ...normalizujPravidlo(d.postupy), zaklad: Number(d.postupy.zaklad) || 0 }); })
+      .catch(() => { /* bez výchozího se volba ukáže bez věty */ });
+    return () => { alive = false; };
+  }, []);
+  const rezimKroku = vychozi ? ucinnePravidlo(vychozi, bodyRezim, vychozi.zaklad).rezim : (bodyRezim?.rezim ?? 'kombinace');
   // Návody se načtou JEDNOU pro celý editor — kroků bývá dvacet a dvacet
   // stejných požadavků na `/api/guides` je zbytečných. Když se načtení
   // nepovede, výběr se prostě nenabídne; postup se uloží i tak.
@@ -576,15 +597,13 @@ function ProcedureEditor({
     return next;
   });
 
-  const save = async () => {
-    setError('');
-    const cleanName = name.trim();
-    const items = steps
+  const sestavKroky = () => steps
       .map(s => ({
         text: s.text.trim(), minutes: s.minutes, note: s.note?.trim() || null, emoji: s.emoji?.trim() || null,
         // Scoring config must survive the round-trip — dropping it here would
         // silently reset every "klíčový krok" back to normal on each save.
-        weight: s.weight ?? 'normal', penalty: s.penalty ?? null,
+        // Vlastní body kroku (kolo 91) taky.
+        weight: s.weight ?? 'normal', penalty: s.penalty ?? null, points: s.points ?? null,
         // Totéž platí pro návod: kdyby se tu zahodil, každé uložení postupu
         // by obsluze potichu sebralo odkaz na postup, podle kterého pracuje.
         guideId: s.guideId ?? null,
@@ -592,13 +611,32 @@ function ProcedureEditor({
         valueKind: s.valueKind ?? null, valueUnit: s.valueUnit?.trim() || null, valueMin: s.valueMin ?? null, valueMax: s.valueMax ?? null,
       }))
       .filter(s => s.text.length > 0);
+
+  const save = async () => {
+    setError('');
+    const cleanName = name.trim();
+    const items = sestavKroky();
     if (!cleanName) { setError(t('Zadej název postupu.')); return; }
     if (items.length === 0) { setError(t('Přidej aspoň jeden krok.')); return; }
+    // Kolo 91: „Přepočítat zpětně“ — nejdřív dopad (s kroky z editoru), uložení až po potvrzení.
+    if (initial && prepocitat) {
+      setNahled({ open: true, data: null, chyba: null });
+      try {
+        setNahled({ open: true, data: await nactiNahled({ typ: 'postup', id: initial.id }, { bodyRezim, items }), chyba: null });
+      } catch (e) {
+        setNahled({ open: true, data: null, chyba: apiMessage(e, t('Dopad se nepodařilo spočítat.')) });
+      }
+      return;
+    }
+    await ulozit(items, false);
+  };
+
+  const ulozit = async (items: ReturnType<typeof sestavKroky>, sPrepoctem: boolean) => {
     setSaving(true);
     try {
       const reminderOn = remindAnchor !== 'time' || !!remindAt;
       const payload = {
-        name: cleanName,
+        name: name.trim(),
         description: (description ?? '').trim(),
         icon,
         items,
@@ -606,6 +644,8 @@ function ProcedureEditor({
         remindAt: remindAnchor === 'time' ? (remindAt || null) : null,
         remindDays: reminderOn ? remindDays : [],
         requireBeforeClosing,
+        // S přepočtem uloží způsob počítání přepočet (zapíše si předchozí kvůli vrácení), ne tahle úprava.
+        ...(smiPovinny && !navrh && !sPrepoctem ? { bodyRezim } : {}),
       };
       const res = await fetch(initial ? `/api/procedures/${initial.id}` : '/api/procedures', {
         method: initial ? 'PATCH' : 'POST',
@@ -613,9 +653,11 @@ function ProcedureEditor({
         body: JSON.stringify(payload),
       });
       const d = await okJson(res);
-      onSaved(d.procedure as Procedure);
+      if (sPrepoctem && initial) await provedPrepocet({ typ: 'postup', id: initial.id }, { bodyRezim, items });
+      onSaved({ ...(d.procedure as Procedure), ...(sPrepoctem ? { bodyRezim } : {}) });
     } catch (e) {
-      setError(apiMessage(e, t('Uložení se nezdařilo.')));
+      const zprava = apiMessage(e, t('Uložení se nezdařilo.'));
+      if (sPrepoctem) setNahled(n => ({ ...n, chyba: zprava })); else setError(zprava);
     } finally {
       setSaving(false);
     }
@@ -651,7 +693,11 @@ function ProcedureEditor({
 
         <div>
           <p className="field-label">{t('Kroky')}</p>
-          <p className="t-meta mb-2 text-pretty">{t('Emoji a čas jsou nepovinné. Důležitost kroku řídí body: hotový krok přičítá, vynechaný odečítá (klíčový +2/−3, běžný +1/−1, drobný 0). Vlastní minus body mají přednost.')}</p>
+          <p className="t-meta mb-2 text-pretty">{rezimKroku === 'kroky'
+            ? t('Emoji a čas jsou nepovinné. Důležitost kroku řídí body: splněný krok přidá (klíčový +2, běžný +1, drobný 0), nesplněný nic neubere. Vlastní body kroku mají přednost.')
+            : rezimKroku === 'celek'
+              ? t('Emoji a čas jsou nepovinné. Důležitost kroku řídí srážky: nedokončený krok strhne (klíčový −3, běžný −1, drobný 0). Vlastní minus body mají přednost.')
+              : t('Emoji a čas jsou nepovinné. Důležitost kroku řídí body: hotový krok přičítá, vynechaný odečítá (klíčový +2/−3, běžný +1/−1, drobný 0). Vlastní minus body mají přednost.')}</p>
           <ol className="space-y-2.5">
             {steps.map((s, i) => (
               <li key={i} className="space-y-2">
@@ -670,10 +716,18 @@ function ProcedureEditor({
                     <Segmented size="sm" ariaLabel={t('Důležitost kroku {n}', { n: i + 1 })} value={s.weight ?? 'normal'}
                       onChange={w => patchStep(i, { weight: w })}
                       options={STEP_WEIGHTS.map(w => ({ id: w.id, label: vahaKroku(t)[w.id] ?? w.label }))} />
-                    <Input type="number" min={0} inputMode="numeric" value={s.penalty ?? ''}
-                      onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
-                      placeholder={`−${weightSpec(s.weight ?? 'normal').minus}`}
-                      aria-label={t('Vlastní minus body kroku {n}, když se neudělá', { n: i + 1 })} className="!w-20 shrink-0 tabular-nums" />
+                    {rezimKroku === 'kroky' ? (
+                      // Kolo 91: „Za každý krok“ — vlastní plus body za splnění místo srážky.
+                      <Input type="number" min={0} inputMode="numeric" value={s.points ?? ''}
+                        onChange={e => patchStep(i, { points: e.target.value === '' ? null : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })}
+                        placeholder={`+${weightSpec(s.weight ?? 'normal').plus}`}
+                        aria-label={t('Vlastní body kroku {n} za splnění', { n: i + 1 })} className="!w-20 shrink-0 tabular-nums" />
+                    ) : (
+                      <Input type="number" min={0} inputMode="numeric" value={s.penalty ?? ''}
+                        onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
+                        placeholder={`−${weightSpec(s.weight ?? 'normal').minus}`}
+                        aria-label={t('Vlastní minus body kroku {n}, když se neudělá', { n: i + 1 })} className="!w-20 shrink-0 tabular-nums" />
+                    )}
                     <Input value={s.note ?? ''} onChange={e => patchStep(i, { note: e.target.value })}
                       aria-label={t('Poznámka ke kroku {n} (nepovinné)', { n: i + 1 })} placeholder={t('Poznámka (nepovinné)')} className="flex-1 min-w-[10rem]" />
                     {/* Poznámka je na jednu větu. „Vyčistit kávovar" chce celý
@@ -728,6 +782,17 @@ function ProcedureEditor({
           <Button variant="secondary" size="sm" icon="plus" className="mt-2.5" onClick={addStep}>{t('Přidat krok')}</Button>
         </div>
 
+        {/* Kolo 91: způsob počítání bodů u postupu (návrh zaměstnance ho nenastavuje). */}
+        {smiPovinny && !navrh && (
+          <div data-body-postupu>
+            <p className="field-label">{t('Body za postup')}</p>
+            <VolbaRezimuPolozky druh="postupy" prepis={bodyRezim} vychozi={vychozi} onZmena={setBodyRezim} />
+            {initial && smiPrepocet && (
+              <div className="mt-2"><PrepocetZpetne checked={prepocitat} onChange={setPrepocitat} /></div>
+            )}
+          </div>
+        )}
+
         {smiPovinny && !navrh && (
           <ul className="list">
             <SwitchRow title={t('Vyžadovat před uzávěrkou')} hint={t('Dokud nebude dokončený, uzávěrka dne zůstane zamčená. Dokončení po půlnoci (do 6:00) se počítá ke včerejší uzávěrce.')}
@@ -775,6 +840,8 @@ function ProcedureEditor({
 
         {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
       </div>
+      <OknoNahledu open={nahled.open} nahled={nahled.data} chyba={nahled.chyba} ukladam={saving}
+        onPotvrdit={() => void ulozit(sestavKroky(), true)} onZrusit={() => setNahled({ open: false, data: null, chyba: null })} />
     </Modal>
   );
 }

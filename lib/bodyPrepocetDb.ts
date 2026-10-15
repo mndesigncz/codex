@@ -17,6 +17,7 @@ import { breakdownForTeam, totalPoints } from './pointsBalance';
 import { nactiDny, upravyZDnu } from './bodyDenDb';
 import { clenovePodniku } from './tenant';
 import { normalizeSkipReasons } from './procedureScoring';
+import { sanitizeSteps } from './steps';
 import {
   bodyPostupu, bodyUkolu, bodyUzaverky, doPointsConfig, jeZmena, nastaveniRezimu, normalizujPrepis, normalizujPravidlo,
   povinneZPoznamky, rozdelRadek, souhrnDopadu, ucinnePravidlo, MAX_STROP,
@@ -36,6 +37,8 @@ export interface PravidlaPrepoctu {
   denniStrop?: unknown;
   /** Položka: nové přepsání (null = podle podniku). */
   bodyRezim?: unknown;
+  /** Postup: kroky z editoru, které se ukládají spolu s přepočtem (váhy a body kroků už podle nich). */
+  items?: unknown;
 }
 
 export interface VysledekPrepoctu {
@@ -114,6 +117,7 @@ export async function spocitejPrepocet(teamId: number, rozsah: Rozsah, pravidla:
 
   if (chciPostupy) {
     const pid = rozsah.typ === 'postup' ? rozsah.id : null;
+    const krokyNavrh = pid != null && Array.isArray(pravidla.items) ? sanitizeSteps(pravidla.items) : null;
     const rows = await sql`
       SELECT i.id, i.employee_id, i.work_date, i.ref_id, i.points, i.srazka, i.note,
              r.checked_items, r.skipped_items, r.skip_reasons, p.items, p.body_rezim
@@ -130,7 +134,7 @@ export async function spocitejPrepocet(teamId: number, rozsah: Rozsah, pravidla:
       const pr = ucinnePravidlo(n1.postupy, prepisPolozky, pt.procedure);
       const checked = ints(r.checked_items);
       const skipped = ints(r.skipped_items).filter(i => !checked.includes(i));
-      const v = bodyPostupu(r.items, checked, skipped, normalizeSkipReasons(r.skip_reasons), pr, pt.procedure);
+      const v = bodyPostupu(krokyNavrh ?? r.items, checked, skipped, normalizeSkipReasons(r.skip_reasons), pr, pt.procedure);
       const z: ZmenaRadku = {
         id: Number(r.id), uid: Number(r.employee_id), den: String(r.work_date), kind: 'procedure', refId: Number(r.ref_id),
         stare: Number(r.points) || 0, nove: v.radek, stareSrazka: r.srazka == null ? null : Number(r.srazka), noveSrazka: v.srazka,
@@ -234,7 +238,7 @@ export async function provedPrepocet(teamId: number, kdo: number, rozsah: Rozsah
   const souhrnUlozeny = { zaznamu: v.souhrn.zaznamu, lidi: v.souhrn.lidi, celkem: v.souhrn.celkem, doMinusu: v.souhrn.doMinusu.length };
   const [hlava] = await sql`
     INSERT INTO body_prepocty (team_id, kdo, rozsah, pravidla, predchozi, radky, souhrn)
-    VALUES (${teamId}, ${kdo}, ${JSON.stringify(rozsah)}::jsonb, ${JSON.stringify(pravidla ?? {})}::jsonb,
+    VALUES (${teamId}, ${kdo}, ${JSON.stringify(rozsah)}::jsonb, ${JSON.stringify({ ...(pravidla ?? {}), items: undefined })}::jsonb,
             ${JSON.stringify(predchozi)}::jsonb, ${JSON.stringify(radky)}::jsonb, ${JSON.stringify(souhrnUlozeny)}::jsonb)
     RETURNING id`;
   const id = Number(hlava.id);
