@@ -22,6 +22,9 @@ export function prelozHlaskuTrestu(t: PrekladFn, chyba: string): string {
     case 'Název je moc dlouhý (nejvýš 80 znaků).': return t('Název je moc dlouhý (nejvýš 80 znaků).');
     case 'Popis je moc dlouhý (nejvýš 300 znaků).': return t('Popis je moc dlouhý (nejvýš 300 znaků).');
     case 'Tenhle měsíc nemá žádné prémie, krátit není z čeho. Dej body nebo napomenutí.': return t('Tenhle měsíc nemá žádné prémie, krátit není z čeho. Dej body nebo napomenutí.');
+    case 'Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není. Založ ji v Docházce → Prémie a srážky jako „Nenároková prémie“. Starší prémie bez typu se nepočítají.':
+      return t('Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není. Založ ji v Docházce → Prémie a srážky jako „Nenároková prémie“. Starší prémie bez typu se nepočítají.');
+    case 'Manko řeš dohodou o odpovědnosti, ne trestem.': return t('Manko řeš dohodou o odpovědnosti, ne trestem.');
     case 'Za tohle už trest je.': return t('Za tohle už trest je.');
     case 'Tenhle návrh už je zahozený.': return t('Tenhle návrh už je zahozený.');
     default: return chyba;

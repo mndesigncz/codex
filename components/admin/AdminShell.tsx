@@ -11,6 +11,7 @@ import { LogoMark, Icon } from '@/components/Icons';
 
 const NAV = [
   { href: '/admin', label: 'Podniky', icon: 'users' },
+  { href: '/admin/nahlaseni', label: 'Nahlášené', icon: 'warning' },
   { href: '/admin/audit', label: 'Historie zásahů', icon: 'archive' },
 ];
 

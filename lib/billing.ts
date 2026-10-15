@@ -240,6 +240,11 @@ async function sZakaznikem<T>(teamId: number, akce: (customer: string) => Promis
   }
 }
 
+/** Chce pokladna Stripe souhlas s podmínkami? Jen s výslovným STRIPE_SOUHLAS_PODMINEK=1 (viz createCheckout). */
+export function souhlasVPokladne(env: Record<string, string | undefined> = process.env): boolean {
+  return env.STRIPE_SOUHLAS_PODMINEK === '1';
+}
+
 // ---- Checkout ----
 // hosted = přesměrování na stránku Stripe; embedded = pokladna Stripe vložená
 // do našeho okna (components/CheckoutModal.tsx). Karta ani v jednom případě
@@ -278,6 +283,10 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
       } : {}),
     },
     metadata: { teamId: String(teamId), plan, interval },
+    // Souhlas s obchodními podmínkami přímo v pokladně (spuštění, balík P) — JEN se zapnutým
+    // STRIPE_SOUHLAS_PODMINEK=1: Stripe vytvoření pokladny odmítne, když v dashboardu
+    // (Settings → Public details) chybí adresa podmínek. Bez proměnné se chová jako dřív.
+    ...(souhlasVPokladne() ? { consent_collection: { terms_of_service: 'required' as const } } : {}),
     ...(mode === 'embedded' ? {
       // Stripe hodnotu přejmenoval: „embedded“ už neexistuje, platí „embedded_page“.
       ui_mode: 'embedded_page' as const,

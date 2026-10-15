@@ -1,7 +1,7 @@
 {
  "navrhy": [
   { "klic": "pozde:9002", "druh": "pozde", "userId": 17, "userName": "Jakub Horák", "userAvatar": "🧔", "day": "VCERA", "closingId": null, "shiftId": 701, "minuty": 18, "castka": null, "poznamka": null },
-  { "klic": "manko:503", "druh": "manko", "userId": 16, "userName": "Eva Testová", "userAvatar": "👩", "day": "PRED3", "closingId": 503, "shiftId": null, "minuty": null, "castka": 340, "poznamka": null },
   { "klic": "vytka:77", "druh": "vytka", "userId": 18, "userName": "Tereza Malá", "userAvatar": null, "day": "PRED4", "closingId": null, "shiftId": null, "minuty": null, "castka": null, "poznamka": "Špinavá parní tryska po zavření." }
- ]
+ ],
+ "manka": 1
 }

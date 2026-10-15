@@ -6,6 +6,8 @@ import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
 import { normalizujEmail, vypadaJakoEmail } from '@/lib/emailAdresa';
 import { CILE_ID, TYPY_ID, VELIKOSTI_TYMU, type Odpovedi } from '@/lib/pruvodce/typy';
+import { HLASKA_BEZ_SOUHLASU, souhlasZTela } from '@/lib/pravni/verze';
+import { zapisSouhlas } from '@/lib/pravni/souhlasDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +23,10 @@ export async function POST(request: Request) {
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Všechna pole jsou povinná' }, { status: 400 });
+    }
+    // Click-wrap (spuštění, balík P): bez výslovného zaškrtnutí souhlasu s podmínkami se podnik nezaloží.
+    if (!souhlasZTela(b)) {
+      return NextResponse.json({ error: HLASKA_BEZ_SOUHLASU }, { status: 400 });
     }
     // Každá registrace zakládá podnik, tým a (s kartou) zkušební předplatné.
     // Pět za hodinu z jedné adresy poctivému nevadí; skript by jinak mohl
@@ -60,6 +66,9 @@ export async function POST(request: Request) {
       if (e?.code === '23505') return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
       throw e;
     }
+
+    // Souhlas s podmínkami a zásadami: verze a čas (lib/pravni/verze.ts). Selhání nezastaví registraci.
+    await zapisSouhlas(Number(user.id));
 
     // Create their team with a unique join code
     let joinCode = generateJoinCode();

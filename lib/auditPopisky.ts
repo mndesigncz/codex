@@ -118,6 +118,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'tresty.sazebnik.pridat': 'Přidána položka sazebníku trestů',
   'tresty.sazebnik.upravit': 'Upravena položka sazebníku trestů',
   'tresty.sazebnik.smazat': 'Smazána položka sazebníku trestů',
+  // Záloha dat (spuštění, balík P): stažení z odkazu v denním e-mailu
+  'data.zaloha.stazeni': 'Stažena záloha dat podniku',
   // docházka (kolo 7: ruční oprava s důvodem)
   'dochazka.upravit': 'Ručně upraven záznam docházky',
   'dochazka.pridat': 'Ručně přidán záznam docházky',
@@ -171,6 +173,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'client.kupon.odeslan': 'Kupon poslán hostům',
   'client.promo': 'Změna promo kódu (založení, dávka, úprava, smazání)',
   'client.card': 'Změna na věrnostní kartě',
+  'client.parovani': 'Kartička hosta spárovaná s účtem z pokladny (samo, nebo výběrem obsluhy) nebo čekání zrušené',
   'client.stamps': 'Změna razítkové kampaně (založení, úprava, archiv, smazání)',
   'client.stamps.manual': 'Ruční úprava razítek hostů s důvodem',
   'client.bonus': 'Změna bonusové akce věrnostního programu',
@@ -308,6 +311,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   client: 'klient', klient: 'klient', rezervace: 'klient', recenze: 'klient',
   // nastavení podniku, organizace, předplatné
   podnik: 'nastaveni', rozlozeni: 'nastaveni', onboarding: 'nastaveni', organization: 'nastaveni', billing: 'nastaveni',
+  // záloha dat podniku (spuštění, balík P)
+  data: 'nastaveni',
   // akce (výdej a vrácení zboží, oznámení týmu) — samostatná agenda, patří k ostatnímu
   event: 'ostatni',
   // úkoly a nápady (kolo 7: fotka jako důkaz, zamítnutí s důvodem) — provozní agenda, patří k ostatnímu

@@ -1,35 +1,35 @@
 WHAT THIS APP IS
-Managero client is the guest-facing app for cafes, restaurants and bistros that run on Managero (our business app, submitted separately as "Managero", app.managero.app). A guest gets one loyalty card (QR code) for all venues, can reserve a table and order from the table. The interface is currently Czech only.
+Managero client is the guest app for cafes and restaurants that run on Managero (our business app, submitted separately as "Managero"). One loyalty card (QR code) for all venues, table reservations, ordering from the table, stamps, points and coupons.
+The interface follows the device language (Czech original; English, German, Slovak, Polish machine-translated). Labels below: Czech (English).
 
 HOW TO SIGN IN
-Use the demo account in the Demo Account fields (guest role, pre-verified, no 2FA). You can also register your own account with any e-mail address; e-mail verification is not required to use the app.
-Do not use a manager account of the other app here: this app will tell you that such an account belongs to the business app.
+Use the demo account in the Demo Account fields (guest, no 2FA), or register with any e-mail (no verification). Business accounts do not work here; the app says so.
 
 DEMO VENUE
-"Café Demo" is a fictional demo venue. It appears in the venue list on the first tab ("Podniky") with the tagline "Ukázkový podnik pro vyzkoušení aplikace"; if it is not visible, tap "Zadat kód podniku" and enter: cafe-demo
-The demo account is already a member of the venue with points, stamps and one coupon.
+"Café Demo" (fictional) is listed on the first tab "Podniky" (Places). Or tap "Naskenovat" (Scan) in the middle of the bottom bar: the native QR scanner opens; close it and type cafe-demo into "Kód podniku" (Place code) > "Otevřít podnik" (Open place).
 
 STEP BY STEP
-1. Karta tab: your QR code and 8-digit code, points, stamps, coupons per venue. The card also opens in airplane mode (cached).
-2. Open "Café Demo" > Rezervace: choose a day, time and number of guests, send. The status becomes "Čeká na potvrzení". A manager confirms it in the business app and the guest gets a push notification (needs a real device).
-3. Open the venue > Objednat: the demo venue has the location and QR checks switched off, so you can order from anywhere. Add items and send. Payment is made with the staff after the meal; nothing is paid in the app.
-4. Věrnost: stamp campaigns and coupons. Stamps and points are added by staff at the till when they scan the guest QR code; guests cannot add them to themselves.
-5. Profil: notification switches, Zásady soukromí, Podmínky, Podpora, Odhlásit se and "Smazat účet" (account deletion inside the app).
+1. "Moje" (My page): loyalty card (QR and 8-character code), points and stamps, one coupon ready to use, one confirmed reservation.
+2. Offline card: open "Moje" once, switch on airplane mode, force-quit and reopen: the offline screen shows the card saved in the app storage, ready to scan.
+3. Café Demo > "Rezervace" (Reservations): day, time, guests, send. Status "Čeká na potvrzení" (Waiting for confirmation); when the venue confirms it, a push notification arrives.
+4. Café Demo > "Objednat" (Order): location and table-QR checks are off for the demo venue. Pick items, send; paid to the staff at the venue, nothing is paid in the app. Status updates arrive as notifications.
+5. Event "Degustace kávy" > "Přidat do kalendáře" (Add to calendar) and "Moje" > "Uložit kartu jako obrázek" (Save card as image) open the share sheet with the file.
+6. Avatar (top right) > "Účet a soukromí" (Account and privacy): notifications, opt-in for news from venues (off by default), privacy policy, terms, support and "Smazat účet" (Delete account) inside the app.
 
 NATIVE FEATURES (guideline 4.2)
-QR scanner with the camera (venue and table codes), push notifications through APNs (reservation and order status), offline card, universal links (venue QR codes open the app), native share sheet and calendar export of a confirmed reservation.
+Native QR scanner (ML Kit) for venue and table codes, APNs push (reservation, order status), loyalty card in native storage shown offline, universal links (printed QR codes open the app), share sheet with real files, haptics, external links (maps) in an in-app Safari view.
 
 PAYMENTS
-No purchases, no payment cards, no top-ups in the app. Orders are paid at the venue (goods and services consumed outside the app, guideline 3.1.3(e)).
+No purchases, cards or top-ups in the app. Orders are paid at the venue (goods and services outside the app, 3.1.3(e)).
 
 USER-GENERATED CONTENT
-Guests write only private notes (reservation note, order note, rating text) that are visible to the venue staff only. There is no public feed and no comments between guests.
+Guests write only private notes (reservation, order, rating) visible to the venue staff. No public feed, no contact between guests.
 
 PUSH AND MARKETING (guideline 4.5.4)
-Transactional notifications (reservation, order) only. Marketing messages from venues are sent only after an explicit opt-in switch ("Novinky a akce") that is off by default.
+Transactional notifications only. Marketing from venues only after the opt-in switch "Novinky a akce od podniků" (News and offers from businesses), off by default.
 
 PERMISSIONS
-Camera (QR scanning), location while using the app (only when ordering from a table, to confirm the guest is on site; coordinates are not stored), notifications. All are requested at the moment of use.
+Camera only when you tap Scan. Location only when ordering at a venue that requires it (not the demo venue); only the distance is stored. Notifications after an in-app explanation. All requested at the moment of use.
 
 CONTACT
 If anything does not work, please reply in App Store Connect; we answer within one working day.

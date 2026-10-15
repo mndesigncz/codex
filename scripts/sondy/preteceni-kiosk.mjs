@@ -3,12 +3,23 @@
 // a /client/login na 320/390/768/1024 px. Co se měří a proč: preteceni-jadro.mjs.
 //   SONDY_ZAKLAD=http://localhost:3400 node scripts/sondy/preteceni-kiosk.mjs
 import { kontext, konec, tvrdi, dokud, BASE, SIRKY, KIOSK_ZALOZKY, VEREJNE, viewport, nastavJazyk, otevriStranku, prover, projdi } from './preteceni-jadro.mjs';
+// Pevné „teď" pro fixtury i prohlížeč: dnes 14:30 v Praze. Směny se počítají od teď, a kolem půlnoci
+// by se plán přehoupl přes den (CI v 23:49 → „po plánu" chyběl); tablet ve skutečnosti dostává jen dnešní směny.
+const TED = (() => {
+  const den = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
+  const poledne = new Date(`${den}T12:00:00Z`);
+  const posun = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Prague', hour: 'numeric', hourCycle: 'h23' }).format(poledne)) - 12;
+  const [r, mes, d] = den.split('-').map(Number);
+  return Date.UTC(r, mes - 1, d, 14 - posun, 30);
+})();
+
 
 // Záložky tabletu v jazyce (sonda klepe podle názvu; tablet nemá URL záložek).
 const ZALOZKY = { cs: KIOSK_ZALOZKY, de: ['Schicht', 'Aufgaben', 'Abläufe', 'Lager', 'Bestellungen', 'Kassenabschluss', 'Anleitungen'] };
 
 for (const [vp, jazyk] of [[{ width: 744, height: 1133 }, 'cs'], [{ width: 1024, height: 768 }, 'cs'], [{ width: 744, height: 1133 }, 'de']]) {
   const { ctx, p } = await kontext({ viewport: vp, role: 'kiosk', mobil: false });
+  await ctx.clock.install({ time: TED });
   await nastavJazyk(ctx, jazyk);
   await otevriStranku(p, `${BASE}/kiosk`);
   const nav = p.locator('nav[aria-label] button, nav button').first();
@@ -29,8 +40,8 @@ for (const [vp, jazyk] of [[{ width: 744, height: 1133 }, 'cs'], [{ width: 1024,
 // Nástroj „Kdo teď pracuje" s plánem proti skutečnosti (kolo 6, B4): řádek „od · délka · plán do"
 // s chipy „po plánu" a „bez rozpisu", výběr osoby s hledáním a dvěma skupinami, okno příchodu
 // s chipem zpoždění — na 810 × 1080 a 768 × 1024 nic nepřeteče. Rozpis se skládá kolem „teď".
-const prahaHMS = (min) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(Date.now() + min * 60000));
-const isoPred = (min) => new Date(Date.now() - min * 60000).toISOString();
+const prahaHMS = (min) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(TED + min * 60000));
+const isoPred = (min) => new Date(TED - min * 60000).toISOString();
 const clen = (id, name, avatar, x = {}) => ({ id, name, avatar, hasPin: false, openSince: null, openEntryId: null, shiftStart: null, shiftEnd: null, ...x });
 const rosterB4 = () => ({ roster: [
   clen(1, 'Martin Nemeškal', '🧑', { hasPin: true, openSince: isoPred(180), openEntryId: 501, shiftStart: prahaHMS(-180), shiftEnd: prahaHMS(-60) }),
@@ -49,13 +60,14 @@ const podvrhB4 = (req, json) => {
     const telo = req.postDataJSON();
     const c = rosterB4().roster.find(r => r.id === telo.employeeId);
     return json(telo.action === 'out'
-      ? { ok: true, action: 'out', entry: { id: c?.openEntryId ?? 1, clockIn: c?.openSince ?? isoPred(60), clockOut: new Date().toISOString() }, closingDone: false }
-      : { ok: true, action: 'in', entry: { id: 900, clockIn: new Date().toISOString(), clockOut: null } });
+      ? { ok: true, action: 'out', entry: { id: c?.openEntryId ?? 1, clockIn: c?.openSince ?? isoPred(60), clockOut: new Date(TED).toISOString() }, closingDone: false }
+      : { ok: true, action: 'in', entry: { id: 900, clockIn: new Date(TED).toISOString(), clockOut: null } });
   }
   return undefined;
 };
 for (const vp of [{ width: 810, height: 1080 }, { width: 768, height: 1024 }]) {
   const { ctx, p } = await kontext({ viewport: vp, role: 'kiosk', mobil: true, dalsi: podvrhB4 });
+  await ctx.clock.install({ time: TED });
   await otevriStranku(p, `${BASE}/kiosk`);
   const nastroj = p.locator('[data-plocha="kiosk.smena"] li[data-widget="nastroj"]');
   const je = await nastroj.getByText('po plánu').first().isVisible().catch(() => false);

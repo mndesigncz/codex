@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints } from '@/lib/rewardLevels';
-import { breakdownFor, breakdownForTeam, totalPoints, PointsBreakdown, PRAZDNY_ROZPAD } from '@/lib/pointsBalance';
+import { breakdownFor, breakdownForTeam, bodyZebricku, rozpadZebricku, totalPoints, PointsBreakdown, PRAZDNY_ROZPAD } from '@/lib/pointsBalance';
 import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { clenovePodniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
@@ -147,9 +147,11 @@ export async function GET(req: NextRequest) {
     const breakdowns = await breakdownForTeam(c.teamId, memberIds, od);
     const pendings = vidiHodnoceni ? await pendingForTeam(c.teamId, memberIds) : new Map<number, { n: number; oldest: string | null }>();
     const nevidene = vidiHodnoceni ? await neviseneVytky(c.teamId, memberIds) : new Map<number, number>();
+    // Žebříček = získané body: tresty (záporné body) se do pořadí ani do rozpadu nepočítají —
+    // žebříček vidí celý tým i tablet (spuštění, balík P). Vlastní zůstatek níž (vlastni) je beze změny.
     const standings = members.map(m => {
-      const b0 = breakdowns.get(m.id) ?? PRAZDNY_ROZPAD;
-      const total = totalPoints(b0, points);
+      const b0 = rozpadZebricku(breakdowns.get(m.id) ?? PRAZDNY_ROZPAD);
+      const total = bodyZebricku(b0, points);
       const st = standingForPoints(levels, total);
       const b = vidiHodnoceni ? b0 : { ...b0, flagged: 0 };
       const p = vidiHodnoceni ? (pendings.get(m.id) ?? { n: 0, oldest: null }) : { n: 0, oldest: null };

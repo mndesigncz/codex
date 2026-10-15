@@ -68,6 +68,7 @@ import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { premieZaNavic } from '../../navic/logika';
 import { textNavrhu } from '@/lib/tresty';
+import { infoPolohyPotvrzeno, potvrdInfoPolohy, zjistiPolohu, type Poloha } from '@/lib/geoPichani';
 import { useNavrhyTrestu } from '../../tresty-vedeni/data';
 import { DatTrest } from '../../tresty-vedeni/DatTrest';
 import { pozdniKTrestu, type PozdniPrichod, type PredvolbyTrestu } from '../../tresty-vedeni/logika';
@@ -120,7 +121,11 @@ interface ZaznamDochazky {
   breakAfter?: number | null;
 }
 
-interface Dochazka { roster: ClenRosteru[]; entries: ZaznamDochazky[]; /** Prémie a srážky (jen s finance.mzdy, jinak prázdné). */ adjustments: UpravaMzdy[] }
+interface Dochazka {
+  roster: ClenRosteru[]; entries: ZaznamDochazky[]; /** Prémie a srážky (jen s finance.mzdy, jinak prázdné). */ adjustments: UpravaMzdy[];
+  /** Podnik ověřuje polohu příchodu z telefonu (spuštění, balík P) — Píchačky ji při příchodu přibalí. */
+  poloha?: boolean;
+}
 
 /**
  * Jeden den docházky. S dochazka.zobrazit / dochazka.tablet vrací API celý
@@ -132,7 +137,7 @@ const URL_DNES = '/api/attendance?days=1';
 /** Odpověď bez rosteru je nečekaný tvar (chyba widgetu), ne „nikdo není na směně". */
 function vyberDochazku(raw: any, t: PrekladFn): Dochazka {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error(t('Docházka přišla v nečekaném tvaru.'));
-  return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [], adjustments: Array.isArray(raw.adjustments) ? raw.adjustments : [] };
+  return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [], adjustments: Array.isArray(raw.adjustments) ? raw.adjustments : [], poloha: raw.pichaniPoloha === true };
 }
 
 // Hranice zapomenutého odchodu (16 h) je v lib/dochazkaPrehled — jedna pro widgety i nástroj.
@@ -243,6 +248,9 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   const pauza = useMemo(() => (ja.id != null && data.data ? stavPauzy(data.data.entries as ZaznamDochazkyLib[], ja.id, pragueToday(), ted) : null), [data.data, ja.id, ted]);
   const naPauze = !!pauza?.naPauze && !naSmene;
   const [ptamSe, setPtamSe] = useState(false);
+  // Poloha při příchodu (spuštění, balík P): jen když ji podnik ověřuje; před prvním použitím informace.
+  const [infoPolohy, setInfoPolohy] = useState(false);
+  const [zjistujiPolohu, setZjistujiPolohu] = useState(false);
 
   const poOdchodu = (d: any) => {
     const zaklad = data.data;
@@ -264,15 +272,26 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
     }
   };
 
-  const pichni = async () => {
+  const pichni = async (poInfu = false) => {
     if (nahled || ja.id == null || pise) return;
     const akce = naSmene ? 'out' : 'in';
     // Odchod po víc než 6 h bez pauzy: nejdřív otázka, pak teprve zápis (zákoník: 30 min nejdéle po 6 h).
     if (akce === 'out' && pauza?.zeptatSe) { setPtamSe(true); return; }
+    // Příchod u podniku, který ověřuje vzdálenost: poprvé na zařízení nejdřív věta, co se ukládá.
+    const sPolohou = akce === 'in' && data.data?.poloha === true;
+    if (sPolohou && !poInfu && !infoPolohyPotvrzeno(typeof window !== 'undefined' ? window.localStorage : null)) { setInfoPolohy(true); return; }
+    setInfoPolohy(false);
     setPise(true); setChyba(null); setPripomenUzaverku(false);
     try {
+      // Bez polohy (odmítnutá, vypnutá GPS, 8 s nic) píchnutí projde — server zapíše stav „bez polohy".
+      let poloha: Poloha | null = null;
+      if (sPolohou) {
+        setZjistujiPolohu(true);
+        poloha = await zjistiPolohu(typeof navigator !== 'undefined' ? navigator.geolocation : null);
+        setZjistujiPolohu(false);
+      }
       const d = await fetch('/api/attendance', {
-        method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ employeeId: ja.id, action: akce }),
+        method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ employeeId: ja.id, action: akce, ...(poloha ? { poloha } : {}) }),
       }).then(okJson);
       // Stav hned podle odpovědi, ať tlačítko neukazuje půl vteřiny starý stav;
       // obnova pak srovná i „Právě na směně", které čte stejnou adresu.
@@ -287,7 +306,12 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
       setChyba(apiMessage(e, t('Píchnutí se nepovedlo. Zkus to znovu.')));
     } finally {
       setPise(false);
+      setZjistujiPolohu(false);
     }
+  };
+  const souhlasPolohy = () => {
+    potvrdInfoPolohy(typeof window !== 'undefined' ? window.localStorage : null);
+    void pichni(true);
   };
 
   // Na směně dvě tlačítka vedle sebe (Odchod primary, Pauza secondary); na pauze „Konec pauzy" a tiché „Odchod".
@@ -300,14 +324,27 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
     </div>
   ) : naSmene ? (
     <div className="grid grid-cols-2 gap-2">
-      <Button variant="primary" size={vel} block icon="logout" loading={pise} onClick={pichni} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
+      <Button variant="primary" size={vel} block icon="logout" loading={pise} onClick={() => { void pichni(); }} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
       <Button variant="secondary" size={vel} block icon="cup" disabled={pise} onClick={() => { void pauzuj('start'); }} aria-label={t('Začít pauzu')}>{t('Pauza')}</Button>
     </div>
   ) : (
-    <Button variant="primary" size="sm" block icon="clock" loading={pise} onClick={pichni} aria-label={t('Odpíchnout příchod')}>
+    <Button variant="primary" size="sm" block icon="clock" loading={pise} onClick={() => { void pichni(); }} aria-label={t('Odpíchnout příchod')}>
       {S ? t('Příchod') : t('Odpíchnout příchod')}
     </Button>
   );
+  // Informace před prvním příchodem s ověřením polohy (pamatuje se v zařízení).
+  const oknoPolohy = infoPolohy ? (
+    <Modal open onClose={() => setInfoPolohy(false)} size="sm" title={t('Ověření vzdálenosti')}
+      footer={<>
+        <Button variant="secondary" onClick={() => setInfoPolohy(false)}>{t('Zrušit')}</Button>
+        <Button variant="primary" icon="clock" loading={pise} onClick={souhlasPolohy}>{t('Rozumím, píchnout')}</Button>
+      </>}>
+      <div className="space-y-2" data-info-polohy>
+        <p className="text-sm text-black/70 text-pretty">{t('Podnik při píchnutí ověřuje vzdálenost od provozovny. Ukládá se jen vzdálenost, ne poloha.')}</p>
+        <p className="t-meta text-pretty">{t('Telefon se může zeptat na povolení polohy. Když ho nedáš, příchod se zapíše i tak, jen bez ověření.')}</p>
+      </div>
+    </Modal>
+  ) : null;
   // „Měl/a jsi pauzu?" — po víc než 6 h bez zapsané pauzy; „Ano" rozdělí směnu s 30 min mezerou, „Ne" dá vědět vedoucímu.
   const otazkaPauzy = ptamSe ? (
     <Modal open onClose={() => setPtamSe(false)} size="sm" title={t('Měl/a jsi pauzu?')}
@@ -323,6 +360,7 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   const hlaseni = (
     <>
       {chyba && <p className="note note-danger !px-3 !py-2 text-[13px]" role="alert">{chyba}</p>}
+      {zjistujiPolohu && <p className="t-meta" role="status">{t('Ověřuji vzdálenost od podniku…')}</p>}
       {pripomenUzaverku && <p className="t-meta" role="status">{t('Směna skončila. Nezapomeň vyplnit uzávěrku.')}</p>}
     </>
   );
@@ -379,6 +417,7 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
         </div>
       )}
       {otazkaPauzy}
+      {oknoPolohy}
     </Widget>
   );
 }
@@ -1135,6 +1174,8 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
   const { jazyk } = useJazyk();
   const dnes = pragueToday();
   const [druh, setDruh] = useState<'premie' | 'srazka'>(clovek.druh);
+  // Typ prémie (spuštění, balík P): tresty smí krátit jen nenárokovou prémii (§ 346b ZP).
+  const [typPremie, setTypPremie] = useState<'premie' | 'mzda'>('premie');
   const [castka, setCastka] = useState('');
   const [den, setDen] = useState(dnes >= rozmezi.od && dnes <= rozmezi.do ? dnes : rozmezi.do);
   const [poznamka, setPoznamka] = useState('');
@@ -1149,7 +1190,7 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
     try {
       await fetch('/api/wage-adjustments', {
         method: 'POST', headers: JSON_HLAVICKA,
-        body: JSON.stringify({ userId: Number(clovek.id), day: den, amount: druh === 'premie' ? cislo : -cislo, note: poznamka.trim() || undefined }),
+        body: JSON.stringify({ userId: Number(clovek.id), day: den, amount: druh === 'premie' ? cislo : -cislo, druh: druh === 'premie' ? typPremie : undefined, note: poznamka.trim() || undefined }),
       }).then(okJson);
       obnovDochazku();
       onClose();
@@ -1179,6 +1220,16 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
       </>}>
       <div className="space-y-4">
         <Segmented ariaLabel={t('Druh')} value={druh} onChange={setDruh} options={[{ id: 'premie', label: t('Prémie') }, { id: 'srazka', label: t('Srážka') }]} />
+        {druh === 'premie' && (
+          <div className="space-y-1.5" data-typ-premie>
+            <p className="field-label">{t('Typ prémie')}</p>
+            <Segmented ariaLabel={t('Typ prémie')} value={typPremie} onChange={setTypPremie}
+              options={[{ id: 'premie', label: t('Nenároková prémie') }, { id: 'mzda', label: t('Mzda / ostatní') }]} />
+            <p className="t-meta text-pretty">{typPremie === 'premie'
+              ? t('Dobrovolná prémie nad mzdu. Jen z ní jde krátit při trestu.')
+              : t('Část mzdy, na kterou má člověk nárok (smlouva, mzdový výměr). Trest ji krátit nesmí.')}</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field id="uprava-castka" label={t('Částka')}>
             <div className="relative">
@@ -1200,7 +1251,7 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
             <ul className="list">
               {upravy.map(u => (
                 <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
-                  meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : u.source === 'navic' ? ` · ${t('za navíc')}` : u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : ''}`}
+                  meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : u.source === 'navic' ? ` · ${t('za navíc')}` : u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : u.source === 'premie' ? ` · ${t('nenároková prémie')}` : ''}`}
                   value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>}
                   actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat zápis')} loading={mazu === u.id} onClick={() => { void smaz(u.id); }} />} />
               ))}

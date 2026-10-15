@@ -134,7 +134,8 @@ export default function ({ eq, ok }: Testy) {
   ok('init: tabulka akcí a sloupce propadání v DDL', init.includes('CREATE TABLE IF NOT EXISTS client_bonus_rules') && init.includes('points_expire_days INTEGER') && init.includes('points_expire_since TEXT'));
   ok('propadání: odpis jde do deníku s ref exp:<den> a upozornění s warn:<den>', zdroj('lib/propadaniBoduDb.ts').includes('`exp:${dnes}`') && zdroj('lib/propadaniBoduDb.ts').includes('`warn:${dnes}`'));
 
-  const scan = zdroj('app/api/client/staff/scan/route.ts');
+  // Připsání z účtenky žije od spuštění (balík Q) v jádru lib/vernostZUctu.ts; kasa ho volá.
+  const scan = zdroj('app/api/client/staff/scan/route.ts') + zdroj('lib/vernostZUctu.ts');
   const client = zdroj('lib/client.ts');
   ok('bonus: kartička u kasy (razítko, účtenka, částka) bonus uplatňuje', (scan.match(/customerId: c\.id, bonus/g) ?? []).length === 2 && client.includes('1 + navic') && scan.includes('stampVisit(u.team_id, c.id, p, \'card\', bonus.razitka') && /applyBillToCampaigns\([^\n]*razitka: bonus\.razitka/.test(scan));
   ok('bonus: hotová objednávka od stolu bonus uplatňuje', zdroj('lib/clientOrders.ts').includes('customerId: Number(o.customer_id), bonus') && zdroj('lib/clientOrders.ts').includes('bonus.razitka'));

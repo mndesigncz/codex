@@ -8,29 +8,32 @@
 // podruhé nepřipíše ani bez klíče.
 // Připsání z účtenky jde po krocích a hotové kroky se při opakování přeskočí.
 // Do deníku věrnosti se zapisuje i obsluha (staff_id).
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { pripisUtratu, slevaClena } from '@/lib/urovneDb';
+import { pripisZUctu, zalozParovani, stolyKParovani, synchronizujPoSkenu } from '@/lib/vernostZUctu';
 import { sql, customerByCard, ensureProfile, join, membership, award, awardCredit, spendCredit, stampVisit, normalizeCardCode, jeClenBlokovan } from '@/lib/client';
 import { zajistiRazitka } from '@/lib/stampsSchema';
-import { otiskAkce, spustKrok, platiTed as platiTedPlan } from '@/lib/stampsPlan';
+import { otiskAkce, platiTed as platiTedPlan } from '@/lib/stampsPlan';
 import { sIdempotenci } from '@/lib/idempotence';
 import { stavKartyHosta, popisOkna } from '@/lib/razitkaPravidla';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { pragueToday, pragueDayOf, pragueHM, parseDbTime } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
 import { activeCampaigns, progressFor, applyBillToCampaigns, isoDow, prubehHosta, navstevniKampane, maKampane, type StampCampaign } from '@/lib/stamps';
-import { getConnection, billDetail } from '@/lib/storyous';
+import { getConnection } from '@/lib/storyous';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { benefitLabel } from '@/lib/coupons';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { poznamkaRazitek } from '@/lib/bonusAkce';
-import { odmenaZUctu, zapisZbytek, zapisPripsaneZaUctenku } from '@/lib/bodyPravidlaDb';
-import { vetyOOmezeni, pravidlaBoduZProfilu, castKreditem } from '@/lib/bodyPravidla';
+import { odmenaZUctu, zapisZbytek } from '@/lib/bodyPravidlaDb';
+import { vetyOOmezeni, pravidlaBoduZProfilu } from '@/lib/bodyPravidla';
 import { cisloUctenky, klicRucniUctenky } from '@/lib/kasaStorno';
 import { stornujPosledniAkci, posledniStornovatelna } from '@/lib/kasaStornoDb';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+// Po skenu v podniku s pokladnou běží na pozadí synchronizace Storyous (rozpočet 35 s).
+export const maxDuration = 60;
 
 /**
  * Položky nabídky, které dávají razítko v běžících kampaních (vybrané položky a položky vybraných
@@ -135,8 +138,23 @@ export async function GET(req: NextRequest) {
       WHERE b.team_id = ${u.team_id} AND b.day = ${pragueToday()} AND b.final_price > 0 AND b.refunded = FALSE AND b.deleted = FALSE
       ORDER BY COALESCE(b.paid_at, b.created_at) DESC LIMIT 5` as any[];
   } catch { bills = []; }
+  // Podnik s pokladnou Storyous: sken založí čekající párování a body se připíšou samy, až
+  // se zaplacený účet stáhne z pokladny (lib/vernostZUctu.ts). Synchronizace se po skenu
+  // vynutí na pozadí (nejvýš jednou za 30 s), ať obsluha nečeká na pětiminutový tik.
+  let parovani: { id: number; deskId: string | null; stoly: { deskId: string; name: string }[] } | null = null;
+  if (p.loyalty_on && !(await jeClenBlokovan(u.team_id, c.id))) {
+    try {
+      if (await getConnection(u.team_id)) {
+        const z = await zalozParovani(u.team_id, c.id, u.id);
+        if (z) {
+          parovani = { id: z.id, deskId: z.deskId, stoly: await stolyKParovani(u.team_id) };
+          after(() => synchronizujPoSkenu(u.team_id));
+        }
+      }
+    } catch { parovani = null; /* bez párování zůstává ruční výběr účtu */ }
+  }
   return NextResponse.json({
-    customer: c, ...(await summary(u.team_id, c.id, p)), bills,
+    customer: c, ...(await summary(u.team_id, c.id, p)), bills, parovani,
     rules: {
       pointsPer100: Number(p.points_per_100) || 0, stampTarget: Number(p.stamp_target) || 0,
       stampReward: p.stamp_reward, cashbackPct: Number(p.cashback_pct) || 0,
@@ -292,96 +310,13 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     sectiVysledek(st);
     msg = `${c.name} · ruční položky: ${st.lines.join(' · ')}`;
   } else if (action === 'bill') {
-    // Připsání Z ÚČTENKY: razítka podle pravidel kampaní z položek účtu +
-    // body a cashback z částky + návštěva. Účtenka smí věrnost připsat jen jednou.
-    // Zápis jde po krocích (kroky hlídá guard): spadne-li něco uprostřed, další pokus
-    // dokončí jen to, co chybí — nic se nezdvojí a účtenka není spotřebovaná naprázdno.
-    const billId = String(b.billId ?? '').slice(0, 60);
-    if (!billId) return NextResponse.json({ error: 'Vyber účtenku.' }, { status: 400 });
-    // Zrušená nebo vrácená účtenka věrnost nepřipíše (a kdyby ji připsala, storno by ji hned vzalo zpět).
-    try {
-      const [pb] = await sql`SELECT refunded, deleted FROM pos_bills WHERE team_id = ${u.team_id} AND bill_id = ${billId}` as any[];
-      if (pb && (pb.refunded === true || pb.deleted === true)) return NextResponse.json({ error: 'Tahle účtenka byla v pokladně zrušena nebo vrácena, věrnost se za ni nepřipisuje.' }, { status: 409 });
-    } catch { /* bez zrcadla účtenek se jen nezkontroluje */ }
-    const guard = await sql`
-      INSERT INTO client_bill_awards (team_id, bill_id, customer_id, done_at, kroky, staff_id)
-      VALUES (${u.team_id}, ${billId}, ${c.id}, NULL, '', ${u.id})
-      ON CONFLICT (team_id, bill_id) DO NOTHING RETURNING bill_id`;
-    let hotove = new Set<string>();
-    if (!guard.length) {
-      // Dřívější pokus nedoběhl (a je starší než 30 s, tedy mrtvý)? Převezme se atomicky.
-      const [navazu] = await sql`
-        UPDATE client_bill_awards SET awarded_at = NOW(), staff_id = ${u.id}
-        WHERE team_id = ${u.team_id} AND bill_id = ${billId} AND customer_id = ${c.id}
-          AND done_at IS NULL AND awarded_at < NOW() - INTERVAL '30 seconds'
-        RETURNING kroky`;
-      if (!navazu) {
-        const [cur] = await sql`SELECT done_at FROM client_bill_awards WHERE team_id = ${u.team_id} AND bill_id = ${billId}`;
-        return NextResponse.json({ error: cur?.done_at ? 'Tahle účtenka už věrnost připsala.' : 'Účtenka se právě připisuje. Zkus to za půl minuty.' }, { status: 409 });
-      }
-      hotove = new Set(String(navazu.kroky ?? '').split(',').filter(Boolean));
-    }
-    const krok = (nazev: string, fn: () => Promise<void>) => spustKrok(hotove, nazev, fn, async n => {
-      await sql`UPDATE client_bill_awards SET kroky = kroky || ${n + ','} WHERE team_id = ${u.team_id} AND bill_id = ${billId}`;
-    });
-    try {
-      const conn = await getConnection(u.team_id);
-      let items: { productId: string | null; qty: number; price: number | null }[] = [];
-      let polozkyUctu: { productId: string | null; amount: number; price: number | null }[] = [];
-      let total = Math.max(0, Math.round(Number(b.amount) || 0));
-      if (conn) {
-        try {
-          const d = await billDetail(conn, billId);
-          items = d.items.map(it => ({ productId: it.productId, qty: Number(it.amount) || 1, price: it.price }));
-          polozkyUctu = d.items.map(it => ({ productId: it.productId, amount: it.amount, price: it.price }));
-          if (d.head?.finalPrice != null) total = Math.max(0, Math.round(Number(d.head.finalPrice)));
-        } catch { /* detail nedostupný — zbude útrata */ }
-      }
-      const parts: string[] = [];
-      await krok('visit', async () => {
-        // Účtenka je návštěva: roste počet návštěv (úrovně) a kampaně „za návštěvu" dostanou razítko, nejvýš jednou denně.
-        const v = await stampVisit(u.team_id, c.id, p, `bill:${billId}`, 0, '', u.id);
-        if (!v.already && v.lines) { parts.push(...v.lines); sectiVysledek(v); }
-      });
-      await krok('stamps', async () => {
-        const st = await applyBillToCampaigns(u.team_id, c.id, pragueToday(), { billId, total, items }, { staffId: u.id, razitka: bonus.razitka, poznamka: poznamkaRazitek(bonus) });
-        parts.push(...st.lines); sectiVysledek(st);
-      });
-      // Body a cashback podle pravidel podniku: zaokrouhlení, minimum, strop, kredit/poukaz a vyloučené položky.
-      // Část zaplacená kreditem nebo poukazem: z ruční hodnoty obsluhy, jinak z rozpadu plateb v pokladně.
-      let predplaceno = Math.max(0, Math.round(Number(b.prepaid) || 0));
-      if (!predplaceno) {
-        try { const [pb] = await sql`SELECT other_methods FROM pos_bills WHERE team_id = ${u.team_id} AND bill_id = ${billId}` as any[]; predplaceno = castKreditem(pb?.other_methods); } catch { /* bez rozpadu plateb */ }
-      }
-      const { odmena: od, pravidla: pr, poznamka: bonusPozn } = await odmenaZUctu(u.team_id, p, total, { predplaceno, polozky: polozkyUctu, customerId: c.id, bonus });
-      const pts = od.points;
-      const back = od.cashback;
-      parts.push(...vetyOOmezeni(od, pr, mena.money));
-      if (pts > 0) await krok('points', async () => { const points = await award(u.team_id, c.id, pts, 'manual', `bill:${billId}`, `Útrata ${mena.money(total)} z účtenky${bonusPozn}`, u.id); parts.push(`+${pts} bodů${od.nasobicPopis ? ` (${od.nasobicPopis})` : ''} (celkem ${points})`); });
-      // Cashback podle nastavení podniku: kredit v korunách, nebo body (Kartička).
-      if (back > 0) {
-        await krok('cashback', async () => {
-          if (p.cashback_mode === 'points') {
-            const points = await award(u.team_id, c.id, back, 'cashback', `bill:${billId}`, `${p.cashback_pct} % z ${mena.money(total)} v bodech`, u.id);
-            parts.push(`+${back} bodů cashback (celkem ${points})`);
-          } else { await awardCredit(u.team_id, c.id, back, 'cashback', `bill:${billId}`, `${p.cashback_pct} % z ${mena.money(total)}`, u.id); parts.push(`+${mena.money(back)} kreditu`); }
-        });
-      }
-      // Útrata pro úrovně podle útraty se počítá z každé účtenky, i když nedala žádný bod.
-      await krok('spend', async () => { await pripisUtratu(u.team_id, c.id, total); });
-      // Co přesně se za účtenku připsalo (pro storno zrušené nebo vrácené účtenky) a přenesený zbytek pod 100.
-      await krok('zapis', async () => {
-        await zapisPripsaneZaUctenku(u.team_id, billId, pts + (p.cashback_mode === 'points' ? back : 0), p.cashback_mode === 'points' ? 0 : back, total);
-        await zapisZbytek(u.team_id, c.id, pr, od);
-      });
-      await sql`UPDATE client_bill_awards SET done_at = NOW() WHERE team_id = ${u.team_id} AND bill_id = ${billId}`;
-      if (!parts.length) parts.push('žádné pravidlo se netrefilo');
-      msg = `${c.name} · účtenka ${mena.money(total)}: ${parts.join(' · ')}`;
-    } catch {
-      // Hotové kroky zůstávají zapsané; ať jde pokus hned zopakovat, guard se uvolní k převzetí.
-      await sql`UPDATE client_bill_awards SET awarded_at = NOW() - INTERVAL '1 minute' WHERE team_id = ${u.team_id} AND bill_id = ${billId} AND done_at IS NULL`.catch(() => {});
-      return NextResponse.json({ error: 'Připsání se přerušilo. Načti účtenku znovu — co už se připsalo, se nezdvojí.' }, { status: 500 });
-    }
+    // Připsání Z ÚČTENKY: jádro v lib/vernostZUctu.ts (razítka z položek, body a cashback z částky,
+    // návštěva, útrata, zápis pro storno). Účtenka smí věrnost připsat jen jednou, ať ji pošle
+    // obsluha tady, nebo ji spáruje naskenovaná kartička sama po zaplacení.
+    const r = await pripisZUctu({ teamId: u.team_id, customer: c, billId: String(b.billId ?? ''), staffId: u.id, profil: p, castka: Number(b.amount) || 0, predplaceno: Number(b.prepaid) || 0, zdroj: 'rucne' });
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+    sectiVysledek(r);
+    msg = r.message;
   } else if (action === 'points') {
     const amount = Math.max(0, Math.min(100000, Math.round(Number(b.amount) || 0)));
     const polozky = rucniPolozky(b.items);

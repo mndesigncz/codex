@@ -163,7 +163,7 @@ export async function syncMenu(teamId: number, conn: PosConnection, force = fals
  * změny. Zámek v pos_connections zaručí, že dva běhy (cron + otevřená appka)
  * nepoběží vedle sebe.
  */
-export async function syncBills(teamId: number, opts: { force?: boolean; backfillDays?: number } = {}): Promise<SyncStats> {
+export async function syncBills(teamId: number, opts: { force?: boolean; backfillDays?: number; throttleSec?: number } = {}): Promise<SyncStats> {
   const stats: SyncStats = { ok: true, billsSeen: 0, billsChanged: 0, itemsFetched: 0, itemsPending: 0, menuUpdated: false };
   const conn = await getConnection(teamId);
   if (!conn) return { ...stats, ok: false, skipped: 'not-connected' };
@@ -173,8 +173,9 @@ export async function syncBills(teamId: number, opts: { force?: boolean; backfil
   const left = () => RUN_BUDGET_MS - (Date.now() - started);
   const budget = () => left() > 6000;
 
-  // Zámek: kdo posune sync_lock_at, běží; druhý čeká na příště.
-  const throttleSec = opts.force ? 20 : 5 * 60;
+  // Zámek: kdo posune sync_lock_at, běží; druhý čeká na příště. Sken kartičky v podniku
+  // s čekajícím párováním si řekne o vlastní kratší klapku (lib/vernostZUctu.ts, 30 s).
+  const throttleSec = opts.force ? 20 : opts.throttleSec != null ? Math.max(20, Math.round(opts.throttleSec)) : 5 * 60;
   let claimed: any[] = [];
   try {
     claimed = await sql`
@@ -266,6 +267,8 @@ export async function syncBills(teamId: number, opts: { force?: boolean; backfil
     await sql`UPDATE pos_connections SET last_sync_at = NOW(), last_error = NULL, last_error_at = NULL WHERE team_id = ${teamId}`;
     // Zrušené nebo vrácené účtenky vezmou zpět body a kredit, které za ně host dostal (best-effort, nikdy neshodí synchronizaci).
     try { const { stornujUctenky } = await import('./bodyPravidlaDb'); await stornujUctenky(teamId); } catch { /* příště */ }
+    // Naskenované kartičky čekající na zaplacení: jednoznačný nový účet se připíše sám (best-effort).
+    try { const { parujCekajici } = await import('./vernostZUctu'); await parujCekajici(teamId); } catch { /* příště */ }
     return stats;
   } catch (e) {
     const msg = e instanceof StoryousError ? e.message : 'Synchronizace selhala.';

@@ -15,7 +15,8 @@
 //  * Izolace: vlastní tým „Café Demo", žádná vazba na Stripe ani pokladnu,
 //    žádné skutečné e-maily (doména `managero.invalid`), žádný správce platformy.
 //  * Objednávka od stolu funguje i bez fyzické přítomnosti: `order_geo = 'off'`
-//    a QR stolu není povinný, ať recenzent nemusí sedět v podniku.
+//    a QR stolu není povinný, ať recenzent nemusí sedět v podniku. Podnik má nabídku
+//    (dvě sekce, pět položek), host vyzvednutý kupon a potvrzenou rezervaci.
 
 export const DEMO_TYM = 'Café Demo';
 export const DEMO_SLUG = 'cafe-demo';
@@ -171,13 +172,27 @@ export async function seed(db, { hesla, hash, dnes, domena = VYCHOZI_DOMENA, kod
     stoly.push(await db.upsert('client_tables', { team_id: ids.tym, name }, { seats: 2 + i, active: true, position: i }, { token: kod(16) }));
   }
   ids.stoly = stoly;
-  await db.upsert('client_coupons', { team_id: ids.tym, title: 'Zákusek k nápoji zdarma' }, { description: 'Jednou na návštěvu', cost_points: 20, kind: 'offer', active: true });
+  // Nabídka pro objednávku od stolu: bez ní by recenzent v záložce Objednat neměl co vybrat (Apple 2.1).
+  ids.menu = await db.upsert('menu_boards', { team_id: ids.tym, slug: 'nabidka' }, { name: 'Nabídka', title: 'Café Demo', enabled: true, created_by: ids.provoz });
+  const nabidka = [
+    ['Káva', [['Espresso', 55, 'Jednoduché espresso z výběrové kávy'], ['Cappuccino', 75, 'Espresso, napěněné mléko'], ['Flat white', 85, 'Dvojité espresso, mléko']]],
+    ['Snídaně a dezerty', [['Croissant s máslem', 65, 'Pečeme každé ráno'], ['Domácí cheesecake', 95, 'S ovocnou omáčkou']]],
+  ];
+  for (const [i, [nazevSekce, polozky]] of nabidka.entries()) {
+    const sekce = await db.upsert('menu_sections', { board_id: ids.menu, title: nazevSekce }, { position: i, column_no: 1 });
+    for (const [j, [name, price, description]] of polozky.entries()) await db.upsert('menu_items', { section_id: sekce, name }, { price, description, position: j, sold_out: false });
+  }
+  await db.upsert('client_profiles', { team_id: ids.tym }, { menu_slug: 'nabidka' });
+  ids.kupon = await db.upsert('client_coupons', { team_id: ids.tym, title: 'Zákusek k nápoji zdarma' }, { description: 'Jednou na návštěvu', cost_points: 20, kind: 'offer', active: true });
   await db.upsert('client_stamp_campaigns', { team_id: ids.tym, name: 'Osmá káva zdarma' }, { description: 'Za každý nápoj razítko', active: true, required_stamps: 8, reward_title: 'Káva zdarma', position: 1 });
   await db.upsert('events', { team_id: ids.tym, title: 'Degustace kávy', date: pricti(dnes, 7) }, { description: 'Ukázková veřejná akce', kind: 'event', start_time: '18:00', end_time: '20:00', public: true, status: 'planned', created_by: ids.provoz });
 
   // ---- Host: karta a členství s body, ať je v aplikaci co ukázat ----
   await db.upsert('client_cards', { customer_id: ids.host }, {}, { code: kod(8) });
   await db.upsert('client_memberships', { customer_id: ids.host, team_id: ids.tym }, { points: 35, stamps: 3, visits: 4 });
+  // Jeden vyzvednutý kupon (kód k ukázání u kasy) a jedna potvrzená rezervace za tři dny: recenzent je uvidí v Moje.
+  await db.upsert('client_coupon_claims', { coupon_id: ids.kupon, customer_id: ids.host, team_id: ids.tym }, {}, { code: `DEMO-${kod(6)}` });
+  await db.upsert('client_reservations', { team_id: ids.tym, customer_id: ids.host, date: pricti(dnes, 3) }, { time: '18:00', party: 2, status: 'confirmed', note: 'Ukázková rezervace' });
 
   return { ids, emaily: ml };
 }

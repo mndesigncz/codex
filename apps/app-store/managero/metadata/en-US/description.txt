@@ -27,4 +27,4 @@ You need a business account to sign in. Management creates the business and invi
 
 Your data belongs to your business. You can delete your account in the app.
 
-The app interface is currently available in Czech only.
+The app follows your phone's language: Czech, English, German, Slovak or Polish (translations other than Czech are machine-made).

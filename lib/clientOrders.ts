@@ -21,6 +21,7 @@ import { naHalere } from './cena.ts';
 import { menaPodniku } from './menaPodniku';
 import { odmenaZUctu, zapisZbytek } from './bodyPravidlaDb';
 import { bodyZObjednavky, zdrojeZProfilu } from './bodyZdroje';
+import { podpisoveTajemstvi } from './tajemstvi';
 
 // ---- Ochrana: sedí host opravdu u stolu? ------------------------------------
 //
@@ -66,7 +67,7 @@ export function parseGeo(raw: any): GeoIn | null {
 
 /** Podpis adresy, na kterou pokladna hlásí stav objednávky. */
 export function callbackSig(orderId: number, event: string): string {
-  return createHmac('sha256', process.env.NEXTAUTH_SECRET || 'managero').update(`${orderId}:${event}`).digest('hex').slice(0, 24);
+  return createHmac('sha256', podpisoveTajemstvi()).update(`${orderId}:${event}`).digest('hex').slice(0, 24);
 }
 function callbackUrls(orderId: number): { confirm: string; dispatch: string; decline: string } | undefined {
   const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, '');

@@ -5,7 +5,7 @@
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
-import { oznameniTrest, oznameniVyjadreni, oznameniZruseni, stropKraceni, type StavTrestu, type Trest, type ZdrojTrestu } from '@/lib/tresty';
+import { ZDROJ_NENAROKOVE_PREMIE, oznameniTrest, oznameniVyjadreni, oznameniZruseni, stropKraceni, type StavTrestu, type Trest, type ZdrojTrestu } from '@/lib/tresty';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -69,16 +69,18 @@ export async function nactiTrest(id: number, teamId: number): Promise<any | null
 }
 
 /**
- * Kolik jde člověku ještě krátit z prémie za měsíc dne `day`: kladné úpravy mzdy
- * za ten měsíc (mimo tresty) minus krácení z jiných platných trestů téhož měsíce.
- * Bez tabulky úprav 0 (krátit není z čeho).
+ * Kolik jde člověku ještě krátit z prémie za měsíc dne `day`: NENÁROKOVÉ prémie za ten
+ * měsíc (wage_adjustments source 'premie') minus krácení z jiných platných trestů téhož
+ * měsíce. Mzda, starší kladné úpravy bez typu ('manual'), prémie za navíc a odměny
+ * z katalogu se nepočítají — krátit nárokovou složku mzdy by byl peněžní postih
+ * (§ 346b odst. 1 zákoníku práce). Bez tabulky úprav 0 (krátit není z čeho).
  */
 export async function stropKraceniDb(teamId: number, userId: number, day: string, bezTrestu: number | null = null): Promise<{ strop: number; premie: number; uzKraceno: number }> {
   const od = `${day.slice(0, 7)}-01`;
   const doDne = `${day.slice(0, 7)}-31`;
   try {
     const [r] = await sql`
-      SELECT COALESCE(SUM(amount) FILTER (WHERE amount > 0 AND COALESCE(source, 'manual') <> 'trest'), 0)::int AS premie,
+      SELECT COALESCE(SUM(amount) FILTER (WHERE amount > 0 AND source = ${ZDROJ_NENAROKOVE_PREMIE}), 0)::int AS premie,
              COALESCE(-SUM(amount) FILTER (WHERE source = 'trest' AND (${bezTrestu}::int IS NULL OR source_ref IS DISTINCT FROM ${bezTrestu})), 0)::int AS kraceno
       FROM wage_adjustments
       WHERE team_id = ${teamId} AND user_id = ${userId} AND day >= ${od} AND day <= ${doDne}`;

@@ -13,8 +13,10 @@ export async function kUctu(p, { nazev = 'Kavárna U Lípy' } = {}) {
   await p.locator('#cs-jmeno').waitFor({ timeout: 10000 });
 }
 
-export async function vyplnUcet(p, { jmeno = 'Jan Novák', email = 'jan@priklad.cz', heslo = 'tajneheslo1' } = {}) {
+// Souhlas s podmínkami (spuštění, balík P) je výslovné zaškrtnutí; `souhlas: false` ho nechá prázdné.
+export async function vyplnUcet(p, { jmeno = 'Jan Novák', email = 'jan@priklad.cz', heslo = 'tajneheslo1', souhlas = true } = {}) {
   await p.fill('#cs-jmeno', jmeno);
   await p.fill('#cs-email', email);
   await p.fill('#cs-heslo', heslo);
+  if (souhlas) await p.check('#cs-souhlas');
 }

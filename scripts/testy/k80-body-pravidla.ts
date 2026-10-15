@@ -106,10 +106,11 @@ export default function ({ eq, ok }: Testy) {
   const client = zdroj('lib/client.ts');
   ok('deník: award i awardCredit zapisují skutečnou změnu (FOR UPDATE)', (client.match(/FOR UPDATE/g) ?? []).length >= 2 && client.includes('MAX_ZUSTATEK') && client.includes("'storno'"));
   ok('deník: storno se nepočítá mezi utracené body', client.includes("kind NOT IN ('expire', 'storno')"));
-  const scan = zdroj('app/api/client/staff/scan/route.ts');
+  // Připsání z účtenky žije od spuštění (balík Q) v jádru lib/vernostZUctu.ts; kasa ho volá.
+  const scan = zdroj('app/api/client/staff/scan/route.ts') + zdroj('lib/vernostZUctu.ts');
   ok('kasa: účtenka i částka jdou přes odmenaZUctu s hostem a bonusem (násobič úrovně, strop za den)', (scan.match(/odmenaZUctu\([^\n]*customerId: c\.id, bonus/g) ?? []).length === 2);
   ok('kasa: zrušená účtenka se nenabízí a nepřipíše', scan.includes('b.refunded = FALSE AND b.deleted = FALSE') && scan.includes('byla v pokladně zrušena nebo vrácena'));
-  ok('kasa: kredit z rozpadu plateb v pokladně (castKreditem) a zápis připsaného pro storno', scan.includes('castKreditem(pb?.other_methods)') && scan.includes('zapisPripsaneZaUctenku('));
+  ok('kasa: kredit z rozpadu plateb v pokladně (castKreditem) a zápis připsaného pro storno', /castKreditem\((pb|radek)\?\.other_methods\)/.test(scan) && scan.includes('zapisPripsaneZaUctenku('));
   ok('objednávka: body přes odmenaZUctu s hostem, jedním místem', zdroj('lib/clientOrders.ts').includes('customerId: Number(o.customer_id), bonus') && zdroj('lib/clientOrders.ts').includes('zapisZbytek('));
   ok('storno: visí na konci synchronizace účtenek', zdroj('lib/posMirror.ts').includes('stornujUctenky(teamId)'));
   const db = zdroj('lib/bodyPravidlaDb.ts');

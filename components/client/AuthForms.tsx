@@ -11,6 +11,7 @@ import { mistniCesta } from '@/lib/bezpecnaUrl';
 import { useObal } from '../ObalProvider';
 import { HLASKA_ROLE_V_CLIENTU } from '@/lib/obal';
 import PravniOdkazy from '../pravni/PravniOdkazy';
+import SouhlasPodminek from '../pravni/SouhlasPodminek';
 import { useT, useJazyk } from '@/lib/i18n/client';
 
 const input = 'field text-sm';
@@ -36,12 +37,20 @@ export function RegisterForm() {
   const [ref, setRef] = useState(() => (params.get('ref') ?? '').toUpperCase());
   // Souhlas s rozesíláním podniků je dobrovolný a výchozí je NE (Apple 4.5.4, zákon 480/2004).
   const [novinky, setNovinky] = useState(false);
+  // Click-wrap (spuštění, balík P): souhlas s podmínkami a věk aspoň 15 let výslovně. Dřív se posílalo
+  // `terms: true` natvrdo a server ho ignoroval.
+  const [souhlas, setSouhlas] = useState(false);
+  const [vek, setVek] = useState(false);
+  const [chybaSouhlasu, setChybaSouhlasu] = useState<string | null>(null);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('');
     if (pw.length < 8) { setErr(t('Heslo musí mít alespoň 8 znaků.')); return; }
+    if (!souhlas) { setChybaSouhlasu(t('Bez souhlasu s podmínkami účet založit nejde.')); return; }
+    if (!vek) { setChybaSouhlasu(t('Účet hosta si můžeš založit od 15 let.')); return; }
+    setChybaSouhlasu(null);
     setBusy(true);
-    const r = await fetch('/api/client/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pw, ref: ref.trim() || undefined, novinky, terms: true }) });
+    const r = await fetch('/api/client/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pw, ref: ref.trim() || undefined, novinky, terms: souhlas, vek15: vek }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setErr(d.error ? t(d.error) : t('Registrace se nepovedla.')); setBusy(false); return; }
     const s = await signIn('credentials', { email, password: pw, redirect: false });
@@ -59,11 +68,13 @@ export function RegisterForm() {
           <input type="checkbox" checked={novinky} onChange={e => setNovinky(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-[#16181A]" />
           <span>{t('Chci dostávat novinky a akce od podniků, kde jsem členem. Nepovinné, půjde to kdykoli vypnout v profilu.')}</span>
         </label>
+        <SouhlasPodminek id="r-souhlas" checked={souhlas} chyba={chybaSouhlasu}
+          onChange={v => { setSouhlas(v); if (v && vek) setChybaSouhlasu(null); }}
+          vek={{ checked: vek, onChange: v => { setVek(v); if (v && souhlas) setChybaSouhlasu(null); } }} />
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
         <button type="submit" disabled={busy} className="tap-target btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
           {busy ? t('Zakládám…') : <><Icon name="plus" size={16} /> {t('Založit účet')}</>}
         </button>
-        <p className="text-xs text-black/50 text-center text-pretty">Založením účtu souhlasíš s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a bereš na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>{/* i18n-ok: právní věta zůstává česky */}
         <p className="text-sm text-black/55 text-center">{t('Už účet máš?')} <Link href={`/client/login?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Přihlas se')}</Link></p>
       </form>
     </AuthCard>

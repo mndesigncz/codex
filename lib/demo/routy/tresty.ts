@@ -14,7 +14,7 @@ const avatar = (id: number) => clen(id)?.avatar ?? null;
 let dalsiId = 100;
 const DRUHY: DruhTrestu[] = [
   { id: 1, title: 'Pozdní příchod', description: 'Víc než 10 minut po začátku směny.', points: 10, bonusCut: null, active: true, createdAt: '' },
-  { id: 2, title: 'Manko v kase', description: null, points: 20, bonusCut: 200, active: true, createdAt: '' },
+  { id: 2, title: 'Nevyplněná uzávěrka', description: null, points: 20, bonusCut: 200, active: true, createdAt: '' },
   { id: 3, title: 'Nezavřená lednice / sklad', description: null, points: 15, bonusCut: null, active: true, createdAt: '' },
 ];
 const zaklad = (o: Partial<Trest> & Pick<Trest, 'id' | 'userId' | 'day' | 'text'>): Trest => ({
@@ -33,7 +33,6 @@ const TRESTY: Trest[] = [
 ];
 const NAVRHY: NavrhTrestu[] = [
   { klic: 'pozde:9002', druh: 'pozde', userId: 3, userName: jmeno(3), userAvatar: avatar(3), day: posunDen(dnes(), -1), closingId: null, shiftId: null, minuty: 18, castka: null, poznamka: null },
-  { klic: 'manko:9003', druh: 'manko', userId: 4, userName: jmeno(4), userAvatar: avatar(4), day: posunDen(dnes(), -3), closingId: 9003, shiftId: null, minuty: null, castka: 340, poznamka: null },
 ];
 const ZAHOZENE = new Set<string>();
 
@@ -76,7 +75,8 @@ export const tresty: Obsluha = (p, k) => {
   if (cesta === '/api/tresty/navrhy') {
     if (!smi.udelit) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
     const vyrizene = new Set([...ZAHOZENE, ...TRESTY.map(t => t.sourceKey).filter(Boolean) as string[]]);
-    if (metoda === 'GET') return ok({ navrhy: NAVRHY.filter(n => !vyrizene.has(n.klic)) });
+    // Manko trestem není (spuštění, balík P): v ukázce jedna uzávěrka s mankem, jen jako věta bez akce.
+    if (metoda === 'GET') return ok({ navrhy: NAVRHY.filter(n => !vyrizene.has(n.klic)), manka: 1 });
     if (metoda === 'POST') {
       if (!platnyKlicNavrhu(p.telo?.klic)) return chyba('Návrh trestu nesedí.');
       ZAHOZENE.add(p.telo.klic);
@@ -109,7 +109,7 @@ export const tresty: Obsluha = (p, k) => {
       return ok({ ok: true, item: t });
     }
     if (b.disputeHandled === true) { t.disputeHandledAt = new Date().toISOString(); return ok({ ok: true, item: t }); }
-    const v = validujTrest({ ...t, ...b, userId: t.userId }, d);
+    const v = validujTrest({ ...t, ...b, userId: t.userId, sourceKey: null }, d);
     if (!v.ok) return chyba(v.chyba);
     const zmena = v.trest.points !== t.points || v.trest.bonusCut !== t.bonusCut;
     Object.assign(t, { text: v.trest.text, day: v.trest.day, points: v.trest.points, bonusCut: v.trest.bonusCut, typeId: v.trest.typeId,

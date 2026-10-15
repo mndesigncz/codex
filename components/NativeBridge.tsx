@@ -13,9 +13,10 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from './ui';
 import {
-  cestaZOdkazu, cestaZQr, jeKioskCesta, jeNativni, nacti, platforma, plugin,
+  cestaZOdkazu, cestaZQr, cilOdkazu, jeKioskCesta, jeLadiciBinarka, jeNativni, nacti, platforma, plugin,
   uloz, zjistiObalUa, type KlicObalu, type NativniApi, type VysledekPushe,
 } from '@/lib/nativni/most';
+import { jeZruseni, ulozZAdresy, zapisDoCache } from '@/lib/stahni';
 import { mistniCesta } from '@/lib/bezpecnaUrl';
 import { useT } from '@/lib/i18n/client';
 
@@ -28,11 +29,15 @@ const ZAMEK_PO_MS = 60_000;                // zámek po minutě v pozadí
 
 /** Registrace tokenu na serveru; selže tiše (endpoint může před nasazením serveru chybět). */
 // Aplikaci (managero / client) určuje server podle role účtu, ne podle těla požadavku.
+// Prostředí APNs (`env`) určuje binárka: vydaná (TestFlight, App Store) má produkční token,
+// ladicí z Xcode (Debug) sandboxový. Bez toho by server posílal ladicí tokeny na produkční
+// APNs, ten by je odmítl (BadDeviceToken) a zkouška push na vlastním telefonu by nešla.
 async function posliToken(token: string, verze: string | null) {
   try {
+    const sandbox = platforma() === 'ios' && jeLadiciBinarka();
     const r = await fetch('/api/native/push', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, platform: platforma(), version: verze }),
+      body: JSON.stringify({ token, platform: platforma(), version: verze, ...(sandbox ? { env: 'sandbox' } : {}) }),
     });
     if (r.ok) uloz(KLIC_TOKENU, token);
   } catch { /* server ještě nezná endpoint nebo není síť: zkusí se při dalším startu */ }
@@ -182,14 +187,30 @@ export default function NativeBridge() {
 
     // Sdílení a haptika: stávající kód volá navigator.share a navigator.vibrate beze změn,
     // ve WebView ale nefungují spolehlivě, proto je přepíšeme nativními pluginy.
+    // Sdílení souborů (kartička jako obrázek, export) jde přes Filesystem: soubor se zapíše
+    // do mezipaměti aplikace a Share dostane jeho adresu. Dřív se `files` tiše zahodily
+    // a sdílecí list ukázal jen název.
     const Share = plugin('Share');
     const Haptics = plugin('Haptics');
     const puvodniShare = (navigator as any).share;
+    const puvodniCanShare = (navigator as any).canShare;
     const puvodniVibrate = (navigator as any).vibrate;
-    const sdilej: NativniApi['sdilej'] = async (d) => {
-      if (!Share) return false;
-      try { await Share.share({ title: d.title, text: d.text, url: d.url, dialogTitle: d.title }); return true; } catch { return false; }
+    const puvodniOpen = window.open;
+    const umiSoubory = () => !!plugin('Filesystem');
+    const sdilejStav = async (d: { title?: string; text?: string; url?: string; files?: File[] }): Promise<'ok' | 'zruseno' | 'nejde'> => {
+      if (!Share) return 'nejde';
+      let files: string[] | undefined;
+      if (d.files?.length) {
+        const uri = await Promise.all(d.files.map((f, i) => zapisDoCache(f.name || `soubor-${i + 1}`, f)));
+        if (uri.some(u => !u)) return 'nejde';
+        files = uri as string[];
+      }
+      try {
+        await Share.share({ title: d.title, text: d.text, url: d.url, files, dialogTitle: d.title });
+        return 'ok';
+      } catch (e) { return jeZruseni(e) ? 'zruseno' : 'nejde'; }
     };
+    const sdilej: NativniApi['sdilej'] = async (d) => (await sdilejStav(d)) === 'ok';
     const haptika: NativniApi['haptika'] = (druh = 'lehka') => {
       if (!Haptics) return;
       try {
@@ -198,8 +219,47 @@ export default function NativeBridge() {
         else void Haptics.impact({ style: druh === 'stredni' ? 'MEDIUM' : 'LIGHT' });
       } catch { /* bez haptiky */ }
     };
-    if (Share) (navigator as any).share = (d: ShareData) => sdilej(d).then(ok => { if (!ok) throw new DOMException('Sdílení zrušeno', 'AbortError'); });
+    if (Share) {
+      (navigator as any).share = (d: ShareData) => sdilejStav(d as any).then(s => {
+        if (s === 'zruseno') throw new DOMException('Sdílení zrušeno', 'AbortError');
+        if (s === 'nejde') throw new DOMException('Sdílení se nepovedlo', 'DataError');
+      });
+      // Soubory jdou sdílet jen s pluginem Filesystem (starší binárka ho nemá): kód, který se
+      // ptá canShare, pak spadne na svou náhradní cestu místo sdílení prázdného listu.
+      (navigator as any).canShare = (d?: ShareData) => !(d?.files?.length) || umiSoubory();
+    }
     if (Haptics) (navigator as any).vibrate = () => { haptika('lehka'); return true; };
+
+    // Odkazy ven a nová okna. iOS by `target="_blank"` a `window.open` poslal do Safari (bez
+    // přihlášení, aplikace se opustí), Android do prohlížeče. Cizí web a veřejné stránky se
+    // otevřou v prohlížeči uvnitř aplikace (plugin Browser), naše soubory z API (fotka účtenky,
+    // export) se stáhnou s přihlášením a nabídnou sdílecím listem. Pravidla: cilOdkazu v lib/nativni/most.ts.
+    const otevriVProhlizeci: NativniApi['otevriVProhlizeci'] = (url) => {
+      const B = plugin('Browser');
+      if (B?.open) { void Promise.resolve(B.open({ url })).catch(() => { puvodniOpen.call(window, url, '_blank'); }); return; }
+      puvodniOpen.call(window, url, '_blank');
+    };
+    const proved = (cil: ReturnType<typeof cilOdkazu>): boolean => {
+      if (cil.druh === 'prohlizec') { otevriVProhlizeci(cil.url); return true; }
+      if (cil.druh === 'soubor') { void ulozZAdresy(cil.url, cil.nazev); return true; }
+      return false;
+    };
+    const naKlik = (e: MouseEvent) => {
+      // Komponenta, která klik obsloužila sama (preventDefault), má přednost.
+      if (e.defaultPrevented || e.button !== 0) return;
+      const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!a) return;
+      const cil = cilOdkazu(a.getAttribute('href'), window.location.href, {
+        noveOkno: a.target === '_blank', stahnout: a.hasAttribute('download') ? a.getAttribute('download') || '' : null,
+      });
+      if (cil.druh !== 'web') { e.preventDefault(); proved(cil); }
+    };
+    document.addEventListener('click', naKlik);
+    window.open = function (url?: string | URL, target?: string, features?: string) {
+      // Prázdné okno (tisk přes document.write) a `_self` zůstávají, jak byly.
+      if (url == null || String(url) === '' || target === '_self') return puvodniOpen.call(window, url, target, features);
+      return proved(cilOdkazu(String(url), window.location.href, { noveOkno: true })) ? null : puvodniOpen.call(window, url, target, features);
+    } as typeof window.open;
 
     const skenujQr: NativniApi['skenujQr'] = async () => {
       const BS = plugin('BarcodeScanner');
@@ -254,7 +314,7 @@ export default function NativeBridge() {
       },
     };
 
-    window.manageroNative = { obal, skenujQr, skenujAOtevri, sdilej, haptika, zapniPush, vypniPush, pushVypnuto, odhlasitPush: smazToken, zamek };
+    window.manageroNative = { obal, skenujQr, skenujAOtevri, sdilej, otevriVProhlizeci, haptika, zapniPush, vypniPush, pushVypnuto, odhlasitPush: smazToken, zamek };
     window.dispatchEvent(new Event('managero:nativni-pripraveno'));
 
     // Universal links a App Links: stejný host → cesta v aplikaci, jiný host se ignoruje.
@@ -295,7 +355,9 @@ export default function NativeBridge() {
     return () => {
       mo.disconnect();
       odebrat.forEach(f => f());
-      if (Share) (navigator as any).share = puvodniShare;
+      document.removeEventListener('click', naKlik);
+      window.open = puvodniOpen;
+      if (Share) { (navigator as any).share = puvodniShare; (navigator as any).canShare = puvodniCanShare; }
       if (Haptics) (navigator as any).vibrate = puvodniVibrate;
       delete window.manageroNative;
     };

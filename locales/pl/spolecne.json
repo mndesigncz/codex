@@ -330,5 +330,15 @@
   "připnuto": "przypięte",
   "Přidat poznámku… @jméno někoho upozorní": "Dodaj notatkę… @imię powiadomi kogoś",
   "Koho zmínit": "Kogo wspomnieć",
-  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Ctrl+Enter wysyła · @imię powiadomi współpracownika"
+  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Ctrl+Enter wysyła · @imię powiadomi współpracownika",
+  "Souhlasím s podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.": "Akceptuję warunki korzystania i przyjmuję do wiadomości politykę prywatności.",
+  "Podmínky užívání": "Warunki korzystania",
+  "Zásady ochrany osobních údajů": "Polityka prywatności",
+  "Je mi aspoň {n} let.": "Mam co najmniej {n} lat.",
+  "Bez souhlasu s podmínkami účet založit nejde.": "Bez akceptacji warunków nie można założyć konta.",
+  "Aktualizovali jsme podmínky": "Zaktualizowaliśmy warunki",
+  "Platí od {datum}. Než budeš pokračovat, potvrď je prosím.": "Obowiązują od {datum}. Zanim przejdziesz dalej, potwierdź je.",
+  "Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.": "Zmiany dotyczą tego, jakie dane aplikacja przetwarza i jak z nimi postępuje. Pełną treść znajdziesz w linkach poniżej.",
+  "Souhlasím a pokračovat": "Akceptuję i dalej",
+  "Souhlas se nepodařilo uložit. Zkus to znovu.": "Nie udało się zapisać zgody. Spróbuj ponownie."
 }

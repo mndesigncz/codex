@@ -2561,6 +2561,10 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`);
     // Souhlas s podmínkami a zásadami při založení účtu (čas, kdy ho člověk dal).
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP`);
+    // Spuštění (balík P): KTERÉ verze podmínek a zásad člověk odsouhlasil (lib/pravni/verze.ts).
+    // Bez verze nejde poznat, kdo novou verzi ještě neviděl; brána NovaVerze se podle nich ptá znovu.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_version TEXT`);
     // Reset hesla: v databázi je jen otisk tokenu, nikdy token sám (únik DB nedá přístup k účtům).
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS password_resets (
@@ -2613,6 +2617,8 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS content_reports_team ON content_reports (team_id, status)`);
+    // Kdy šlo nahlášení provozovateli platformy (eskalace e-mailem, lib/moderaceDb.ts); NULL = neodešlo.
+    await ddl(sql`ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMP`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS user_blocks (
         blocker_id INTEGER NOT NULL,
@@ -2967,6 +2973,33 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS extra_claims_team_offer ON extra_claims (team_id, offer_id, termin)`);
     // ---- konec Volitelné úkoly ----
+
+    // ---- Párování účtu (spuštění, balík Q): kartička naskenovaná u kasy čeká na zaplacený účet ze Storyous ----
+    // Stejné příkazy jsou v lib/vernostZUctu.ts (zajistiParovani, lazy při prvním použití).
+    // stav: ceka | paruji (zábor běhu) | sparovano | propadlo (po 6 h) | zruseno; desk_id = stůl v pokladně;
+    // waiter_name = jméno obsluhy, podle kterého se hledá číšník účtu; total/points/credit = co se připsalo.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_bill_claims (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        staff_id INTEGER,
+        waiter_name TEXT,
+        desk_id TEXT,
+        scanned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        stav TEXT NOT NULL DEFAULT 'ceka',
+        bill_id TEXT,
+        total INTEGER NOT NULL DEFAULT 0,
+        points INTEGER NOT NULL DEFAULT 0,
+        credit INTEGER NOT NULL DEFAULT 0,
+        matched_by TEXT,
+        matched_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_bill_claims_team_stav ON client_bill_claims (team_id, stav, scanned_at)`);
+    // Komu účet patří, když ho věrnost spárovala s kartičkou (ručně, sama, nebo později přes Loyalty API).
+    await ddl(sql`ALTER TABLE pos_bills ADD COLUMN IF NOT EXISTS customer_id INTEGER`);
+    // ---- konec Párování účtu ----
 
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku

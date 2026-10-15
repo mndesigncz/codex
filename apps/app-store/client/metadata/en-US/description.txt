@@ -2,16 +2,17 @@ Managero client is an app for guests of cafes, restaurants, bistros and tea room
 
 CARD
 • One QR code for every venue. Show it at the till and the staff adds a stamp, points or credit.
-• Your card also shows without a connection, handy where the signal is poor.
+• The app saves your card on the phone, so you can show it even without a connection, say in a cellar bar with no signal.
+• You can also save the card as an image.
 • In every venue you see your points, stamps, credit and coupons.
 
 FIND A VENUE
-• Scan the QR code on a table or at the counter, or search by name or street.
-• Menu, opening hours, events and news from the venue.
+• Tap Scan and point at the QR code on a table or at the counter. Without a QR code, enter the venue code or search by name or street.
+• Menu, opening hours, events and news from the venue. Add an event to your calendar.
 
 RESERVATIONS
 • Pick a day, a time and the number of guests, the confirmation arrives as a notification.
-• Add a confirmed reservation to your calendar.
+• See your reservations and their status in My page.
 
 ORDER FROM YOUR TABLE
 • Scan the table QR code, choose from the menu and send the order to the staff. You pay the staff, nothing is paid in the app.
@@ -27,8 +28,8 @@ NOTIFICATIONS
 Reservation confirmations and order status arrive as notifications. News and events from venues are sent only if you explicitly allow it, and you can turn them off at any time.
 
 PRIVACY
-You can delete your account at any time inside the app, in the Profile section.
+You can delete your account at any time inside the app, in My page, Account and privacy.
 
 The app works with venues that use Managero. Cannot find your venue? Tell them about us.
 
-The app interface is currently available in Czech only.
+The app follows your phone's language: Czech, English, German, Slovak or Polish (translations other than Czech are machine-made).

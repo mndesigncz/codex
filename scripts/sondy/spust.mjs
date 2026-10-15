@@ -123,6 +123,7 @@ export const ZELENE = [
   'k71-role',
   'k74-demo',
   'k77-obchody',
+  'k88-klient-obal',
   'k73-pruvodce',
   'k76-jazyk',
   'k75-landing',
@@ -133,6 +134,7 @@ export const ZELENE = [
   'k73-sirky',
   'tisk-nahled',
   'ctecka',
+  'k88-ctecka',
   'nakup-seznam',
   'sirka-sklad',
   'k82-sklad-jednotky',
@@ -167,6 +169,7 @@ export const ZELENE = [
   'k86-tresty-ved',
   'k87-za-body-z',
   'k87-za-body-ved',
+  'k88-souhlas',
   'preteceni-vedeni',
   'preteceni-vedeni-tablet',
   'preteceni-zamestnanec',
@@ -233,6 +236,23 @@ for (const r of spadle) {
   const spadla = radky.filter(l => l.startsWith('✗'));
   if (spadla.length) console.log(spadla.join('\n') + '\n…');
   console.log(radky.filter(l => !l.startsWith('✓') && !l.startsWith('  ✓') && !l.startsWith('✗')).slice(-25).join('\n'));
+}
+// V GitHub Actions i jako anotace: ty jdou číst přes API (check-runs/…/annotations),
+// log jobu leží na externím úložišti a ne každý ho otevře.
+if (process.env.GITHUB_ACTIONS === 'true') {
+  const kod = (s) => s.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  for (const r of spadle.slice(0, 10)) {
+    const radky = r.out.split('\n');
+    // ✗ řádek i odsazené řádky pod ním (nálezy přetečení, viníci) — bez nich anotace neřekne kde.
+    const pricina = [];
+    radky.forEach((l, i) => {
+      if (!l.startsWith('✗') || pricina.length >= 30) return;
+      pricina.push(l);
+      for (let j = i + 1; j < radky.length && /^\s+\S/.test(radky[j]) && pricina.length < 30; j++) pricina.push(radky[j]);
+    });
+    const text = (pricina.length ? pricina : radky.filter(Boolean).slice(-8)).join('\n').slice(0, 1800);
+    console.log(`::error title=Sonda ${r.jmeno}::${kod(text || 'spadla bez výpisu')}`);
+  }
 }
 console.log(`\nSondy: ${vysledky.length - spadle.length} z ${vysledky.length} prošlo.`);
 if (args.includes('--vse')) console.log('Zelené: ' + JSON.stringify(vysledky.filter(r => r.ok).map(r => r.jmeno).sort()));

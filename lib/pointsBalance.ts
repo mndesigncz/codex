@@ -28,23 +28,30 @@ export const PRAZDNY_ROZPAD: PointsBreakdown = {
 
 // Count the point-earning signals for one user (each guarded so a missing
 // column degrades to zero instead of failing the whole request).
+// Úkoly, postupy a uzávěrky jen z TOHOHLE podniku, stejně jako breakdownForTeam
+// (k89: dřív se sem počítaly i z jiných podniků, takže kontrola bodů na odměnu
+// viděla jiný zůstatek než žebříček).
 export async function breakdownFor(teamId: number, userId: number): Promise<PointsBreakdown> {
   let tasks = 0, procedures = 0, closings = 0, reviewPoints = 0, ratedShifts = 0;
   let autoPoints = 0, itemPoints = 0, flagged = 0;
   try {
-    const [r] = await sql`SELECT COUNT(*)::int AS n FROM tasks WHERE completed_by = ${userId} AND status = 'done'`;
+    const [r] = await sql`SELECT COUNT(*)::int AS n FROM tasks WHERE completed_by = ${userId} AND status = 'done' AND (team_id = ${teamId} OR team_id IS NULL)`;
     tasks = r?.n ?? 0;
   } catch { /* column missing */ }
   try {
-    const [r] = await sql`SELECT COUNT(*)::int AS n FROM procedure_runs WHERE user_id = ${userId} AND status = 'completed'`;
+    // Prázdné dokončení (ani jeden odškrtnutý krok) základ nedostane (k89) — stejně jako breakdownForTeam.
+    const [r] = await sql`
+      SELECT COUNT(*)::int AS n FROM procedure_runs
+      WHERE user_id = ${userId} AND status = 'completed' AND (team_id = ${teamId} OR team_id IS NULL)
+        AND (COALESCE(total_items, 0) = 0 OR (jsonb_typeof(checked_items) = 'array' AND checked_items <> '[]'::jsonb))`;
     procedures = r?.n ?? 0;
   } catch { /* ignore */ }
   try {
-    const [r] = await sql`SELECT COUNT(*)::int AS n FROM cash_closings WHERE created_by = ${userId} AND (covered_by IS NULL)`;
+    const [r] = await sql`SELECT COUNT(*)::int AS n FROM cash_closings WHERE created_by = ${userId} AND (covered_by IS NULL) AND (team_id = ${teamId} OR team_id IS NULL)`;
     closings = r?.n ?? 0;
   } catch {
     try {
-      const [r] = await sql`SELECT COUNT(*)::int AS n FROM cash_closings WHERE created_by = ${userId}`;
+      const [r] = await sql`SELECT COUNT(*)::int AS n FROM cash_closings WHERE created_by = ${userId} AND (team_id = ${teamId} OR team_id IS NULL)`;
       closings = r?.n ?? 0;
     } catch { /* ignore */ }
   }
@@ -121,6 +128,7 @@ export async function breakdownForTeam(teamId: number, userIds: number[], od: st
     const rows = await sql`
       SELECT user_id AS uid, COUNT(*)::int AS n FROM procedure_runs
       WHERE user_id = ANY(${userIds}) AND status = 'completed' AND (team_id = ${teamId} OR team_id IS NULL)
+        AND (COALESCE(total_items, 0) = 0 OR (jsonb_typeof(checked_items) = 'array' AND checked_items <> '[]'::jsonb))
         AND (${odCas}::text IS NULL OR completed_at >= ${odCas}::timestamp)
       GROUP BY user_id`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.procedures = r.n; }
@@ -194,6 +202,21 @@ export async function breakdownForTeam(teamId: number, userIds: number[], od: st
 export function totalPoints(b: PointsBreakdown, pt: PointsConfig): number {
   return b.tasks * pt.task + b.procedures * pt.procedure + b.closings * pt.closing
     + b.reviewPoints + b.autoPoints + b.itemPoints + (b.awards ?? 0) + (b.navicPoints ?? 0) + (b.trestPoints ?? 0);
+}
+
+/**
+ * Body do VEŘEJNÉHO žebříčku týmu (i na tabletu): jen získané body, bez trestů
+ * (spuštění, balík P). Žebříček visí před celým týmem — záporné body za trest by tam
+ * byly veřejným pranýřem; pořadí má říkat, kdo si body vydělal. Zůstatek člověka
+ * (totalPoints, Můj výdělek, odměny) se nemění, tresty v něm zůstávají.
+ */
+export function bodyZebricku(b: PointsBreakdown, pt: PointsConfig): number {
+  return totalPoints({ ...b, trestPoints: 0 }, pt);
+}
+
+/** Rozpad do žebříčku: bez trestů (počet i body), ať se z něj nedají dopočítat. */
+export function rozpadZebricku(b: PointsBreakdown): PointsBreakdown {
+  return { ...b, trestPoints: 0, trestCount: 0 };
 }
 
 /** Current spendable balance: earned total minus reward requests still waiting

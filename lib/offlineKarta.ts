@@ -2,9 +2,14 @@
 
 // Offline kartička hosta: kód a QR se při každém načtení Moje uloží do telefonu (localStorage) a stránka
 // bez připojení (public/offline.html) je ukáže, takže host dá razítko i ve sklepě bez signálu.
+// V nativní aplikaci Managero client se kartička ukládá navíc do úložiště aplikace (plugin Preferences):
+// offline stránka obalu (apps/client/www/offline.html, server.errorPath) běží na jiném původu než web
+// a jeho localStorage nevidí, service worker ve WKWebView nefunguje. Preferences vidí obě.
 // Ukládá se jen to, co je na kartičce vidět (kód, jméno, QR jako SVG); po odhlášení se smaže.
 // Obsah z úložiště se před zobrazením znovu ověří (tvar kódu, jen bezpečné prvky SVG): offline.html má
 // tutéž kontrolu (hlídá ji test w6-host-kasa), ať se do stránky nikdy nedostane cizí značkování.
+
+import { plugin } from './nativni/most.ts';
 
 export const KLIC_KARTY = 'managero-karta-v1';
 /** Kód kartičky: písmena, číslice a pomlčky, 8 až 16 znaků (zobrazuje se „ABCD-EFGH“). */
@@ -39,12 +44,24 @@ export function ulozKartu(x: unknown): boolean {
   try {
     const t = zabalKartu(x);
     if (!t) return false;
+    ulozDoAplikace(t);
     window.localStorage.setItem(KLIC_KARTY, t);
     return true;
   } catch { return false; }
 }
 
+/** Úložiště nativní aplikace (plugin Preferences), když běžíme v obalu; jinak nic. Chyba nic nerozbije. */
+function ulozDoAplikace(hodnota: string | null): void {
+  const pr = plugin('Preferences');
+  if (!pr) return;
+  try {
+    const slib = hodnota == null ? pr.remove({ key: KLIC_KARTY }) : pr.set({ key: KLIC_KARTY, value: hodnota });
+    void Promise.resolve(slib).catch(() => {});
+  } catch { /* starší binárka */ }
+}
+
 /** Smaže uloženou kartičku (odhlášení: další člověk na zařízení nesmí vidět cizí kartičku). */
 export function smazUlozenouKartu(): void {
+  ulozDoAplikace(null);
   try { window.localStorage.removeItem(KLIC_KARTY); } catch { /* bez úložiště není co mazat */ }
 }

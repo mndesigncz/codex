@@ -10,8 +10,8 @@ Dvě nativní aplikace (obaly nad živým webem `https://www.managero.app`, Capa
 | Značka v User-Agentu | `ManageroApp/<verze> (build <n>)` | `ManageroClient/<verze> (build <n>)` |
 | Zařízení | iPhone, iPad, Android | iPhone, Android |
 
-Server pozná aplikaci podle značky v User-Agentu (`lib/obal.ts`, dělá jiná větev) a podle ní zužuje: v obalu nejsou žádné platby,
-špatná role se nepřihlásí. Značka nic neodemyká (dá se napodobit), jen zužuje.
+Server pozná aplikaci podle značky v User-Agentu (`lib/obal.ts`) a podle ní zužuje: v obalu nejsou žádné platby ani založení
+podniku (`/register` → `/zalozit-podnik`), špatná role se nepřihlásí. Značka nic neodemyká (dá se napodobit), jen zužuje.
 
 **Rozhodnutí** (plány se v drobnostech rozcházely): bundle/application ID `app.managero.app` a `app.managero.client` (ne `.provoz`),
 doména `https://www.managero.app` s `www` (apex `managero.app` jen přesměrovává a rozbil by ověřené odkazy). Všechno je v
@@ -43,17 +43,24 @@ a dodělá je `apps/scripts/po-cap-add.mjs` (idempotentní, spouští se i po `c
 ne importy, takže web se nezvětšil. Dělá:
 
 - **push**: po přihlášení (ne v kiosku) si nejdřív řekne vlastním vysvětlením, teprve po souhlasu vyvolá systémový dialog; token odešle
-  `POST /api/native/push` s `{ token, platform, app: 'provoz' | 'klient', appVersion }` (kontrakt z `plan-app-host.md` 4.3;
-  po odhlášení `DELETE` s `{ token }`). Když endpoint neexistuje, selže potichu. Klepnutí na oznámení otevře jen relativní cestu z `link`;
+  `POST /api/native/push` s `{ token, platform, version }` a u ladicí binárky z Xcode navíc `env: 'sandbox'` (podle
+  `window.Capacitor.DEBUG`; aplikaci určuje server podle role účtu). Po odhlášení `DELETE` s `{ token }`. Klepnutí na oznámení otevře
+  jen relativní cestu z `link`;
 - **sken QR** (`window.manageroNative.skenujQr()` a `skenujAOtevri()`): Google Code Scanner na Androidu (bez oprávnění ke kameře),
-  ML Kit na iOS. `CardScan` (Managero) ho používá místo `BarcodeDetector`, který na iPhonu není;
-- **sdílení a haptika**: přepíše `navigator.share` a `navigator.vibrate` nativními pluginy, stávající kód se nemění;
-- **Face ID zámek** (volitelný, výchozí vypnutý): `window.manageroNative.zamek.{dostupny, zapnuto, nastav}`; zamkne po minutě v pozadí;
+  ML Kit na iOS. `CardScan` (Managero) ho používá místo `BarcodeDetector`, který na iPhonu není; v Managero client ho spouští
+  tlačítko **Naskenovat** (`components/client/NajitPodnik.tsx`, uprostřed doku), vedle je **Zadat kód podniku**;
+- **sdílení a haptika**: přepíše `navigator.share` (i se soubory: zapíše je přes Filesystem do mezipaměti a předá Share),
+  `navigator.canShare` a `navigator.vibrate` nativními pluginy, stávající kód se nemění;
+- **odkazy a nová okna**: cizí web a veřejné stránky přes `target="_blank"` / `window.open` do prohlížeče v aplikaci (Browser),
+  naše soubory z API a `<a download>` přes sdílecí list s přihlášením (`cilOdkazu` v `lib/nativni/most.ts`);
+- **karta offline**: `lib/offlineKarta.ts` ukládá kartičku i do Preferences, offline stránka obalu (`errorPath`) ji ukáže;
+- **Face ID zámek** (volitelný, výchozí vypnutý): `window.manageroNative.zamek.{dostupny, zapnuto, nastav}`; zamkne po minutě v pozadí.
+  Přepínač v Nastavení zatím není, proto se v popisech neuvádí;
 - **universal links a App Links** (`appUrlOpen`): jen náš host, cizí ignoruje; Android zpětné gesto;
 - **stavový řádek** podle motivu, **splash** se schová po vykreslení.
 
-Zatím **nedodělané** (viz `CHECKLIST.md`): stahování souborů a tisk ve WebView, přepínače v Nastavení (zámek, upozornění),
-tlačítko „Naskenovat kód" v hostovské aplikaci.
+Zatím **nedodělané** (viz `CHECKLIST.md`): přepínač Face ID zámku v Nastavení, „Přidat na plochu" a Wallet v obalu
+(`components/client/KartaNastroje.tsx`).
 
 ## Rychlý start
 

@@ -8,7 +8,7 @@
 //  O2 Značka jen zužuje: běžný prohlížeč (bez značky) prochází všude; falešná značka
 //     nic neodemkne (jen něco zavře).
 //  O3 Platby: /api/billing/{checkout,portal,upgrade} z obou obalů 403, na webu ne;
-//     v obalu není cena, Stripe, „Předplatné“, „Odemknout“ ani prodejní stránka;
+//     v obalu není cena, Stripe, „Předplatné“, „Odemknout“, prodejní stránka ani založení podniku;
 //     na webu prodejní stránka a volba tarifu zůstávají.
 //  O4 Právní stránky bez přihlášení (cs i en), z obou aplikací; smazání účtu z webu
 //     (formulář požádá o e-mail, nic nesmaže sám).
@@ -148,20 +148,13 @@ console.log('O3 Platby');
     tvrdi('provoz: úvodní stránka končí na přihlášení, ne na prodejní stránce', p.url().endsWith('/login'), p.url());
     tvrdi('provoz: přihlášení bez ceny a bez Stripe', !ZAKAZANO.test(await text(p)), (await text(p)).slice(0, 120));
     tvrdi('provoz: přihlášení má Zapomenuté heslo a právní odkazy', await p.getByRole('link', { name: 'Zapomenuté heslo' }).count() === 1 && await p.getByRole('link', { name: 'Zásady ochrany osobních údajů' }).count() === 1 && await p.getByRole('link', { name: 'Podmínky užívání' }).count() === 1);
-    // Cesta registrace: v obalu otázky a účet, žádný krok tarifu ani cena (po účtu rovnou průvodce).
-    await p.route('**/api/register', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, joinCode: 'ABCD12' }) }));
-    await p.route('**/api/auth/callback/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: BASE + '/' }) }));
+    // Založení podniku v obalu není (Apple 3.1.3(f), balík O spuštění): /register vede na vysvětlení bez odkazu a bez cen.
     await p.goto(BASE + '/register', { waitUntil: 'networkidle' });
-    let t = await text(p);
-    tvrdi('provoz: začátek registrace bez cen a tarifů', !ZAKAZANO.test(t), t.slice(0, 160));
-    await kUctu(p);
-    t = await text(p);
-    tvrdi('provoz: krok účtu bez cen a tarifů', !ZAKAZANO.test(t), t.slice(0, 160));
-    tvrdi('provoz: registrace odkazuje na podmínky a zásady', /Podmínkami užívání/.test(t) && /Zásady ochrany osobních údajů/.test(t));
-    await vyplnUcet(p);
-    await p.getByRole('button', { name: 'Založit podnik' }).click();
-    await p.waitForURL(u => !u.pathname.startsWith('/register'), { timeout: 20000 }).catch(() => {});
-    tvrdi('provoz: po účtu žádný tarif, rovnou průvodce', !p.url().includes('/register') && await p.getByText('Jak chceš začít?').count() === 0, p.url());
+    const t = await text(p);
+    tvrdi('provoz: /register v aplikaci končí na vysvětlení „Účet podniku založíte na webu"', new URL(p.url()).pathname === '/zalozit-podnik' && /Účet podniku založíte na webu/.test(t), `${p.url()} ${t.slice(0, 120)}`);
+    tvrdi('provoz: vysvětlení bez cen, tarifů a odkazu na web nebo registraci', !ZAKAZANO.test(t)
+      && await p.locator('a[href^="http"], a[href="/register"]').count() === 0, t.slice(0, 160));
+    tvrdi('provoz: z vysvětlení jde přihlásit se a připojit se kódem týmu', await p.getByRole('link', { name: 'Přihlásit se' }).count() === 1 && await p.getByRole('link', { name: 'Připojit se kódem týmu' }).count() === 1);
     await ctx.close();
   }
   // Web: prodejní stránka a tarif v registraci zůstávají.
@@ -364,11 +357,14 @@ console.log('O6 Reset hesla a O8 souhlas s novinkami');
   await p.getByLabel('Jméno').fill('Host Test');
   await p.getByLabel('E-mail').fill('host@priklad.cz');
   await p.getByLabel('Heslo', { exact: true }).fill('Dlouhe-Heslo-123');
+  // Spuštění (balík P): souhlas s podmínkami a věk jsou výslovná zaškrtnutí.
+  await p.getByLabel(/Souhlasím s podmínkami užívání/).check();
+  await p.getByLabel(/Je mi aspoň 15 let/).check();
   await p.getByRole('button', { name: 'Založit účet' }).click();
   await dokudVola(vola, v => v.path === '/api/client/register');
   const reg = vola.find(v => v.path === '/api/client/register');
   tvrdi('souhlas s novinkami: registrace pošle novinky:false a souhlas s podmínkami', reg?.telo.novinky === false && reg.telo.terms === true, JSON.stringify(reg?.telo));
-  tvrdi('registrace hosta odkazuje na podmínky a zásady', /Podmínkami užívání/.test(await p.evaluate(() => document.body.innerText)));
+  tvrdi('registrace hosta odkazuje na podmínky a zásady', /Podmínky užívání/.test(await p.evaluate(() => document.body.innerText)) && /Zásady ochrany osobních údajů/.test(await p.evaluate(() => document.body.innerText)));
   await ctx.close();
 
   // V profilu jde souhlas zapnout a vypnout (PATCH /api/client/me s novinky).

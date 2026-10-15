@@ -11,11 +11,19 @@
 
   Všechno je tu natvrdo a v jednom souboru schválně: v tu chvíli nejde stáhnout
   ani styl, ani písmo. Prázdná obrazovka je horší než dinosaurus, protože
-  nevysvětlí nic. Texty jsou česky a anglicky podle jazyka zařízení, protože
-  rozhraní aplikace je zatím jen česky, ale telefon může být v angličtině.
+  nevysvětlí nic. Texty jsou česky a anglicky podle jazyka zařízení (web sám
+  mluví pěti jazyky, tahle záchranná stránka jen dvěma: čeština a pro ostatní
+  angličtina).
 
   Text je poctivý: nic neslibuje o rozepsaném ani o offline režimu. V obalu
   žádný offline režim není, aplikace se načítá z internetu.
+
+  Výjimka je kartička hosta (jen Managero client, blok KARTA níž): web ji při
+  každém otevření Moje uloží do úložiště aplikace (plugin Preferences,
+  lib/offlineKarta.ts) a tady se ukáže, ať host dostane razítko i bez signálu.
+  Tahle stránka běží na jiném původu než web, localStorage webu nevidí; proto
+  Preferences. Kontrola tvaru kódu a SVG je stejná jako v lib/offlineKarta.ts
+  (hlídá ji test k88-obal).
 -->
 <style>
   :root { --bg: #F1F3ED; --ink: #16181A; --lime: #C8F542; --surface: #FFFFFF; }
