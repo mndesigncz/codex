@@ -10,6 +10,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { hit } from '@/lib/rateLimit';
 import { ocistiRadek } from '@/lib/importKarticka';
 import { importujDavku, nahledDavky, seznamImportu, vratImport, MAX_DAVKA, type NastaveniImportu } from '@/lib/importKartickaDb';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -28,6 +29,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.import');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const surove: any[] = Array.isArray(b.radky) ? b.radky : [];
   if (surove.length > MAX_DAVKA) return NextResponse.json({ error: `Nejvýš ${MAX_DAVKA} členů najednou.` }, { status: 400 });

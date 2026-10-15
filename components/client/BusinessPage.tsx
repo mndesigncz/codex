@@ -54,6 +54,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
   });
   const [flash, setFlash] = useState('');
   const [joining, setJoining] = useState(false);
+  // „Chci novinky od <podnik>“ při vstupu do členství (spuštění, balík G): výchozí NE.
+  const [chciNovinky, setChciNovinky] = useState(false);
   // „Podnik tu není" smí zaznít **jen** na 404. Dřív to bylo v `catch`,
   // takže výpadek wifi vypadal úplně stejně — a zákazník z toho usoudil,
   // že kavárna na platformě není, a přestal to zkoušet. Kavárna přitom
@@ -96,9 +98,9 @@ export default function BusinessPage({ slug }: { slug: string }) {
     if (joining) return;
     setJoining(true);
     try {
-      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/join`, { method: 'POST' });
+      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ novinky: chciNovinky }) });
       if (r.status === 401) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
-      if (r.ok) { setFlash(t('Jsi členem. Vítej.')); load(); return; }
+      if (r.ok) { setFlash(chciNovinky ? t('Jsi členem. Novinky ti budou chodit, vypnout je jde v profilu.') : t('Jsi členem. Vítej.')); load(); return; }
       const d = await r.json().catch(() => ({}));
       setFlash(d.error ? t(d.error) : t('Přidat se teď nepovedlo. Zkus to prosím znovu.'));
     } finally { setJoining(false); }
@@ -155,8 +157,15 @@ export default function BusinessPage({ slug }: { slug: string }) {
                 {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{me.nextTierUnit === 'spend' ? t('do „{level}“ ještě {castka}', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) }) : t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
               </div>
             ) : (
-              <button onClick={join} disabled={joining} className="tap-target w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-60 transition"
-                style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> {t('Stát se členem')}</button>
+              <div className="grid gap-1.5" data-vstup-clenstvi>
+                <button type="button" onClick={join} disabled={joining} className="tap-target w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-60 transition"
+                  style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> {t('Stát se členem')}</button>
+                {/* Souhlas s novinkami je dobrovolný a po podnicích: výchozí NE, jde změnit v profilu. */}
+                <label className={`min-h-[44px] inline-flex items-center gap-2.5 text-sm cursor-pointer select-none ${b.coverUrl ? 'text-white/90' : 'text-black/70'}`}>
+                  <input type="checkbox" checked={chciNovinky} onChange={e => setChciNovinky(e.target.checked)} className="h-5 w-5 shrink-0 accent-[#16181A]" />
+                  <span className="min-w-0 break-words">{t('Chci novinky od {podnik}', { podnik: b.name })}</span>
+                </label>
+              </div>
             )}
           </div>
         </div>

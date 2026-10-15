@@ -8,6 +8,7 @@ import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
 import { nactiAutomatizace, ulozAutomatizaci, logAutomatizace, poctyAutomatizace } from '@/lib/automatizaceDb';
 import { jeDruhAutomatizace, zpravaAutomatizace } from '@/lib/automatizace';
 import { zkusebniZprava } from '@/lib/broadcasts';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -36,6 +37,8 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.zpravy');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   if (!jeDruhAutomatizace(b.druh)) return NextResponse.json({ error: 'Neznámá automatizace.' }, { status: 400 });
   const r = await ulozAutomatizaci(ctx.teamId, ctx.meId, b.druh, b.enabled === true, b.config, ctx.role.opravneni.has('vernost.pravidla'));
@@ -46,6 +49,8 @@ export async function PUT(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.zpravy');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   if (b.akce !== 'test' || !jeDruhAutomatizace(b.druh)) return NextResponse.json({ error: 'Neznámá akce.' }, { status: 400 });
   const stav = (await nactiAutomatizace(ctx.teamId)).find(s => s.druh === b.druh);

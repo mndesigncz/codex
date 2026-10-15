@@ -44,6 +44,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   announcement_reads: 'smazat', chat_reactions: 'smazat',
   // kdo kdy naposled otevřel vlákno poznámek (kolo 8): osobní stav čtení, bez něj nic nechybí
   entity_note_reads: 'smazat',
+  // odkazy na ověření e-mailu (spuštění, balík S): jednorázové, bez účtu nemají smysl
+  email_verifications: 'smazat',
   // host
   client_cards: 'smazat', client_memberships: 'smazat', client_loyalty_ledger: 'smazat', client_stamp_progress: 'smazat', client_stamp_events: 'smazat', client_scan_actions: 'smazat',
   client_coupon_claims: 'smazat', client_promo_uses: 'smazat', client_group_members: 'smazat', client_event_follows: 'smazat',
@@ -53,6 +55,13 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   client_vouchers: 'upravit',
   // čekající párování kartičky s účtem (spuštění, balík Q): bez hosta nemá smysl
   client_bill_claims: 'smazat',
+  // fyzické kartičky (spuštění, balík C): plastová karta patří podniku — od hosta se odpojí a zablokuje (nikdo jiný ji nepoužije);
+  // dávku karet založil člověk z vedení, záznam o dávce zůstává podniku pod anonymním autorem
+  client_card_aliases: 'upravit', client_card_batches: 'ponechat',
+  // souhlasy (spuštění, balík G): záznam, kdy a jak host souhlasil nebo souhlas odvolal. Řádek nese jen
+  // id účtu, typ a verzi znění, bez osobních údajů; po anonymizaci účtu ho nejde přiřadit osobě a zůstává
+  // jako doklad (GDPR čl. 7 odst. 1). Se smazáním podniku zmizí souhlasy s ním (TYMOVE_TABULKY).
+  consents: 'ponechat',
   // osobní text a soubory: řádek zůstává podniku, osobní obsah se maže (viz OSOBNI_UDAJE)
   uploads: 'upravit', audit_log: 'upravit', content_reports: 'upravit',
   // záznamy podniku: anonymní autor, obsah patří podniku
@@ -103,9 +112,10 @@ export type ZpusobOsobni = 'smazat' | 'anonymizovat' | 'podnik' | 'ponechat';
 export const OSOBNI_UDAJE: Record<string, { zpusob: ZpusobOsobni; co: string }> = {
   users: { zpusob: 'anonymizovat', co: 'Jméno, e-mail, telefon, narozeniny, avatar, heslo, PIN, hodinová sazba, limity a preference směn, pozice, aktivní podnik a nastavení oznámení se přepíšou nebo vymažou; řádek zůstane pod anonymním jménem kvůli provozním záznamům podniku.' },
   invitations: { zpusob: 'smazat', co: 'Pozvánky s e-mailem osoby (i pozvánky, které osoba rozeslala) se smažou včetně tokenu.' },
+  email_verifications: { zpusob: 'smazat', co: 'Odkazy na ověření e-mailu (otisk tokenu a adresa, na kterou šel) se se smazáním účtu smažou.' },
   uploads: { zpusob: 'anonymizovat', co: 'Soubory osoby mimo podnik se smažou i s blobem; soubory v podniku (fotky účtenek, přílohy chatu) zůstanou podniku bez vazby na osobu a s obecným názvem. Soubory smazaného podniku se smažou i s blobem.' },
   audit_log: { zpusob: 'anonymizovat', co: 'Záznamy o akcích zůstanou (kdo=anonymní účet, co, kdy); volný text `detail` k osobě se vymaže. Záznamy smazaného podniku zmizí s ním.' },
-  content_reports: { zpusob: 'anonymizovat', co: 'Nahlášení zůstanou pro moderaci; text podatele a opis nahlášeného obsahu osoby se vymaže.' },
+  content_reports: { zpusob: 'anonymizovat', co: 'Nahlášení zůstanou pro moderaci; text podatele, jeho jméno a e-mail (oznámení z webu, DSA) a opis nahlášeného obsahu osoby se vymažou.' },
   teams: { zpusob: 'smazat', co: 'Smazáním podniku zmizí i stripe_customer_id a stripe_subscription_id; ve Stripe se zruší předplatné a smaže zákazník (chyba Stripe smazání neblokuje, vrací se jako varování a zapíše do protokolu).' },
   organizations: { zpusob: 'smazat', co: 'Organizace (název firmy, sdílená nastavení) se smaže se smazáním posledního podniku v ní; prázdná organizace vlastníka se smaže vždy.' },
   team_members: { zpusob: 'smazat', co: 'Členství v podniku včetně pozice a hodinové sazby se smaže.' },
@@ -140,6 +150,10 @@ export const TYMOVE_TABULKY = [
   'extra_claims',
   // spuštění (balík Q): párování kartičky s účtem z pokladny
   'client_bill_claims',
+  // spuštění (balík C): fyzické kartičky a jejich tiskové dávky
+  'client_card_batches', 'client_card_aliases',
+  // spuštění (balík G): souhlasy s novinkami podniku
+  'consents',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */
 export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_audit'];
@@ -218,6 +232,8 @@ const volitelny = (popis: string, text: string, params: unknown[]): Krok => ({ t
 export const RESET_SLOUPCU: [string, string][] = [
   ['pin', 'NULL'], ['pin_hash', 'NULL'], ['hourly_rate', '0'], ['max_consecutive_days', 'NULL'], ['max_month_hours', 'NULL'],
   ['split_shifts_ok', 'NULL'], ['shift_preference', `'flexible'`], ['job_title', 'NULL'], ['active_team_id', 'NULL'],
+  ['pin_delka', 'NULL'],
+  ['email_verified_at', 'NULL'],
 ];
 
 /** Kroky pro jednoho uživatele. Pořadí: nejdřív mazání, nakonec anonymizace řádku users. */
@@ -229,6 +245,7 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     'poll_votes', 'suggestion_votes', 'conversation_members', 'team_members', 'billing_interest', 'announcement_reads', 'chat_reactions']) del(t);
   k.push(volitelny('smazat osobní rozložení stránek', `DELETE FROM rozlozeni_stranek WHERE user_id = $1`, [id]));
   del('entity_note_reads');
+  del('email_verifications');
   k.push(volitelny('smazat blokace', `DELETE FROM user_blocks WHERE blocker_id = $1 OR blocked_id = $1`, [id]));
   k.push(volitelny('smazat počítadla přihlášení', `DELETE FROM auth_attempts WHERE key = ANY($1)`,
     [[`login:${u.email}`, `client-register:${u.email}`, `reset:${u.email}`, `smazani:${id}`]]));
@@ -236,6 +253,8 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     for (const t of ['client_cards', 'client_memberships', 'client_loyalty_ledger', 'client_stamp_progress', 'client_coupon_claims',
       'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards', 'client_import_clenove', 'client_member_notes', 'client_automatizace_log', 'client_stamp_events']) del(t, 'customer_id');
     del('client_bill_claims', 'customer_id');
+    // Plastová karta patří podniku: od smazaného hosta se odpojí a zablokuje, ať ji u kasy nikdo nepřiřadí znovu.
+    k.push(volitelny('odpojit a zablokovat fyzické karty hosta', `UPDATE client_card_aliases SET customer_id = NULL, stav = 'blokovana', blocked_at = NOW() WHERE customer_id = $1`, [id]));
     // Účet v pokladně patří podniku; jen se odpojí od hosta, kterého k němu věrnost přiřadila.
     k.push(volitelny('odpojit účty z pokladny od hosta', `UPDATE pos_bills SET customer_id = NULL WHERE customer_id = $1`, [id]));
     // Budoucí rezervace se zruší (podnik s nimi nepočítá s anonymem), minulým zmizí poznámka.
@@ -257,6 +276,8 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     AND action NOT IN ('ucet.smazan', 'podnik.smazan', 'ucet.stripe_chyba')`, [id]));
   k.push(volitelny('vymazat text nahlášení podatele', `UPDATE content_reports SET detail = NULL WHERE reporter_id = $1`, [id]));
   k.push(volitelny('vymazat opis nahlášeného obsahu', `UPDATE content_reports SET snapshot = NULL WHERE reported_user_id = $1`, [id]));
+  // Oznámení z webu (DSA, balík G) podané přihlášeným: i kontakt oznamovatele je osobní údaj.
+  k.push(volitelny('vymazat kontakt oznamovatele', `UPDATE content_reports SET reporter_name = NULL, reporter_email = NULL WHERE reporter_id = $1`, [id]));
   // Prázdná organizace vlastníka (po smazání jeho podniků) nemá smysl držet.
   k.push(volitelny('smazat prázdné organizace vlastníka', `DELETE FROM organizations WHERE owner_id = $1
     AND NOT EXISTS (SELECT 1 FROM teams WHERE organization_id = organizations.id)`, [id]));

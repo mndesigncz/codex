@@ -2,6 +2,7 @@
 // importovat i prohlížeč (rozhraní zpráv a hromadných akcí). Skládání e-mailu a podpis odhlášení jsou v lib/zpravyEmail.ts.
 
 import { vypadaJakoEmail } from './emailAdresa.ts';
+import type { SouhlasNovinek } from './consents.ts';
 
 export type KanalyZpravy = 'push' | 'email' | 'push+email';
 export const KANALY_ZPRAVY: { id: KanalyZpravy; label: string; popis: string }[] = [
@@ -20,8 +21,20 @@ export interface PrijemceZpravy {
   id: number;
   email?: string | null;
   blocked?: boolean | null;
-  /** users.notif_prefs */
+  /** users.notif_prefs — globální souhlas z doby před souhlasy po podnicích (záloha, viz `souhlas`). */
   prefs?: { novinky?: unknown; novinkyEmail?: unknown } | null;
+  /**
+   * Souhlas s novinkami TOHOTO podniku (tabulka consents, lib/consentsDb.ts). Když je vyplněný, rozhoduje
+   * jen on; `undefined` = host v nové tabulce ještě nic nemá (před převodem) a platí globální `prefs`.
+   */
+  souhlas?: SouhlasNovinek | null;
+}
+
+/** Souhlas s novinkami podniku: z tabulky souhlasů, jinak z globálního příznaku (před převodem). */
+function souhlasClena(p: PrijemceZpravy): SouhlasNovinek {
+  if (p.souhlas) return p.souhlas;
+  if (p.prefs?.novinky !== true) return { push: false, email: false };
+  return { push: true, email: p.prefs?.novinkyEmail !== false };
 }
 
 export type DuvodVynechani = 'blokovany' | 'bez_souhlasu' | 'bez_emailu' | 'email_vypnuty';
@@ -29,8 +42,9 @@ export type DuvodVynechani = 'blokovany' | 'bez_souhlasu' | 'bez_emailu' | 'emai
 /** Proč člen e-mail nedostane; null = dostane. */
 export function procNedostaneEmail(p: PrijemceZpravy): DuvodVynechani | null {
   if (p.blocked) return 'blokovany';
-  if (p.prefs?.novinky !== true) return 'bez_souhlasu';
-  if (p.prefs?.novinkyEmail === false) return 'email_vypnuty';
+  const s = souhlasClena(p);
+  if (!s.push && !s.email) return 'bez_souhlasu';
+  if (!s.email) return 'email_vypnuty';
   if (!p.email || !vypadaJakoEmail(String(p.email).trim().toLowerCase())) return 'bez_emailu';
   return null;
 }
@@ -38,7 +52,7 @@ export function procNedostaneEmail(p: PrijemceZpravy): DuvodVynechani | null {
 /** Proč člen push/oznámení nedostane; null = dostane. */
 export function procNedostanePush(p: PrijemceZpravy): DuvodVynechani | null {
   if (p.blocked) return 'blokovany';
-  if (p.prefs?.novinky !== true) return 'bez_souhlasu';
+  if (!souhlasClena(p).push) return 'bez_souhlasu';
   return null;
 }
 
@@ -67,7 +81,8 @@ export function dosahZpravy(prijemci: PrijemceZpravy[], kanal: KanalyZpravy): Do
     if (push) d.push++;
     if (email) d.email++;
     if (!push && !email) d.nikdo++;
-    if (p.prefs?.novinky !== true) d.bezSouhlasu++;
+    const s = souhlasClena(p);
+    if (!s.push && !s.email) d.bezSouhlasu++;
     else if (duvodE === 'bez_emailu') d.bezEmailu++;
     else if (duvodE === 'email_vypnuty') d.emailVypnuty++;
   }

@@ -7,6 +7,7 @@ import { notifyUsers } from '@/lib/push';
 import { pragueToday } from '@/lib/pragueTime';
 import { cashDifference } from '@/lib/closing';
 import { vycistiVyzvu, type MetrikaVyzvy, type Vyzva } from '@/lib/vyzvy';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 // Týmové výzvy (kolo 8, R8-3): vedení vyhlásí společný cíl z hotových čísel podniku
 // (uzávěrky bez manka / splněné úkoly / průměrné hodnocení hostů / tržba období), widget
@@ -112,6 +113,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const c = await pozaduj('odmeny.nastaveni');
   if (jeOdpoved(c)) return c;
+  const tarif = await pozadujTarif(c.teamId, 'pro');
+  if (tarif) return tarif;
   const v = vycistiVyzvu(await req.json().catch(() => ({})));
   if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 400 });
   const n = v.vyzva;

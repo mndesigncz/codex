@@ -27,6 +27,7 @@ import { PRICES, REFERRALS_PER_MONTH, MAX_OFFER_DAYS, TRIAL_DAYS, type Interval,
 import { generateJoinCode } from './team';
 import { pocetClenu, organizaceTymu, podnikyOrganizace } from './tenant';
 import type { CerpaniTarifu } from './plan';
+import { zapomenTarif } from './tarifServer';
 import { notifyUsers } from './push';
 import { audit } from './audit';
 import { pragueToday } from './pragueTime';
@@ -416,6 +417,8 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<numbe
       billing_synced_at = NOW()
     WHERE id = ${id}`;
   try { await zapis(true); } catch { await zapis(false); /* před migrací: sloupec stripe_mode ještě není */ }
+  // Brána placených funkcí (lib/tarifServer) si tarif drží 10 s; po změně ho v tomhle isolátu zahodí hned.
+  zapomenTarif(id);
   return id;
 }
 
@@ -520,6 +523,8 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
             type: 'billing', link: '/employer/overview?view=settings&tab=billing',
           });
         } catch { /* ignore */ }
+        // Spuštění (balík G): i e-mailem vlastníkovi, kdo aplikaci zrovna neotevře, by o konci zkoušky nevěděl.
+        await (await import('./platbyEmailDb')).emailVlastnikoviOPlatbe(teamId, 'konec_zkousky', { zruseno });
       }
       break;
     }
@@ -548,6 +553,8 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
             type: 'billing', link: '/employer/overview?view=settings&tab=billing',
           });
         } catch { /* ignore */ }
+        // Spuštění (balík G): i e-mailem vlastníkovi s odkazem na Platby (jen push nestačil).
+        await (await import('./platbyEmailDb')).emailVlastnikoviOPlatbe(Number(t.id), 'platba_selhala', { pokus: typeof inv.attempt_count === 'number' ? inv.attempt_count : null });
       }
       break;
     }

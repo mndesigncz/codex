@@ -19,6 +19,7 @@ import { zajistiTabulkuBanneru, statistikyBanneru } from '@/lib/clientBanners';
 import { kdyTed } from '@/lib/banneryPlan';
 import { validujBanner, overPoradi, nadpisKopie, souhrnStatistik, MAX_BANNERU, type BannerHodnoty } from '@/lib/bannery';
 import { TIER_LABELS } from '@/lib/kuponyPopisky';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -87,6 +88,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj(OPR);
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const v = validujBanner(b);
   if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 400 });
@@ -111,6 +114,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const ctx = await pozaduj(OPR);
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   await zajistiTabulkuBanneru();
 

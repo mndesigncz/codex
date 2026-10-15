@@ -238,5 +238,9 @@
   "Ťukni na sebe a zaznamenej příchod.": "Ťukni na seba a zaznamenaj príchod.",
   "Žádné položky": "Žiadne položky",
   "Žádné úkoly": "Žiadne úlohy",
-  "Úkoly za body: klepni na Hotovo u toho, co jsi udělal(a), nebo napiš vlastní věc.": "Úlohy za body: ťukni na Hotovo pri tom, čo si urobil(a), alebo napíš vlastnú vec."
+  "Úkoly za body: klepni na Hotovo u toho, co jsi udělal(a), nebo napiš vlastní věc.": "Úlohy za body: ťukni na Hotovo pri tom, čo si urobil(a), alebo napíš vlastnú vec.",
+  "PIN musí mít 6 číslic.": "PIN musí mať 6 číslic.",
+  "Nový PIN má 6 číslic.": "Nový PIN má 6 číslic.",
+  "Doporučujeme změnit PIN na 6 číslic.": "Odporúčame zmeniť PIN na 6 číslic.",
+  "Moc špatných PINů. Zkus to za {n} s.": "Priveľa nesprávnych PINov. Skús to o {n} s."
 }

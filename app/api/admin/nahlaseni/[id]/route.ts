@@ -5,6 +5,7 @@ import { AdminError, logAdmin } from '@/lib/admin';
 import { audit } from '@/lib/audit';
 import { stavPoAkci } from '@/lib/moderace';
 import { vyridNahlaseni } from '@/lib/moderaceDb';
+import { poVyrizeniNahlaseni } from '@/lib/dsaDb';
 import { odmitnuto, odpoved } from '../../_odpoved';
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (!r) throw new AdminError(404, 'Nahlášení nenalezeno.');
     await logAdmin(g.actor, `report.${stav}`, r.teamId, `#${reportId} · ${r.kind}`);
     if (r.teamId != null) await audit(r.teamId, g.actor.userId, 'nahlaseni.vyreseno', 'content_report', reportId, `${stav} · správce platformy`);
+    // DSA (spuštění, balík G): odůvodnění autorovi (čl. 17) a rozhodnutí oznamovateli z webu (čl. 16 odst. 5).
+    await poVyrizeniNahlaseni(reportId, stav, 'provozovatel', typeof b?.oduvodneni === 'string' ? b.oduvodneni : null);
     return { ok: true, status: stav };
   });
 }

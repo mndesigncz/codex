@@ -189,17 +189,17 @@ async function SELECT_POZNAMKY(teamId: number, typ: string, klic: string) {
   }
 }
 
-async function JEDNA_POZNAMKA(id: number) {
+async function JEDNA_POZNAMKA(id: number, teamId: number) {
   try {
     const [row] = await sql`
       SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, n.mentions, n.pinned, u.name AS autor_name, u.avatar AS autor_avatar
-      FROM entity_notes n LEFT JOIN users u ON u.id = n.user_id WHERE n.id = ${id}`;
+      FROM entity_notes n LEFT JOIN users u ON u.id = n.user_id WHERE n.id = ${id} AND n.team_id = ${teamId}`;
     return row;
   } catch (e) {
     if (!bezSloupce(e)) throw e;
     const [row] = await sql`
       SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, u.name AS autor_name, u.avatar AS autor_avatar
-      FROM entity_notes n LEFT JOIN users u ON u.id = n.user_id WHERE n.id = ${id}`;
+      FROM entity_notes n LEFT JOIN users u ON u.id = n.user_id WHERE n.id = ${id} AND n.team_id = ${teamId}`;
     return row;
   }
 }
@@ -328,7 +328,7 @@ export async function POST(req: NextRequest) {
     }
     await oznacPrecteno(v.c.teamId, v.actingId, c.typ, c.klic);
     try { await oznamPoznamku(v, c.typ, c.klic, text, zminky); } catch (e) { console.error('notes notify', e); }
-    const row = await JEDNA_POZNAMKA(Number(r.id));
+    const row = await JEDNA_POZNAMKA(Number(r.id), v.c.teamId);
     return NextResponse.json(tvar(row, v), { status: 201 });
   } catch (e) {
     if (predMigraci(e)) return chyba('Poznámky ještě nejsou zapnuté — vedení musí spustit aktualizaci databáze.', 503);
@@ -365,7 +365,7 @@ export async function PATCH(req: NextRequest) {
     } else {
       await sql`UPDATE entity_notes SET text = ${text}, updated_at = NOW() WHERE id = ${id} AND team_id = ${v.c.teamId}`;
     }
-    const row = await JEDNA_POZNAMKA(id);
+    const row = await JEDNA_POZNAMKA(id, v.c.teamId);
     return NextResponse.json(tvar(row, v));
   } catch (e) {
     console.error('notes PATCH', e);

@@ -15,6 +15,7 @@ import {
 } from './automatizace';
 import { kuponKPripsani, nactiPrijemce, pripisKuponClenum } from './clenoveDb';
 import { procNedostaneEmail, procNedostanePush, odkazOdhlaseni, sestavEmailZpravy } from './zpravyEmail';
+import { icoPodniku } from './consentsDb';
 import { sendNovinkyEmail, odkazovyZaklad } from './email';
 import { cistyJazyk } from './i18n/config';
 import { linkFor } from './broadcasts';
@@ -120,9 +121,9 @@ export async function dorucClenovi(d: Dorucovane): Promise<{ status: string; cha
     kanaly.push('push');
   }
   if (procNedostaneEmail(prijemce) === null) {
-    const odh = odkazOdhlaseni(odkazovyZaklad(), d.customerId);
+    const odh = odkazOdhlaseni(odkazovyZaklad(), d.customerId, d.teamId);
     const mail = sestavEmailZpravy({
-      podnik, title: d.title, body: d.body, odkaz: `${odkazovyZaklad()}${link}`, kuponNazev: kupon, promoKod: null,
+      podnik, ico: await icoPodniku(d.teamId), title: d.title, body: d.body, odkaz: `${odkazovyZaklad()}${link}`, kuponNazev: kupon, promoKod: null,
       odhlasitStranka: odh.stranka, jazyk: cistyJazyk(prijemce.lang) ?? cistyJazyk(jazykPodniku) ?? 'cs',
     });
     const r = await sendNovinkyEmail(String(prijemce.email), podnik, mail.subject, mail.html, odh.api);

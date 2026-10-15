@@ -37,6 +37,6 @@ export async function POST(req: Request) {
   if (id == null) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const b = await req.json().catch(() => ({}));
   if (!souhlasZTela(b)) return NextResponse.json({ error: HLASKA_BEZ_SOUHLASU }, { status: 400 });
-  if (!(await zapisSouhlas(id))) return NextResponse.json({ error: 'Souhlas se teď nepodařilo uložit. Zkus to za chvíli znovu.' }, { status: 503 });
+  if (!(await zapisSouhlas(id, 'brana'))) return NextResponse.json({ error: 'Souhlas se teď nepodařilo uložit. Zkus to za chvíli znovu.' }, { status: 503 });
   return NextResponse.json({ ok: true, verzePodminek: VERZE_PODMINEK, verzeZasad: VERZE_ZASAD });
 }

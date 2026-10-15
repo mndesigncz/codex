@@ -29,6 +29,8 @@ import OdkazCtecka from './OdkazCtecka';
 import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
 import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
 import CekaNaZaplaceni, { ParovaniHosta } from './CekaNaZaplaceni';
+import KartickaAktivace from './KartickaAktivace';
+import { ciziCislo } from '@/lib/kartyFyzicke';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
@@ -62,6 +64,8 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
   useEffect(() => { if (obnovaParovani > 0) onParovaniRef.current?.(); }, [obnovaParovani]);
   // Náhled kuponu z QR nebo kódu, který obsluha ještě neuplatnila.
   const [cp, setCp] = useState<any | null>(null);
+  // Nová plastová karta (spuštění, balík C): ještě nikomu nepatří, obsluha ji přiřadí hostovi.
+  const [nova, setNova] = useState<string | null>(null);
   // Uplatnění jde přes okno s náhledem (útrata, varování, ověření věku): KuponUplatnitOkno.
   const [uplatnuji, setUplatnuji] = useState<{ kod: string; zNahledu: boolean } | null>(null);
   // Nativní skener z obalu (window.manageroNative, components/NativeBridge): na iPhonu
@@ -86,6 +90,8 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
     const r = rozpoznejQr(text);
     if (r.typ === 'karta') { await lookup(r.kod); return; }
     if (r.typ === 'kupon') { await previewCoupon(r.kod); return; }
+    // Číslo staré karty převzaté z Kartičky (jiný tvar než osm znaků): hledá se v tomhle podniku.
+    if (r.typ === 'cizi' && ciziCislo(text)) { await lookup(text); return; }
     setErr(r.typ === 'prazdny' ? 'Zadej kód kartičky nebo kuponu, nebo naskenuj QR.' : /^[A-Za-z0-9 -]+$/.test(text.trim()) ? 'Kód kartičky má osm znaků, kód kuponu šest.' : 'Tohle není QR z Managera (kartička ani kupon). Opiš kód ručně.');
   };
   const previewCoupon = async (kod: string) => {
@@ -101,15 +107,18 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
   const redeemPreview = () => { if (cp) setUplatnuji({ kod: cp.code, zNahledu: true }); };
 
   const lookup = async (c: string) => {
-    const norm = c.replace(/[^A-Z0-9]/g, '');
-    if (norm.length < 8) { setErr('Kód má osm znaků.'); return; }
+    const norm = c.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (norm.length < 3) { setErr('Kód má osm znaků.'); return; }
     setBusy('lookup'); setErr('');
     try {
       const r = await fetch(`/api/client/staff/scan?code=${encodeURIComponent(norm)}`);
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      setHit(x); setCode(fmt(norm)); setUpoz(null);
-      if (x.parovani) setObnovaParovani(n => n + 1);
+      if (x.novaKarta) { setNova(String(x.novaKarta.kod)); setHit(null); setCode(String(x.novaKarta.kod)); setUpoz(null); }
+      else {
+        setNova(null); setHit(x); setCode(norm.length === 8 ? fmt(norm) : norm); setUpoz(null);
+        if (x.parovani) setObnovaParovani(n => n + 1);
+      }
     } catch (e: any) { setErr(e.message); setHit(null); }
     setBusy('');
   };
@@ -137,7 +146,7 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
     setBusy('');
   };
   const redeem = (couponCode: string) => setUplatnuji({ kod: couponCode, zNahledu: false });
-  const reset = () => { setHit(null); setCp(null); setCode(''); setErr(''); setAmount(''); setBill(null); setPredplaceno(''); setUctenka(''); setUpoz(null); };
+  const reset = () => { setHit(null); setCp(null); setNova(null); setCode(''); setErr(''); setAmount(''); setBill(null); setPredplaceno(''); setUctenka(''); setUpoz(null); };
 
   return (
     // Jamka, ne karta: kartička se kreslí uvnitř karty (widget Objednávky od
@@ -146,11 +155,14 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
       <div className="flex items-center gap-2 flex-wrap">
         <h3 id="h-scan" className="t-card flex items-center gap-2"><Icon name="card" size={17} className="text-black/40" />{rezim === 'poukaz' && smiPoukaz ? 'Dárkový poukaz' : 'Kartička hosta'}</h3>
         {smiPoukaz && !hit && <Segmented options={[{ id: 'karta', label: 'Karta' }, { id: 'poukaz', label: 'Poukaz' }]} value={rezim} onChange={v => { setRezim(v as 'karta' | 'poukaz'); setErr(''); setCam(false); }} size="sm" ariaLabel="Co se u kasy vyřizuje" />}
-        {!hit && !cp && <OdkazCtecka className="sm:ml-auto" />}
+        {!hit && !cp && !nova && <OdkazCtecka className="sm:ml-auto" />}
         {hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>Jiný host</Button>}
         {cp && !hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>Jiný kód</Button>}
       </div>
-      {rezim === 'poukaz' && smiPoukaz ? <PoukazKasa onToast={onToast} onChange={onChange} nativni={nativni} canScan={canScan} /> : !hit && cp ? (
+      {rezim === 'poukaz' && smiPoukaz ? <PoukazKasa onToast={onToast} onChange={onChange} nativni={nativni} canScan={canScan} /> : !hit && nova ? (
+        <KartickaAktivace kod={nova} onZrusit={reset}
+          onHotovo={zprava => { const k = nova; onToast(zprava); onChange?.(); void lookup(k); }} />
+      ) : !hit && cp ? (
         <div className="space-y-3" data-testid="kupon-nahled">
           <div className="min-w-0">
             <p className="t-label mb-0.5">Kupon</p>
@@ -274,7 +286,7 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
           )}
         </div>
       )}
-      {cam && !hit && !cp && rezim === 'karta' && <Camera onCode={c => { setCam(false); void resolve(c); }} onForeign={() => setErr('Tohle není QR z Managera (kartička ani kupon). Zkus jiný.')} onError={m => { setCam(false); setErr(m); }} />}
+      {cam && !hit && !cp && !nova && rezim === 'karta' && <Camera onCode={c => { setCam(false); void resolve(c); }} onForeign={() => setErr('Tohle není QR z Managera (kartička ani kupon). Zkus jiný.')} onError={m => { setCam(false); setErr(m); }} />}
       {err && rezim === 'karta' && <p role="alert" className="note note-danger">{err}</p>}
       {rezim === 'karta' && seznamParovani && <CekaNaZaplaceni obnovit={obnovaParovani} onToast={onToast} />}
       {uplatnuji && (
@@ -315,7 +327,8 @@ function Camera({ onCode, onForeign, onError, prijmi }: { onCode: (c: string) =>
             else if (v) {
               // Karta hosta, nebo kupon (payload / šest znaků); cokoli jiného se jednou ohlásí a kamera čte dál.
               const typ = rozpoznejQr(v).typ;
-              if (typ === 'karta' || typ === 'kupon') { done = true; cb.current.onCode(String(v)); }
+              // Číslo staré karty z Kartičky (QR s holým číslem) se zkusí jako karta v tomhle podniku.
+              if (typ === 'karta' || typ === 'kupon' || ciziCislo(v)) { done = true; cb.current.onCode(String(v)); }
               else if (String(v) !== posledniCizi) { posledniCizi = String(v); cb.current.onForeign?.(); }
             }
           } catch { /* další snímek */ }

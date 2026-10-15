@@ -17,6 +17,7 @@ import { nactiClenyTymu, zajistiClenove, kontextFiltru } from '@/lib/clenoveDb';
 import {
   HROMADNE_AKCE, HROMADNA_MAX, BONUS_CELKEM_MAX, normalizujFiltr, splnujeFiltr, chybaBonusu, normalizujKlicAkce, PRAZDNY_FILTR,
 } from '@/lib/clenoveFiltr';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -28,6 +29,8 @@ const KLIC_AKCE: Record<string, string> = {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj(['zakaznici.skupiny', 'vernost.upravit_body', 'zakaznici.zpravy']);
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const akce = String(b.action ?? '');

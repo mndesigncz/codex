@@ -27,6 +27,8 @@ import { formatujPriPsani } from '@/lib/poukazy';
 import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
 import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
 import CekaNaZaplaceni, { ParovaniHosta } from './CekaNaZaplaceni';
+import KartickaAktivace from './KartickaAktivace';
+import { ciziCislo } from '@/lib/kartyFyzicke';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const RAZITKO: CzNoun = { one: 'razítko', few: 'razítka', many: 'razítek' };
@@ -42,6 +44,8 @@ type Faze =
   | { druh: 'nacitam'; popis: string }
   | { druh: 'chyba'; text: string }
   | { druh: 'host'; kod: string; data: any }
+  // Nová plastová karta (spuštění, balík C): ještě nikomu nepatří, obsluha ji přiřadí hostovi.
+  | { druh: 'nova'; kod: string }
   | { druh: 'kupon'; data: any }
   | { druh: 'poukaz'; data: any };
 
@@ -168,17 +172,23 @@ export default function CteckaKasa() {
     bezi.current = true;
     setPotvrzeni(null); setZustat(false); setCastka(''); setPoukazCastka(''); poukazRef.current = null;
     try {
-      if (r.typ === 'cizi') {
+      // Číslo staré karty převzaté z Kartičky (jiný tvar než osm znaků) se zkusí jako karta v tomhle podniku.
+      const stare = r.typ === 'cizi' && smiKartu ? ciziCislo(ocistiVstupCtecky(raw)) : null;
+      if (r.typ === 'cizi' && !stare) {
         const text = /^[A-Za-z0-9 -]+$/.test(ocistiVstupCtecky(raw)) ? 'Kód kartičky má osm znaků, kód kuponu šest.' : 'Tohle není QR z Managera (kartička, kupon ani poukaz).';
         setFaze({ druh: 'chyba', text }); zapis(text, false); pipni(false);
-      } else if (r.typ === 'karta') {
+      } else if (r.typ === 'karta' || stare) {
+        const kod = stare ?? r.kod;
         if (!smiKartu) { const t = 'Pracovat s kartičkou hosta nemáš povoleno.'; setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
         else {
           setFaze({ druh: 'nacitam', popis: 'Načítám kartičku' });
           try {
-            const d = await fetch(`/api/client/staff/scan?code=${encodeURIComponent(r.kod)}`).then(okJson);
-            setFaze({ druh: 'host', kod: r.kod, data: d }); zapis(d.customer?.name ?? r.kod, true, r.kod); pipni(true);
-            if (d.parovani) setObnovaParovani(n => n + 1);
+            const d = await fetch(`/api/client/staff/scan?code=${encodeURIComponent(kod)}`).then(okJson);
+            if (d.novaKarta) { setFaze({ druh: 'nova', kod: String(d.novaKarta.kod) }); zapis(`Nová karta ${d.novaKarta.kod}`, true, kod); pipni(true); }
+            else {
+              setFaze({ druh: 'host', kod, data: d }); zapis(d.customer?.name ?? kod, true, kod); pipni(true);
+              if (d.parovani) setObnovaParovani(n => n + 1);
+            }
           } catch (e) { const t = chyba(e, 'karta'); setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
         }
       } else if (r.typ === 'kupon') {
@@ -421,6 +431,11 @@ export default function CteckaKasa() {
             <p role="alert" className="note note-danger font-semibold break-words">{faze.text}</p>
             <Button size="lg" variant="primary" onClick={dalsi}>Čekám na další kartu</Button>
           </div>
+        )}
+
+        {faze.druh === 'nova' && (
+          <KartickaAktivace kod={faze.kod} velke onZrusit={dalsi}
+            onHotovo={zprava => { const k = faze.kod; zapis(zprava, true, k); posledniSken.current = null; void nactiRef.current(k); }} />
         )}
 
         {faze.druh === 'host' && h && (

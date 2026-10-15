@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { recipeOf, saveRecipe } from '@/lib/production';
-import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +26,8 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
   const params = await props.params;
   const c = await pozaduj('vyroba.receptura');
   if (jeOdpoved(c)) return c;
-  if (!(await teamIsMax(c.teamId))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
+  const tarif = await pozadujTarif(c.teamId, 'max');
+  if (tarif) return tarif;
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
   const b = await req.json().catch(() => ({}));

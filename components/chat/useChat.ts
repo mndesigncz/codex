@@ -157,11 +157,11 @@ export const TEXT_PRILOHA = 'Příloha'; // i18n-ok: hodnota z API
 export async function uploadFile(file: File, t: PrekladFn): Promise<UploadResult | { error: string }> {
   const { compressImage } = await import('@/lib/clientImage');
   const prepared = await compressImage(file);
-  const form = new FormData();
-  form.append('file', prepared);
+  // Velké soubory (video, hlasovka, sken) jdou přímo do úložiště, malé přes server (lib/nahrajSoubor).
   // Stejný důvod jako u `sendMessage`: offline `fetch` vyhodí výjimku,
   // kterou volající nečeká, a nahrávání pak zůstane viset na „Nahrávám…".
-  const res = await fetch('/api/upload', { method: 'POST', body: form }).catch(() => null);
+  const { nahrajSoubor } = await import('@/lib/nahrajSoubor');
+  const res = await nahrajSoubor(prepared, (prepared as File).name || file.name).catch(() => null);
   if (!res) return { error: t('Nahrání se nezdařilo — zkontroluj připojení.') };
   const d = await res.json().catch(() => null);
   if (!res.ok || !d?.url) return { error: typeof d?.error === 'string' ? d.error : t('Nahrání souboru se nezdařilo.') };

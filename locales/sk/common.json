@@ -167,5 +167,6 @@
   "Organizace": "Organizácia",
   "Nastavení organizace": "Nastavenia organizácie",
   "Sdílení mezi podniky": "Zdieľanie medzi podnikmi",
-  "{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}": "{n, plural, one {# úloha za body na prevzatie} few {# úlohy za body na prevzatie} other {# úloh za body na prevzatie}}"
+  "{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}": "{n, plural, one {# úloha za body na prevzatie} few {# úlohy za body na prevzatie} other {# úloh za body na prevzatie}}",
+  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Heslo bolo zmenené. Ostatné zariadenia sú odhlásené."
 }

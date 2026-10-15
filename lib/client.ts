@@ -18,6 +18,7 @@ import { pragueToday } from './pragueTime';
 import { slotsFor as _slotsFor } from './clientSlots';
 import { MAX_ZUSTATEK, uvitaciBody } from './bodyPravidla';
 import { automatizaceUdalost } from './automatizaceHaky';
+import { kodyKHledani } from './kartyFyzicke';
 
 // Veřejné routy hosta (podnik podle adresy, seznam podniků) sahají do
 // databáze dřív, než se dotknou session. Next.js na Vercelu takové volání
@@ -445,6 +446,8 @@ export async function ensureCard(customerId: number): Promise<string> {
   if (c) return String(c.code);
   for (let i = 0; i < 5; i++) {
     const code = cardCode();
+    // Kód nesmí patřit plastové kartě (client_card_aliases); před migrací tabulka není a nevadí to.
+    try { const [x] = await sql`SELECT 1 AS je FROM client_card_aliases WHERE kod = ${code}`; if (x) continue; } catch { /* bez tabulky karet */ }
     try {
       await sql`INSERT INTO client_cards (customer_id, code) VALUES (${customerId}, ${code})`;
       return code;
@@ -460,11 +463,44 @@ export function normalizeCardCode(raw: string): string {
   return s.slice(0, 4) + '-' + s.slice(4);
 }
 
-export async function customerByCard(code: string): Promise<{ id: number; name: string } | null> {
+/**
+ * Co je za kódem karty: host (kartička z aplikace nebo aktivní fyzická karta), nová fyzická
+ * karta k přiřazení, nebo zablokovaná karta. `teamId` = podnik, kde se karta čte: jen v něm
+ * platí čísla starých karet převzatá z Kartičky (lib/kartyFyzicke.ts, klicCiziKarty).
+ */
+export type NalezKarty =
+  | { typ: 'host'; id: number; name: string; karta: { id: number; kod: string; teamId: number } | null }
+  | { typ: 'nova'; kartaId: number; kod: string; teamId: number; davkaId: number | null }
+  | { typ: 'blokovana'; kartaId: number; kod: string; teamId: number };
+
+export async function najdiKartu(code: string, teamId: number | null = null): Promise<NalezKarty | null> {
   const norm = normalizeCardCode(code);
-  if (!norm) return null;
-  const [row] = await sql`SELECT u.id, u.name FROM client_cards c JOIN users u ON u.id = c.customer_id WHERE c.code = ${norm}`;
-  return row ? { id: Number(row.id), name: String(row.name) } : null;
+  if (norm) {
+    const [row] = await sql`SELECT u.id, u.name FROM client_cards c JOIN users u ON u.id = c.customer_id WHERE c.code = ${norm}`;
+    if (row) return { typ: 'host', id: Number(row.id), name: String(row.name), karta: null };
+  }
+  const kody = kodyKHledani(code, teamId);
+  if (!kody.length) return null;
+  let a: any;
+  try {
+    // Kód Managera má přednost před klíčem starého čísla (osm znaků může být obojí).
+    [a] = await sql`
+      SELECT a.id, a.team_id, a.kod, a.stav, a.davka_id, a.customer_id, u.name, u.deleted_at
+      FROM client_card_aliases a LEFT JOIN users u ON u.id = a.customer_id
+      WHERE a.kod = ANY(${kody}) ORDER BY (a.kod LIKE 'T%:%') LIMIT 1`;
+  } catch { return null; /* před migrací tabulka fyzických karet není */ }
+  if (!a) return null;
+  const karta = { id: Number(a.id), kod: String(a.kod), teamId: Number(a.team_id) };
+  if (a.stav === 'blokovana') return { typ: 'blokovana', kartaId: karta.id, kod: karta.kod, teamId: karta.teamId };
+  if (a.customer_id == null) return { typ: 'nova', kartaId: karta.id, kod: karta.kod, teamId: karta.teamId, davkaId: a.davka_id == null ? null : Number(a.davka_id) };
+  // Host smazaný (anonymizovaný) nebo karta bez účtu: karta nikomu nepatří.
+  if (a.name == null || a.deleted_at) return null;
+  return { typ: 'host', id: Number(a.customer_id), name: String(a.name), karta };
+}
+
+export async function customerByCard(code: string, teamId: number | null = null): Promise<{ id: number; name: string } | null> {
+  const n = await najdiKartu(code, teamId);
+  return n?.typ === 'host' ? { id: n.id, name: n.name } : null;
 }
 
 
@@ -499,7 +535,15 @@ export async function awardBirthdays(): Promise<number> {
       // Přání k narozeninám od podniku je marketing (zákon 480/2004, Apple 4.5.4): kategorie
       // 'novinky' = chodí jen hostům, kteří novinky výslovně povolili (lib/pushPravidla OPT_IN).
       // Body se připíšou vždy; bez souhlasu je host uvidí na kartičce, jen bez upozornění.
-      if (!vlastniZprava.has(Number(r.team_id))) notifyUser(Number(r.customer_id), {
+      // Souhlas se dává každému podniku zvlášť (lib/consents): přání pošle jen podnik, kterému host
+      // novinky povolil. null = tabulka souhlasů ještě není → rozhodne globální příznak v lib/push.
+      let smiPodnik = true;
+      try {
+        const { souhlasHostaPodniku } = await import('./consentsDb');
+        const s = await souhlasHostaPodniku(Number(r.customer_id), Number(r.team_id));
+        if (s) smiPodnik = s.push;
+      } catch { /* bez tabulky souhlasů */ }
+      if (smiPodnik && !vlastniZprava.has(Number(r.team_id))) notifyUser(Number(r.customer_id), {
         title: `Všechno nejlepší! ${r.birthday_points} bodů od ${r.team_name}`,
         body: 'Dárek k narozeninám máš na kartičce.',
         link: r.slug ? `/client/${r.slug}?tab=loyalty` : '/client/me', type: 'success', category: 'novinky',

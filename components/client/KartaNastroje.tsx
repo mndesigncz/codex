@@ -8,6 +8,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Modal } from '../ui';
 import { useT } from '@/lib/i18n/client';
+import { useObal } from '../ObalProvider';
+import { otevriVeSystemu } from '@/lib/stahni';
+import { okJson } from '@/lib/api';
 
 interface Karta { code: string; name?: string; svg?: string; wallet?: { apple?: boolean; google?: boolean } }
 interface Podnik { slug: string; name: string }
@@ -81,6 +84,8 @@ async function kartaJakoPng(karta: Karta, jmeno: string, popisek: string): Promi
 
 export default function KartaNastroje({ karta, podniky }: { karta: Karta; podniky: Podnik[] }) {
   const t = useT('klient-host');
+  // V aplikaci z obchodu (obal) je „Přidat na plochu“ k ničemu — aplikace na ploše už je.
+  const { jeObal } = useObal();
   const [velky, setVelky] = useState(false);
   const [vyber, setVyber] = useState(podniky[0]?.slug ?? '');
   const [zprava, setZprava] = useState('');
@@ -130,14 +135,22 @@ export default function KartaNastroje({ karta, podniky }: { karta: Karta; podnik
   const wallet = karta.wallet ?? {};
   const jdeApple = !!wallet.apple && ios && !!vyber;
   const jdeGoogle = !!wallet.google && android && !!vyber;
-  const otevri = (cesta: string) => { window.location.href = `/api/client/card/wallet/${cesta}?team=${encodeURIComponent(vyber)}`; };
+  // Wallet přes prohlížeč systému: v obalu by navigace WebView na .pkpass nebo odkaz Googlu skončila
+  // prázdnou obrazovkou; SFSafariViewController / Custom Tabs kartu nabídnou do peněženky. Na webu nová záložka.
+  // V obalu nemá prohlížeč systému přihlášení z aplikace: aplikace si řekne o podepsaný odkaz na 10 minut.
+  const otevri = (cesta: 'apple' | 'google') => {
+    if (!jeObal) { otevriVeSystemu(`/api/client/card/wallet/${cesta}?team=${encodeURIComponent(vyber)}`); return; }
+    fetch('/api/client/cards/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ team: vyber, druh: cesta }) })
+      .then(okJson).then(x => { if (typeof x?.url === 'string') otevriVeSystemu(x.url); else setZprava(t('Nepovedlo se.')); })
+      .catch(() => setZprava(t('Nepovedlo se.')));
+  };
 
   return (
     <section aria-label={t('Nástroje karty')} className="space-y-3">
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="primary" icon="card" onClick={() => setVelky(true)} disabled={!karta.svg}>{t('Zvětšit QR')}</Button>
         <Button size="sm" variant="secondary" icon="download" onClick={ulozObrazek} disabled={!karta.svg}>{t('Uložit kartu jako obrázek')}</Button>
-        {!nainstalovana && <Button size="sm" variant="secondary" icon="plus" onClick={naPlochu} aria-expanded={pomocPlocha}>{t('Přidat na plochu')}</Button>}
+        {!nainstalovana && !jeObal && <Button size="sm" variant="secondary" icon="plus" onClick={naPlochu} aria-expanded={pomocPlocha}>{t('Přidat na plochu')}</Button>}
       </div>
 
       {(jdeApple || jdeGoogle) && (
@@ -152,7 +165,7 @@ export default function KartaNastroje({ karta, podniky }: { karta: Karta; podnik
         </div>
       )}
 
-      {pomocPlocha && !instalace && (
+      {pomocPlocha && !instalace && !jeObal && (
         <p className="note text-sm px-4 py-3 text-pretty">
           {ios ? t('V Safari klepni na Sdílet a pak na Přidat na plochu. Karta se pak otevře jedním klepnutím.') : t('V menu prohlížeče zvol Přidat na plochu (nebo Nainstalovat aplikaci). Karta se pak otevře jedním klepnutím.')}
         </p>

@@ -412,8 +412,9 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
   };
   const nahrajFotku = async (f: File) => {
     setUploading(true);
-    const fd = new FormData(); fd.append('file', f);
-    const r = await fetch('/api/upload', { method: 'POST', body: fd }).catch(() => null);
+    // Fotka z akce jde bez zmenšení: velká přímo do úložiště, malá přes server (lib/nahrajSoubor).
+    const { nahrajSoubor } = await import('@/lib/nahrajSoubor');
+    const r = await nahrajSoubor(f).catch(() => null);
     const d = r?.ok ? await r.json().catch(() => null) : null;
     setUploading(false);
     const upId = d?.url ? parseInt(String(d.url).split('/').pop()!) : NaN;

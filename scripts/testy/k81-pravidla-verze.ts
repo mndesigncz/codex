@@ -26,7 +26,7 @@ export default function ({ eq, ok }: Testy) {
   ok('verze: číslo se zvedá a řádek vkládá jedním příkazem (dva souběžné zápisy nedostanou stejné číslo)', /WITH nova AS \(UPDATE client_profiles SET rules_version = COALESCE\(rules_version, 1\) \+ 1/.test(lib) && /UNIQUE \(team_id, version\)/.test(lib));
   ok('koncept: ukládá se po kontrole celého souboru pravidel (stejná funkce jako přímé uložení)', /validujPravidla\(spojene\)/.test(lib));
   const route = precti('app/api/client/admin/loyalty/pravidla/route.ts');
-  ok('API: čtení s vernost.zobrazit, změny s vernost.pravidla a v plánu Max', /pozaduj\('vernost\.zobrazit'\)/.test(route) && /pozaduj\('vernost\.pravidla'\)/.test(route) && /teamIsMax/.test(route));
+  ok('API: čtení s vernost.zobrazit, změny s vernost.pravidla a v plánu Max', /pozaduj\('vernost\.zobrazit'\)/.test(route) && /pozaduj\('vernost\.pravidla'\)/.test(route) && /teamIsMax|pozadujTarif\([\w.]+, 'max'\)/.test(route));
   ok('API: použití konceptu jde přes PUT profilu (jedna cesta zápisu) a pak koncept zmizí', /ulozPravidlaProfilu\(new NextRequest/.test(route) && /zahodKoncept\(ctx\.teamId\)/.test(route) && /_verze/.test(route));
   ok('API: prázdný koncept se nepoužije', /Není co použít/.test(route));
   const profil = precti('app/api/client/admin/profile/route.ts');

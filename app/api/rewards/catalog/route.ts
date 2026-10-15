@@ -7,11 +7,11 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { pointsAvailableFor } from '@/lib/pointsBalance';
-import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueToday } from '@/lib/pragueTime';
 import { ciselnikPodniku, tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { HLASKA_ODMENY, validujOdmenu } from '@/lib/odmenyKatalog';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,9 +79,8 @@ export async function POST(req: NextRequest) {
   const u = await me();
   if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
-  if (!(await teamIsPro(u.team_id))) {
-    return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
-  }
+  const tarif = await pozadujTarif(u.team_id, 'pro');
+  if (tarif) return tarif;
 
   // Správa katalogu — odmeny.katalog.
   if (b.manage === true) {
@@ -144,6 +143,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const u = await me();
   if (jeOdpoved(u)) return u;
+  const tarif = await pozadujTarif(u.team_id, 'pro');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const zakazano = () => NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 

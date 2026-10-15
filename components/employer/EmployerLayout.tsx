@@ -42,6 +42,7 @@ import { useJazyk, useT } from '@/lib/i18n/client';
 import { JAZYK_NAZEV } from '@/lib/i18n/config';
 import JazykOkno from '../JazykOkno';
 import { Chip } from '../ui';
+import { PotvrditEmailBanner } from '../auth/OvereniEmailu';
 
 // Pohledy se stahují až při otevření.
 //
@@ -590,6 +591,8 @@ export default function EmployerLayout({ user }: Props) {
             <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />{`Vyzkoušejte Pro ${TRIAL_DAYS} dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.` /* i18n-ok (platební a cenové věty jsou právně citlivé, překlad až po lidské revizi) */}
           </button>
         ) : null}
+        {/* Ověření e-mailu vedení (spuštění, balík S): jen prosba, nic neblokuje. */}
+        <PotvrditEmailBanner />
         {/* relative: absolutně umístěné prvky uvnitř (skryté popisky pro
             odečítač, sr-only) se jinak vztahují k celému dokumentu, ne
             k posuvné <main> — v jejím obsahu ležely pod okrajem obrazovky

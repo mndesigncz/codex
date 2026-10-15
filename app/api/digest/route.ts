@@ -15,6 +15,7 @@ import { escHtml } from '@/lib/email';
 import { tymyCiselnikuHromadne } from '@/lib/tenant';
 import { clenoveSOpravnenim, maOpravneni } from '@/lib/opravneniDb';
 import { chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
+import { poDavkach, type VysledekDavek } from '@/lib/cronDavky';
 
 export const dynamic = 'force-dynamic';
 // Digest iteruje přes všechny týmy a u každého sahá na pokladnu — default 10 s
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
   const today = pragueToday();
   const dateLabel = new Date(today + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
   let sent = 0;
+  let davky: VysledekDavek | null = null;
 
   // Záchranná síť pro naplánované zprávy členům: co nestihl provoz, pošle cron.
   try { const { dispatchDueBroadcasts } = await import('@/lib/broadcasts'); await dispatchDueBroadcasts(); } catch { /* nesmí shodit digest */ }
@@ -40,12 +42,14 @@ export async function GET(request: Request) {
     // Které kategorie skladu podnik čte (kolo 60) — pro všechny podniky
     // najednou, ne dotaz na organizaci uvnitř smyčky za každý podnik.
     const tymyKategorii = await tymyCiselnikuHromadne((teams as any[]).map(t => Number(t.id)), 'kategorieSkladu');
-    for (const team of teams as any[]) {
+    // Podniky po dávkách (lib/cronDavky): čtyři souběžně a s hlídáním času,
+    // ať podniky na konci seznamu nepřijdou o souhrn kvůli limitu funkce.
+    const zpracujPodnik = async (team: any): Promise<void> => {
       // Příjemci podle oprávnění z členství (kolo 67), ne podle typu účtu —
       // souhrn si podnik může dát i provoznímu. Členství místo zrcadla
       // (kolo 62) platí dál: kdo je přepnutý jinam, souhrn dostane.
       const ids = await clenoveSOpravnenim(Number(team.id), 'notifikace.denni_souhrn');
-      if (!ids.length) continue;
+      if (!ids.length) return;
       // Kdo si denní souhrn osobně vypnul (Nastavení → Notifikace, notif_prefs.digest = false), ho nedostane.
       // Před migrací sloupce notif_prefs dostanou souhrn všichni jako dřív.
       let employers: any[];
@@ -54,7 +58,7 @@ export async function GET(request: Request) {
       } catch {
         employers = await sql`SELECT id, email FROM users WHERE id = ANY(${ids}::int[])` as any[];
       }
-      if (!employers.length) continue;
+      if (!employers.length) return;
       // Částky v souhrnu jsou v měně podniku (eurová kavárna nečte koruny).
       const czk = (await menaPodniku(Number(team.id))).money;
 
@@ -247,7 +251,7 @@ export async function GET(request: Request) {
       } catch { /* hodnocení nemusí existovat */ }
 
       // Nothing at all happened and nothing needs eyes — stay silent.
-      if (closings.length === 0 && worked.length === 0 && stillOn.length === 0 && procsMissing.length === 0 && ukolyMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0 && !guestLine && !reviewLine) continue;
+      if (closings.length === 0 && worked.length === 0 && stillOn.length === 0 && procsMissing.length === 0 && ukolyMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0 && !guestLine && !reviewLine) return;
 
       // Tržby a rozdíl v kase jen pro příjemce s finance.trzby (kolo 67):
       // souhrn může dostávat i role, která peníze vidět nemá. Vedení má obojí,
@@ -308,9 +312,11 @@ export async function GET(request: Request) {
           } else sent++;
         } catch { /* best-effort per employer */ }
       }
-    }
+    };
+    davky = await poDavkach(teams as any[], zpracujPodnik, { soubezne: 4, rozpocetMs: 50_000 });
+    if (davky.nestihnuto || davky.chyby) console.error('digest: nedokončeno', davky);
   } catch (err) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, sent, date: today });
+  return NextResponse.json({ ok: true, sent, date: today, ...(davky ? { podniku: davky.hotovo, chyby: davky.chyby, nestihnuto: davky.nestihnuto } : {}) });
 }

@@ -38,6 +38,10 @@
     {
       "path": "/api/billing/cron",
       "schedule": "10 5 * * *"
+    },
+    {
+      "path": "/api/retence",
+      "schedule": "35 3 * * *"
     }
   ]
 }

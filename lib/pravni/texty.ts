@@ -218,10 +218,12 @@ function podporaCs(f: Firma): Dokument {
     uvod: 'Potřebujete pomoc s aplikací Managero nebo Managero client? Tady najdete kontakt i odpovědi na nejčastější věci.',
     aktualizace: AKTUALIZACE.cs,
     sekce: [
-      { id: 'kontakt', h: 'Kontakt', p: [`E-mail: ${f.emailPodpory}. Odpovídáme zpravidla do dvou pracovních dnů. Uveďte e-mail účtu a v jaké aplikaci se problém děje, heslo nikdy nepište.`, `Provozovatel: ${f.nazev}, IČO ${f.ico}, ${f.adresa}.`] },
+      { id: 'kontakt', h: 'Kontakt', p: [`E-mail: ${f.emailPodpory}. Odpovídáme zpravidla do dvou pracovních dnů. Uveďte e-mail účtu a v jaké aplikaci se problém děje, heslo nikdy nepište.`, `Provozovatel: ${f.nazev}, IČO ${f.ico}, ${f.adresa}.`,
+        `Kontaktní místo podle Aktu o digitálních službách (čl. 11 a 12) pro orgány členských států, Evropskou komisi i uživatele: ${f.emailPodpory}. Komunikujeme česky a anglicky.`] },
       { id: 'heslo', h: 'Zapomenuté heslo', p: ['Na přihlašovací obrazovce zvolte Zapomenuté heslo. Pošleme odkaz na obnovení, který platí krátce a dá se použít jednou.'] },
       { id: 'smazani', h: 'Smazání účtu', p: ['V aplikaci: Nastavení nebo Profil, Smazat účet. Bez aplikace: stránka /smazat-ucet.'] },
-      { id: 'nahlaseni', h: 'Nahlášení obsahu nebo uživatele', p: [`V chatu a u nápadů je u každé zprávy volba Nahlásit a u uživatele Zablokovat. Vážné případy napište také na ${f.emailPodpory}.`] },
+      { id: 'nahlaseni', h: 'Nahlášení obsahu nebo uživatele', p: [`V chatu a u nápadů je u každé zprávy volba Nahlásit a u uživatele Zablokovat. Vážné případy napište také na ${f.emailPodpory}.`,
+        'Nezákonný obsah (například na stránce podniku, v nabídce nebo v akci) může kdokoli oznámit i bez účtu na stránce /nahlasit. Oznámení posoudí člověk, oznamovatel dostane potvrzení i rozhodnutí a autor odstraněného obsahu odůvodnění s možností se ohradit.'] },
       { id: 'hoste', h: 'Pro hosty', li: [
         'Razítka a body přidává obsluha u kasy po načtení vaší karty, aplikace je sama nepřidává.',
         'Objednávka od stolu vyžaduje QR kód ze stolu a povolení polohy v podnicích, které si to zapnuly.',
@@ -238,10 +240,12 @@ function podporaEn(f: Firma): Dokument {
     uvod: 'Need help with Managero or Managero client? Here is how to reach us and answers to common questions. The apps are currently available in Czech only.',
     aktualizace: AKTUALIZACE.en,
     sekce: [
-      { id: 'kontakt', h: 'Contact', p: [`Email: ${f.emailPodpory}. We usually reply within two working days. Include the account email and which app the problem is in; never send your password.`, `Operator: ${f.nazev}, company ID ${f.ico}, ${f.adresa}.`] },
+      { id: 'kontakt', h: 'Contact', p: [`Email: ${f.emailPodpory}. We usually reply within two working days. Include the account email and which app the problem is in; never send your password.`, `Operator: ${f.nazev}, company ID ${f.ico}, ${f.adresa}.`,
+        `Single point of contact under the Digital Services Act (Articles 11 and 12) for Member State authorities, the European Commission and users: ${f.emailPodpory}. We communicate in Czech and English.`] },
       { id: 'heslo', h: 'Forgot password', p: ['On the sign-in screen choose Forgot password. We email a reset link that is valid for a short time and can be used once.'] },
       { id: 'smazani', h: 'Delete account', p: ['In the app: Settings or Profile, Delete account. Without the app: the /smazat-ucet page.'] },
-      { id: 'nahlaseni', h: 'Report content or a user', p: [`In chat and ideas every message has Report and every user can be blocked. For serious cases also write to ${f.emailPodpory}.`] },
+      { id: 'nahlaseni', h: 'Report content or a user', p: [`In chat and ideas every message has Report and every user can be blocked. For serious cases also write to ${f.emailPodpory}.`,
+        'Anyone can report illegal content (for example on a venue page, in a menu or an event) without an account on the /nahlasit page. A person reviews every notice; the reporter receives a confirmation and the decision, and the author of removed content receives a statement of reasons with a way to object.'] },
       { id: 'hoste', h: 'For guests', li: [
         'Stamps and points are added by staff at the till after scanning your card; the app does not add them itself.',
         'Table ordering requires the QR code on the table and location permission at venues that enabled it.',

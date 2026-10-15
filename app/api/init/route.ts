@@ -12,6 +12,7 @@ import { pripomenPoukazy } from '@/lib/poukazyPrehledDb';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
 import { zDashboardConfig } from '@/lib/widgety/migrace';
+import bcryptPin from 'bcryptjs';
 
 /**
  * Jednorázový převod dashboard_config → rozlozeni_stranek. Zapnutý ve stejném
@@ -22,6 +23,8 @@ import { zDashboardConfig } from '@/lib/widgety/migrace';
 const PREVEST_DASHBOARD_CONFIG = true;
 import { normalizujRozlozeni } from '@/lib/widgety/rozlozeni';
 import { stranka as strankaRozlozeni } from '@/lib/widgety/stranky';
+// Spuštění (balík G): převod globálního souhlasu s novinkami na souhlasy po podnicích.
+import { prevodSouhlasu } from '@/lib/consentsDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -2130,6 +2133,36 @@ export async function GET(request: Request) {
         code TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT NOW()
       )`);
+    // Fyzické kartičky (spuštění, balík C): plastové a papírové karty, které podnik rozdá
+    // hostům bez aplikace. Kód je jedinečný napříč platformou; host je NULL, dokud kartu
+    // obsluha u kasy nepřiřadí. Čísla starých karet z Kartičky mají klíč T<podnik>:<číslo>.
+    // Stejné příkazy spouští lib/kartyFyzickeDb.ts (zajistiTabulkyKaret) při studeném startu.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_card_batches (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        nazev TEXT,
+        pocet INTEGER NOT NULL DEFAULT 0,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_card_aliases (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        kod TEXT NOT NULL UNIQUE,
+        customer_id INTEGER,
+        stav TEXT NOT NULL DEFAULT 'nova',
+        zdroj TEXT NOT NULL DEFAULT 'davka',
+        davka_id INTEGER,
+        nahrazuje_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        activated_at TIMESTAMP,
+        blocked_at TIMESTAMP
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_card_aliases_team ON client_card_aliases (team_id, davka_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_card_aliases_customer ON client_card_aliases (customer_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_card_batches_team ON client_card_batches (team_id, created_at)`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_reviews (
         id SERIAL PRIMARY KEY,
@@ -3000,6 +3033,79 @@ export async function GET(request: Request) {
     // Komu účet patří, když ho věrnost spárovala s kartičkou (ručně, sama, nebo později přes Loyalty API).
     await ddl(sql`ALTER TABLE pos_bills ADD COLUMN IF NOT EXISTS customer_id INTEGER`);
     // ---- konec Párování účtu ----
+
+    // ---- Bezpečnost účtů (spuštění, balík S) ----
+    // Verze relace: změna/obnovení hesla ji zvýší a starší tokeny se odhlásí
+    // (lib/authVerze). Výchozí 0 pro všechny = nasazení nikoho neodhlásí.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0`);
+    // PIN tabletu: délka (nové PINy 6 číslic, vedení vidí doporučení u kratších).
+    // Otisk délku neprozradí; zapíše se při nastavení a po prvním správném zadání.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_delka SMALLINT`);
+    await ddl(sql`UPDATE users SET pin_delka = length(pin) WHERE pin IS NOT NULL AND pin <> '' AND pin_delka IS NULL`);
+    // Jednorázový úklid: čitelný PIN pryč všude, kde už je otisk (idempotentní).
+    await ddl(sql`UPDATE users SET pin = NULL WHERE pin IS NOT NULL AND pin_hash IS NOT NULL AND pin_hash <> ''`);
+    // Zbylé čitelné PINy (nikdo je od převodu nezadal) se zahašují po dávkách,
+    // ať migrace nepočítá bcrypt pro stovky lidí najednou; další běh vezme další.
+    try {
+      const cisteP = await sql`SELECT id, pin FROM users WHERE pin IS NOT NULL AND pin <> '' AND (pin_hash IS NULL OR pin_hash = '') LIMIT 50` as { id: number; pin: string }[];
+      for (const r of cisteP) {
+        await ddl(sql`UPDATE users SET pin_hash = ${await bcryptPin.hash(String(r.pin), 10)}, pin = NULL WHERE id = ${r.id} AND pin = ${r.pin}`);
+      }
+    } catch (e) { migFails.push(`pin: ${String((e as any)?.message ?? e).slice(0, 100)}`); }
+    // Ověření e-mailu vedení: jen záznam a banner, nic neblokuje (lib/overeniEmailu).
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS email_verifications (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        email TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS email_verifications_user ON email_verifications (user_id)`);
+    // ---- konec Bezpečnost účtů ----
+    // ---- GDPR a DSA pro hosty, retence (spuštění, balík G) ----
+    // Souhlasy hosta po podnicích (lib/consents.ts): tabulka se JEN doplňuje, platí poslední řádek
+    // pro (uživatel, podnik, typ); team_id NULL = platforma. Stejný příkaz dělá lazy lib/consentsDb.ts.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS consents (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        team_id INTEGER,
+        typ TEXT NOT NULL,
+        stav TEXT NOT NULL,
+        verze TEXT,
+        zneni TEXT,
+        kanal TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS consents_user ON consents (user_id, team_id, typ, id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS consents_team ON consents (team_id, typ, user_id)`);
+    // DSA čl. 16: oznámení z veřejného formuláře /nahlasit i bez účtu (reporter_id smí chybět),
+    // s kontaktem oznamovatele, odkazem na obsah a časem prohlášení o dobré víře; oduvodneni_at = kdy
+    // odešlo rozhodnutí / odůvodnění (čl. 16 odst. 5, čl. 17).
+    await ddl(sql`ALTER TABLE content_reports ALTER COLUMN reporter_id DROP NOT NULL`);
+    await ddl(sql`ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS source TEXT`);
+    await ddl(sql`ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS reporter_name TEXT`);
+    await ddl(sql`ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS reporter_email TEXT`);
+    await ddl(sql`ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS content_url TEXT`);
+    await ddl(sql`ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS declaration_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS oduvodneni_at TIMESTAMP`);
+    // Retence (lib/retence.ts): kdy šlo hostovi upozornění před anonymizací a kdy klikl „Ponechat účet“.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS retence_upozorneno_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS retence_ponechat_at TIMESTAMP`);
+    // Souhrny běhů retence (náhled i ostré): jen počty a id, žádné osobní údaje. Správa platformy → Retence.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS retence_behy (
+        id SERIAL PRIMARY KEY,
+        rezim TEXT NOT NULL,
+        souhrn JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    // Jednorázový převod dřívějšího globálního souhlasu s novinkami na souhlasy po podnicích (idempotentní).
+    try { const n = await prevodSouhlasu(); if (n) console.log('init: převedeno souhlasů s novinkami', n); } catch { /* nesmí shodit migrace */ }
+    // ---- konec GDPR a DSA ----
 
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku

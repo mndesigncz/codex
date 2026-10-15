@@ -238,5 +238,9 @@
   "Ťukni na sebe a zaznamenej příchod.": "Tippe auf dich, um deinen Beginn zu erfassen.",
   "Žádné položky": "Keine Artikel",
   "Žádné úkoly": "Keine Aufgaben",
-  "Úkoly za body: klepni na Hotovo u toho, co jsi udělal(a), nebo napiš vlastní věc.": "Aufgaben für Punkte: Tippe bei dem, was du erledigt hast, auf Fertig – oder schreib etwas Eigenes."
+  "Úkoly za body: klepni na Hotovo u toho, co jsi udělal(a), nebo napiš vlastní věc.": "Aufgaben für Punkte: Tippe bei dem, was du erledigt hast, auf Fertig – oder schreib etwas Eigenes.",
+  "PIN musí mít 6 číslic.": "Die PIN muss 6 Ziffern haben.",
+  "Nový PIN má 6 číslic.": "Eine neue PIN hat 6 Ziffern.",
+  "Doporučujeme změnit PIN na 6 číslic.": "Wir empfehlen, die PIN auf 6 Ziffern zu ändern.",
+  "Moc špatných PINů. Zkus to za {n} s.": "Zu viele falsche PINs. Versuche es in {n} s erneut."
 }

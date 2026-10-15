@@ -17,6 +17,7 @@ import { prehledPoukazu, prodlouzPoukazy, nahledProdlouzeni, odesliPoukaz } from
 import {
   nactiNastaveniPoukazu, ulozNastaveniPoukazu, poukazBezBodu, priradPoukaz, jmenoClena, pripisBodyZaNakup, pohybyProExport, souhrnProExport, zmenVzhled,
 } from '@/lib/poukazyHostDb';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -84,6 +85,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('poukazy.spravovat');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const dnes = pragueToday();
   const pocet = b.count == null ? 1 : Math.round(Number(b.count));

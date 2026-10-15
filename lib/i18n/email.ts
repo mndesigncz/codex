@@ -94,6 +94,15 @@ export const EMAIL = {
   novinkyOtevrit: {
     cs: 'Otevřít', en: 'Open', de: 'Öffnen', sk: 'Otvoriť', pl: 'Otwórz',
   },
+  // Spuštění (balík G): označení obchodního sdělení (§ 7 zák. 480/2004) a odesílatel = podnik.
+  novinkyOznaceni: {
+    cs: 'Obchodní sdělení', en: 'Commercial communication', de: 'Werbemitteilung', sk: 'Obchodné oznámenie', pl: 'Informacja handlowa',
+  },
+  novinkyOdesilatel: {
+    cs: 'Odesílatel: {odesilatel}. Rozesíláno přes aplikaci Managero.', en: 'Sender: {odesilatel}. Sent via the Managero app.',
+    de: 'Absender: {odesilatel}. Versendet über die Managero-App.', sk: 'Odosielateľ: {odesilatel}. Rozosielané cez aplikáciu Managero.',
+    pl: 'Nadawca: {odesilatel}. Wysłano przez aplikację Managero.',
+  },
 } satisfies Record<string, Texty>;
 
 export type KlicEmailu = keyof typeof EMAIL;

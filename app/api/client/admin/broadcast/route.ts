@@ -18,6 +18,7 @@ import { hit } from '@/lib/rateLimit';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import { zajistiClenove } from '@/lib/clenoveDb';
+import { pozadujTarif } from '@/lib/tarifServer';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const maxDuration = 60;
@@ -139,6 +140,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.zpravy');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const k = zkontrolujZpravu(b);
@@ -180,6 +183,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.zpravy');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const id = parseInt(String(b.id), 10);

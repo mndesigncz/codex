@@ -8,6 +8,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import { cistiKod, zkontrolujPromo, zkontrolujDavku, navrhniKody, stavPromo } from '@/lib/promoKody';
+import { pozadujTarif } from '@/lib/tarifServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -32,6 +33,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('kupony.spravovat');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const davka = b.davka === true;
   // Dávka má jednorázové kódy, dokud správce neřekne jinak.
@@ -76,6 +79,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const ctx = await pozaduj('kupony.spravovat');
   if (jeOdpoved(ctx)) return ctx;
+  const tarif = await pozadujTarif(ctx.teamId, 'max');
+  if (tarif) return tarif;
   const b = await req.json().catch(() => ({}));
   const id = parseInt(String(b.id), 10);
   const [cur] = await sql`SELECT * FROM client_promos WHERE id = ${id} AND team_id = ${ctx.teamId}`;

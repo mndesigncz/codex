@@ -12,7 +12,8 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { pripisUtratu, slevaClena } from '@/lib/urovneDb';
 import { pripisZUctu, zalozParovani, stolyKParovani, synchronizujPoSkenu } from '@/lib/vernostZUctu';
-import { sql, customerByCard, ensureProfile, join, membership, award, awardCredit, spendCredit, stampVisit, normalizeCardCode, jeClenBlokovan } from '@/lib/client';
+import { sql, najdiKartu, ensureProfile, join, membership, award, awardCredit, spendCredit, stampVisit, jeClenBlokovan } from '@/lib/client';
+import { vypadaJakoKarta, zobrazitelnyKod, HLASKA_BLOKOVANA, HLASKA_CIZI_NOVA } from '@/lib/kartyFyzicke';
 import { zajistiRazitka } from '@/lib/stampsSchema';
 import { otiskAkce, platiTed as platiTedPlan } from '@/lib/stampsPlan';
 import { sIdempotenci } from '@/lib/idempotence';
@@ -122,9 +123,17 @@ export async function GET(req: NextRequest) {
   const ctx = await pozaduj('vernost.karta');
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
-  const code = normalizeCardCode(String(new URL(req.url).searchParams.get('code') ?? ''));
-  if (!code) return NextResponse.json({ error: 'Kód má osm znaků.' }, { status: 400 });
-  const c = await customerByCard(code);
+  // Kartička z aplikace, plastová karta z dávky (lib/kartyFyzicke.ts) nebo číslo staré karty převzaté z Kartičky.
+  const raw = String(new URL(req.url).searchParams.get('code') ?? '');
+  if (!vypadaJakoKarta(raw)) return NextResponse.json({ error: 'Kód má osm znaků.' }, { status: 400 });
+  const nalez = await najdiKartu(raw, u.team_id);
+  if (nalez?.typ === 'blokovana') return NextResponse.json({ error: HLASKA_BLOKOVANA, blokovana: true }, { status: 403 });
+  // Nová plastová karta: obsluha ji přiřadí hostovi (POST /api/client/cards/aktivace).
+  if (nalez?.typ === 'nova') {
+    if (nalez.teamId !== u.team_id) return NextResponse.json({ error: HLASKA_CIZI_NOVA }, { status: 404 });
+    return NextResponse.json({ novaKarta: { kod: zobrazitelnyKod(nalez.kod), davkaId: nalez.davkaId } });
+  }
+  const c = nalez?.typ === 'host' ? { id: nalez.id, name: nalez.name } : null;
   if (!c) return NextResponse.json({ error: 'Takovou kartičku neznáme.' }, { status: 404 });
   const p = await ensureProfile(u.team_id);
   // Poslední dnešní účtenky z pokladny: obsluha částku vybere, nemusí ji
@@ -200,7 +209,10 @@ export async function POST(req: NextRequest) {
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
-  const c = await customerByCard(String(b.code ?? ''));
+  const nalez = await najdiKartu(String(b.code ?? ''), u.team_id);
+  if (nalez?.typ === 'blokovana') return NextResponse.json({ error: HLASKA_BLOKOVANA, blokovana: true }, { status: 403 });
+  if (nalez?.typ === 'nova') return NextResponse.json({ error: 'Karta ještě nepatří žádnému hostovi. Nejdřív ji přiřaď.' }, { status: 409 });
+  const c = nalez?.typ === 'host' ? { id: nalez.id, name: nalez.name } : null;
   if (!c) return NextResponse.json({ error: 'Takovou kartičku neznáme.' }, { status: 404 });
   const action = String(b.action ?? '');
   // Razítko, storno poslední akce, ruční položky a připsání z účtenky jsou běžná práce u kasy; body z ručně

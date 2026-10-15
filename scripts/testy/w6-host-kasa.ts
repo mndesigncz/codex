@@ -94,7 +94,7 @@ export default async function ({ eq, ok }: Testy) {
   ok('rezervace: atomický zábor před připsáním (jednou za rezervaci)', /UPDATE client_reservations SET points_awarded = \$\{body\}[\s\S]*?points_awarded = 0[\s\S]*?award\(/.test(rdb));
   ok('rezervace: při chybě se zábor vrátí', rdb.includes('SET points_awarded = 0'));
   const zr = zdroj('app/api/client/admin/body-zdroje/route.ts');
-  ok('nastavení: měnit smí jen správce pravidel a jen v plánu Max', zr.includes("pozaduj('vernost.pravidla')") && zr.includes('teamIsMax'));
+  ok('nastavení: měnit smí jen správce pravidel a jen v plánu Max', zr.includes("pozaduj('vernost.pravidla')") && (zr.includes('teamIsMax') || zr.includes("pozadujTarif(ctx.teamId, 'max')")));
   const init = zdroj('app/api/init/route.ts');
   ok('init: sloupce bodů mimo kasu a storna', ['points_orders BOOLEAN', 'points_per_reservation INTEGER', 'client_reservations ADD COLUMN IF NOT EXISTS points_awarded', 'client_scan_actions ADD COLUMN IF NOT EXISTS undone_at'].every(x => init.includes(x)));
   const audit = zdroj('lib/auditPopisky.ts');

@@ -13,6 +13,7 @@ const NAV = [
   { href: '/admin', label: 'Podniky', icon: 'users' },
   { href: '/admin/nahlaseni', label: 'Nahlášené', icon: 'warning' },
   { href: '/admin/audit', label: 'Historie zásahů', icon: 'archive' },
+  { href: '/admin/retence', label: 'Retence', icon: 'clock' },
 ];
 
 export default function AdminShell({ email, children }: { email: string; children: React.ReactNode }) {

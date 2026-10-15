@@ -371,10 +371,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       <span className="text-sm font-semibold">{diff === 0 ? t('Kasa sedí') : diff > 0 ? t('Přebytek') : t('Manko')}</span>
                       <span className="text-sm font-bold tabular-nums">{diff > 0 ? '+' : ''}{money(diff)}</span>
                     </div>
-                    {/* Kolo 10: manko → trest tomu, kdo uzávěrku dělal (návrh `manko:<id>` tím z widgetu zmizí). Jen s tresty.udelit. */}
+                    {/* Manko trestem není (§ 346b ZP): TrestTlacitko s klíčem manko:<id> místo tlačítka ukáže větu,
+                        jak to řešit (jen s tresty.udelit). Popisek tlačítka by se nikdy nezobrazil, proto žádný není. */}
                     {diff < 0 && c.created_by ? (
                       <div className="mb-1.5 flex justify-end" data-trest-za-manko>
-                        <TrestTlacitko popisek={t('Dát trest za manko')} onUlozeno={onChanged}
+                        <TrestTlacitko onUlozeno={onChanged}
                           vyrizeno={{ day: String(c.shift_date ?? c.date).slice(0, 10), sourceKey: `manko:${id}` }}
                           predvolby={{
                             userId: Number(c.created_by), jmeno: c.author_name ?? undefined, day: String(c.shift_date ?? c.date).slice(0, 10), closingId: id,

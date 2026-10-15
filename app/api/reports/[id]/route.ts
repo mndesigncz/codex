@@ -6,6 +6,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { stavPoAkci } from '@/lib/moderace';
 import { vyridNahlaseni } from '@/lib/moderaceDb';
+import { poVyrizeniNahlaseni } from '@/lib/dsaDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const r = await vyridNahlaseni(reportId, novyStav, c.meId, c.teamId);
     if (!r) return NextResponse.json({ error: 'Nahlášení nenalezeno.' }, { status: 404 });
     await audit(c.teamId, c.meId, 'nahlaseni.vyreseno', 'content_report', reportId, novyStav);
+    // DSA (spuštění, balík G): autorovi odstraněného obsahu odůvodnění (čl. 17), oznamovateli z webu rozhodnutí.
+    const poznamka = typeof body?.oduvodneni === 'string' ? body.oduvodneni : null;
+    await poVyrizeniNahlaseni(reportId, novyStav, 'podnik', poznamka);
     return NextResponse.json({ ok: true, status: novyStav });
   } catch (e) {
     console.error('vyřízení nahlášení selhalo', e);

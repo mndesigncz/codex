@@ -26,6 +26,7 @@ import {
 import { nextActiveId, IDLE_MS, ACTING_MAX_AGE_S, ACTING_OBNOVA_MS, obnovitCookie } from '@/lib/kioskIdentity';
 import bcrypt from 'bcryptjs';
 import { novyKlic } from '@/lib/idempotenceKlic';
+import { tecekPinu, pinKompletni, poSpatnemPinu, zbyvaPauza, type StavPokusu } from '@/lib/pinTabletu';
 import { duvodProcNeOffline, poSynchronizaci, pridejDoFronty, rosterSFrontou, zastaraleVeFronte, type AkceFronty, type PolozkaFronty } from '@/lib/kioskOffline';
 import { useMoney } from '../CurrencyProvider';
 import { apiMessage, okJson } from '@/lib/api';
@@ -41,6 +42,8 @@ export interface RosterMember {
   name: string;
   avatar?: string | null;
   hasPin: boolean;
+  /** Délka PINu (4–6), když ji server zná; jinak tečky rostou s psaním (lib/pinTabletu). */
+  pinDelka?: number | null;
   openSince: string | null;
   /** Od kdy běží pauza (záznam po pauze ještě bez konce); na pauze je openSince null. */
   breakSince?: string | null;
@@ -832,6 +835,10 @@ function PrepinacOsoby({ active, onShift, canSwitch, selectPerson }: {
   );
 }
 
+// Špatné PINy po lidech, přes zavření okna: pět za sebou = 30 s pauza (lib/pinTabletu).
+// Hlavně pro tablet bez internetu — online hlídá pokusy přísněji server.
+const spatnePiny = new Map<number, StavPokusu>();
+
 export function PunchDialog({ member, now, onClose, onDone }: {
   member: RosterMember;
   now: number;
@@ -854,13 +861,32 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   const rozpis = !on && !naPauze ? zpozdeniPrichodu(pragueToday(), member.shiftStart, now) : null;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const pinChybi = needPin && pin.length < 4;
+  const pinChybi = needPin && !pinKompletni(member.pinDelka, pin.length);
+  // Pauza po pěti špatných PINech: odpočet si okno tiká samo (prop `now` jde jen po minutách).
+  const [ted, setTed] = useState(() => Date.now());
+  const pauza = needPin ? zbyvaPauza(spatnePiny.get(member.id), ted) : 0;
+  useEffect(() => {
+    if (!pauza) return;
+    const i = setInterval(() => setTed(Date.now()), 1000);
+    return () => clearInterval(i);
+  }, [pauza > 0]);
+  const spatnyPin = () => {
+    const s = poSpatnemPinu(spatnePiny.get(member.id), Date.now());
+    spatnePiny.set(member.id, s);
+    setTed(Date.now());
+    setPin('');
+    // Během pauzy mluví odpočet níž (živě); po ní nezůstane stará věta.
+    setErr(s.zamcenoDo > Date.now() ? '' : t('Nesprávný PIN'));
+  };
+  const zablokovano = pinChybi || pauza > 0;
+  // Známá délka PINu = víc číslic se ani nenapíše; jinak nejvýš 6.
+  const maxPin = tecekPinu(member.pinDelka, 6);
 
   /** Bez internetu: PIN proti otisku z posledního připojení, píchnutí do fronty. Pauza bez sítě nejde. */
   const offlinePichnuti = async (action: AkceTabletu): Promise<boolean> => {
     if (action !== 'in' && action !== 'out') { setErr(t('Pauza bez internetu nejde zapsat — zkus to, až bude tablet online.')); return false; }
     if (duvodProcNeOffline(member, maOtisk(member.id))) { setErr(t('Bez internetu nejde ověřit PIN — zkus to, až bude tablet online.')); return false; }
-    if (needPin && !(await overPinOffline(member.id, pin))) { setErr(t('Nesprávný PIN')); setPin(''); return false; }
+    if (needPin && !(await overPinOffline(member.id, pin))) { spatnyPin(); return false; }
     zaradDoFronty(member, action, needPin);
     onDone(action, member, undefined, action === 'in'
       ? t('{jmeno}: příchod uložený v tabletu — odešle se sám, až bude internet.', { jmeno: member.name })
@@ -869,6 +895,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   };
 
   const submit = async (action: AkceTabletu) => {
+    if (needPin && zbyvaPauza(spatnePiny.get(member.id), Date.now()) > 0) return;
     setErr(''); setBusy(true);
     try {
       if (offline) { await offlinePichnuti(action); return; }
@@ -878,9 +905,12 @@ export function PunchDialog({ member, now, onClose, onDone }: {
       });
       const d = await res.json();
       if (res.ok) {
+        spatnePiny.delete(member.id);
         // Odpověď nese entry (clockIn, clockOut) a closingDone — handler z nich složí souhrn směny
         // a bez uzávěrky varuje; pauza (break_start/break_end) souhrn nemá.
         onDone(action, member, { entry: d.entry ?? null, closingDone: typeof d.closingDone === 'boolean' ? d.closingDone : null });
+      } else if (needPin && res.status === 403 && d.error === 'Nesprávný PIN') { // i18n-ok (hláška serveru, porovnání)
+        spatnyPin();
       } else {
         setErr(d.error || t('Nepodařilo se zaznamenat.'));
         setPin('');
@@ -900,19 +930,19 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   const paticka = naPauze ? (
     <div className="grid grid-cols-2 gap-2 w-full">
       <Button variant="secondary" size="lg" className="!h-14" onClick={onClose}>{t('Zpět')}</Button>
-      <Button variant="danger-solid" size="lg" className="!h-14" disabled={pinChybi || busy} onClick={() => submit('out')}>{t('Odpíchnout odchod')}</Button>
-      <Button variant="primary" size="lg" icon="play" className="col-span-2 !h-14" loading={busy} disabled={pinChybi} onClick={() => submit('break_end')}>{t('Konec pauzy')}</Button>
+      <Button variant="danger-solid" size="lg" className="!h-14" disabled={zablokovano || busy} onClick={() => submit('out')}>{t('Odpíchnout odchod')}</Button>
+      <Button variant="primary" size="lg" icon="play" className="col-span-2 !h-14" loading={busy} disabled={zablokovano} onClick={() => submit('break_end')}>{t('Konec pauzy')}</Button>
     </div>
   ) : on ? (
     <div className="grid grid-cols-2 gap-2 w-full">
       <Button variant="secondary" size="lg" className="!h-14" onClick={onClose}>{t('Zpět')}</Button>
-      <Button variant="secondary" size="lg" icon="cup" className="!h-14" disabled={pinChybi || busy} onClick={() => submit('break_start')}>{t('Pauza')}</Button>
-      <Button variant="danger-solid" size="lg" icon="logout" className="col-span-2 !h-14" loading={busy} disabled={pinChybi} onClick={() => submit('out')}>{t('Odpíchnout odchod')}</Button>
+      <Button variant="secondary" size="lg" icon="cup" className="!h-14" disabled={zablokovano || busy} onClick={() => submit('break_start')}>{t('Pauza')}</Button>
+      <Button variant="danger-solid" size="lg" icon="logout" className="col-span-2 !h-14" loading={busy} disabled={zablokovano} onClick={() => submit('out')}>{t('Odpíchnout odchod')}</Button>
     </div>
   ) : (
     <>
       <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>{t('Zpět')}</Button>
-      <Button variant="primary" size="lg" className="flex-1" loading={busy} disabled={pinChybi} onClick={() => submit('in')}>{t('Odpíchnout příchod')}</Button>
+      <Button variant="primary" size="lg" className="flex-1" loading={busy} disabled={zablokovano} onClick={() => submit('in')}>{t('Odpíchnout příchod')}</Button>
     </>
   );
   return (
@@ -939,7 +969,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
             <p className="t-meta mb-3">{on ? t('Zadej PIN pro odchod') : naPauze ? t('Zadej PIN pro konec pauzy nebo odchod') : t('Zadej PIN pro příchod')}</p>
             {/* Tečky nesou délku PINu i pro odečítač (role=img s popisem). */}
             <div className="flex justify-center gap-2 mb-3" role="img" aria-label={t('Zadáno číslic: {n}', { n: pin.length })}>
-              {[0, 1, 2, 3].map(i => (
+              {Array.from({ length: tecekPinu(member.pinDelka, pin.length) }, (_, i) => i).map(i => (
                 <span key={i} className={`h-3.5 w-3.5 rounded-full ${i < pin.length ? 'bg-[#C8F542] ring-1 ring-black/15' : 'bg-black/15'}`} />
               ))}
             </div>
@@ -948,18 +978,20 @@ export function PunchDialog({ member, now, onClose, onDone }: {
             <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
               {['1','2','3','4','5','6','7','8','9'].map(k => (
                 <Button key={k} variant="secondary" size="lg" className="text-lg tabular-nums"
-                  onClick={() => setPin(p => (p.length < 6 ? p + k : p))}>{k}</Button>
+                  onClick={() => setPin(p => (p.length < maxPin ? p + k : p))}>{k}</Button>
               ))}
               <span />
               <Button variant="secondary" size="lg" className="text-lg tabular-nums"
-                onClick={() => setPin(p => (p.length < 6 ? p + '0' : p))}>0</Button>
+                onClick={() => setPin(p => (p.length < maxPin ? p + '0' : p))}>0</Button>
               <Button variant="secondary" size="lg" iconOnly icon="undo" aria-label={t('Smazat číslici')} title={t('Smazat číslici')}
                 className="w-full" disabled={pin.length === 0} onClick={() => setPin(p => p.slice(0, -1))} />
             </div>
           </div>
         )}
 
-        {err && <p role="alert" className="text-sm text-bad-ink mt-4">{err}</p>}
+        {pauza > 0
+          ? <p role="alert" className="text-sm text-bad-ink mt-4 tabular-nums">{t('Moc špatných PINů. Zkus to za {n} s.', { n: pauza })}</p>
+          : err && <p role="alert" className="text-sm text-bad-ink mt-4">{err}</p>}
       </div>
     </Modal>
   );

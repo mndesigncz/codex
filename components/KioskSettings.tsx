@@ -10,7 +10,8 @@ import { useT } from '@/lib/i18n/client';
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 
-interface Member { id: number; name: string; avatar?: string; hasPin: boolean }
+// pinKratky: PIN kratší než 6 číslic nebo neznámé délky (z doby před 6místnými PINy) — vedení dostane doporučení.
+interface Member { id: number; name: string; avatar?: string; hasPin: boolean; pinKratky?: boolean }
 
 export default function KioskSettings() {
   const t = useT('kiosk');
@@ -79,6 +80,8 @@ export default function KioskSettings() {
 
   const savePin = async (userId: number) => {
     const pin = (pins[userId] ?? '').replace(/\D/g, '');
+    // Nové PINy mají 6 číslic (server kratší odmítne); staré 4místné na tabletu platí dál.
+    if (pin && pin.length !== 6) { setErr(t('PIN musí mít 6 číslic.')); return; }
     try {
       const res = await fetch('/api/kiosk', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -86,7 +89,7 @@ export default function KioskSettings() {
       });
       const d = await res.json();
       if (res.ok) {
-        setMembers(ms => ms.map(m => m.id === userId ? { ...m, hasPin: !!pin } : m));
+        setMembers(ms => ms.map(m => m.id === userId ? { ...m, hasPin: !!pin, pinKratky: false } : m));
         setPins(p => ({ ...p, [userId]: '' }));
         flash(pin ? t('PIN nastaven.') : t('PIN zrušen.'));
       } else setErr(d.error || t('PIN se nepodařilo uložit.'));
@@ -143,7 +146,7 @@ export default function KioskSettings() {
           {smiPiny && (
           <div className="space-y-2.5">
             <p className="t-label">{t('PIN pro odpíchnutí (nepovinné)')}</p>
-            <p className="t-meta -mt-1">{t('Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu i odchodu — nikdo se nepodepíše za něj.')}</p>
+            <p className="t-meta -mt-1">{t('Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu i odchodu — nikdo se nepodepíše za něj.')} {t('Nový PIN má 6 číslic.')}</p>
             {nacitam ? (
               <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
             ) : chybaLidi ? (
@@ -160,11 +163,12 @@ export default function KioskSettings() {
                   <ListRow key={m.id}
                     lead={<Avatar emoji={m.avatar} size="sm" ring={false} />}
                     title={m.name}
-                    right={m.hasPin ? <Chip tone="ok" size="sm" icon="lock">PIN</Chip> : undefined}
+                    meta={m.hasPin && m.pinKratky ? t('Doporučujeme změnit PIN na 6 číslic.') : undefined}
+                    right={!m.hasPin ? undefined : m.pinKratky ? <Chip tone="wait" size="sm" icon="lock">PIN</Chip> : <Chip tone="ok" size="sm" icon="lock">PIN</Chip>}
                     actions={<>
                       <input
                         value={pins[m.id] ?? ''} onChange={e => setPins(p => ({ ...p, [m.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
-                        inputMode="numeric" aria-label={t('PIN pro {jmeno}', { jmeno: m.name })} placeholder={m.hasPin ? '••••' : 'PIN'}
+                        inputMode="numeric" autoComplete="off" maxLength={6} aria-label={t('PIN pro {jmeno}', { jmeno: m.name })} placeholder={m.hasPin ? '••••••' : 'PIN'}
                         className="w-24 field rounded-xl border border-black/[0.08] px-3 py-2 text-sm tabular-nums text-center focus:border-[#C8F542]/50 focus:outline-none shrink-0" />
                       <Button variant="secondary" size="sm" onClick={() => savePin(m.id)}>
                         {(pins[m.id] ?? '') ? t('Uložit') : m.hasPin ? t('Zrušit PIN') : t('Uložit')}
