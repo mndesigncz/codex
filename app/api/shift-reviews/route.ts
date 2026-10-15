@@ -7,6 +7,7 @@ import { computeAutoPoints, normalizePoints, PointsConfig } from '@/lib/rewardLe
 import { shiftSpanFor, graceSpan, shiftsOverlap, type ShiftWindow } from '@/lib/shiftWindow';
 import { tymyCiselniku, clenovePodniku, clenPodniku, jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { denCloveka, type DenCloveka } from '@/lib/bodyDenDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -295,20 +296,39 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
   let review: any = null;
   try {
     const [rv] = await sql`
-      SELECT rating, note, points, auto_points, flagged, scope FROM shift_reviews
+      SELECT rating, note, points, auto_points, flagged, scope, nahradit_auto FROM shift_reviews
       WHERE employee_id = ${employeeId} AND work_date = ${date} LIMIT 1`;
     review = rv ? {
       rating: rv.rating ?? 0, note: rv.note ?? null, points: rv.points ?? 0,
       autoPoints: rv.auto_points ?? 0, flagged: rv.flagged === true, scope: rv.scope ?? 'individual',
+      // Kolo 91: ruční hodnocení nahrazuje automatické body dne (null = starší hodnocení, přičítá se).
+      nahraditAuto: rv.nahradit_auto === true,
     } : null;
   } catch {
+   try {
+    const [rv] = await sql`
+      SELECT rating, note, points, auto_points, flagged, scope FROM shift_reviews
+      WHERE employee_id = ${employeeId} AND work_date = ${date} LIMIT 1`;
+    review = rv ? {
+      rating: rv.rating ?? 0, note: rv.note ?? null, points: rv.points ?? 0,
+      autoPoints: rv.auto_points ?? 0, flagged: rv.flagged === true, scope: rv.scope ?? 'individual', nahraditAuto: false,
+    } : null;
+   } catch {
     try {
       const [rv] = await sql`SELECT rating, note, points FROM shift_reviews WHERE employee_id = ${employeeId} AND work_date = ${date} LIMIT 1`;
-      review = rv ? { rating: rv.rating ?? 0, note: rv.note ?? null, points: rv.points ?? 0, autoPoints: 0, flagged: false, scope: 'individual' } : null;
+      review = rv ? { rating: rv.rating ?? 0, note: rv.note ?? null, points: rv.points ?? 0, autoPoints: 0, flagged: false, scope: 'individual', nahraditAuto: false } : null;
     } catch { review = null; }
+   }
   }
 
   const autoPoints = computeAutoPoints({ hadShift, tasks, procedures, closing }, pt);
+
+  // Kolo 91: automatické body dne po stropu — „Automaticky by dostal X b“ a „Dnes 30 b (strop) — nasbíral 42“.
+  let den: DenCloveka | null = null;
+  try {
+    const [t] = await sql`SELECT points_config FROM teams WHERE id = ${teamId}`;
+    den = await denCloveka(teamId, employeeId, date, t?.points_config ?? null, autoPoints.total);
+  } catch { den = null; }
 
   return {
     employee: { id: emp.id, name: emp.name, avatar: emp.avatar },
@@ -318,7 +338,7 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
       from: span.start.toISOString(), to: span.end.toISOString(),
       overnight: span.overnight, days: span.days,
     },
-    tasks, procedures, closing, review, autoPoints,
+    tasks, procedures, closing, review, autoPoints, den,
   };
 }
 
@@ -494,6 +514,8 @@ export async function POST(req: NextRequest) {
   const note = b.note ? String(b.note).slice(0, 1000) : null;
   const pointsAwarded = Math.max(-500, Math.min(500, Math.round(Number(b.points) || 0)));
   const flagged = b.flagged === true;
+  // Kolo 91: ruční hodnocení nahradí automatické body dne (výchozí), nebo se k nim přičte.
+  const nahraditAuto = b.nahraditAuto !== false;
 
   // Resolve who the verdict applies to.
   const explicitIds = Array.isArray(b.employeeIds)
@@ -542,6 +564,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Hodnocení se nepodařilo uložit. Spusť /api/init.' }, { status: 500 });
       }
     }
+    try {
+      await sql`UPDATE shift_reviews SET nahradit_auto = ${nahraditAuto} WHERE employee_id = ${t.id} AND work_date = ${date}`;
+    } catch { /* před migrací kola 91 — hodnocení se přičte jako dřív */ }
 
     // Let the employee know they were rated.
     try {
@@ -598,14 +623,28 @@ export async function PATCH(req: NextRequest) {
     const points = b.points !== undefined ? clampPts(b.points) : (existing?.points ?? 0);
     const nextNote = noteProvided ? note ?? null : (existing?.note ?? null);
     const flagged = b.flagged !== undefined ? b.flagged === true : existing?.flagged === true;
+    // Kolo 91: body zadané vedením = ruční řádek (rucne). Ten přebíjí automatický výpočet —
+    // přepočet zpětně ho nepřepíše a do denního stropu se nepočítá. Jen poznámka / vlajka
+    // řádek ruční nedělá (body zůstávají automatické).
+    const rucne = b.points !== undefined;
     try {
       await sql`
-        INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, note, flagged, created_by, updated_at)
-        VALUES (${c.teamId}, ${itemEmployeeId}, ${itemDate}, ${kind}, ${id}, ${points}, ${nextNote}, ${flagged}, ${c.meId}, NOW())
+        INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, note, flagged, created_by, updated_at, rucne)
+        VALUES (${c.teamId}, ${itemEmployeeId}, ${itemDate}, ${kind}, ${id}, ${points}, ${nextNote}, ${flagged}, ${c.meId}, NOW(), ${rucne})
         ON CONFLICT (employee_id, work_date, kind, ref_id)
-        DO UPDATE SET points = ${points}, note = ${nextNote}, flagged = ${flagged}, updated_at = NOW()`;
+        DO UPDATE SET points = ${points}, note = ${nextNote}, flagged = ${flagged}, updated_at = NOW(),
+                      rucne = COALESCE(shift_review_items.rucne, FALSE) OR ${rucne}`;
       itemSaved = true;
-    } catch { /* not migrated */ }
+    } catch {
+      try {
+        await sql`
+          INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, note, flagged, created_by, updated_at)
+          VALUES (${c.teamId}, ${itemEmployeeId}, ${itemDate}, ${kind}, ${id}, ${points}, ${nextNote}, ${flagged}, ${c.meId}, NOW())
+          ON CONFLICT (employee_id, work_date, kind, ref_id)
+          DO UPDATE SET points = ${points}, note = ${nextNote}, flagged = ${flagged}, updated_at = NOW()`;
+        itemSaved = true;
+      } catch { /* not migrated */ }
+    }
   };
 
   if (kind === 'task') {

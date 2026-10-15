@@ -11,6 +11,8 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
 import { jeStavZapisu, casNeboNull, validujCasTerminu, doplnkyVyskytu, textOznameniUkolu, platnaFotka, validujDukaz, type DoplnkyVyskytu } from '@/lib/ukolyPrehled';
 import { audit } from '@/lib/audit';
+import { normalizujPrepis, type PrepisRezimu } from '@/lib/bodyRezim';
+import { bodyZaSplnenyUkol, smazAutoRadekUkolu } from '@/lib/bodyZapisDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +50,8 @@ const shape = (r: any) => ({
   sourceMeta: r.source_meta ?? null,
   // Kolo 70: výskyt úkolu zamyká uzávěrku svého dne, dokud není hotový.
   requireBeforeClosing: r.require_before_closing === true,
+  // Kolo 91: způsob počítání bodů / vlastní body úkolu (null = podle podniku).
+  bodyRezim: normalizujPrepis(r.body_rezim),
   // Kolo 7: splní se jen s fotkou; fotka ze splnění (jen /api/upload/<id>).
   requirePhoto: r.require_photo === true,
   completionPhoto: platnaFotka(r.completion_photo) ? r.completion_photo : null,
@@ -74,6 +78,20 @@ async function zapisPovinny(flag: boolean, cil: { id?: number | null; seriesId?:
     }
     if (cil.id != null) await sql`UPDATE tasks SET require_before_closing = ${flag} WHERE id = ${cil.id}`;
   } catch { /* sloupec ještě není — úkol platí, jen bez zámku */ }
+}
+
+// Kolo 91: způsob počítání bodů úkolu (body_rezim) — zvlášť a best-effort jako příznak
+// povinného úkolu; série jen budoucí nesplněné výskyty (historie zůstává, tu přepočítá
+// „Přepočítat zpětně“ v okně úkolu).
+async function zapisRezimUkolu(prepis: PrepisRezimu | null, cil: { id?: number | null; seriesId?: string | null; odDne?: string }) {
+  const json = prepis ? JSON.stringify(prepis) : null;
+  try {
+    if (cil.seriesId) {
+      await sql`UPDATE tasks SET body_rezim = ${json}::jsonb
+        WHERE series_id = ${cil.seriesId} AND status <> 'done' AND (${cil.odDne ?? null}::text IS NULL OR due_date >= ${cil.odDne ?? null})`;
+    }
+    if (cil.id != null) await sql`UPDATE tasks SET body_rezim = ${json}::jsonb WHERE id = ${cil.id}`;
+  } catch { /* sloupec ještě není */ }
 }
 
 // Kolo 7: doplňky výskytu (čas termínu, „jen s fotkou") se zapisují ZVLÁŠŤ a best-effort,
@@ -179,6 +197,12 @@ async function topUpSeries(teamId: number) {
       try {
         const [vzor] = await sql`SELECT due_time, require_photo FROM tasks WHERE id = ${tmpl.id}`;
         await zapisDoplnky(doplnkyVyskytu(vzor), { seriesId, dny: inserts });
+      } catch { /* před migrací */ }
+      // Kolo 91: způsob počítání bodů ze vzoru.
+      try {
+        await sql`
+          UPDATE tasks SET body_rezim = (SELECT body_rezim FROM tasks WHERE id = ${tmpl.id})
+          WHERE series_id = ${seriesId} AND due_date = ANY(${inserts}::text[])`;
       } catch { /* před migrací */ }
     }
   }
@@ -313,6 +337,12 @@ export async function POST(req: NextRequest) {
   if ((casV.cas || chceFoto) && first) {
     await zapisDoplnky({ due_time: casV.cas, require_photo: chceFoto }, seriesId ? { seriesId } : { id: Number(first.id) });
     first = { ...first, due_time: casV.cas, require_photo: chceFoto };
+  }
+  // Kolo 91: body za úkol nastavuje jen ten, kdo smí úkoly zadávat (vedení).
+  const rezimNovy = c.opr.has('ukoly.zadavat') ? normalizujPrepis(b.bodyRezim) : null;
+  if (rezimNovy && first) {
+    await zapisRezimUkolu(rezimNovy, seriesId ? { seriesId } : { id: Number(first.id) });
+    first = { ...first, body_rezim: rezimNovy };
   }
 
   // Notify the assignee (specific person) when it isn't self-assigned.
@@ -517,6 +547,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (povinny || bylPovinny) await zapisPovinny(povinny, cilPovinny);
+    // Kolo 91: způsob počítání bodů — vždycky, když nějaký je (přestavba série zakládá výskyty bez něj).
+    const bylRezim = normalizujPrepis(task.body_rezim);
+    const rezimU = b.bodyRezim !== undefined && c.opr.has('ukoly.zadavat') ? normalizujPrepis(b.bodyRezim) : bylRezim;
+    if (rezimU || bylRezim) await zapisRezimUkolu(rezimU, cilPovinny);
     // Doplňky (čas) vždycky: přestavba série výš zakládá výskyty bez nich.
     await zapisDoplnky({ due_time: cas, require_photo: chceFoto }, cilPovinny);
 
@@ -627,7 +661,14 @@ export async function PATCH(req: NextRequest) {
   // „+5 bodů" hned při odškrtnutí. Jen při přechodu do „hotovo".
   let pointsEarned: number | null = null;
   if (done && task.status !== 'done' && taskTeam) {
-    try { pointsEarned = (await sazebnikBodu(Number(taskTeam))).task; } catch { /* bez bodů se úkol splní taky */ }
+    // Kolo 91: body podle způsobu počítání (checklist, vlastní body úkolu) — automatický řádek.
+    pointsEarned = await bodyZaSplnenyUkol(Number(taskTeam), effectiveId, { id, checklist: row?.checklist ?? task.checklist, body_rezim: row?.body_rezim ?? task.body_rezim });
+    if (pointsEarned == null) {
+      try { pointsEarned = (await sazebnikBodu(Number(taskTeam))).task; } catch { /* bez bodů se úkol splní taky */ }
+    }
+  } else if (!done && task.status === 'done' && taskTeam) {
+    // Znovu otevřený úkol: základ se přestane počítat, automatický řádek k němu taky.
+    await smazAutoRadekUkolu(Number(taskTeam), id);
   }
   return NextResponse.json({ ...shape(row), pointsEarned });
 }

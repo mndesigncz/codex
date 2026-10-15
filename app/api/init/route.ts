@@ -3107,6 +3107,36 @@ export async function GET(request: Request) {
     try { const n = await prevodSouhlasu(); if (n) console.log('init: převedeno souhlasů s novinkami', n); } catch { /* nesmí shodit migrace */ }
     // ---- konec GDPR a DSA ----
 
+    // ---- Kolo 91 (body-R): způsob počítání bodů, denní strop, ruční přednost, přepočet zpětně ----
+    // srazka = srážková část automatického řádku (≤ 0) — denní strop ji odečte vždy (lib/bodyRezim).
+    // rucne = body k položce zadalo vedení (PATCH /api/shift-reviews) — přepočet ani strop se jich netýkají.
+    await ddl(sql`ALTER TABLE shift_review_items ADD COLUMN IF NOT EXISTS srazka INTEGER`);
+    await ddl(sql`ALTER TABLE shift_review_items ADD COLUMN IF NOT EXISTS rucne BOOLEAN DEFAULT FALSE`);
+    // Ruční hodnocení směny nahrazuje automatické body dne (TRUE) / přičítá se k nim (FALSE).
+    // Starší hodnocení mají NULL = přičítají se jako dřív (nasazení nemění historii).
+    await ddl(sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS nahradit_auto BOOLEAN`);
+    // Přepsání způsobu počítání u položky: { rezim, bonus, zaklad } (null = dědí z podniku).
+    await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS body_rezim JSONB`);
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS body_rezim JSONB`);
+    // Přepočty zpětně: kdo, co, podle jakého pravidla, předchozí nastavení a staré hodnoty
+    // řádků (radky: [{ id, p, s, n, novy }]) — ať jde poslední přepočet vrátit.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS body_prepocty (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        kdo INTEGER,
+        rozsah JSONB NOT NULL DEFAULT '{}'::jsonb,
+        pravidla JSONB NOT NULL DEFAULT '{}'::jsonb,
+        predchozi JSONB NOT NULL DEFAULT '{}'::jsonb,
+        radky JSONB NOT NULL DEFAULT '[]'::jsonb,
+        souhrn JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW(),
+        vraceno_at TIMESTAMP,
+        vratil INTEGER
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS body_prepocty_team ON body_prepocty (team_id, id)`);
+    // ---- konec kola 91 ----
+
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

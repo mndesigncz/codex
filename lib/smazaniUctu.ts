@@ -67,7 +67,10 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   // záznamy podniku: anonymní autor, obsah patří podniku
   shifts: 'ponechat', shift_requests: 'ponechat', availability_requests: 'ponechat', shift_offers: 'ponechat',
   time_entries: 'ponechat', fixed_assignments: 'ponechat', time_off_requests: 'ponechat', shift_reviews: 'ponechat', wage_adjustments: 'ponechat', point_awards: 'ponechat',
-  shift_review_items: 'ponechat', reward_redemptions: 'ponechat', inventory_log: 'ponechat', inventory_reports: 'ponechat',
+  shift_review_items: 'ponechat',
+  // přepočty bodů zpětně (kolo 91): kdo přepočítal je anonymní autor, staré hodnoty řádků patří podniku (vrácení přepočtu)
+  body_prepocty: 'ponechat',
+  reward_redemptions: 'ponechat', inventory_log: 'ponechat', inventory_reports: 'ponechat',
   inventory_items: 'ponechat', chat_messages: 'ponechat', messages: 'ponechat', procedure_runs: 'ponechat',
   // poznámky k úkolům, návodům, postupům, recepturám a skladu: provozní znalost podniku, autor zůstane anonymní
   entity_notes: 'ponechat',
@@ -143,6 +146,8 @@ export const TYMOVE_TABULKY = [
   'pos_recipe_versions', 'pos_recipe_proposals', 'entity_note_reads',
   // kolo 8 (R8-3): týmové výzvy v Odměnách
   'reward_challenges',
+  // kolo 91 (body-R): přepočty bodů zpětně
+  'body_prepocty',
   'extra_work', 'extra_offers',
   // kolo 10: tresty
   'penalties', 'penalty_types', 'penalty_dismissed',

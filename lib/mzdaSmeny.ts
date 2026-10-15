@@ -18,6 +18,8 @@ import { neon } from '@neondatabase/serverless';
 import { earnedFor, MAX_SHIFT_HOURS } from './wages';
 import { normalizePoints, type PointsConfig } from './rewardLevels';
 import { sazbaVPodniku } from './tenant';
+import { denSurovy } from './bodyDenDb';
+import { nastaveniRezimu, ucinnyDen } from './bodyRezim';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -72,7 +74,13 @@ export interface BodyZaSmenu {
   taskPts: number; procPts: number;
   /** Body za samotnou uzávěrku — dostane je ten, kdo ji odešle. */
   closingPts: number;
+  /** Kolik se za den opravdu připíše: automatické body dne po denním stropu (kolo 91). */
   total: number;
+  /** Kolik by to bylo bez stropu (základy + automatické řádky dne + tahle uzávěrka). */
+  nasbirano: number;
+  /** Denní strop podniku (0 = bez stropu) a jestli ho dnešek přesáhl. */
+  strop: number;
+  zastropovano: boolean;
   config: PointsConfig;
 }
 
@@ -111,5 +119,17 @@ export async function bodyZaSmenu(teamId: number, employeeId: number, den: strin
   const taskPts = tasks * config.task;
   const procPts = procedures * config.procedure;
   const closingPts = config.closing;
-  return { tasks, procedures, taskPts, procPts, closingPts, total: taskPts + procPts + closingPts, config };
+  // Kolo 91: denní strop. Automatické body dne z jednoho místa (lib/bodyDenDb) — i příplatky
+  // a srážky k postupům a úkolům — plus body za uzávěrku, která se právě odesílá.
+  let nasbirano = taskPts + procPts + closingPts;
+  let total = nasbirano, strop = 0, zastropovano = false;
+  try {
+    let raw: any = null;
+    try { const [t] = await sql`SELECT points_config FROM teams WHERE id = ${teamId}`; raw = t?.points_config ?? null; } catch { /* výchozí */ }
+    const n = nastaveniRezimu(raw);
+    const d = await denSurovy(teamId, employeeId, den, raw);
+    const vys = ucinnyDen({ ...d, plus: d.plus + closingPts }, n);
+    nasbirano = vys.nasbirano; total = vys.efektivni; strop = n.denniStrop; zastropovano = vys.zastropovano;
+  } catch { /* bez stropu, jako dřív */ }
+  return { tasks, procedures, taskPts, procPts, closingPts, total, nasbirano, strop, zastropovano, config };
 }

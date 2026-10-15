@@ -446,5 +446,6 @@
   "Dnes tu nic za body není — zapsat můžeš i vlastní věc navíc.": "Nothing for points today — you can still log your own extra.",
   "Volitelné — kdo chce, vezme si. Body dostaneš po uznání.": "Optional — take one if you like. You get the points once approved.",
   "Za body navíc": "Extra for points",
-  "Zapsat navíc": "Log extra"
+  "Zapsat navíc": "Log extra",
+  "strop {strop} b — nasbíral/a {nasbirano}": "cap {strop} pts — earned {nasbirano}"
 }

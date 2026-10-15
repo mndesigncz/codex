@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { normalizeSkipReasons, scoreRun } from '@/lib/procedureScoring';
+import { normalizeSkipReasons } from '@/lib/procedureScoring';
+import { bodyPostupu, nastaveniRezimu, normalizujPrepis, ucinnePravidlo } from '@/lib/bodyRezim';
 import { normalizePoints } from '@/lib/rewardLevels';
 import { resolveActingUser, jeUcetTabletu } from '@/lib/kioskActing';
 import { pragueToday } from '@/lib/pragueTime';
@@ -381,21 +382,34 @@ export async function PATCH(request: Request) {
     // ---- Automatic points: score the run from step weights and skip reasons,
     // and write it into the same per-item ledger the review modal edits. A row
     // the employer already touched wins (ON CONFLICT DO NOTHING).
-    // Řádek nese jen PŘÍPLATEK/SRÁŽKU ke kroku — základ za dokončený postup
-    // (cfg.procedure) se počítá jednou v totalPoints(); cfg.procedure je tu
-    // jen strop bonusu za úplnost (k89: dřív se základ platil dvakrát a za
-    // každou fajfku bod navíc).
+    // Řádek nese jen ROZDÍL proti základu — základ za dokončený postup
+    // (cfg.procedure) se počítá jednou v totalPoints() (k89: dřív se základ
+    // platil dvakrát a za každou fajfku bod navíc).
+    // Způsob počítání (kolo 91): výchozí podniku (points_config.rezim.postupy),
+    // nebo přepsání u postupu (procedures.body_rezim) — lib/bodyRezim.
     try {
-      const [proc] = await sql`SELECT items FROM procedures WHERE id = ${run.procedure_id}`;
+      let proc: any;
+      try { [proc] = await sql`SELECT items, body_rezim FROM procedures WHERE id = ${run.procedure_id}`; }
+      catch { [proc] = await sql`SELECT items FROM procedures WHERE id = ${run.procedure_id}`; }
       const [teamCfg] = await sql`SELECT points_config FROM teams WHERE id = ${run.team_id}`;
       const cfg = normalizePoints(teamCfg?.points_config);
-      const score = scoreRun(proc?.items, checked, skipped, skipReasons, cfg.procedure);
+      const pravidlo = ucinnePravidlo(nastaveniRezimu(teamCfg?.points_config).postupy, normalizujPrepis(proc?.body_rezim), cfg.procedure);
+      const score = bodyPostupu(proc?.items, checked, skipped, skipReasons, pravidlo, cfg.procedure);
       const workDate = pragueToday();
-      await sql`
-        INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, note, flagged, created_by)
-        VALUES (${run.team_id}, ${run.user_id}, ${workDate}, 'procedure', ${runId},
-                ${score.points}, ${score.summary}, ${score.flagged}, NULL)
-        ON CONFLICT (employee_id, work_date, kind, ref_id) DO NOTHING`;
+      try {
+        await sql`
+          INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, srazka, note, flagged, created_by)
+          VALUES (${run.team_id}, ${run.user_id}, ${workDate}, 'procedure', ${runId},
+                  ${score.radek}, ${score.srazka}, ${score.summary}, ${score.flagged}, NULL)
+          ON CONFLICT (employee_id, work_date, kind, ref_id) DO NOTHING`;
+      } catch {
+        // Před migrací kola 91 (bez sloupce srazka).
+        await sql`
+          INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, note, flagged, created_by)
+          VALUES (${run.team_id}, ${run.user_id}, ${workDate}, 'procedure', ${runId},
+                  ${score.radek}, ${score.summary}, ${score.flagged}, NULL)
+          ON CONFLICT (employee_id, work_date, kind, ref_id) DO NOTHING`;
+      }
     } catch { /* auto-scoring is additive — never block completing a run */ }
 
     return NextResponse.json({ run: updated });
