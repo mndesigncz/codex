@@ -237,6 +237,17 @@ for (const r of spadle) {
   if (spadla.length) console.log(spadla.join('\n') + '\n…');
   console.log(radky.filter(l => !l.startsWith('✓') && !l.startsWith('  ✓') && !l.startsWith('✗')).slice(-25).join('\n'));
 }
+// V GitHub Actions i jako anotace: ty jdou číst přes API (check-runs/…/annotations),
+// log jobu leží na externím úložišti a ne každý ho otevře.
+if (process.env.GITHUB_ACTIONS === 'true') {
+  const kod = (s) => s.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  for (const r of spadle.slice(0, 10)) {
+    const radky = r.out.split('\n');
+    const pricina = radky.filter(l => l.startsWith('✗')).slice(0, 5);
+    const text = (pricina.length ? pricina : radky.filter(Boolean).slice(-8)).join('\n').slice(0, 1800);
+    console.log(`::error title=Sonda ${r.jmeno}::${kod(text || 'spadla bez výpisu')}`);
+  }
+}
 console.log(`\nSondy: ${vysledky.length - spadle.length} z ${vysledky.length} prošlo.`);
 if (args.includes('--vse')) console.log('Zelené: ' + JSON.stringify(vysledky.filter(r => r.ok).map(r => r.jmeno).sort()));
 process.exit(spadle.length ? 1 : 0);
