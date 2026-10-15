@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints } from '@/lib/rewardLevels';
+import { nastaveniRezimu } from '@/lib/bodyRezim';
 import { breakdownFor, breakdownForTeam, bodyZebricku, rozpadZebricku, totalPoints, PointsBreakdown, PRAZDNY_ROZPAD } from '@/lib/pointsBalance';
 import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { clenovePodniku } from '@/lib/tenant';
@@ -128,6 +129,9 @@ export async function GET(req: NextRequest) {
   const dik = nastaveniDiku(pointsRaw);
   // Automatické body (kolo 8): dochvilnost, výročí, narozeniny — přepínače v Nastavení bodů.
   const auto = nastaveniAuto(pointsRaw);
+  // Způsob počítání bodů a denní strop (kolo 91) — formulář Nastavení bodů je posílá zpátky
+  // v points_config (PATCH /api/teams přepisuje celý JSON, bez nich by se ztratily).
+  const rezim = nastaveniRezimu(pointsRaw);
 
   if (c.opr.has('odmeny.zebricek')) {
     // Výtky a nehodnocené směny jsou hodnocení lidí, ne pořadí — patří jen
@@ -144,7 +148,7 @@ export async function GET(req: NextRequest) {
     // ?od=YYYY-MM-DD → pořadí za období (widget Žebříček „tento měsíc"); bez něj celkem.
     const odParam = req.nextUrl.searchParams.get('od');
     const od = odParam && /^\d{4}-\d{2}-\d{2}$/.test(odParam) ? odParam : null;
-    const breakdowns = await breakdownForTeam(c.teamId, memberIds, od);
+    const breakdowns = await breakdownForTeam(c.teamId, memberIds, od, pointsRaw ?? null);
     const pendings = vidiHodnoceni ? await pendingForTeam(c.teamId, memberIds) : new Map<number, { n: number; oldest: string | null }>();
     const nevidene = vidiHodnoceni ? await neviseneVytky(c.teamId, memberIds) : new Map<number, number>();
     // Žebříček = získané body: tresty (záporné body) se do pořadí ani do rozpadu nepočítají —
@@ -168,10 +172,10 @@ export async function GET(req: NextRequest) {
     // žebříčkem (vedoucí směny, zaměstnanecká role s odmeny.zebricek)
     // přišel o vlastní body, úroveň i zpětnou vazbu. Vlastní část je teď
     // v odpovědi vždy — kromě tabletu, který body nemá.
-    return NextResponse.json({ role: 'employer', levels, points, dik, auto, standings, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
+    return NextResponse.json({ role: 'employer', levels, points, dik, auto, rezim, standings, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
   }
 
-  return NextResponse.json({ role: 'employee', levels, points, dik, auto, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
+  return NextResponse.json({ role: 'employee', levels, points, dik, auto, rezim, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
 }
 
 // Vlastní úroveň, body a zpětná vazba člena (obě větve GET).

@@ -52,6 +52,6 @@ export async function GET(req: NextRequest) {
     available: true,
     employeeId,
     wage: { ms: mzda.ms, rate: mzda.rate, earned: mzda.earned, open: mzda.open, suspicious: mzda.suspicious, noEntries: mzda.noEntries },
-    points: { tasks: body.tasks, procedures: body.procedures, taskPts: body.taskPts, procPts: body.procPts, closingPts: body.closingPts, total: body.total },
+    points: { tasks: body.tasks, procedures: body.procedures, taskPts: body.taskPts, procPts: body.procPts, closingPts: body.closingPts, total: body.total, nasbirano: body.nasbirano, strop: body.strop, zastropovano: body.zastropovano },
   });
 }

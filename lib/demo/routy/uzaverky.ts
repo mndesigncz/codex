@@ -172,7 +172,7 @@ export const uzaverky: Obsluha = (p, k) => {
     return ok({
       available: opr.has('finance.moje_mzda') || opr.has('finance.mzdy'), employeeId: kdo,
       wage: { ms, rate: sazba, earned: Math.round(ms / 3600000 * sazba), open: !!otevrena, suspicious: false, noEntries: !otevrena },
-      points: { tasks: 2, procedures: 1, taskPts: 10, procPts: 10, closingPts: 15, total: 35 },
+      points: { tasks: 2, procedures: 1, taskPts: 10, procPts: 10, closingPts: 15, total: 30, nasbirano: 35, strop: 30, zastropovano: true },
     });
   }
   if (cesta === '/api/closings/coworkers') {

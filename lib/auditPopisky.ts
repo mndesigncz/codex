@@ -206,6 +206,9 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'billing.upgrade': 'Změna tarifu na vyšší',
   // úkoly (kolo 7)
   'ukoly.fotka': 'Úkol splněn s fotkou jako důkazem',
+  // způsob počítání bodů (kolo 91): přepočet automatických bodů zpětně a jeho vrácení
+  'points.prepocet': 'Body přepočítány zpětně podle nového pravidla',
+  'points.prepocet_vracen': 'Přepočet bodů vrácen',
   // výplaty (kolo 8, R8-1)
   'vyplata.oznacena': 'Výplata označená jako vyplacená',
   'vyplata.zrusena': 'Označení výplaty zrušeno',

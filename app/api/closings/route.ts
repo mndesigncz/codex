@@ -11,7 +11,8 @@ import { getConnection } from '@/lib/storyous';
 import { eventWindowFromPos } from '@/lib/eventPos';
 import { clenovePodniku, idClenu } from '@/lib/tenant';
 import { urciKontextUzaverky, chybejiciPredUzaverkou, smiObejitPovinne } from '@/lib/povinnePredUzaverkouDb';
-import { jeZamceno, zpravaZamceno } from '@/lib/povinnePredUzaverkou';
+import { jeZamceno, zpravaZamceno, pocty } from '@/lib/povinnePredUzaverkou';
+import { bodyZaUzaverku } from '@/lib/bodyZapisDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -545,6 +546,15 @@ export async function POST(request: Request) {
         row.event_id = eventId;
       } catch { /* column not migrated yet */ }
     }
+  }
+
+  // Kolo 91: body za uzávěrku podle povinných věcí dne (způsob počítání v Nastavení bodů).
+  // Jen denní uzávěrka ze směny (stejně jako zámek povinných); řádek nese snímek „3/4 povinných“.
+  if (row?.id && eventId == null && shift && row.covered_by == null) {
+    try {
+      const stav = await chybejiciPredUzaverkou({ teamId: c.teamId, den: shiftDate, actorId, posadka: shiftEmployeeIds, typy: typyPovinnych });
+      await bodyZaUzaverku(c.teamId, actorId, String(row.date ?? shiftDate), Number(row.id), pocty(stav));
+    } catch { /* body nikdy neblokují uzávěrku */ }
   }
 
   // ---- „podřadná uzávěrka" akce: denní uzávěrka sama rozepíše okna akcí ----

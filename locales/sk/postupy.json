@@ -177,5 +177,10 @@
   "Čeká na schválení": "Čaká na schválenie",
   "Čt|den": "Št",
   "Žádný postup nečeká na schválení.": "Žiadny postup nečaká na schválenie.",
-  "−{n} b.": "−{n} b."
+  "−{n} b.": "−{n} b.",
+  "Dopad se nepodařilo spočítat.": "Dopad sa nepodarilo spočítať.",
+  "Emoji a čas jsou nepovinné. Důležitost kroku řídí body: splněný krok přidá (klíčový +2, běžný +1, drobný 0), nesplněný nic neubere. Vlastní body kroku mají přednost.": "Emoji a čas sú nepovinné. Dôležitosť kroku riadi body: splnený krok pridá (kľúčový +2, bežný +1, drobný 0), nesplnený nič neuberie. Vlastné body kroku majú prednosť.",
+  "Emoji a čas jsou nepovinné. Důležitost kroku řídí srážky: nedokončený krok strhne (klíčový −3, běžný −1, drobný 0). Vlastní minus body mají přednost.": "Emoji a čas sú nepovinné. Dôležitosť kroku riadi zrážky: nedokončený krok strhne (kľúčový −3, bežný −1, drobný 0). Vlastné mínus body majú prednosť.",
+  "Vlastní body kroku {n} za splnění": "Vlastné body kroku {n} za splnenie",
+  "Body za postup": "Body za postup"
 }

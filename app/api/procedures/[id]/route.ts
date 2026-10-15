@@ -3,6 +3,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { sanitizeSteps } from '@/lib/steps';
+import { normalizujPrepis } from '@/lib/bodyRezim';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,6 +102,15 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       WHERE id = ${id}
       RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
    }
+  }
+
+  // Způsob počítání bodů u postupu (kolo 91): null = podle podniku. Jen když ho klient poslal.
+  if (updated && Object.prototype.hasOwnProperty.call(body, 'bodyRezim')) {
+    const prepis = normalizujPrepis(body.bodyRezim);
+    try {
+      await sql`UPDATE procedures SET body_rezim = ${prepis ? JSON.stringify(prepis) : null}::jsonb WHERE id = ${id}`;
+      updated.bodyRezim = prepis;
+    } catch { /* před migrací — postup se uloží i bez něj */ }
   }
 
   return NextResponse.json({ procedure: updated });

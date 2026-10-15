@@ -45,7 +45,7 @@ interface Profile {
   employee: { id: number; name: string; avatar?: string; email: string | null; phone: string | null; jobTitle: string | null; hourlyRate: number | null };
   standing: { points: number; levelName: string; levelIndex: number; perks: string; next: RewardLevel | null; pctToNext: number; pointsIntoLevel: number; pointsForNext: number };
   levels: RewardLevel[];
-  breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number | null; autoPoints: number | null; itemPoints: number | null; ratedShifts: number | null; flagged: number | null; awards?: number | null; awardCount?: number | null };
+  breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number | null; autoPoints: number | null; itemPoints: number | null; dayAdjust?: number | null; ratedShifts: number | null; flagged: number | null; awards?: number | null; awardCount?: number | null };
   shifts: { upcoming: ShiftRow[]; recent: ShiftRow[] };
   reviews: Review[];
   items: FeedbackItem[];
@@ -167,7 +167,9 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   <div className="flex flex-wrap gap-1.5">
                     {([
                       [t('Úkoly'), p.breakdown.tasks], [t('Postupy'), p.breakdown.procedures], [t('Uzávěrky'), p.breakdown.closings],
-                      ...(vidiHodnoceni ? [[t('Z hodnocení'), p.breakdown.reviewPoints], [t('Automaticky'), p.breakdown.autoPoints], [t('K položkám'), p.breakdown.itemPoints], [t('Pochvaly'), p.breakdown.awards ?? null]] : []),
+                      ...(vidiHodnoceni ? [[t('Z hodnocení'), p.breakdown.reviewPoints], [t('Automaticky'), p.breakdown.autoPoints], [t('K položkám'), p.breakdown.itemPoints], [t('Pochvaly'), p.breakdown.awards ?? null],
+                        // Kolo 91: kolik denní strop a ruční hodnocení směn z automatických bodů ubraly (jen když něco).
+                        ...(p.breakdown.dayAdjust ? [[t('Denní strop a ruční hodnocení'), p.breakdown.dayAdjust]] : [])] : []),
                     ] as [string, number | null][]).filter(([, v]) => v != null).map(([label, val]) => (
                       <Chip key={label} tone="muted" size="sm">{label}: {(val ?? 0).toLocaleString(loc)}</Chip>
                     ))}

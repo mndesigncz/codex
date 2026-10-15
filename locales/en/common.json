@@ -168,5 +168,20 @@
   "Nastavení organizace": "Organization settings",
   "Sdílení mezi podniky": "Sharing between businesses",
   "{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}": "{n, plural, one {# task for points to take} other {# tasks for points to take}}",
-  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Password changed. Your other devices have been signed out."
+  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Password changed. Your other devices have been signed out.",
+  "Kombinace": "Combined",
+  "Podle podniku": "Follow the business",
+  "Postupy": "Procedures",
+  "Za celek": "For the whole",
+  "Za každý krok": "Per step",
+  "Za celý postup {z} b, za nedokončený krok −1 b, klíčový −3 b.": "{z} pts for the whole procedure, −1 pt for an unfinished step, −3 for a key one.",
+  "Za celý úkol {z} b, za nesplněnou položku checklistu −{s} b.": "{z} pts for the whole task, −{s} pts for each unchecked checklist item.",
+  "Za dokončení celku navíc +{z} b.": "Plus +{z} pts for finishing the whole.",
+  "Za dokončený postup {z} b a za úplnost až dalších {z} b; za nedokončený krok −1 b, klíčový −3 b.": "{z} pts for a finished procedure and up to {z} more for completeness; −1 pt for an unfinished step, −3 for a key one.",
+  "Za každou splněnou položku checklistu +{p} b, nesplněná nic neubere. Úkol bez checklistu: {z} b.": "+{p} pts for each checked checklist item, an unchecked one takes nothing away. Task without a checklist: {z} pts.",
+  "Za každou splněnou povinnou věc dne +{p} b, nesplněná nic neubere.": "+{p} pts for each required item of the day that was done, a missed one takes nothing away.",
+  "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "+1 pt for each step done, +2 for a key one (a step's own points win), a missed step takes nothing away.",
+  "Za splněný úkol {z} b, položky checklistu se nepočítají.": "{z} pts for a completed task, checklist items don't count.",
+  "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "{z} pts for the closing, the day's required items don't count.",
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} pts for the closing, −{s} pts for each required item of the day left undone."
 }

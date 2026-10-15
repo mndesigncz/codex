@@ -13,6 +13,12 @@ export interface Step {
   /** Override of the minus points when the step isn't done (positive number). */
   penalty: number | null;
   /**
+   * Vlastní body za splněný krok (kolo 91) — platí ve způsobu „Za každý krok“
+   * (lib/bodyRezim). Bez nich se bere váha (klíčový +2, běžný +1, drobný 0).
+   * Nepovinné v typu, ať ručně skládané kroky jinde nemusí nic měnit.
+   */
+  points?: number | null;
+  /**
    * Návod, podle kterého se krok dělá.
    *
    * `note` je jedna věta („Nechat nahřát před prvním kafem."). Krok
@@ -55,6 +61,12 @@ export function stepPenalty(s: Step): number {
   return weightSpec(s.weight).minus;
 }
 
+/** Body za splněný krok ve způsobu „Za každý krok“: vlastní body mají přednost, jinak váha. */
+export function krokBody(s: Step): number {
+  if (s.points != null && Number.isFinite(s.points)) return Math.max(0, Math.round(s.points));
+  return weightSpec(s.weight).plus;
+}
+
 /** Plus weight of a done step — its share of the run's completion bonus
  *  (scoreRun: bonus = body za postup × hotové plus / všechny plus), not raw points. */
 export function stepPlus(s: Step): number {
@@ -92,6 +104,7 @@ export function parseStep(raw: any): Step {
     const m = Number(raw.minutes);
     const pen = Number(raw.penalty);
     const g = Number(raw.guideId);
+    const pts = raw.points == null || raw.points === '' ? NaN : Number(raw.points);
     return {
       text: String(raw.text ?? '').trim(),
       minutes: Number.isFinite(m) && m > 0 ? Math.round(m) : null,
@@ -99,11 +112,12 @@ export function parseStep(raw: any): Step {
       emoji: raw.emoji ? String(raw.emoji).trim().slice(0, 4) : null,
       weight: raw.weight === 'key' || raw.weight === 'minor' ? raw.weight : 'normal',
       penalty: Number.isFinite(pen) && pen >= 0 ? Math.round(pen) : null,
+      points: Number.isFinite(pts) && pts >= 0 ? Math.min(100, Math.round(pts)) : null,
       guideId: Number.isFinite(g) && g > 0 ? Math.round(g) : null,
       ...hodnotaKroku(raw),
     };
   }
-  return { text: String(raw ?? '').trim(), minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null, valueKind: null, valueUnit: null, valueMin: null, valueMax: null };
+  return { text: String(raw ?? '').trim(), minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, points: null, guideId: null, valueKind: null, valueUnit: null, valueMin: null, valueMax: null };
 }
 
 /**
@@ -156,13 +170,14 @@ export function parseSteps(items: any): Step[] {
 export function serializeStep(s: Step): string | Record<string, any> {
   const plainWeight = !s.weight || s.weight === 'normal';
   const meri = s.valueKind === 'number';
-  if (!s.minutes && !s.note && !s.emoji && plainWeight && s.penalty == null && s.guideId == null && !meri) return s.text;
+  if (!s.minutes && !s.note && !s.emoji && plainWeight && s.penalty == null && s.points == null && s.guideId == null && !meri) return s.text;
   const out: Record<string, any> = { text: s.text };
   if (s.minutes) out.minutes = s.minutes;
   if (s.note) out.note = s.note;
   if (s.emoji) out.emoji = s.emoji;
   if (!plainWeight) out.weight = s.weight;
   if (s.penalty != null) out.penalty = s.penalty;
+  if (s.points != null) out.points = s.points;
   if (s.guideId != null) out.guideId = s.guideId;
   if (meri) {
     out.valueKind = 'number';

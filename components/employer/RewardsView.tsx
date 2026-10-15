@@ -36,6 +36,11 @@ import { MAX_HODNOT, MAX_PRISPEVEK, VYCHOZI_HODNOTY, VYCHOZI_PRISPEVEK, nastaven
 import { DRUHY_AUTO, MAX_BODU_AUTO, MIN_SMEN_TYDNE, nastaveniAuto, type DruhAuto, type NastaveniAuto } from '@/lib/automatickeBody';
 import { KLIC_KALENDAR, UDALOST_KALENDAR, urlZebricku, vyberKatalog, vyberPoradi, type ObdobiZebricku, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
+import { doPointsConfig, nastaveniRezimu, stropSeZmenil, MAX_STROP, type DruhBodu, type NastaveniRezimu, type PravidloRezimu, type ZdrojStropu } from '@/lib/bodyRezim';
+import { NastaveniStropu } from '../body-rezim/Strop';
+import { VolbaRezimu } from '../body-rezim/VolbaRezimu';
+import { HistoriePrepoctu, OknoNahledu, PrepocetZpetne, nactiNahled, provedPrepocet, type NahledPrepoctu, type RozsahPrepoctu } from '../body-rezim/Prepocet';
+import { nazevDruhu } from '../body-rezim/veta';
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
 import EmployeeProfile from './EmployeeProfile';
@@ -262,16 +267,34 @@ function NastaveniBodu({ onUlozeno }: { onUlozeno: () => void }) {
   const t = useT('sprava');
   // `dik` (kolo 8): příspěvek a hodnoty poděkování — server je posílá vedle normalizovaného sazebníku.
   // `auto` = pravidla automatických bodů; server je posílá už vyčištěná, nastaveniAuto({ auto }) je jen přečte.
-  const data = useDataWidgetu(URL_ODMENY, raw => ({ levels: normalizeLevels(raw?.levels), points: normalizePoints(raw?.points), dik: nastaveniDiku(raw?.dik), auto: nastaveniAuto({ auto: raw?.auto }) }));
+  const data = useDataWidgetu(URL_ODMENY, raw => ({ levels: normalizeLevels(raw?.levels), points: normalizePoints(raw?.points), dik: nastaveniDiku(raw?.dik), auto: nastaveniAuto({ auto: raw?.auto }), rezim: rezimZOdpovedi(raw?.rezim) }));
   if (data.error) return <Card><ErrorState compact title={t('Nastavení se nenačetlo')} onRetry={data.reload} detail={data.error} /></Card>;
   if (!data.data) return <Card aria-busy><Skeleton className="h-6 w-40" /><Skeleton className="mt-4 h-40" /></Card>;
-  return <FormularBodu levels={data.data.levels} points={data.data.points} dik={data.data.dik} auto={data.data.auto} onUlozeno={onUlozeno} />;
+  return <FormularBodu levels={data.data.levels} points={data.data.points} dik={data.data.dik} auto={data.data.auto} rezim={data.data.rezim} onUlozeno={onUlozeno} />;
 }
 
-function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychoziDik, auto: vychoziAuto, onUlozeno }: {
-  levels: RewardLevel[]; points: PointsConfig | null; dik?: NastaveniDiku; auto?: NastaveniAuto; onUlozeno: () => void;
+/** Způsob počítání a strop z GET /api/rewards (server posílá tvar NastaveniRezimu). */
+function rezimZOdpovedi(r: any): NastaveniRezimu {
+  if (!r || typeof r !== 'object') return nastaveniRezimu(null);
+  return nastaveniRezimu({ rezim: { postupy: r.postupy, ukoly: r.ukoly, uzaverky: r.uzaverky }, denniStropZap: r.stropZap === true, denniStrop: r.denniStrop, stropZdroje: r.stropZdroje, denniStropOd: r.stropOd ?? null });
+}
+
+const DRUHY: DruhBodu[] = ['postupy', 'ukoly', 'uzaverky'];
+
+function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychoziDik, auto: vychoziAuto, rezim: vychoziRezim, onUlozeno }: {
+  levels: RewardLevel[]; points: PointsConfig | null; dik?: NastaveniDiku; auto?: NastaveniAuto; rezim?: NastaveniRezimu; onUlozeno: () => void;
 }) {
   const t = useT('sprava');
+  // Kolo 91: způsob počítání bodů podle druhu, denní strop (výchozí vypnutý, plně volitelný) a „Přepočítat zpětně“.
+  const [rezim, setRezim] = useState<NastaveniRezimu>(vychoziRezim ?? nastaveniRezimu(null));
+  const [puvodniStrop, setPuvodniStrop] = useState<NastaveniRezimu>(vychoziRezim ?? nastaveniRezimu(null));
+  const [stropZap, setStropZap] = useState<boolean>((vychoziRezim ?? nastaveniRezimu(null)).stropZap);
+  const [stropText, setStropText] = useState<string>(String((vychoziRezim ?? nastaveniRezimu(null)).denniStrop));
+  const [zdroje, setZdroje] = useState<ZdrojStropu[]>((vychoziRezim ?? nastaveniRezimu(null)).stropZdroje);
+  const [zpetne, setZpetne] = useState(false);
+  const [starsi, setStarsi] = useState(false);
+  const [nahled, setNahled] = useState<{ open: boolean; data: NahledPrepoctu | null; chyba: string | null }>({ open: false, data: null, chyba: null });
+  const [obnovHistorii, setObnovHistorii] = useState(0);
   const [urovne, setUrovne] = useState<RewardLevel[]>(vychoziUrovne);
   const [body, setBody] = useState<PointsConfig>(vychoziBody ?? DEFAULT_POINTS);
   // Poděkování mezi kolegy (kolo 8): měsíční příspěvek (0 = vypnuto) a hodnoty podniku (#ochota, #tým…).
@@ -287,18 +310,44 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
   const pridatUroven = () => setUrovne(ls => [...ls, { name: 'Nová úroveň' /* i18n-ok (obsah podniku, ukládá se na server) */, minPoints: (ls[ls.length - 1]?.minPoints ?? 0) + 300, perks: '' }]);
   const odebratUroven = (i: number) => setUrovne(ls => ls.filter((_, idx) => idx !== i));
 
+  const strop = Math.max(0, Math.min(MAX_STROP, Number.parseInt(stropText, 10) || 0));
+  const stropTed = { stropZap, denniStrop: strop, stropZdroje: zdroje };
+  const stropZmenen = stropSeZmenil(puvodniStrop, stropTed);
+  // Přepočet (náhled i provedení): se „zpětně“ všechny druhy a strop odjakživa, jinak jen nový strop od dne uložení.
+  const rozsahPrepoctu: RozsahPrepoctu = { typ: 'podnik', druhy: zpetne ? DRUHY : [], zpetneStrop: zpetne };
+  const pravidlaPrepoctu = { rezim: { postupy: rezim.postupy, ukoly: rezim.ukoly, uzaverky: rezim.uzaverky }, ...stropTed, starsiHodnoceni: zpetne && starsi };
+
+  const ulozitNastaveni = async (stropOd: string | null) => {
+    // Způsob počítání a strop (kolo 91) jedou v points_config vedle sazebníku — PATCH přepisuje
+    // celý JSON, bez nich by se ztratily.
+    await odeslatNastaveni({ ...body, ...doPointsConfig({ ...rezim, ...stropTed, stropOd }) });
+  };
+  // Výsledek čte volající (ulozitNastaveni → ulozit / potvrditPrepocet, obojí v try s hláškou).
+  const odeslatNastaveni = (body: PointsConfig & Record<string, unknown>) =>
+    fetch('/api/teams', {
+      method: 'PATCH', headers: JSON_HLAVICKA,
+      body: JSON.stringify({
+        levelsConfig: urovne.map(l => ({ name: l.name.trim() || 'Úroveň' /* i18n-ok (obsah podniku) */, minPoints: Math.max(0, Math.round(l.minPoints) || 0), perks: l.perks.trim() })),
+        // Příspěvek a hodnoty jedou v points_config vedle sazebníku pod klíči, které čte nastaveniDiku.
+        pointsConfig: { ...body, mesicniPrispevek: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).prispevek, hodnoty: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).hodnoty, auto },
+      }),
+    }).then(okJson);
+
   const ulozit = async () => {
-    setUkladam(true);
     setChyba(null);
+    // Zpětný přepočet nebo nový strop mění body i za minulé dny — nejdřív ukázat dopad.
+    if (zpetne || stropZmenen) {
+      setNahled({ open: true, data: null, chyba: null });
+      try {
+        setNahled({ open: true, data: await nactiNahled(rozsahPrepoctu, pravidlaPrepoctu), chyba: null });
+      } catch (e) {
+        setNahled({ open: true, data: null, chyba: apiMessage(e, t('Dopad se nepodařilo spočítat.')) });
+      }
+      return;
+    }
+    setUkladam(true);
     try {
-      await fetch('/api/teams', {
-        method: 'PATCH', headers: JSON_HLAVICKA,
-        body: JSON.stringify({
-          levelsConfig: urovne.map(l => ({ name: l.name.trim() || 'Úroveň' /* i18n-ok (obsah podniku) */, minPoints: Math.max(0, Math.round(l.minPoints) || 0), perks: l.perks.trim() })),
-          // Příspěvek a hodnoty jedou v points_config vedle sazebníku pod klíči, které čte nastaveniDiku.
-          pointsConfig: { ...body, mesicniPrispevek: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).prispevek, hodnoty: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).hodnoty, auto },
-        }),
-      }).then(okJson);
+      await ulozitNastaveni(rezim.stropOd);
       setToast(t('Nastavení odměn uloženo.'));
       obnovDataWidgetu('/api/rewards/awards?zed=1&limit=30');
       onUlozeno();
@@ -308,6 +357,31 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
       setUkladam(false);
     }
   };
+
+  const potvrditPrepocet = async () => {
+    setUkladam(true);
+    try {
+      // Přepočet první: uloží si předchozí pravidlo (kvůli vrácení) a teprve pak se uloží zbytek formuláře.
+      await provedPrepocet(rozsahPrepoctu, pravidlaPrepoctu);
+      // Stejně jako server (lib/bodyPrepocetDb): zpětně = odjakživa, nový strop ode dneška, jinak beze změny.
+      const stropOd = zpetne ? null : stropZmenen ? pragueToday() : rezim.stropOd;
+      await ulozitNastaveni(stropOd);
+      setRezim(r => ({ ...r, ...stropTed, stropOd }));
+      setPuvodniStrop(p => ({ ...p, ...stropTed, stropOd }));
+      setZpetne(false); setStarsi(false);
+      setNahled({ open: false, data: null, chyba: null });
+      setObnovHistorii(n => n + 1);
+      setToast(t('Body jsou přepočítané a nastavení uložené.'));
+      obnovDataWidgetu('/api/rewards/awards?zed=1&limit=30');
+      onUlozeno();
+    } catch (e) {
+      setNahled(n => ({ ...n, chyba: apiMessage(e, t('Přepočet se nepodařilo uložit.')) }));
+    } finally {
+      setUkladam(false);
+    }
+  };
+
+  const zmenRezim = (d: DruhBodu, p: PravidloRezimu) => setRezim(r => ({ ...r, [d]: p }));
 
   // Odměny zůstávají nezáporné, srážky musí přijmout i minus.
   const pole = (label: string, klic: keyof PointsConfig, hint: string, zaporne = false) => {
@@ -348,6 +422,32 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
           {pole(t('Kasa sedí'), 'closingBalanced', t('Bonus, když rozdíl v kase vyjde přesně na nulu'))}
         </div>
       </Card>
+
+      {/* Kolo 91: způsob počítání bodů u věcí s kroky, denní strop a přepočet zpětně. */}
+      <Card aria-labelledby="body-zpusob" data-nastaveni-rezimu>
+        <h2 id="body-zpusob" className="t-card">{t('Způsob počítání bodů')}</h2>
+        <p className="t-meta mt-1 text-pretty">{t('Za každý krok: každý splněný krok body přidá. Za celek: body jen za celou věc, nesplněné kroky body strhnou. Kombinace: dnešní pravidlo. U postupu a úkolu jde způsob změnit zvlášť v jeho okně.')}</p>
+        <div className="mt-2 divide-y divide-black/[0.06]">
+          {DRUHY.map(d => (
+            <VolbaRezimu key={d} druh={d} nazev={nazevDruhu(t, d)} pravidlo={rezim[d]}
+              zaklad={d === 'postupy' ? body.procedure : d === 'ukoly' ? body.task : body.closing}
+              onZmena={p => zmenRezim(d, p)} />
+          ))}
+        </div>
+        <div className="mt-3 border-t border-black/[0.06] pt-4 space-y-3">
+          <NastaveniStropu zap={stropZap} onZap={setStropZap} hodnota={stropText} onHodnota={setStropText}
+            zdroje={zdroje} onZdroje={setZdroje} stropOd={rezim.stropOd} zmenen={stropZmenen} />
+          <PrepocetZpetne checked={zpetne} onChange={setZpetne}
+            hint={t('Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop (když je zapnutý) začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.')} />
+          {zpetne && (
+            <PrepocetZpetne checked={starsi} onChange={setStarsi} nazev={t('I starší ruční hodnocení směn považovat za nahrazující')}
+              hint={t('Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).')} />
+          )}
+        </div>
+      </Card>
+      <HistoriePrepoctu obnov={obnovHistorii} onVraceno={onUlozeno} />
+      <OknoNahledu open={nahled.open} nahled={nahled.data} chyba={nahled.chyba} ukladam={ukladam}
+        onPotvrdit={potvrditPrepocet} onZrusit={() => setNahled({ open: false, data: null, chyba: null })} />
 
       {/* Automatické body (kolo 8, vzor Kudos / Bonusly „automated awards"): připisuje denní cron, každé pravidlo s přepínačem. */}
       <Card aria-labelledby="auto-titulek" data-nastaveni-auto>

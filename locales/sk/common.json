@@ -168,5 +168,20 @@
   "Nastavení organizace": "Nastavenia organizácie",
   "Sdílení mezi podniky": "Zdieľanie medzi podnikmi",
   "{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}": "{n, plural, one {# úloha za body na prevzatie} few {# úlohy za body na prevzatie} other {# úloh za body na prevzatie}}",
-  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Heslo bolo zmenené. Ostatné zariadenia sú odhlásené."
+  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Heslo bolo zmenené. Ostatné zariadenia sú odhlásené.",
+  "Kombinace": "Kombinácia",
+  "Podle podniku": "Podľa podniku",
+  "Postupy": "Postupy",
+  "Za celek": "Za celok",
+  "Za každý krok": "Za každý krok",
+  "Za celý postup {z} b, za nedokončený krok −1 b, klíčový −3 b.": "Za celý postup {z} b, za nedokončený krok −1 b, kľúčový −3 b.",
+  "Za celý úkol {z} b, za nesplněnou položku checklistu −{s} b.": "Za celú úlohu {z} b, za nesplnenú položku checklistu −{s} b.",
+  "Za dokončení celku navíc +{z} b.": "Za dokončenie celku navyše +{z} b.",
+  "Za dokončený postup {z} b a za úplnost až dalších {z} b; za nedokončený krok −1 b, klíčový −3 b.": "Za dokončený postup {z} b a za úplnosť až ďalších {z} b; za nedokončený krok −1 b, kľúčový −3 b.",
+  "Za každou splněnou položku checklistu +{p} b, nesplněná nic neubere. Úkol bez checklistu: {z} b.": "Za každú splnenú položku checklistu +{p} b, nesplnená nič neuberie. Úloha bez checklistu: {z} b.",
+  "Za každou splněnou povinnou věc dne +{p} b, nesplněná nic neubere.": "Za každú splnenú povinnú vec dňa +{p} b, nesplnená nič neuberie.",
+  "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "Za každý splnený krok +1 b, kľúčový +2 b (vlastné body kroku majú prednosť), nesplnený nič neuberie.",
+  "Za splněný úkol {z} b, položky checklistu se nepočítají.": "Za splnenú úlohu {z} b, položky checklistu sa nepočítajú.",
+  "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "Za uzávierku {z} b, povinné veci dňa sa nepočítajú.",
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "Za uzávierku {z} b, za každú nesplnenú povinnú vec dňa −{s} b."
 }

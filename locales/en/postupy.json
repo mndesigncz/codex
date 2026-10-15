@@ -177,5 +177,10 @@
   "Čeká na schválení": "Awaiting approval",
   "Čt|den": "Th",
   "Žádný postup nečeká na schválení.": "No procedure is waiting for approval.",
-  "−{n} b.": "−{n} pts."
+  "−{n} b.": "−{n} pts.",
+  "Dopad se nepodařilo spočítat.": "Couldn't calculate the impact.",
+  "Emoji a čas jsou nepovinné. Důležitost kroku řídí body: splněný krok přidá (klíčový +2, běžný +1, drobný 0), nesplněný nic neubere. Vlastní body kroku mají přednost.": "Emoji and time are optional. Step importance drives points: a step done adds (key +2, normal +1, minor 0), a missed one takes nothing away. A step's own points win.",
+  "Emoji a čas jsou nepovinné. Důležitost kroku řídí srážky: nedokončený krok strhne (klíčový −3, běžný −1, drobný 0). Vlastní minus body mají přednost.": "Emoji and time are optional. Step importance drives deductions: an unfinished step deducts (key −3, normal −1, minor 0). Own minus points win.",
+  "Vlastní body kroku {n} za splnění": "Own points for step {n} when done",
+  "Body za postup": "Points for the procedure"
 }

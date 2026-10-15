@@ -44,6 +44,8 @@ export interface RunScore {
   missed: number;
   excusedSkips: number;
   unexcusedSkips: number;
+  /** Součet srážek za nedokončené a neomluveně přeskočené kroky (kladné číslo; u prázdného průběhu 0). */
+  penalty: number;
   summary: string;
 }
 
@@ -112,6 +114,7 @@ export function scoreRun(
   if (missed) parts.push(`${missed}× nedokončeno`);
   return {
     points, flagged, done, missed, excusedSkips, unexcusedSkips,
+    penalty: empty ? 0 : penalty,
     summary: `auto: ${parts.join(', ')}`,
   };
 }

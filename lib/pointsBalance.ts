@@ -4,6 +4,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { normalizePoints, PointsConfig } from '@/lib/rewardLevels';
+import { denniUpravy } from '@/lib/bodyDenDb';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -19,19 +20,32 @@ export interface PointsBreakdown {
   navicCount: number;    // kolik uznaných zápisů navíc
   trestPoints: number;   // body z trestů (point_awards kind = 'trest', záporné číslo)
   trestCount: number;    // kolik trestů s body
+  // Kolo 91: denní strop automatických bodů a přednost ručního hodnocení směny
+  // (lib/bodyDenDb). Oprava k součtu automatických bodů (≤ 0); data se nemažou.
+  dayAdjust: number;     // kolik strop a ruční hodnocení z automatických bodů ubraly
+  cappedDays: number;    // kolik dní narazilo na denní strop
+  replacedDays: number;  // kolik dní nahradilo ruční hodnocení směny
 }
 
 /** Prázdný rozpad — jeden tvar pro „člen bez bodů" všude (route i dávka). */
 export const PRAZDNY_ROZPAD: PointsBreakdown = {
-  tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0, awards: 0, awardCount: 0, navicPoints: 0, navicCount: 0, trestPoints: 0, trestCount: 0,
+  tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0, awards: 0, awardCount: 0, navicPoints: 0, navicCount: 0, trestPoints: 0, trestCount: 0, dayAdjust: 0, cappedDays: 0, replacedDays: 0,
 };
+
+/** points_config podniku (null, když tabulka/sloupec chybí). */
+async function pointsConfigOf(teamId: number): Promise<any> {
+  try {
+    const [t] = await sql`SELECT points_config FROM teams WHERE id = ${teamId}`;
+    return t?.points_config ?? null;
+  } catch { return null; }
+}
 
 // Count the point-earning signals for one user (each guarded so a missing
 // column degrades to zero instead of failing the whole request).
 // Úkoly, postupy a uzávěrky jen z TOHOHLE podniku, stejně jako breakdownForTeam
 // (k89: dřív se sem počítaly i z jiných podniků, takže kontrola bodů na odměnu
 // viděla jiný zůstatek než žebříček).
-export async function breakdownFor(teamId: number, userId: number): Promise<PointsBreakdown> {
+export async function breakdownFor(teamId: number, userId: number, pointsRaw?: any): Promise<PointsBreakdown> {
   let tasks = 0, procedures = 0, closings = 0, reviewPoints = 0, ratedShifts = 0;
   let autoPoints = 0, itemPoints = 0, flagged = 0;
   try {
@@ -94,7 +108,13 @@ export async function breakdownFor(teamId: number, userId: number): Promise<Poin
       awards = r?.pts ?? 0; awardCount = r?.n ?? 0;
     } catch { /* table missing */ }
   }
-  return { tasks, procedures, closings, reviewPoints, ratedShifts, autoPoints, itemPoints, flagged, awards, awardCount, navicPoints, navicCount, trestPoints, trestCount };
+  // Denní strop a ruční hodnocení (kolo 91) — stejná oprava jako v breakdownForTeam.
+  const cfg = pointsRaw !== undefined ? pointsRaw : await pointsConfigOf(teamId);
+  const u = (await denniUpravy(teamId, [userId], cfg)).get(userId);
+  return {
+    tasks, procedures, closings, reviewPoints, ratedShifts, autoPoints, itemPoints, flagged, awards, awardCount, navicPoints, navicCount, trestPoints, trestCount,
+    dayAdjust: u?.uprava ?? 0, cappedDays: u?.zastropovano ?? 0, replacedDays: u?.nahrazeno ?? 0,
+  };
 }
 
 // Batched varianta breakdownFor pro celý tým naráz: místo 5 dotazů na každého
@@ -106,7 +126,7 @@ export async function breakdownFor(teamId: number, userId: number): Promise<Poin
 // Odečty za odměny (kind = redemption) se v období nepočítají — pořadí za měsíc
 // říká, kdo si body vydělal, ne kdo si za ně koupil kávu. Bez `od` je to
 // celkový zůstatek jako dřív, včetně odečtů.
-export async function breakdownForTeam(teamId: number, userIds: number[], od: string | null = null): Promise<Map<number, PointsBreakdown>> {
+export async function breakdownForTeam(teamId: number, userIds: number[], od: string | null = null, pointsRaw?: any): Promise<Map<number, PointsBreakdown>> {
   const map = new Map<number, PointsBreakdown>();
   for (const id of userIds) map.set(id, { ...PRAZDNY_ROZPAD });
   if (userIds.length === 0) return map;
@@ -196,12 +216,20 @@ export async function breakdownForTeam(teamId: number, userIds: number[], od: st
     } catch { /* table missing */ }
   }
 
+  // Denní strop a ruční hodnocení (kolo 91): oprava po dnech, ve stejném období.
+  const cfg = pointsRaw !== undefined ? pointsRaw : await pointsConfigOf(teamId);
+  for (const [uid, u] of await denniUpravy(teamId, userIds, cfg, od)) {
+    const b = map.get(uid);
+    if (b) { b.dayAdjust = u.uprava; b.cappedDays = u.zastropovano; b.replacedDays = u.nahrazeno; }
+  }
+
   return map;
 }
 
 export function totalPoints(b: PointsBreakdown, pt: PointsConfig): number {
   return b.tasks * pt.task + b.procedures * pt.procedure + b.closings * pt.closing
-    + b.reviewPoints + b.autoPoints + b.itemPoints + (b.awards ?? 0) + (b.navicPoints ?? 0) + (b.trestPoints ?? 0);
+    + b.reviewPoints + b.autoPoints + b.itemPoints + (b.awards ?? 0) + (b.navicPoints ?? 0) + (b.trestPoints ?? 0)
+    + (b.dayAdjust ?? 0);
 }
 
 /**
@@ -223,12 +251,8 @@ export function rozpadZebricku(b: PointsBreakdown): PointsBreakdown {
  *  for approval (their deduction lands only on approve, but the points are
  *  already spoken for). */
 export async function pointsAvailableFor(teamId: number, userId: number): Promise<number> {
-  let pointsRaw: any = {};
-  try {
-    const [t] = await sql`SELECT points_config FROM teams WHERE id = ${teamId}`;
-    pointsRaw = t?.points_config;
-  } catch { /* not migrated */ }
-  const total = totalPoints(await breakdownFor(teamId, userId), normalizePoints(pointsRaw));
+  const pointsRaw = await pointsConfigOf(teamId);
+  const total = totalPoints(await breakdownFor(teamId, userId, pointsRaw), normalizePoints(pointsRaw));
   let pending = 0;
   try {
     const [r] = await sql`

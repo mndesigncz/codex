@@ -46,8 +46,10 @@ export interface Summary {
   tasks: TaskDetail[];
   procedures: ProcDetail[];
   closing: ClosingDetail | null;
-  review: { rating: number; note: string | null; points: number; autoPoints: number; flagged: boolean; scope: string } | null;
+  review: { rating: number; note: string | null; points: number; autoPoints: number; flagged: boolean; scope: string; nahraditAuto?: boolean } | null;
   autoPoints: { total: number; lines: { label: string; points: number }[] };
+  /** Kolo 91: automatické body dne po denním stropu (lib/bodyDenDb). */
+  den?: { efektivni: number; nasbirano: number; zastropovano: boolean; strop: number; stropPlati: boolean; nahrazeno: boolean; automaticky: number } | null;
 }
 
 const todayStr = () => pragueToday();
@@ -92,6 +94,8 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
   const [ptsTouched, setPtsTouched] = useState(false);
   const [flagged, setFlagged] = useState(false);
   const [wholeShift, setWholeShift] = useState(false);
+  // Kolo 91: ruční hodnocení nahradí automatické body dne (výchozí), nebo se k nim přičte.
+  const [nahraditAuto, setNahraditAuto] = useState(true);
   const [ratingStar, setRatingStar] = useState(4);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState('');
@@ -136,6 +140,8 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
         const crew = d.coworkers?.length ?? 0;
         setWholeShift(crew > 0 && (initialWholeShift || (d.review ? d.review.scope === 'shift' : true)));
         if (d.review) { setPts(d.review.points ?? 0); setPtsTouched(true); } else { setPtsTouched(false); }
+        // Nové hodnocení nahrazuje; uložené říká samo (starší bez volby se přičítalo).
+        setNahraditAuto(d.review ? d.review.nahraditAuto === true : true);
         setExpanded({});
       }
     }).catch(() => {}).finally(() => setLoadingSummary(false));
@@ -203,7 +209,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employeeId: employee.id, date, rating, note: note.trim() || null, points: pts, flagged,
-          applyToShift: wholeShift, employeeIds: ids,
+          applyToShift: wholeShift, employeeIds: ids, nahraditAuto,
         }),
       });
       if (res.ok) onSaved();
@@ -495,7 +501,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                       </div>
                     ))}
                   </div>
-                  <p className="text-[11px] text-black/40 mt-2">{t('Připočítají se automaticky k bodům níže.')}</p>
+                  {!summary.den && <p className="text-[11px] text-black/40 mt-2">{t('Připočítají se automaticky k bodům níže.')}</p>}
                 </div>
               )}
             </div>
@@ -516,11 +522,26 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               <div className="flex items-center gap-2 flex-wrap">
                 <input type="number" inputMode="numeric" value={pts} onChange={e => { setPtsTouched(true); setPts(parseInt(e.target.value) || 0); }} className={`${inputCls} !py-2.5 max-w-[130px] tabular-nums`} />
                 <span className="text-xs text-black/45">{t('bodů')} {!ptsTouched && rating > 0 && t('(návrh z hvězd)')}</span>
-                {summary && summary.autoPoints.total !== 0 && (
+                {summary && !summary.den && summary.autoPoints.total !== 0 && (
                   <span className="text-xs text-black/45 tabular-nums">· {t('celkem s automatickými:')} <strong className="text-[#16181A]">{signed(pts + summary.autoPoints.total)}</strong></span>
                 )}
               </div>
             </div>
+            {/* Kolo 91: ruční hodnocení přebíjí automatické body dne — ať je vidět, o co jde. */}
+            {summary?.den && (
+              <div className="well p-3.5 space-y-1.5" data-rucni-prednost>
+                <p className="text-[13px] text-[#16181A] tabular-nums">
+                  {nahraditAuto && (pts !== 0 || rating > 0)
+                    ? t('Automaticky by dostal {x} b — ruční hodnocení ho nahrazuje.', { x: signed(summary.den.automaticky) })
+                    : t('Automaticky dostane {x} b a ruční body se přičtou: celkem {c} b.', { x: signed(summary.den.automaticky), c: signed(summary.den.automaticky + pts) })}
+                </p>
+                {summary.den.zastropovano && (
+                  <p className="text-xs text-black/55 tabular-nums" data-denni-strop>{t('Dnes {b} b (strop) — nasbíral {n}.', { b: summary.den.strop, n: summary.den.nasbirano })}</p>
+                )}
+                <SwitchRow as="div" className="!py-1" title={t('Ruční body nahradí automatické')} checked={nahraditAuto} onChange={setNahraditAuto}
+                  hint={t('Vypnuto = ruční body se k automatickým přičtou. Body k jednotlivým položkám platí vždy.')} />
+              </div>
+            )}
             {/* Kolo 69 (B7): dřív ručně obarvená pilulka — je to zapnuto/vypnuto, tak Switch (DP §3.20). */}
             <SwitchRow as="div" title={t('Označit směnu k nápravě')} checked={flagged} onChange={setFlagged}
               hint={t('Zaměstnanec uvidí výtku nahoře v Odměnách a potvrdí, že ji četl.')} />

@@ -446,5 +446,6 @@
   "Dnes tu nic za body není — zapsat můžeš i vlastní věc navíc.": "Dziś nie ma nic za punkty — możesz zapisać też coś własnego ekstra.",
   "Volitelné — kdo chce, vezme si. Body dostaneš po uznání.": "Dobrowolne — kto chce, ten bierze. Punkty dostaniesz po uznaniu.",
   "Za body navíc": "Ekstra za punkty",
-  "Zapsat navíc": "Zapisz ekstra"
+  "Zapsat navíc": "Zapisz ekstra",
+  "strop {strop} b — nasbíral/a {nasbirano}": "limit {strop} pkt — zebrano {nasbirano}"
 }

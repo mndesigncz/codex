@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { sanitizeSteps } from '@/lib/steps';
+import { normalizujPrepis } from '@/lib/bodyRezim';
 import { notifyUsers } from '@/lib/push';
 import { pragueToday } from '@/lib/pragueTime';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
@@ -30,13 +31,22 @@ export async function GET() {
 
   let procedures: any[];
   try {
+    // body_rezim (kolo 91): způsob počítání bodů u postupu, null = podle podniku.
+    procedures = await sql`
+      SELECT id, name, description, icon, color, items,
+             remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor",
+             require_before_closing AS "requireBeforeClosing",
+             approved, submitted_by AS "submittedBy", body_rezim AS "bodyRezim"
+      FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
+  } catch {
+   try {
     procedures = await sql`
       SELECT id, name, description, icon, color, items,
              remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor",
              require_before_closing AS "requireBeforeClosing",
              approved, submitted_by AS "submittedBy"
       FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
-  } catch {
+   } catch {
    try {
     procedures = await sql`
       SELECT id, name, description, icon, color, items,
@@ -47,6 +57,7 @@ export async function GET() {
       SELECT id, name, description, icon, color, items,
              remind_at AS "remindAt", remind_days AS "remindDays"
       FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
+   }
    }
   }
 
@@ -116,6 +127,17 @@ export async function POST(request: Request) {
       INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, created_by)
       VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${me.id})
       RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
+  }
+
+  // Způsob počítání bodů (kolo 91) — návrh zaměstnance ho nenastavuje (rozhoduje vedení).
+  if (created && !isProposal && body.bodyRezim !== undefined) {
+    const prepis = normalizujPrepis(body.bodyRezim);
+    if (prepis) {
+      try {
+        await sql`UPDATE procedures SET body_rezim = ${JSON.stringify(prepis)}::jsonb WHERE id = ${created.id}`;
+        created.bodyRezim = prepis;
+      } catch { /* před migrací */ }
+    }
   }
 
   if (isProposal) {

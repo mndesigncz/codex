@@ -898,7 +898,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   // (sdílená obrazovka za barem) a karta se nevykreslí.
   const [mzda, setMzda] = useState<{
     wage: { ms: number; rate: number; earned: number; open: boolean; suspicious: boolean; noEntries: boolean };
-    points: { tasks: number; procedures: number; taskPts: number; procPts: number; closingPts: number; total: number };
+    points: { tasks: number; procedures: number; taskPts: number; procPts: number; closingPts: number; total: number; nasbirano?: number; strop?: number; zastropovano?: boolean };
   } | null>(null);
   useEffect(() => {
     if (!form.date || actorId == null || isKiosk) { setMzda(null); return; }
@@ -1857,7 +1857,11 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                 </div>
               )}
               <p className="text-[13px] text-black/55">
-                {t('Body za dnešek:')} <span className="font-semibold text-ok-ink tabular-nums">+{mzda.points.total}</span>
+                {t('Body za dnešek:')} <span className={`font-semibold tabular-nums ${mzda.points.total < 0 ? 'text-bad-ink' : 'text-ok-ink'}`}>{mzda.points.total > 0 ? '+' : ''}{mzda.points.total}</span>
+                {/* Kolo 91: denní strop automatických bodů — ať je jasné, proč je číslo menší než součet. */}
+                {mzda.points.zastropovano && (
+                  <span className="text-black/55" data-denni-strop>{' '}({t('strop {strop} b — nasbíral/a {nasbirano}', { strop: mzda.points.strop ?? 0, nasbirano: mzda.points.nasbirano ?? 0 })})</span>
+                )}
                 <span className="text-black/45">
                   {' '}— {t('{body} za uzávěrku', { body: mzda.points.closingPts })}
                   {mzda.points.tasks > 0 ? `, ${t('{body} za {n, plural, one {úkol} few {úkoly} other {úkolů}}', { body: mzda.points.taskPts, n: mzda.points.tasks })}` : ''}

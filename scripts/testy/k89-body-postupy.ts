@@ -89,7 +89,9 @@ export default function ({ eq, ok }: Testy) {
   const hodnoceni = zdroj('lib/procedureScoring.ts');
   ok('scoreRun nezačíná základem (let points = basePoints)', !/let points = basePoints/.test(hodnoceni));
   const route = zdroj('app/api/procedures/runs/route.ts');
-  ok('dokončení průběhu: scoreRun dostává body za postup jako strop bonusu', /scoreRun\(proc\?\.items, checked, skipped, skipReasons, cfg\.procedure\)/.test(route));
+  // Kolo 91: hodnocení jde přes způsob počítání (lib/bodyRezim) — výchozí „Kombinace“ je tentýž scoreRun
+  // se stropem bonusu cfg.procedure a řádek = body − započtený základ cfg.procedure (k91-body-rezim-*).
+  ok('dokončení průběhu: body za postup jako strop bonusu i započtený základ', /ucinnePravidlo\(.*, cfg\.procedure\);/.test(route) && /bodyPostupu\(proc\?\.items, checked, skipped, skipReasons, pravidlo, cfg\.procedure\)/.test(route));
   ok('dokončení průběhu: zápis jen jednou na průběh (ON CONFLICT DO NOTHING)', /ON CONFLICT \(employee_id, work_date, kind, ref_id\) DO NOTHING/.test(route));
   ok('detail průběhu neukazuje „+1“ u každého kroku', !/stepPlus/.test(zdroj('components/procedures/DetailPrubehu.tsx')));
 

@@ -6,6 +6,7 @@ import { KDO_JSEM, LIDE, clen } from '../data/lide';
 import { posunDen } from '../cas';
 import type { DemoStav } from '../stav';
 import { computeAutoPoints, normalizePoints } from '@/lib/rewardLevels';
+import { nastaveniRezimu } from '@/lib/bodyRezim';
 import { mojeRole } from './zaklad';
 
 const UROVNE = [
@@ -55,6 +56,9 @@ function nazevSmeny(s: DemoStav, x: { type: string }): string {
   return s.typySmen.find(t => t.name === x.type)?.name ?? x.type;
 }
 
+/** Přepočty bodů v paměti ukázky (kolo 91). */
+const PREPOCTY: { id: number; kdo: string | null; kdy: string; rozsah: unknown; souhrn: { zaznamu: number; lidi: number; celkem: number; doMinusu: number }; vraceno: string | null }[] = [];
+
 export const ostatni: Obsluha = (p, k) => {
   const s = k.stav;
   const { cesta, metoda, q } = p;
@@ -68,7 +72,7 @@ export const ostatni: Obsluha = (p, k) => {
       { work_date: posunDen(s.dnes, -1), rating: 5, note: 'Skvěle zvládnutý páteční nával, díky!', points: 20, autoPoints: 0, flagged: false, scope: 'shift', seen_at: null, created_at: `${posunDen(s.dnes, -1)}T21:00:00Z` },
       { work_date: posunDen(s.dnes, -4), rating: 4, note: null, points: 16, autoPoints: 0, flagged: false, scope: 'individual', seen_at: `${posunDen(s.dnes, -3)}T08:00:00Z`, created_at: `${posunDen(s.dnes, -4)}T21:00:00Z` },
     ];
-    const telo: Record<string, unknown> = { role: s.role === 'vedeni' ? 'employer' : 'employee', levels: UROVNE, points: BODY, me: ja, reviews, items: [], unseenFlagged: 0 };
+    const telo: Record<string, unknown> = { role: s.role === 'vedeni' ? 'employer' : 'employee', levels: UROVNE, points: BODY, rezim: nastaveniRezimu(null), me: ja, reviews, items: [], unseenFlagged: 0 };
     if (opr.has('odmeny.zebricek') || s.role === 'vedeni') {
       telo.standings = LIDE.filter(l => l.role === 'employee').map(l => {
         const b = BODY_LIDI[l.id] ?? 0;
@@ -77,6 +81,32 @@ export const ostatni: Obsluha = (p, k) => {
     }
     return ok(telo);
   }
+  // ---- Výchozí způsob počítání bodů (kolo 91) pro okno postupu a úkolu ----
+  if (cesta === '/api/body/vychozi' && metoda === 'GET') {
+    const n = nastaveniRezimu(null);
+    return ok({ postupy: { ...n.postupy, zaklad: BODY.procedure }, ukoly: { ...n.ukoly, zaklad: BODY.task }, uzaverky: { ...n.uzaverky, zaklad: BODY.closing }, stropZap: n.stropZap, denniStrop: n.denniStrop, stropZdroje: n.stropZdroje, stropOd: n.stropOd });
+  }
+  // ---- Přepočet bodů zpětně (kolo 91): náhled dopadu a historie jen v paměti ukázky ----
+  if (cesta === '/api/body/prepocet') {
+    if (!opr.has('odmeny.nastaveni')) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
+    if (metoda === 'GET') return ok({ historie: PREPOCTY.map((h, i) => ({ ...h, lzeVratit: i === 0 && !h.vraceno })) });
+    const b = p.telo ?? {};
+    if (b.vratit != null) {
+      const h = PREPOCTY[0];
+      if (!h || h.id !== Number(b.vratit) || h.vraceno) return chyba('Vrátit jde jen poslední přepočet.', 409);
+      h.vraceno = new Date().toISOString();
+      return ok({ ok: true, historie: PREPOCTY.map(x => ({ ...x, lzeVratit: false })) });
+    }
+    const druhy: string[] = Array.isArray(b.rozsah?.druhy) ? b.rozsah.druhy : [];
+    const polozka = b.rozsah?.typ === 'postup' || b.rozsah?.typ === 'ukol';
+    const zaznamu = polozka ? 4 : druhy.length * 9;
+    const nahled = { zaznamu, lidi: zaznamu ? Math.min(3, zaznamu) : (b.rozsah?.zpetneStrop ? 2 : 0), celkem: zaznamu ? -zaznamu * 2 : (b.rozsah?.zpetneStrop ? -36 : 0), doMinusu: [],
+      clenove: LIDE.filter(l => l.role === 'employee').slice(0, 2).map((l, i) => ({ uid: l.id, jmeno: l.name, pred: BODY_LIDI[l.id] ?? 0, po: (BODY_LIDI[l.id] ?? 0) - 10 - i * 8 })) };
+    if (b.nahled !== false) return ok({ nahled });
+    PREPOCTY.unshift({ id: Date.now(), kdo: clen(meId)?.name ?? null, kdy: new Date().toISOString(), rozsah: b.rozsah ?? null, souhrn: { zaznamu, lidi: nahled.lidi, celkem: nahled.celkem, doMinusu: 0 }, vraceno: null });
+    return ok({ ok: true, id: PREPOCTY[0].id, nahled, historie: PREPOCTY.map((h, i) => ({ ...h, lzeVratit: i === 0 })) });
+  }
+
   // ---- Pochvaly s body (kolo 5) ----
   if (cesta === '/api/rewards/awards') {
     if (!opr.has('hodnoceni.zobrazit')) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
@@ -174,8 +204,10 @@ export const ostatni: Obsluha = (p, k) => {
       date: den, hadShift, shift: sm ? { startTime: sm.startTime, endTime: sm.endTime, label: nazevSmeny(s, sm) } : null,
       coworkers: sm ? s.smeny.filter(x => x.date === den && x.employeeId !== id && x.startTime === sm.startTime).map(x => ({ id: x.employeeId, name: clen(x.employeeId).name, avatar: clen(x.employeeId).avatar })) : [],
       tasks: ukoly, procedures: [], closing,
-      review: rv ? { rating: rv.rating, note: rv.note, points: rv.points, autoPoints: 0, flagged: rv.flagged, scope: 'individual' } : null,
+      review: rv ? { rating: rv.rating, note: rv.note, points: rv.points, autoPoints: 0, flagged: rv.flagged, scope: 'individual', nahraditAuto: true } : null,
       autoPoints: computeAutoPoints({ hadShift, tasks: ukoly, procedures: [], closing }, normalizePoints(null)),
+      // Kolo 91: automatické body dne po stropu (ukázka: nasbíral víc než strop).
+      den: hadShift ? { efektivni: 30, nasbirano: 42, uprava: -12, zastropovano: true, strop: 30, stropPlati: true, nahrazeno: false, automaticky: 30 } : null,
     });
   }
 

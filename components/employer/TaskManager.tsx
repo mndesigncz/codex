@@ -55,6 +55,9 @@ import { SpravaNabidky } from '../navic-vedeni/SpravaNabidky';
 import { NabidkaNavicOkno } from '../navic-vedeni/NabidkaNavicOkno';
 import { rozborArgZaBody } from '../navic-vedeni/zaBody';
 import { useLocale } from './jazyk';
+import { normalizujPravidlo, type PrepisRezimu, type PravidloRezimu } from '@/lib/bodyRezim';
+import { VolbaRezimuPolozky } from '../body-rezim/VolbaRezimu';
+import { OknoNahledu, PrepocetZpetne, nactiNahled, provedPrepocet, type NahledPrepoctu } from '../body-rezim/Prepocet';
 
 interface Member { id: number; name: string; role: string }
 
@@ -117,6 +120,12 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   // Kolo 7: zadání víc lidem, kde část POSTů selhala — komu se nezadalo (formulář zůstane otevřený jen s nimi).
   const [castecne, setCastecne] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  // Kolo 91: body za úkol (vlastní počet, způsob u checklistu) a „Přepočítat zpětně“.
+  const [bodyRezim, setBodyRezim] = useState<PrepisRezimu | null>(null);
+  const [vychoziBody, setVychoziBody] = useState<(PravidloRezimu & { zaklad: number }) | null>(null);
+  const [prepocitat, setPrepocitat] = useState(false);
+  const preskocPrepocet = useRef(false);
+  const [nahledPrepoctu, setNahledPrepoctu] = useState<{ open: boolean; data: NahledPrepoctu | null; chyba: string | null }>({ open: false, data: null, chyba: null });
   const [editingSeries, setEditingSeries] = useState(false);
   const [akceChyba, setAkceChyba] = useState<string | null>(null);
   const [zprava, setZprava] = useState<string | null>(null);
@@ -192,7 +201,16 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     setZprava(t('Úkol je zadaný.'));
   };
 
-  const closeForm = () => { setShowForm(false); setEditingId(null); setEditingSeries(false); setForm(emptyForm()); setError(''); setCastecne(null); };
+  const closeForm = () => { setShowForm(false); setEditingId(null); setEditingSeries(false); setForm(emptyForm()); setError(''); setCastecne(null); setBodyRezim(null); setPrepocitat(false); };
+  // Výchozí body za úkol podniku — jen pro toho, kdo body u úkolu nastavuje (vedení).
+  useEffect(() => {
+    if (!zadava || !showForm || vychoziBody) return;
+    let alive = true;
+    fetch('/api/body/vychozi').then(okJson)
+      .then(d => { if (alive && d?.ukoly) setVychoziBody({ ...normalizujPravidlo(d.ukoly), zaklad: Number(d.ukoly.zaklad) || 0 }); })
+      .catch(() => { /* volba se ukáže bez věty */ });
+    return () => { alive = false; };
+  }, [zadava, showForm, vychoziBody]);
   const openNew = (dueDate = '') => {
     setEditingId(null); setEditingSeries(false);
     setForm({ ...emptyForm(), dueDate, assignedTo: zadava ? '' : String(ja ?? '') });
@@ -229,6 +247,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       requireBeforeClosing: uk.requireBeforeClosing === true,
       requirePhoto: uk.requirePhoto === true,
     });
+    setBodyRezim(uk.bodyRezim ?? null); setPrepocitat(false);
     setShowForm(true); setError(''); setCastecne(null);
   };
 
@@ -253,7 +272,20 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       recurrence: form.recurrence || null,
       // Bez práva se příznak neposílá vůbec: úprava od autora bez práva ho pak na serveru nechá, jak byl.
       ...(smiPovinny ? { requireBeforeClosing: form.requireBeforeClosing, requirePhoto: form.requirePhoto } : {}),
+      // Kolo 91: body za úkol nastavuje vedení (server bez ukoly.zadavat ignoruje).
+      ...(zadava ? { bodyRezim } : {}),
     };
+    // „Přepočítat zpětně“ u úpravy: nejdřív dopad, uložení až po potvrzení (dokonciPrepocet).
+    if (editingId && prepocitat && zadava && !preskocPrepocet.current) {
+      setSaving(false);
+      setNahledPrepoctu({ open: true, data: null, chyba: null });
+      try {
+        setNahledPrepoctu({ open: true, data: await nactiNahled({ typ: 'ukol', id: editingId }, { bodyRezim }), chyba: null });
+      } catch (err) {
+        setNahledPrepoctu({ open: true, data: null, chyba: apiMessage(err, t('Dopad se nepodařilo spočítat.')) });
+      }
+      return;
+    }
     // Kolo 7: víc lidí najednou = úkol každému zvlášť (Connecteam „Assign to"). Požadavky
     // jdou naráz (runBulk), každý s kontrolou res.ok; co se nepovede, se řekne jménem.
     if (lide.length > 1) {
@@ -293,6 +325,22 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       setError(apiMessage(err, editingId ? t('Úkol se nepodařilo upravit.') : t('Úkol se nepodařilo vytvořit.')));
     }
     setSaving(false);
+  };
+
+  /** Potvrzený přepočet zpětně: přepočet (uloží způsob a zapíše předchozí kvůli vrácení), pak zbytek úpravy. */
+  const dokonciPrepocet = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      await provedPrepocet({ typ: 'ukol', id: editingId }, { bodyRezim });
+      setPrepocitat(false);
+      setNahledPrepoctu({ open: false, data: null, chyba: null });
+      // Zbytek formuláře uloží běžná úprava (přepočet už proběhl).
+      preskocPrepocet.current = true;
+      try { await save({ preventDefault() { /* volá se mimo formulář */ } } as React.FormEvent); } finally { preskocPrepocet.current = false; }
+    } catch (err) {
+      setNahledPrepoctu(n => ({ ...n, chyba: apiMessage(err, t('Přepočet se nepodařilo uložit.')) }));
+    } finally { setSaving(false); }
   };
 
   /** Zápis s optimistickou změnou a vrácením při chybě (seznam, tabule i widgety nad /api/tasks). */
@@ -592,6 +640,18 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             </ul>
           )}
 
+          {/* Kolo 91: body za úkol — vlastní počet bodů, u checklistu i způsob počítání. */}
+          {zadava && (
+            <div data-body-ukolu>
+              <p className="field-label">{t('Body za úkol')}</p>
+              <VolbaRezimuPolozky druh="ukoly" prepis={bodyRezim} vychozi={vychoziBody} onZmena={setBodyRezim} />
+              {editingId != null && smi('odmeny.nastaveni') && (
+                <div className="mt-2"><PrepocetZpetne checked={prepocitat} onChange={setPrepocitat}
+                  hint={t('Body za tenhle úkol (u opakovaného za celou sérii) se nastaví podle téhle změny, jako by platila odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.')} /></div>
+              )}
+            </div>
+          )}
+
           <fieldset className="min-w-0">
             <legend className="field-label">{t('Kontrolní seznam')} <span className="text-black/45 font-normal">{t('— nepovinné')}</span></legend>
             <div className="space-y-2">
@@ -615,6 +675,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         </Card>
       )}
 
+      <OknoNahledu open={nahledPrepoctu.open} nahled={nahledPrepoctu.data} chyba={nahledPrepoctu.chyba} ukladam={saving}
+        onPotvrdit={() => void dokonciPrepocet()} onZrusit={() => setNahledPrepoctu({ open: false, data: null, chyba: null })} />
       {akceChyba && <p className="note note-danger text-sm" role="alert">{akceChyba}</p>}
 
       {view === 'zabody' ? (

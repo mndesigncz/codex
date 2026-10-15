@@ -168,5 +168,20 @@
   "Nastavení organizace": "Ustawienia organizacji",
   "Sdílení mezi podniky": "Współdzielenie między lokalami",
   "{n, plural, one {# úkol za body k vzetí} few {# úkoly za body k vzetí} other {# úkolů za body k vzetí}}": "{n, plural, one {# zadanie za punkty do wzięcia} few {# zadania za punkty do wzięcia} many {# zadań za punkty do wzięcia} other {# zadania za punkty do wzięcia}}",
-  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Hasło zostało zmienione. Pozostałe urządzenia zostały wylogowane."
+  "Heslo bylo změněno. Ostatní zařízení jsou odhlášená.": "Hasło zostało zmienione. Pozostałe urządzenia zostały wylogowane.",
+  "Kombinace": "Łączony",
+  "Podle podniku": "Jak w lokalu",
+  "Postupy": "Procedury",
+  "Za celek": "Za całość",
+  "Za každý krok": "Za każdy krok",
+  "Za celý postup {z} b, za nedokončený krok −1 b, klíčový −3 b.": "Za całą procedurę {z} pkt, za niedokończony krok −1 pkt, kluczowy −3 pkt.",
+  "Za celý úkol {z} b, za nesplněnou položku checklistu −{s} b.": "Za całe zadanie {z} pkt, za niewykonany punkt listy −{s} pkt.",
+  "Za dokončení celku navíc +{z} b.": "Za ukończenie całości dodatkowo +{z} pkt.",
+  "Za dokončený postup {z} b a za úplnost až dalších {z} b; za nedokončený krok −1 b, klíčový −3 b.": "Za ukończoną procedurę {z} pkt i za kompletność do {z} pkt więcej; za niedokończony krok −1 pkt, kluczowy −3 pkt.",
+  "Za každou splněnou položku checklistu +{p} b, nesplněná nic neubere. Úkol bez checklistu: {z} b.": "Za każdy wykonany punkt listy +{p} pkt, niewykonany nic nie odejmuje. Zadanie bez listy: {z} pkt.",
+  "Za každou splněnou povinnou věc dne +{p} b, nesplněná nic neubere.": "Za każdą wykonaną obowiązkową rzecz dnia +{p} pkt, niewykonana nic nie odejmuje.",
+  "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "Za każdy wykonany krok +1 pkt, kluczowy +2 pkt (własne punkty kroku mają pierwszeństwo), niewykonany nic nie odejmuje.",
+  "Za splněný úkol {z} b, položky checklistu se nepočítají.": "Za wykonane zadanie {z} pkt, punkty listy się nie liczą.",
+  "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "Za zamknięcie {z} pkt, obowiązkowe rzeczy dnia się nie liczą.",
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "Za zamknięcie {z} pkt, za każdą niewykonaną obowiązkową rzecz dnia −{s} pkt."
 }
