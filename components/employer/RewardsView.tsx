@@ -437,7 +437,7 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
           </Field>
           <p className="t-meta" data-strop-od>
             {strop === 0 ? t('Bez stropu.')
-              : rezim.stropOd ? t('Strop platí od {datum}. Starší dny jsou beze změny, dokud body nepřepočítáš zpětně.', { datum: fmtDatum(rezim.stropOd, { jazyk, styl: 'kratce' }) })
+              : rezim.stropOd ? t('Strop platí od {datum}, starší dny jsou beze změny, dokud body nepřepočítáš zpětně.', { datum: fmtDatum(rezim.stropOd, { jazyk, styl: 'kratce' }) })
               : t('Strop platí pro všechny dny (přepočítáno zpětně).')}
           </p>
           <PrepocetZpetne checked={zpetne} onChange={setZpetne}

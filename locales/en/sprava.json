@@ -1848,7 +1848,7 @@
   "Denní strop automatických bodů (b)": "Daily cap on automatic points (pts)",
   "Nejvýš kolik automatických bodů člověk dostane za jeden den (postupy, úkoly, uzávěrky, automatické hodnocení). Srážky platí vždy. Navíc, pochvaly a ruční body vedení se nepočítají. 0 = bez stropu.": "The most automatic points a person gets in one day (procedures, tasks, closings, automatic review). Deductions always apply. Extras, praise and manual points from management don't count. 0 = no cap.",
   "Bez stropu.": "No cap.",
-  "Strop platí od {datum}. Starší dny jsou beze změny, dokud body nepřepočítáš zpětně.": "The cap applies from {datum}. Earlier days stay unchanged until you recalculate retroactively.",
+  "Strop platí od {datum}, starší dny jsou beze změny, dokud body nepřepočítáš zpětně.": "The cap applies from {datum}, earlier days stay unchanged until you recalculate retroactively.",
   "Strop platí pro všechny dny (přepočítáno zpětně).": "The cap applies to all days (recalculated retroactively).",
   "Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Automatic points for procedures, tasks and closings will follow the method above and the cap will apply to past days too — as if it had always been so. Manual edits by management stay. You'll see the impact before saving.",
   "Automaticky by dostal {x} b — ruční hodnocení ho nahrazuje.": "Automatically they'd get {x} pts — the manual review replaces it.",
@@ -1857,5 +1857,8 @@
   "Ruční body nahradí automatické": "Manual points replace automatic ones",
   "Vypnuto = ruční body se k automatickým přičtou. Body k jednotlivým položkám platí vždy.": "Off = manual points are added to the automatic ones. Points on individual items always apply.",
   "Body za tenhle úkol (u opakovaného za celou sérii) se nastaví podle téhle změny, jako by platila odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Points for this task (for a recurring one, the whole series) will follow this change as if it had always applied. Manual edits by management stay. You'll see the impact before saving.",
-  "Denní strop a ruční hodnocení": "Daily cap and manual reviews"
+  "Denní strop a ruční hodnocení": "Daily cap and manual reviews",
+  "Body za celý úkol": "Points for the whole task",
+  "Body se nezměnily.": "No points changed.",
+  "{z, plural, one {# záznam} few {# záznamy} other {# záznamů}} u {l, plural, one {# člověka} few {# lidí} other {# lidí}}, celkem {c} b": "{z, plural, one {# record} other {# records}} for {l, plural, one {# person} other {# people}}, {c} pts in total"
 }

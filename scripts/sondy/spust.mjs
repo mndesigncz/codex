@@ -174,6 +174,8 @@ export const ZELENE = [
   'k90-karty',
   'k90-bezpecnost',
   'k90-host-data',
+  // kolo 91 (body-R): způsob počítání bodů, denní strop, ruční přednost, přepočet zpětně
+  'k91-body-rezim',
   'preteceni-vedeni',
   'preteceni-vedeni-tablet',
   'preteceni-zamestnanec',

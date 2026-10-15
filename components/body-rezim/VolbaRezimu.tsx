@@ -60,7 +60,7 @@ export function VolbaRezimuPolozky({ druh, prepis, vychozi, onZmena, smiZaklad =
     onZmena(dalsi.rezim == null && dalsi.bonus == null && dalsi.zaklad == null ? null : dalsi);
   };
   const ucinne = vychozi ? ucinnePravidlo(vychozi, prepis, vychozi.zaklad) : null;
-  const zakladPopis = druh === 'postupy' ? t('Body za celý postup') : t('Body za úkol');
+  const zakladPopis = druh === 'postupy' ? t('Body za celý postup') : t('Body za celý úkol');
   return (
     <div className="space-y-2.5" data-volba-rezimu-polozky={druh}>
       <Segmented size="sm" ariaLabel={t('Způsob počítání bodů')} value={volba}

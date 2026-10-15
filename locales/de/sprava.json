@@ -1848,7 +1848,7 @@
   "Denní strop automatických bodů (b)": "Tageslimit für automatische Punkte (P)",
   "Nejvýš kolik automatických bodů člověk dostane za jeden den (postupy, úkoly, uzávěrky, automatické hodnocení). Srážky platí vždy. Navíc, pochvaly a ruční body vedení se nepočítají. 0 = bez stropu.": "Höchstens so viele automatische Punkte bekommt jemand pro Tag (Abläufe, Aufgaben, Abschlüsse, automatische Bewertung). Abzüge gelten immer. Extras, Lob und manuelle Punkte der Leitung zählen nicht. 0 = kein Limit.",
   "Bez stropu.": "Kein Limit.",
-  "Strop platí od {datum}. Starší dny jsou beze změny, dokud body nepřepočítáš zpětně.": "Das Limit gilt ab {datum}. Frühere Tage bleiben unverändert, bis du rückwirkend neu berechnest.",
+  "Strop platí od {datum}, starší dny jsou beze změny, dokud body nepřepočítáš zpětně.": "Das Limit gilt ab {datum}, frühere Tage bleiben unverändert, bis du rückwirkend neu berechnest.",
   "Strop platí pro všechny dny (přepočítáno zpětně).": "Das Limit gilt für alle Tage (rückwirkend neu berechnet).",
   "Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Automatische Punkte für Abläufe, Aufgaben und Abschlüsse folgen der Zählweise oben und das Limit gilt auch für vergangene Tage — als wäre es immer so gewesen. Manuelle Änderungen der Leitung bleiben. Vor dem Speichern siehst du die Auswirkung.",
   "Automaticky by dostal {x} b — ruční hodnocení ho nahrazuje.": "Automatisch bekäme er/sie {x} P — die manuelle Bewertung ersetzt das.",
@@ -1857,5 +1857,8 @@
   "Ruční body nahradí automatické": "Manuelle Punkte ersetzen automatische",
   "Vypnuto = ruční body se k automatickým přičtou. Body k jednotlivým položkám platí vždy.": "Aus = manuelle Punkte kommen zu den automatischen dazu. Punkte zu einzelnen Posten gelten immer.",
   "Body za tenhle úkol (u opakovaného za celou sérii) se nastaví podle téhle změny, jako by platila odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Punkte für diese Aufgabe (bei einer wiederkehrenden die ganze Serie) richten sich nach dieser Änderung, als hätte sie immer gegolten. Manuelle Änderungen der Leitung bleiben. Vor dem Speichern siehst du die Auswirkung.",
-  "Denní strop a ruční hodnocení": "Tageslimit und manuelle Bewertungen"
+  "Denní strop a ruční hodnocení": "Tageslimit und manuelle Bewertungen",
+  "Body za celý úkol": "Punkte für die ganze Aufgabe",
+  "Body se nezměnily.": "Keine Punkte geändert.",
+  "{z, plural, one {# záznam} few {# záznamy} other {# záznamů}} u {l, plural, one {# člověka} few {# lidí} other {# lidí}}, celkem {c} b": "{z, plural, one {# Eintrag} other {# Einträge}} bei {l, plural, one {# Person} other {# Personen}}, insgesamt {c} P"
 }

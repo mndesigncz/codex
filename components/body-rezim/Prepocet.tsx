@@ -59,8 +59,12 @@ export function PrepocetZpetne({ checked, onChange, hint }: { checked: boolean; 
   );
 }
 
-/** Věta souhrnu: „Změní se 23 záznamů u 6 lidí, celkem −84 b“. */
-export function vetaDopadu(t: ReturnType<typeof useT>, n: Pick<NahledPrepoctu, 'zaznamu' | 'lidi' | 'celkem'>): string {
+/** Věta souhrnu: „Změní se 23 záznamů u 6 lidí, celkem −84 b“ (v historii bez „změní se“). */
+export function vetaDopadu(t: ReturnType<typeof useT>, n: Pick<NahledPrepoctu, 'zaznamu' | 'lidi' | 'celkem'>, probehlo = false): string {
+  if (probehlo) {
+    if (n.zaznamu === 0 && n.celkem === 0) return t('Body se nezměnily.');
+    return t('{z, plural, one {# záznam} few {# záznamy} other {# záznamů}} u {l, plural, one {# člověka} few {# lidí} other {# lidí}}, celkem {c} b', { z: n.zaznamu, l: n.lidi, c: znam(n.celkem) });
+  }
   if (n.zaznamu === 0 && n.celkem === 0) return t('Body se nezmění nikomu.');
   return t('Změní se {z, plural, one {# záznam} few {# záznamy} other {# záznamů}} u {l, plural, one {# člověka} few {# lidí} other {# lidí}}, celkem {c} b.', { z: n.zaznamu, l: n.lidi, c: znam(n.celkem) });
 }
@@ -163,7 +167,7 @@ export function HistoriePrepoctu({ obnov, onVraceno }: { obnov: number; onVracen
                     {coPrepocet(z.rozsah)}{z.vraceno ? <span className="ml-2 chip chip-sm chip-muted">{t('vráceno')}</span> : null}
                   </span>
                   <span className="block text-xs text-black/50 mt-0.5 text-pretty">
-                    {kdy ? fmtDatum(kdy, { jazyk, styl: 'kratce' }) : ''}{z.kdo ? ` · ${z.kdo}` : ''} · {vetaDopadu(t, z.souhrn)}
+                    {kdy ? fmtDatum(kdy, { jazyk, styl: 'kratce' }) : ''}{z.kdo ? ` · ${z.kdo}` : ''} · {vetaDopadu(t, z.souhrn, true)}
                   </span>
                 </span>
                 {z.lzeVratit && (
