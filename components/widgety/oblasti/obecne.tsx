@@ -716,12 +716,14 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
   return (
     <Sloupec mezera={4}>
       {pole}
-      {/* v4 (P2): počítadlo vlevo a „Připnout" vpravo v JEDNÉ řadě (pružný + obsahový na R), výška 44 —
-          dřív na telefonu tlačítko přes šířku a pod ním osamělé počítadlo. */}
-      <div className="flex items-center justify-between gap-3">
-        <span className="t-meta tabular-nums min-w-0">{cislo(text.length)}/{cislo(MAX_OZNAMENI)}</span>
-        <Button variant="primary" loading={ukladam} disabled={!text.trim()} onClick={pripnout}>{t('Připnout oznámení')}</Button>
-      </div>
+      {/* v4 (P2, P17): „Připnout" přes celou šířku L→R × 44 jako akce formuláře, počítadlo znaků nad ním
+          na pravé hraně (patří k poli) — dřív tlačítko obsahové šířky vpravo, na monitoru osamělé. */}
+      <Sloupec mezera={2}>
+        <p className="t-meta tabular-nums text-right">{cislo(text.length)}/{cislo(MAX_OZNAMENI)}</p>
+        <div className="rada rada-rovne rada-m">
+          <Button variant="primary" loading={ukladam} disabled={!text.trim()} onClick={pripnout}>{t('Připnout oznámení')}</Button>
+        </div>
+      </Sloupec>
     </Sloupec>
   );
 }

@@ -191,7 +191,9 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
       prazdno={prvni ? undefined : <p className="t-meta">{t('Další směnu v rozvrhu zatím nemáš.')}</p>}
       // v4 (V16): „Navíc" k běžící směně je akce widgetu — patka L→R × 44 na konci karty, ne pilulka pod textem.
       patka={!S && prvni && probiha && navic.smi ? (
-        <Button variant="secondary" icon="sparkle" onClick={() => setOknoNavic({ day: prvni.den, shiftId: prvni.s.id ?? null })} data-navic-smeny>{t('Navíc')}</Button>
+        <span className="flex" data-navic-smeny>
+          <Button variant="secondary" icon="sparkle" onClick={() => setOknoNavic({ day: prvni.den, shiftId: prvni.s.id ?? null })}>{t('Navíc')}</Button>
+        </span>
       ) : undefined}
     >
       {prvni && (S ? (

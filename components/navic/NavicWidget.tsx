@@ -146,8 +146,13 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
   const pilulky = smiZapsat && nabidka.length > 0 ? (
     // Pás pilulek přesahoval kvůli prstenci fokusu o 4 px do odsazení karty — obsah karty pak začínal
     // před levou osou (P5). Ve widgetu pás začíná přesně na L; pás i ve velké kartě (ne zalomené pilulky
-    // různé šířky pod sebou — zubatý sloupec, audit V03).
-    <div data-navic-akce className="[&_.scroll-fade-x]:mx-0 [&_.scroll-fade-x]:px-0">
+    // různé šířky pod sebou — zubatý sloupec, audit V03). Dlaždice pásu mají JEDNU šířku (12 rem, text
+    // na dva řádky, výška podle nejvyšší): v kartě pak zůstanou tři šířky ovládání (P3), ne pět.
+    <div data-navic-akce className={[
+      '[&_.scroll-fade-x]:mx-0 [&_.scroll-fade-x]:px-0',
+      '[&_.scroll-fade-x>button]:w-48 [&_.scroll-fade-x>button]:!h-auto [&_.scroll-fade-x>button]:min-h-[44px]',
+      '[&_.scroll-fade-x>button]:!whitespace-normal [&_.scroll-fade-x>button]:py-2 [&_.scroll-fade-x>button]:justify-start [&_.scroll-fade-x>button]:text-left',
+    ].join(' ')}>
       <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} obsazene={obsazene} label={t('Co se dá udělat navíc')} pas />
     </div>
   ) : null;
