@@ -12,7 +12,8 @@
 // všechna data /api/navic i /api/navic/ukoly (widgety, odznak v navigaci, okno).
 //
 // Žádná limetka: „Hotovo" je tmavé (primary), „Beru si" tónované, „Vrátit" tiché — jediná
-// limetka obrazovky patří stránce. Cíle ≥ 44 px (Button md), na tabletu lg.
+// limetka obrazovky patří stránce. Ve widgetu (`tiche`, v3) je i „Hotovo" šedá pilulka: na
+// Přehledu stojí vedle Píchaček a inkoustové tlačítko smí být v zorném poli jen jedno. Cíle ≥ 44 px (Button md), na tabletu lg.
 
 import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
@@ -59,7 +60,7 @@ export function textOpakovani(t: PrekladFn, n: Pick<NabidkaNavic, 'recurrence' |
   }
 }
 
-export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = false, velke = false, nahled = false, max, jenAkce = false, popisy = true, onZapsano }: {
+export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = false, velke = false, nahled = false, max, jenAkce = false, popisy = true, tiche = false, onZapsano }: {
   ukoly: readonly UkolNavic[];
   /** Tablet: za koho (vybraný člověk) — jde do „Beru si" i do zápisu. */
   actingAs?: number | null;
@@ -77,6 +78,8 @@ export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = 
   jenAkce?: boolean;
   /** Popis úkolu pod meta řádkem (střední karta widgetu ho vynechá — vejdou se tři úkoly bez „Zobrazit vše"). */
   popisy?: boolean;
+  /** Widget mezi jinými kartami: „Hotovo" šedé, ne inkoustové (inkoust nese hlavní akce stránky). */
+  tiche?: boolean;
   onZapsano?: (item: Navic) => void;
 }) {
   const t = useT('widgety');
@@ -119,7 +122,7 @@ export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = 
         aria-label={t('Vrátit: {nazev}', { nazev })} onClick={() => void zmen(u, 'vratit')} data-akce="vratit">{t('Vrátit')}</Button>
     );
     return (
-      <Button key={a} variant="primary" size={size} icon={u.nabidka.requirePhoto ? 'camera' : 'check'} disabled={probiha != null}
+      <Button key={a} variant={tiche ? 'secondary' : 'primary'} size={size} icon={u.nabidka.requirePhoto ? 'camera' : 'check'} disabled={probiha != null}
         aria-label={t('Hotovo: {nazev}', { nazev })} onClick={() => setHotovo(u)} data-akce="hotovo">{t('Hotovo')}</Button>
     );
   };

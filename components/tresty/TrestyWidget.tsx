@@ -99,7 +99,10 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
                   <span className="cz-sentence inline-block">{denKratce(prvni.day)}</span> · {dopadTrestu(t, prvni, money)}
                 </span>
               </button>
-              <Button variant="primary" block icon="check" loading={potvrzuji} disabled={nahled} onClick={() => void beruNaVedomi(prvni)} className="w-full justify-center" data-beru-na-vedomi>
+              {/* Šedá pilulka, ne inkoustová (v3): na Přehledu stojí nad Píchačkami, jejichž
+                  „Odpíchnout příchod" je hlavní akce obrazovky — dvě plná tlačítka v sousedních
+                  kartách soupeřila. Potvrzení je drobnost, kterou člověk udělá cestou. */}
+              <Button variant="secondary" block icon="check" loading={potvrzuji} disabled={nahled} onClick={() => void beruNaVedomi(prvni)} className="w-full justify-center" data-beru-na-vedomi>
                 {t('Beru na vědomí')}
               </Button>
             </div>

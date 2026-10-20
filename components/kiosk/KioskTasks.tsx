@@ -20,7 +20,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { okJson, apiMessage } from '@/lib/api';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum, fmtHM } from '@/lib/i18n/format';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Skeleton, Toast } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Segmented, Skeleton, Toast } from '../ui';
 import { Icon } from '../Icons';
 import { TaskChecklist } from '../TaskChecklist';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
@@ -180,14 +180,10 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
     <div className="space-y-6">
       <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
       {foto && <PrilozFoto nazev={foto.u.title} zaKoho={foto.who.name} onClose={() => setFoto(null)} onHotovo={url => zapisStav(foto.u, 'done', foto.who, url)} />}
-      <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none scroll-fade-x -mx-1 px-1" role="group" aria-label={t('Filtr úkolů')}>
-        {FILTERS.map(f => (
-          <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
-            className={`filter-pill tap-target ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {/* Pohled na seznam = jemný segment (v3), ne pás inkoustových pilulek: pod šedými
+          záložkami tabletu by to byla druhá řada stejných pilulek. Velikost md — na
+          tabletu ji .kiosk-surface zvedá na 44 px pro prst. */}
+      <Segmented ariaLabel={t('Filtr úkolů')} value={filter} onChange={setFilter} options={FILTERS} />
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
 
       {data.error && !data.data ? (

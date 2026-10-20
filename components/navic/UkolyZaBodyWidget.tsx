@@ -82,7 +82,7 @@ export function UkolyZaBodyWidget({ velikost, nahled }: WidgetProps) {
             )}
             {prvni && akce && (
               // Malá karta má jen akci prvního volného úkolu — název a body nese nahoře, celý seznam je v Úkolech.
-              <UkolyZaBody ukoly={[prvni]} actingAs={actingAs} jmeno={osoba?.jmeno ?? null} velke={naTabletu} jenAkce />
+              <UkolyZaBody ukoly={[prvni]} actingAs={actingAs} jmeno={osoba?.jmeno ?? null} velke={naTabletu} jenAkce tiche />
             )}
           </div>
         </Widget>
@@ -101,7 +101,7 @@ export function UkolyZaBodyWidget({ velikost, nahled }: WidgetProps) {
         ) : undefined}>
         <div className="space-y-3" data-za-body-widget={velikost}>
           {naTabletu && osoba && <p className="t-meta">{t('Pro: {jmeno}', { jmeno: osoba.jmeno })}</p>}
-          <UkolyZaBody ukoly={ukoly} actingAs={actingAs} jmeno={naTabletu ? osoba?.jmeno ?? null : null} velke={naTabletu} nahled={nahled} max={L ? undefined : 3} popisy={L || naTabletu} />
+          <UkolyZaBody ukoly={ukoly} actingAs={actingAs} jmeno={naTabletu ? osoba?.jmeno ?? null : null} velke={naTabletu} nahled={nahled} max={L ? undefined : 3} popisy={L || naTabletu} tiche />
           {L && tlacitkoZapsat('md')}
         </div>
       </Widget>
