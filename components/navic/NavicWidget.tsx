@@ -160,7 +160,8 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
     <>
       {tlacitko()}
       {kUkolum && (
-        <Button variant="ghost" iconAfter="chevronRight" onClick={() => nav.onNavigate('tasks', ARG_ZA_BODY)} data-navic-za-body>{t('Úkoly za body')}</Button>
+        // Tichý odkaz v pravé půlce patky drží text u pravé hrany (P4) — na středu půlky by řada „končila" uprostřed.
+        <Button variant="ghost" iconAfter="chevronRight" className="justify-end !pr-2" onClick={() => nav.onNavigate('tasks', ARG_ZA_BODY)} data-navic-za-body>{t('Úkoly za body')}</Button>
       )}
     </>
   ) : undefined;

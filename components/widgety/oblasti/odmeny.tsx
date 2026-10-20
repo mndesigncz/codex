@@ -1041,14 +1041,14 @@ function ZadostiOOdmeny({ velikost, nahled }: WidgetProps) {
         prazdno={data.data && fronta.length === 0 ? <p className="t-meta">{t('Žádná žádost nečeká.')}</p> : undefined}
         patka={(fronta.length > videt.length || (fronta.length > 1 && !vyber.selecting)) ? (
           <>
-            {fronta.length > videt.length && (
-              <Button variant="ghost" iconAfter="chevron" onClick={() => setRozbaleno(true)}>
-                {t('Ukázat všech {pocet}', { pocet: cislo(fronta.length) })}
-              </Button>
-            )}
-            {/* „Vybrat víc" se ukáže, až je co vybírat (DP §3.19). */}
+            {/* „Vybrat víc" se ukáže, až je co vybírat (DP §3.19). Tichý „Ukázat všech" vpravo, text u pravé hrany. */}
             {fronta.length > 1 && !vyber.selecting && (
               <Button variant="secondary" icon="check" disabled={pracuji != null} onClick={() => { if (!nahled) vyber.start(); }}>{t('Vybrat víc')}</Button>
+            )}
+            {fronta.length > videt.length && (
+              <Button variant="ghost" iconAfter="chevron" className="justify-end !pr-2" onClick={() => setRozbaleno(true)}>
+                {t('Ukázat všech {pocet}', { pocet: cislo(fronta.length) })}
+              </Button>
             )}
           </>
         ) : undefined}>
@@ -1234,7 +1234,7 @@ function Pochvaly({ velikost, nahled }: WidgetProps) {
   // v4 (V16, P12): Pochválit + Poděkovat jako pár ½ + ½ v patce widgetu (L→R × 44).
   const tlacitko = smiChvalit && <>
     <Button variant="secondary" icon="award" onClick={() => setOkno(true)}>{t('Pochválit')}</Button>
-    {!nahled && <Button variant="ghost" onClick={() => setDekuji(true)}>{t('Poděkovat')}</Button>}
+    {!nahled && <Button variant="ghost" className="justify-end !pr-2" onClick={() => setDekuji(true)}>{t('Poděkovat')}</Button>}
     {dekuji && <PodekovaniOkno onClose={() => setDekuji(false)} />}
   </>;
   return (
