@@ -140,7 +140,9 @@ const prepinac = (p, nazev) => p.getByRole('switch', { name: nazev, exact: true 
   let t = norm(await p.locator('main').innerText());
   tvrdi('tým: u člena je název role', t.includes('barista / obsluha'), t.slice(0, 200));
   const radek = p.locator('li.list-row').filter({ hasText: 'Eva Testová' }).first();
-  await p.getByRole('button', { name: 'Upravit: Eva Testová' }).click(); await p.waitForTimeout(400); // kolo 69: úprava v okně
+  // kolo 69: úprava v okně; v4 (V4): „Upravit…" je první položka „···" řádku (jedna akce na R).
+  await p.getByRole('button', { name: 'Další akce: Eva Testová' }).click(); await p.waitForTimeout(200);
+  await p.getByRole('menuitem', { name: 'Upravit…' }).click(); await p.waitForTimeout(400);
   const vyber = p.getByLabel('Role', { exact: true });
   const volby = await vyber.locator('option').allInnerTexts();
   tvrdi('tým: výběr nabízí přednastavené i vlastní role, ne tablet', volby.some(v => v.includes('Provozní')) && volby.some(v => v.includes('Směnový vedoucí')) && !volby.some(v => v.includes('Kiosk')), volby.join(' | '));
