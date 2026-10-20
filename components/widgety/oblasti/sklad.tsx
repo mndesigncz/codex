@@ -1318,8 +1318,10 @@ function ZapsatNovou({ velikost, nahled }: WidgetProps) {
             <p className="t-meta">{t('Přišlo zboží? Vyfoť ho a napiš kolik.')}{navrh ? ` ${t('Vedení zápis jen potvrdí.')}` : ''}</p>
           )}
           <Button variant="secondary" size="sm" icon="plus" className={velikost === 'S' ? 'w-full justify-center' : ''}
+            aria-label={velikost === 'S' ? t('Zapsat novou věc') : undefined}
             onClick={() => { if (!nahled) setOkno(true); }}>
-            {t('Zapsat novou věc')}
+            {/* Malá karta už název nese v titulku — tlačítko řekne jen sloveso (celé jméno čte odečítač). */}
+            {velikost === 'S' ? t('Zapsat') : t('Zapsat novou věc')}
           </Button>
         </div>
       </Widget>
@@ -1441,8 +1443,9 @@ function Nahlasit({ velikost, nahled }: WidgetProps) {
             </p>
           )}
           <Button variant="secondary" size="sm" icon="send" className={velikost === 'S' ? 'w-full justify-center' : ''}
+            aria-label={velikost === 'S' ? t('Nahlásit chybějící') : undefined}
             onClick={() => { if (!nahled) setOkno(true); }}>
-            {t('Nahlásit chybějící')}
+            {velikost === 'S' ? t('Nahlásit') : t('Nahlásit chybějící')}
           </Button>
         </div>
       </Widget>
