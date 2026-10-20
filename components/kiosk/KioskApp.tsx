@@ -271,7 +271,9 @@ function KioskShell({ user }: { user: KioskUser }) {
       {/* Na tabletu se záložky zalomí místo scrollování: 882 px pásu se do
           712 px nevešlo a poslední („Uzávěrka") byla uříznutá bez jakéhokoli
           náznaku, že tam ještě něco je. U baru se nehledá posuvník. */}
-      <nav className="mt-5 flex gap-1.5 flex-wrap sm:flex-wrap overflow-x-auto sm:overflow-x-visible scrollbar-thin -mx-1 px-1">
+      {/* Na telefonu (pod sm) jeden posuvný řádek: sedm šedých pilulek by se zalomilo do čtyř
+          řad nad obsahem. Tablet zalamuje do mřížky dál. */}
+      <nav className="mt-5 flex gap-1.5 sm:flex-wrap overflow-x-auto sm:overflow-x-visible scrollbar-none -mx-1 px-1">
         {viditelne.map(t => (
           // aria-current: odečítač musí říct, na které obrazovce obsluha je —
           // třída seg-on je jen pro oko (v tmavém režimu ji odliší světlý okraj v globals.css).

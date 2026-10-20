@@ -1925,7 +1925,8 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       {jeTelefon && !schovany && (
         <PlovouciLista label={t('Kroky uzávěrky')}>
           <button type="button" onClick={() => otevriKrok(aktivniKrok - 1)} disabled={aktivniKrok === 0}
-            className="tap-target rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap disabled:opacity-40">
+            // v3: Zpět tiše jako text, pilulku má jen krok dopředu — v liště je jedna akce.
+            className="tap-target rounded-full px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 transition whitespace-nowrap disabled:opacity-40">
             <Icon name="chevronLeft" size={14} className="inline -mt-0.5 mr-1" />{t('Zpět')}
           </button>
           <span className="text-sm font-semibold whitespace-nowrap px-1 tabular-nums" aria-live="polite">
