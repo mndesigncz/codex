@@ -452,13 +452,15 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
                 </button>
               )}
             </div>
-            <Menu label={t('Řadit: {druh}', { druh: NAZVY_RAZENI[razeni] })} icon="swap"
+            {/* 36 jako filtry vedle (P7) — dřív kruh 40 vedle pilulek 36. */}
+            <Menu size="sm" label={t('Řadit: {druh}', { druh: NAZVY_RAZENI[razeni] })} icon="swap"
               items={RAZENI_RECEPTUR.map(k => ({ label: NAZVY_RAZENI[k], icon: k === razeni ? 'check' : undefined, onClick: () => setRazeni(k) }))} />
           </div>
         </div>
         {categories.length > 2 && (
-          // Zalamuje se; posuvný pás se záporným okrajem (-mx-1) dřív přečníval 4 px za widget.
-          <div className="flex flex-wrap gap-2" role="group" aria-label={t('Kategorie menu')}>
+          // Jeden posuvný pás mezi L a R (v4): zalomené pilulky různé šířky nechávaly poslední
+          // („Pečivo") samotnou na řádku. Bez záporného okraje — ten dřív přečníval 4 px za widget.
+          <div className="flex gap-2 overflow-x-auto scrollbar-none scroll-fade-x py-0.5" role="group" aria-label={t('Kategorie menu')}>
             {categories.map(c => (
               <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(c)}
                 className={`filter-pill tap-target whitespace-nowrap shrink-0 ${cat === c ? 'seg-on' : 'seg-off glass'}`}>

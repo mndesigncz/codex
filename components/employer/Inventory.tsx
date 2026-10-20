@@ -24,7 +24,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Icon } from '../Icons';
 import {
-  Button, Card, Chip, EmptyState, ErrorState, Field, ListRow, Menu, Modal, SearchField, Segmented, Skeleton, Toast,
+  Button, Card, Chip, EmptyState, ErrorState, Field, ListRow, Menu, Modal, Rada, SearchField, Segmented, Skeleton, Toast,
   BulkBar, SelectBox, Avatar, SwitchRow, type MenuItem,
 } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
@@ -886,19 +886,25 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
             ]}
             inputClassName={kompakt ? '!py-2' : ''}
           />
-          <div className="flex items-center gap-2 shrink-0 min-w-0">
-            {selecting && <Button variant="secondary" size={kompakt ? 'sm' : 'md'} onClick={exitSelection}>{t('Zrušit výběr')}</Button>}
-            {kompakt ? (
+          {kompakt ? (
+            <div className="flex items-center gap-2 shrink-0 min-w-0">
+              {selecting && <Button variant="secondary" size="sm" onClick={exitSelection}>{t('Zrušit výběr')}</Button>}
               <Button variant="secondary" iconOnly icon={view === 'list' ? 'grid' : 'menu'}
                 aria-label={view === 'list' ? t('Zobrazit jako karty') : t('Zobrazit jako seznam')}
                 onClick={() => setView(view === 'list' ? 'grid' : 'list')} />
-            ) : (
-              <Segmented ariaLabel={t('Zobrazení')} size="sm" value={view} onChange={setView}
+              <Menu label={t('Řadit: {druh}', { druh: razeni(t).find(s => s.key === sort)?.label ?? '' })} icon="swap"
+                items={razeni(t).map(s => ({ label: s.label, icon: s.key === sort ? 'check' : undefined, onClick: () => setSort(s.key) }))} />
+            </div>
+          ) : (
+            // v4 (P7/P10): Seznam | Karty pružně a řazení na R v jedné řadě 44 (dřív segment 36 a kruh 40).
+            <Rada deleni="pruzne" vyska="m" className="lg:w-auto lg:flex-none">
+              <Segmented ariaLabel={t('Zobrazení')} value={view} onChange={setView}
                 options={[{ id: 'list', label: t('Seznam'), icon: 'menu' }, { id: 'grid', label: t('Karty'), icon: 'grid' }]} />
-            )}
-            <Menu label={t('Řadit: {druh}', { druh: razeni(t).find(s => s.key === sort)?.label ?? '' })} icon="swap"
-              items={razeni(t).map(s => ({ label: s.label, icon: s.key === sort ? 'check' : undefined, onClick: () => setSort(s.key) }))} />
-          </div>
+              {selecting && <Button variant="secondary" onClick={exitSelection}>{t('Zrušit výběr')}</Button>}
+              <Menu className="[&>button]:!w-11" label={t('Řadit: {druh}', { druh: razeni(t).find(s => s.key === sort)?.label ?? '' })} icon="swap"
+                items={razeni(t).map(s => ({ label: s.label, icon: s.key === sort ? 'check' : undefined, onClick: () => setSort(s.key) }))} />
+            </Rada>
+          )}
         </div>
         <CategoryNav
           categories={categories}

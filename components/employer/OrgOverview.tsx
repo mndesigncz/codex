@@ -141,7 +141,8 @@ export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: numb
           title: t('Všechny podniky'),
           subtitle: org ? t('{org} · tržby, mzdy, uzávěrky a sklad za každý podnik i celkem.', { org }) : t('Tržby, mzdy, uzávěrky a sklad za každý podnik i celkem.'),
           hintId: 'orgoverview',
-          aside: <MonthNav value={mesic} onChange={setMesic} max={dnes} />,
+          // Přepínač měsíce stránky L→R jako segment stránky (P2/P11) — dřív 232 px vlevo, sám na řádku.
+          aside: <MonthNav value={mesic} onChange={setMesic} max={dnes} className="sm:!w-full" />,
         }}
         nastroj={<SeznamPodniku mesic={mesic} onOpenTeam={onOpenTeam} />}
       />
