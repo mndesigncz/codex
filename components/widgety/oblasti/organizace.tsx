@@ -94,7 +94,8 @@ function Podniky({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
     <Widget nacteni={ceka ? CEKA : data}
       // Nedostupný přehled (vypnutý, jeden podnik) na Přehledu nic neříká — v klidu se nekreslí.
       prazdno={p && !p.dostupny ? null : undefined}
-      doplnek={p?.dostupny ? <Chip tone="muted" size="sm">{t('{n, plural, one {# podnik} few {# podniky} other {# podniků}}', { n: p.podniky.length })}</Chip> : undefined}
+      // v3: počet podniků není chip v titulku (lámal „Všechny podniky" na dva řádky) — ve střední
+      // velikosti je na začátku souhrnné věty dole, ve velké ho řekne seznam sám.
       odkaz={naStrance ? undefined : { popisek: t('Všechny podniky'), pohled: 'org' }}>
       {p?.dostupny && c && (velikost === 'M' ? (
         <div className="space-y-4">
@@ -114,6 +115,7 @@ function Podniky({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
             <Stat label={t('Sklad dochází')} value={c.stockAlerts.toLocaleString('cs-CZ')} note={c.stockAlerts > 0 ? t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: c.stockAlerts }) : undefined} />
           </StatRow>
           <p className="t-meta">
+            {t('{n, plural, one {# podnik} few {# podniky} other {# podniků}}', { n: p.podniky.length })}{' · '}
             {problemove.length === 0 ? t('Všechny podniky jsou v pořádku.') : t('Pozornost potřebuje {podniky}: {jmena}.', { podniky: t('{n, plural, one {# podnik} few {# podniky} other {# podniků}}', { n: problemove.length }), jmena: problemove.map(r => r.name).join(', ') })}
           </p>
         </div>
