@@ -477,12 +477,14 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
           </ul>
         ) : <p className="text-sm text-black/55">{t('Zatím žádná. První je hned vlevo.')}</p>}
       </aside>
+      {/* v3: velký titulek, jedna věta pod ním, dvě pilulky přes šířku; nevratný krok plně červený. */}
       <Modal open={zrusitId !== null} onClose={() => setZrusitId(null)} size="sm" title={t('Zrušit rezervaci?')}
+        subtitle={t('Podnik se o zrušení dozví a termín se uvolní.')}
         footer={<>
           <Button variant="secondary" onClick={() => setZrusitId(null)}>{t('Ponechat')}</Button>
-          <Button variant="danger" onClick={() => { if (zrusitId !== null) void cancel(zrusitId); }}>{t('Zrušit rezervaci')}</Button>
+          <Button variant="danger-solid" onClick={() => { if (zrusitId !== null) void cancel(zrusitId); }}>{t('Zrušit rezervaci')}</Button>
         </>}>
-        <p className="text-sm text-black/65">{t('Podnik se o zrušení dozví a termín se uvolní.')}</p>
+        {null}
       </Modal>
     </div>
   );
