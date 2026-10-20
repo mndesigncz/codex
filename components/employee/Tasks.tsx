@@ -296,7 +296,8 @@ export default function Tasks({ user }: Props) {
           )}
           {/* „Zapsat navíc" (vlastní věc mimo nabídku) pod seznamem — v hlavičce by na 390 px zalomil nadpis. */}
           <div className="border-t border-[var(--surface-line)] py-3">
-            <Button variant="secondary" icon="plus" onClick={() => setZapsatNavic(true)} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
+            {/* v4 (P17, V2): akce sekce na konci karty přes celou šířku (patka), ne osamělá vlevo. */}
+            <Button variant="secondary" icon="plus" className="w-full" onClick={() => setZapsatNavic(true)} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
           </div>
         </Card>
       ) : (

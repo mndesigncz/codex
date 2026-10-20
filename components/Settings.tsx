@@ -558,18 +558,18 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
               <div>
                 <label className={labelClass} id="nast-avatar">{t('Avatar')}</label>
-                {/* v4 (P1, P2): volba avatara je mřížka rovných dílů až k pravé hraně (6 na telefonu, 12 od sm) —
+                {/* v4 (P1, P2): volba avatara je mřížka rovných dílů (aspoň 40 px) až k pravé hraně —
                     dřív zalomené dlaždice končily 78 px před hranou polí pod nimi. */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                   <div className="w-16 h-16 rounded-full bg-[var(--well)] border border-[var(--well-line)] flex items-center justify-center text-3xl flex-shrink-0" aria-hidden>
                     {avatar}
                   </div>
-                  <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 min-w-0 flex-1" role="group" aria-labelledby="nast-avatar">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-2 min-w-0 flex-1" role="group" aria-labelledby="nast-avatar">
                     {AVATARS.map(a => (
                       // Vybraný avatar nese inkoustový prstenec, ne limetkový tón —
                       // limetka na obrazovce patří tlačítku Uložit.
                       <button key={a} type="button" onClick={() => setAvatar(a)} aria-pressed={avatar === a} aria-label={t('Avatar {a}', { a })}
-                        className={`w-full aspect-square max-sm:max-h-11 sm:max-h-10 rounded-xl flex items-center justify-center text-xl transition ${
+                        className={`w-full min-w-0 h-11 rounded-xl flex items-center justify-center text-xl transition ${
                           avatar === a ? 'bg-black/[0.04] ring-2 ring-[#16181A]' : 'bg-black/[0.04] border border-black/[0.08] hover:bg-black/[0.06]'
                         }`}>
                         {a}
