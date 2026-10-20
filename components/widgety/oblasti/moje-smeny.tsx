@@ -42,7 +42,7 @@
 
 import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { Button, Chip, ListRow, Stat, StatRow } from '../../ui';
+import { Button, Chip, ListRow, Sloupec, Stat, StatRow } from '../../ui';
 import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, type StavNacteni } from '../Widget';
@@ -181,6 +181,7 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
   // Kolo 9: běžící směna nabídne „Navíc" — co bylo nad rámec, se zapisuje ještě na směně, ne večer z paměti.
   const navic = useNavicKeSmenam(!S && !nahled && probiha);
   const [oknoNavic, setOknoNavic] = useState<PredvolbyNavic | null>(null);
+  const pocetNavic = prvni ? navic.pocet({ id: prvni.s.id, date: prvni.den }) : 0;
 
   return (
     <Widget
@@ -188,6 +189,10 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
       odkaz={S ? undefined : { popisek: t('Moje směny'), pohled: 'my-shifts' }}
       otevrit={S && muze ? () => nav.onNavigate('my-shifts') : undefined}
       prazdno={prvni ? undefined : <p className="t-meta">{t('Další směnu v rozvrhu zatím nemáš.')}</p>}
+      // v4 (V16): „Navíc" k běžící směně je akce widgetu — patka L→R × 44 na konci karty, ne pilulka pod textem.
+      patka={!S && prvni && probiha && navic.smi ? (
+        <Button variant="secondary" icon="sparkle" onClick={() => setOknoNavic({ day: prvni.den, shiftId: prvni.s.id ?? null })} data-navic-smeny>{t('Navíc')}</Button>
+      ) : undefined}
     >
       {prvni && (S ? (
         // Malá karta má na telefonu ~140 px: celé „08:00–16:00" v 28 px by přeteklo,
@@ -195,7 +200,7 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
         <Stat label={probiha ? t('Právě probíhá') : denKratce(prvni.den, t)} value={prvni.od || '—'}
           note={[prvni.do && t('do {cas}', { cas: prvni.do }), typ].filter(Boolean).join(' · ') || undefined} />
       ) : (
-        <div className="space-y-2">
+        <Sloupec mezera={2}>
           <Stat label={probiha ? t('Právě probíhá') : denKratce(prvni.den, t)} value={cas || '—'}
             // ::first-letter (cz-sentence) funguje jen na blokovém prvku — řádek bez typu začíná dnem.
             note={<span className="block truncate cz-sentence">
@@ -215,15 +220,10 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
               {t('Potom')} <span className="tabular-nums">{denVetou(dalsi.den)}{dalsi.od ? `, ${dalsi.od}${dalsi.do ? `–${dalsi.do}` : ''}` : ''}</span>
             </p>
           )}
-          {probiha && navic.smi && (
-            <div className="flex flex-wrap items-center gap-2 pt-1" data-navic-smeny>
-              <Button variant="secondary" size="sm" icon="sparkle" onClick={() => setOknoNavic({ day: prvni.den, shiftId: prvni.s.id ?? null })}>{t('Navíc')}</Button>
-              {navic.pocet({ id: prvni.s.id, date: prvni.den }) > 0 && (
-                <Chip tone="muted" size="sm" icon="sparkle">{t('navíc: {n}', { n: navic.pocet({ id: prvni.s.id, date: prvni.den }) })}</Chip>
-              )}
-            </div>
+          {probiha && navic.smi && pocetNavic > 0 && (
+            <span className="flex"><Chip tone="muted" size="sm" icon="sparkle">{t('navíc: {n}', { n: pocetNavic })}</Chip></span>
           )}
-        </div>
+        </Sloupec>
       ))}
       <ZapsatNavic open={oknoNavic != null} onClose={() => setOknoNavic(null)} predvolby={oknoNavic} />
     </Widget>
@@ -342,7 +342,7 @@ function SchvaleneVolno({ velikost }: WidgetProps) {
   const prvni = schvalene[0] ?? null;
   // Zůstatek dovolené (kolo 8) — totéž číslo jako v žádosti; bez nároku se nekreslí.
   const zustatek = narok ? (
-    <p className="t-meta mt-2 flex items-center gap-1.5" data-narok-dovolene={narok.zbyva}>
+    <p className="t-meta flex items-center gap-1.5" data-narok-dovolene={narok.zbyva}>
       <Chip tone={narok.zbyva > 0 ? 'ok' : narok.zbyva === 0 ? 'wait' : 'bad'} size="sm" icon="sun">{t('Dovolená: zbývá {n} z {celkem} dní', { n: narok.zbyva, celkem: narok.dni })}</Chip>
     </p>
   ) : null;
@@ -350,7 +350,7 @@ function SchvaleneVolno({ velikost }: WidgetProps) {
   return (
     <Widget
       nacteni={data}
-      prazdno={vse.length === 0 ? <div><p className="t-meta text-pretty">{t('Žádné volno před sebou nemáš.')}</p>{zustatek}</div> : undefined}
+      prazdno={vse.length === 0 ? <Sloupec mezera={2}><p className="t-meta text-pretty">{t('Žádné volno před sebou nemáš.')}</p>{zustatek}</Sloupec> : undefined}
     >
       {S ? (
         prvni ? (
@@ -361,7 +361,7 @@ function SchvaleneVolno({ velikost }: WidgetProps) {
           <Stat label={t('Čeká na schválení')} value={cekajici.length.toLocaleString('cs-CZ')} note={t('{n, plural, one {žádost} few {žádosti} other {žádostí}}', { n: cekajici.length })} />
         )
       ) : (
-        <>
+        <Sloupec mezera={2}>
           <ul className="list">
             {vse.slice(0, 5).map(z => (
               <ListRow key={z.id}
@@ -371,9 +371,9 @@ function SchvaleneVolno({ velikost }: WidgetProps) {
               />
             ))}
           </ul>
-          {vse.length > 5 && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (vse.length - 5).toLocaleString('cs-CZ') })}</p>}
+          {vse.length > 5 && <p className="t-meta">{t('…a dalších {n}', { n: (vse.length - 5).toLocaleString('cs-CZ') })}</p>}
           {zustatek}
-        </>
+        </Sloupec>
       )}
     </Widget>
   );

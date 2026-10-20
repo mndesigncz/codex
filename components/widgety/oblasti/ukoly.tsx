@@ -28,7 +28,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
-import { Chip, ListRow, Stat } from '../../ui';
+import { Chip, ListRow, Sloupec, Stat } from '../../ui';
 import { Icon } from '../../Icons';
 import TaskWeekBoard from '../../TaskWeekBoard';
 import { UkolyZaBodyWidget } from '../../navic/UkolyZaBodyWidget';
@@ -42,6 +42,7 @@ import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
 import { apiMessage, okJson } from '@/lib/api';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../../PredUzaverkou';
+import { OSA_TEXTU, OSA_ZASKRTNUTI, osaTextu } from '../osaTextu';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtHM } from '@/lib/i18n/format';
@@ -263,8 +264,9 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
         <Stat label={t('Zbývá')} value={cislo(zbyva)}
           note={poTerminuN > 0 ? <span className="text-bad-ink">{t('{n} po termínu', { n: cislo(poTerminuN) })}</span> : t('na dnešek')} />
       ) : (
-        <>
-          <ul className="list">
+        <Sloupec mezera={2}>
+          {/* v4 (V4): štítky (Po termínu, Před uzávěrkou) na ose textu pod titulkem, ne pod zaškrtávátkem. */}
+          <ul className={`list ${OSA_TEXTU}`} style={osaTextu(OSA_ZASKRTNUTI)}>
             {zobrazene.map(t => {
               const hotovo = t.status === 'done';
               const pozde = !!t.dueDate && t.dueDate < dnes;
@@ -299,10 +301,10 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
               );
             })}
           </ul>
-          {!L && radky.length > 5 && <p className="t-meta mt-2">{aDalsich(radky.length - 5, t)}</p>}
-          {o.chyba && <p className="note note-danger mt-3" role="alert">{o.chyba}</p>}
+          {!L && radky.length > 5 && <p className="t-meta">{aDalsich(radky.length - 5, t)}</p>}
+          {o.chyba && <p className="note note-danger" role="alert">{o.chyba}</p>}
           {o.okno}
-        </>
+        </Sloupec>
       )}
     </Widget>
   );

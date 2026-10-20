@@ -418,11 +418,15 @@ function ObjednavkyOdStolu({ velikost }: WidgetProps) {
   // Vyhledání kartičky je nástroj pro chvíli, kdy ji někdo drží v ruce — jeden
   // sbalený řádek, ne obsah, který by objednávkám bral první pohled.
   const karta = kartu ? (
+    // v4 (P2, P4, V05): rozbalovací řádek přes celou šířku (44, šipka na R), ne osamělý odkaz vlevo;
+    // pole kódu a „Najít" v jedné řadě (dřív se „Najít" na telefonu zalomilo pod pole).
     <details className="group">
-      <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
-        <Icon name="card" size={16} />{t('Kartička hosta u kasy')}<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
+      <summary className="flex min-h-11 w-full items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none [&::-webkit-details-marker]:hidden">
+        <Icon name="card" size={16} className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{t('Kartička hosta u kasy')}</span>
+        <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center -mr-2"><Icon name="chevron" size={16} className="transition-transform group-open:rotate-180" /></span>
       </summary>
-      <div className="mt-2"><CardScan onToast={text => setHlaska({ text, ton: 'ok' })} /></div>
+      <div className="mt-2 [&_form]:flex-nowrap [&_form>*:last-child]:shrink-0"><CardScan onToast={text => setHlaska({ text, ton: 'ok' })} /></div>
     </details>
   ) : null;
   return (
@@ -621,7 +625,8 @@ function DnesniRezervace({ velikost }: WidgetProps) {
           {hlaska && (
             <p className={`note ${hlaska.ton === 'ok' ? 'note-ok' : 'note-danger'}`} role={hlaska.ton === 'ok' ? 'status' : 'alert'}>{hlaska.text}</p>
           )}
-          <ul className="list">
+          {/* v4 (P15): ve střední kartě (bez akcí) je čas poslední sloupec na R — chip stavu stojí před ním. */}
+          <ul className={`list ${L ? '' : 'sm:[&_.list-value]:order-1'}`}>
             {videt.map(r => {
               const krok = L && !nahled ? hlavniKrok(r.stav, smiKrok) : null;
               const tel = odkazTel(r.telefon);

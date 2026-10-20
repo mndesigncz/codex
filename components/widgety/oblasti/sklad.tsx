@@ -41,7 +41,7 @@ import {
 import { cenaDoPole, cenaZFormulare } from '@/lib/cena';
 import { pocetDoPole, pocetZPole } from '@/lib/inventura';
 import { Icon } from '../../Icons';
-import { Avatar, BulkBar, Button, Chip, Field, Input, ListRow, Modal, SearchField, Segmented, SelectBox, Stat, Textarea, Toast, Well, useSelection } from '../../ui';
+import { Avatar, BulkBar, Button, Chip, Field, Input, ListRow, Modal, SearchField, Segmented, SelectBox, Sloupec, Stat, Textarea, Toast, Well, useSelection } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney, useSymbol } from '../../CurrencyProvider';
 import PoleMnozstvi from '../../inventory/PoleMnozstvi';
@@ -376,39 +376,39 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
     <Widget
       nacteni={ceka ? CEKA : [sklad, kategorie]}
       kostra="seznam"
+      // v4 (V2, V16): řazení je slot `segment` (L→R × 36 pod hlavičkou), „Nakoupit" akce widgetu v patce (L→R × 44).
+      // Řazení jen s předpovědí: bez ní by „Dojde dřív" nemělo podle čeho řadit.
+      segment={Object.keys(pred).length > 0 ? (
+        <Segmented size="sm" ariaLabel={t('Řadit')} value={razeni} onChange={setRazeni}
+          options={[{ id: 'stav', label: t('Podle stavu') }, { id: 'dojde', label: t('Dojde dřív') }]} />
+      ) : undefined}
+      patka={smiNakoupit ? (
+        // Ve widgetu nikdy limetka (DESIGN.md) — ta patří hlavní akci stránky.
+        <Button variant="secondary" icon="cart" onClick={() => pozadejSklad(nav, UDALOST_NAKUP, KLIC_NAKUP, { dodavatel: null })}>
+          {t('Nakoupit ({n})', { n: cislo(kNakupu) })}
+        </Button>
+      ) : undefined}
       doplnek={polozky.length > 0 ? <Chip tone={kritickych > 0 ? 'bad' : 'wait'} size="sm">{cislo(polozky.length)}</Chip> : undefined}
       // Popisek odkazu je jméno cíle (DP §5.1): s vybranou kategorií její
       // jméno — dvě instance pro dvě kategorie se tak na ploše rozliší.
       odkaz={{ popisek: vybrana?.nazev ?? t('Sklad'), pohled: 'inventory', arg: vybrana?.nazev }}
       prazdno={prazdno}
     >
-      {/* Řazení jen s předpovědí: bez ní by „Dojde dřív" nemělo podle čeho řadit. */}
-      {Object.keys(pred).length > 0 && (
-        <Segmented size="sm" className="mb-2" ariaLabel={t('Řadit')} value={razeni} onChange={setRazeni}
-          options={[{ id: 'stav', label: t('Podle stavu') }, { id: 'dojde', label: t('Dojde dřív') }]} />
-      )}
+      <Sloupec mezera={2}>
       {velikost === 'L' && razeni !== 'dojde' ? (
-        <div className="space-y-4">
+        <Sloupec mezera={6}>
           {skupiny.map(s => (
-            <section key={s.nazev} aria-label={s.nazev}>
+            <section key={s.nazev} aria-label={s.nazev} className="sloupec sloupec-1">
               <p className="t-label">{s.nazev}</p>
-              <ul className="list mt-1">{s.polozky.map(p => radek(p, false))}</ul>
+              <ul className="list">{s.polozky.map(p => radek(p, false))}</ul>
             </section>
           ))}
-        </div>
+        </Sloupec>
       ) : (
         <ul className="list">{ukazat.map(p => radek(p, !vybrana))}</ul>
       )}
-      {smiNakoupit ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          {polozky.length > strop ? <p className="t-meta">{aDalsich(polozky.length - strop, t)}</p> : <span />}
-          {/* Ve widgetu nikdy limetka (DESIGN.md) — ta patří hlavní akci stránky. */}
-          <Button variant="secondary" size="sm" icon="cart"
-            onClick={() => pozadejSklad(nav, UDALOST_NAKUP, KLIC_NAKUP, { dodavatel: null })}>
-            {t('Nakoupit ({n})', { n: cislo(kNakupu) })}
-          </Button>
-        </div>
-      ) : polozky.length > strop && <p className="t-meta mt-2">{aDalsich(polozky.length - strop, t)}</p>}
+      {polozky.length > strop && <p className="t-meta">{aDalsich(polozky.length - strop, t)}</p>}
+      </Sloupec>
     </Widget>
   );
 }
@@ -469,31 +469,30 @@ function NakupniSeznam({ velikost, nastaveni, nahled }: WidgetProps<NastaveniNak
       prazdno={sklad.data && radky.length === 0
         ? <p className="t-meta">{dodavatel ? t('Od dodavatele {dodavatel} teď nic nechybí.', { dodavatel }) : t('Není co kupovat — všechno je nad limitem.')}</p>
         : undefined}
+      // v4 (V16, P15): odhad nákupu je souhrn nad seznamem, „Objednat" akce widgetu v patce (L→R × 44).
+      souhrn={L && smiCeny && odhad > 0 ? t('Odhad nákupu {castka}', { castka: money(odhad) }) : undefined}
+      patka={smiObjednat ? (
+        <Button variant="secondary" icon="cart"
+          onClick={() => { if (!nahled) pozadejSklad(nav, UDALOST_NAKUP, KLIC_NAKUP, { dodavatel }); }}>
+          {t('Objednat')}
+        </Button>
+      ) : undefined}
     >
+      <Sloupec mezera={2}>
       {L ? (
-        <div className="space-y-4">
+        <Sloupec mezera={6}>
           {poDodavatelich(ukazat).map(s => (
-            <section key={s.dodavatel ?? '-'} aria-label={s.dodavatel ?? t('Bez dodavatele')}>
+            <section key={s.dodavatel ?? '-'} aria-label={s.dodavatel ?? t('Bez dodavatele')} className="sloupec sloupec-1">
               <p className="t-label">{s.dodavatel ?? t('Bez dodavatele')}</p>
-              <ul className="list mt-1">{s.radky.map(r => radek(r, false))}</ul>
+              <ul className="list sm:[&_.list-value]:order-1">{s.radky.map(r => radek(r, false))}</ul>
             </section>
           ))}
-        </div>
+        </Sloupec>
       ) : (
         <ul className="list">{ukazat.map(r => radek(r, !dodavatel))}</ul>
       )}
-      {radky.length > strop && <p className="t-meta mt-2">{aDalsich(radky.length - strop, t)}</p>}
-      {(L || smiObjednat) && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          {L && smiCeny && odhad > 0 ? <p className="t-meta">{t('Odhad nákupu {castka}', { castka: money(odhad) })}</p> : <span />}
-          {smiObjednat && (
-            <Button variant="secondary" size="sm" icon="cart"
-              onClick={() => { if (!nahled) pozadejSklad(nav, UDALOST_NAKUP, KLIC_NAKUP, { dodavatel }); }}>
-              {t('Objednat')}
-            </Button>
-          )}
-        </div>
-      )}
+      {radky.length > strop && <p className="t-meta">{aDalsich(radky.length - strop, t)}</p>}
+      </Sloupec>
     </Widget>
   );
 }
@@ -1250,9 +1249,10 @@ function Inventura({ velikost, nahled }: WidgetProps) {
   const otevri = () => { if (!nahled) setOkno(true); };
   const zavri = () => { setOkno(false); data.reload(); };
 
+  // v4 (V16): akce widgetu v patce (L→R × 44), ne obsahová pilulka pod větou.
   const akce = s && (s.bezi
-    ? <Button variant="secondary" size="sm" icon="clipboard" onClick={otevri}>{t('Pokračovat v počítání')}</Button>
-    : smiZahajit ? <Button variant="secondary" size="sm" icon="clipboard" onClick={otevri}>{t('Zahájit inventuru')}</Button> : null);
+    ? <Button variant="secondary" icon="clipboard" onClick={otevri}>{t('Pokračovat v počítání')}</Button>
+    : smiZahajit ? <Button variant="secondary" icon="clipboard" onClick={otevri}>{t('Zahájit inventuru')}</Button> : null);
 
   return (
     <>
@@ -1261,13 +1261,14 @@ function Inventura({ velikost, nahled }: WidgetProps) {
         kostra={velikost === 'S' ? 'cislo' : 'text'}
         // Malý widget je celý proklik (bez dalšího tlačítka v těle).
         otevrit={velikost === 'S' && s && (s.bezi || smiZahajit) && !nahled ? otevri : undefined}
+        patka={velikost !== 'S' && akce ? akce : undefined}
       >
         {s && (velikost === 'S' ? (
           s.bezi
             ? <Stat label={t('Inventura běží')} value={`${cislo(s.spocitano)}/${cislo(s.celkem)}`} note={t('spočítáno')} />
             : <Stat label={t('Poslední inventura')} value={s.posledni ? datumKratce(s.posledni) : t('Zatím žádná')} />
         ) : (
-          <div className="space-y-3">
+          <Sloupec mezera={2}>
             {s.bezi ? (
               <>
                 <p className="text-[15px] text-[#16181A]">
@@ -1282,8 +1283,7 @@ function Inventura({ velikost, nahled }: WidgetProps) {
             ) : (
               <p className="t-meta">{s.posledni ? t('Poslední inventura byla {datum}.', { datum: datumKratce(s.posledni) }) : t('Inventura ještě nebyla.')}{smiZahajit ? '' : ` ${t('Zahajuje ji vedení.')}`}</p>
             )}
-            {akce && <div>{akce}</div>}
-          </div>
+          </Sloupec>
         ))}
       </Widget>
       {okno && (
@@ -1312,18 +1312,20 @@ function ZapsatNovou({ velikost, nahled }: WidgetProps) {
 
   return (
     <>
-      <Widget nacteni={ceka ? CEKA : undefined} kostra="text">
-        <div className={velikost === 'S' ? 'flex flex-col justify-end h-full' : 'space-y-3'}>
-          {velikost === 'M' && (
-            <p className="t-meta">{t('Přišlo zboží? Vyfoť ho a napiš kolik.')}{navrh ? ` ${t('Vedení zápis jen potvrdí.')}` : ''}</p>
-          )}
-          <Button variant="secondary" size="sm" icon="plus" className={velikost === 'S' ? 'w-full justify-center' : ''}
+      {/* v4 (V16, P17): tlačítko je akce widgetu — patka L→R × 44 na konci karty (v malé kartě dole,
+          nad ní volné místo), ne obsahová pilulka vlevo pod větou. */}
+      <Widget nacteni={ceka ? CEKA : undefined} kostra="text"
+        patka={(
+          <Button variant="secondary" icon="plus"
             aria-label={velikost === 'S' ? t('Zapsat novou věc') : undefined}
             onClick={() => { if (!nahled) setOkno(true); }}>
             {/* Malá karta už název nese v titulku — tlačítko řekne jen sloveso (celé jméno čte odečítač). */}
             {velikost === 'S' ? t('Zapsat') : t('Zapsat novou věc')}
           </Button>
-        </div>
+        )}>
+        {velikost === 'S' ? <div aria-hidden className="flex-1" /> : (
+          <p className="t-meta">{t('Přišlo zboží? Vyfoť ho a napiš kolik.')}{navrh ? ` ${t('Vedení zápis jen potvrdí.')}` : ''}</p>
+        )}
       </Widget>
       {okno && (
         <NadPlochou>
@@ -1433,21 +1435,22 @@ function Nahlasit({ velikost, nahled }: WidgetProps) {
 
   return (
     <>
-      <Widget nacteni={ceka ? CEKA : sklad} kostra="text">
-        <div className={velikost === 'S' ? 'flex flex-col justify-end h-full' : 'space-y-3'}>
-          {velikost === 'M' && (
-            <p className="t-meta">
-              {nizke.length > 0
-                ? t('Dochází {n, plural, one {# položka} few {# položky} other {# položek}}: {seznam}', { n: nizke.length, seznam: `${nizke.slice(0, 3).map(p => p.name).join(', ')}${nizke.length > 3 ? '…' : ''}` })
-                : t('Něco došlo? Vyber, co chybí, a vedení dostane upozornění.')}
-            </p>
-          )}
-          <Button variant="secondary" size="sm" icon="send" className={velikost === 'S' ? 'w-full justify-center' : ''}
+      {/* v4 (V16, P17): tlačítko je akce widgetu — patka L→R × 44 na konci karty (v malé kartě dole). */}
+      <Widget nacteni={ceka ? CEKA : sklad} kostra="text"
+        patka={(
+          <Button variant="secondary" icon="send"
             aria-label={velikost === 'S' ? t('Nahlásit chybějící') : undefined}
             onClick={() => { if (!nahled) setOkno(true); }}>
             {velikost === 'S' ? t('Nahlásit') : t('Nahlásit chybějící')}
           </Button>
-        </div>
+        )}>
+        {velikost === 'M' ? (
+          <p className="t-meta">
+            {nizke.length > 0
+              ? t('Dochází {n, plural, one {# položka} few {# položky} other {# položek}}: {seznam}', { n: nizke.length, seznam: `${nizke.slice(0, 3).map(p => p.name).join(', ')}${nizke.length > 3 ? '…' : ''}` })
+              : t('Něco došlo? Vyber, co chybí, a vedení dostane upozornění.')}
+          </p>
+        ) : <div aria-hidden className="flex-1" />}
       </Widget>
       {okno && (
         <NadPlochou>

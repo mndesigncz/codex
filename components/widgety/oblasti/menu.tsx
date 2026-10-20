@@ -30,7 +30,8 @@ import {
   UDALOST_VYPRODANO, URL_MENU, URL_VYPRODANO, type DataMenu, type DeskaMenu, type RadekVyprodano, jinaCenaDesek,
 } from '@/lib/recepturyPrehled';
 import { Icon } from '../../Icons';
-import { Button, Chip, EmptyState, ListRow, SearchField, Stat, Switch, Toast } from '../../ui';
+import { Button, Chip, ListRow, SearchField, Stat, Switch, Toast } from '../../ui';
+import { PrazdnoWidgetu } from '../PrazdnoWidgetu';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
@@ -119,21 +120,25 @@ function StavMenu({ velikost, nahled }: WidgetProps) {
   const prazdno = data.data?.nezmigrovano
     ? <p className="t-meta">{t('Tabulky pro menu ještě nejsou v databázi.')}</p>
     : data.data && desky.length === 0
-      ? <EmptyState compact icon="clipboard" title={t('Zatím žádné menu')} hint={t('Založ ho v editoru — z pokladny nebo z dnešní nabídky.')} />
+      // v4 (V11, P5): prázdný stav na levé ose karty, ne na střed (v malé kartě zalomil větu do úzkého sloupce).
+      ? <PrazdnoWidgetu titul={t('Zatím žádné menu')} text={t('Založ ho v editoru — z pokladny nebo z dnešní nabídky.')} />
       : undefined;
 
   if (velikost === 'S') {
     return (
-      <Widget nacteni={ceka ? CEKA : data} kostra="cislo" prazdno={prazdno}>
+      <Widget nacteni={ceka ? CEKA : data} kostra="cislo" prazdno={prazdno}
+        // v4 (V16): „Zveřejnit" je akce malé karty — patka L→R × 44 na konci karty.
+        patka={hlavni && !hlavni.zapnuto && smiZverejnit ? (
+          <Button variant="secondary" loading={pracuji === hlavni.id} onClick={() => zverejnit(hlavni)}>{t('Zveřejnit')}</Button>
+        ) : undefined}>
         {hlavni && (
-          <div className="space-y-2">
-            <Chip tone={hlavni.zapnuto ? 'ok' : 'muted'} icon={hlavni.zapnuto ? 'check' : 'close'}>
-              {hlavni.zapnuto ? t('Hosté ho vidí') : t('Vypnuté')}
-            </Chip>
+          <div className="sloupec sloupec-2">
+            <span className="flex">
+              <Chip tone={hlavni.zapnuto ? 'ok' : 'muted'} icon={hlavni.zapnuto ? 'check' : 'close'}>
+                {hlavni.zapnuto ? t('Hosté ho vidí') : t('Vypnuté')}
+              </Chip>
+            </span>
             <p className="t-meta truncate">{hlavni.nazev} · {t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: hlavni.polozek })}</p>
-            {!hlavni.zapnuto && smiZverejnit && (
-              <Button variant="secondary" size="sm" loading={pracuji === hlavni.id} onClick={() => zverejnit(hlavni)}>{t('Zveřejnit')}</Button>
-            )}
           </div>
         )}
         {zprava.toast}
