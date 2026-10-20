@@ -26,6 +26,10 @@ export interface MenuItem {
   disabled?: boolean;
   /** Vysvětlivka pod názvem, když akce není samozřejmá. */
   hint?: string;
+  /** Jen pod `md` (vedlejší akce, která je na monitoru vidět jako tlačítko). */
+  jenMobil?: boolean;
+  /** Linka nad položkou — začátek další skupiny (v liště: akce lišty pod akcemi stránky). 'mobil' = jen pod `md`. */
+  oddelit?: boolean | 'mobil';
 }
 
 /**
@@ -89,7 +93,7 @@ export const MenuPanel = React.forwardRef<HTMLDivElement, {
  * volitelná vysvětlivka. Nebezpečnou akci (`danger`) dej červeně a na konec.
  * `onClick` dostane místo použití — typicky nejdřív zavře panel, pak akci.
  */
-export function MenuItemButton({ label, icon, hint, danger, disabled, onClick, className = '' }: MenuItem & { className?: string }) {
+export function MenuItemButton({ label, icon, hint, danger, disabled, onClick, jenMobil, oddelit, className = '' }: MenuItem & { className?: string }) {
   return (
     <button
       // type="button": v menu uvnitř formuláře by položka jinak formulář odeslala.
@@ -99,7 +103,7 @@ export function MenuItemButton({ label, icon, hint, danger, disabled, onClick, c
       onClick={onClick}
       className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-sm text-left transition-colors disabled:opacity-40 ${
         danger ? 'text-bad-ink hover:bg-bad/[0.07]' : 'text-[#16181A] hover:bg-black/[0.05]'
-      } ${className}`}
+      } ${jenMobil ? 'md:hidden' : ''} ${oddelit ? `menu-oddelit ${oddelit === 'mobil' ? 'menu-oddelit-mobil' : ''}` : ''} ${className}`}
     >
       {icon && <Icon name={icon} size={18} className={`shrink-0 mt-px ${danger ? '' : 'text-black/55'}`} />}
       <span className="min-w-0">
@@ -126,9 +130,11 @@ export function Menu({ items, label, size = 'md', align = 'right', icon = 'more'
 
   const visible = items.filter(Boolean);
   if (visible.length === 0) return null;
+  // Samé položky „jen pod md" → na monitoru by „···" otevřelo prázdný panel: schová se celé.
+  const jenMobil = visible.every(i => i.jenMobil);
 
   return (
-    <div ref={pop.ref} className={`relative shrink-0 ${className}`}>
+    <div ref={pop.ref} className={`relative shrink-0 ${jenMobil ? 'md:hidden' : ''} ${className}`}>
       {/* v3: „···" je ikona v šedém kruhu 40 px — stejná jako hledání a oznámení
           v liště. Malé (36 px) zůstává v řádku a v hlavičce widgetu. */}
       {size === 'sm' ? (

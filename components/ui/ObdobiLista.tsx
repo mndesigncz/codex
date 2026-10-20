@@ -68,9 +68,11 @@ export function ObdobiLista({ value, onChange, volby, dnyTydne = true, hrubost =
   return (
     <div className={`min-w-0 ${className}`} role="group" aria-label={t('Období')}>
       <button type="button" aria-haspopup="dialog" aria-expanded={otevreno} onClick={() => setOtevreno(true)}
-        className="glass tap-target inline-flex max-w-full min-w-0 items-center gap-2.5 rounded-full py-2 pl-4 pr-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+        // v4 (P2, P6): filtr období je díl L→R výšky 36 (stupeň S), šipka na pravé hraně —
+        // dřív obsahová pilulka 38 nad segmentem 36 jiné šířky (zubatý sloupec, audit V07).
+        className="glass tap-target flex w-full min-w-0 h-9 items-center gap-2.5 rounded-full pl-4 pr-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
         <Icon name="calendar" size={16} className="shrink-0 text-black/55" />
-        <span className="min-w-0 truncate text-sm">
+        <span className="min-w-0 flex-1 truncate text-sm">
           {jmeno && <span className="font-semibold text-[#16181A]">{jmeno}</span>}
           <span className={jmeno ? 'text-black/50 tabular-nums' : 'font-semibold text-[#16181A] tabular-nums'}>{jmeno ? ` · ${rozmezi}` : rozmezi}</span>
           {value.dnyTydne.length > 0 && <span className="text-black/50">{` · ${value.dnyTydne.map(jmenoDne).join(', ')}`}</span>}

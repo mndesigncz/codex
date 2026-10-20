@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { Menu, type MenuItem } from './Menu';
+import { useOdevzdejMenu } from './MenuStranky';
 import { useT } from '@/lib/i18n/client';
 
 // Hlavička obrazovky — jedna pro všechny.
@@ -10,8 +11,9 @@ import { useT } from '@/lib/i18n/client';
 // Vlevo název (jediný h1, 32 px) a jeden řádek kontextu („190 položek ·
 // hodnota zásob 365 897 Kč"). Vpravo nejvýš: dvě vedlejší akce (jen na
 // monitoru), menu „···" a jedna hlavní akce. Na telefonu jdou vedlejší akce
-// do menu, „···" zůstane vedle nadpisu a hlavní akce pod ním přes šířku.
+// do menu a hlavní akce pod nadpis přes šířku (52).
 // Dřív měla každá obrazovka svůj nadpis (osm variant) a svou řadu tlačítek.
+// v4: „···" stránky se kreslí v horní liště (MenuStranky) — na obrazovce je jedno.
 
 export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, menuMobile, aside, className = '', as: Nadpis = 'h1' }: {
   title: React.ReactNode;
@@ -64,8 +66,12 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
   }, [hintId]);
 
   const showSubtitle = subtitle && !(hintId && subtitleHidden);
-  const maMenu = !!menu && menu.length > 0;
-  const maMenuMobil = !!menuMobile && menuMobile.length > 0;
+  // v4 (V0, P18): „···" je na obrazovce JEDNOU — v horní liště. Hlavička své položky liště
+  // odevzdá (MenuStranky) a h1 má celou šířku L→R. Bez lišty (správa platformy, okna)
+  // kreslí „···" sama jako dřív.
+  const vListe = useOdevzdejMenu(menu, menuMobile);
+  const maMenu = !vListe && !!menu && menu.length > 0;
+  const maMenuMobil = !vListe && !!menuMobile && menuMobile.length > 0;
   const maAkce = !!(secondary || maMenu || maMenuMobil);
 
   // v3: jeden velký nadpis vlevo a vedle něj tiché akce v šedých kruzích
@@ -74,16 +80,17 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
   // na celou šířku — palec ji najde a „···" zůstane u nadpisu, kam patří.
   // Dřív stálo na telefonu „···" osamocené vlevo pod nadpisem vedle limetky.
   // Jeden DOM, žádné zdvojené tlačítko: sondy počítají limetky na stránce.
+  // v4 skladba (V0): h1 → 4 → podtitulek → 16 → hlavní akce L→R × 52 → 12 → segment L→R × 44.
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={className}>
       {/* Akce se zalamují (iPad 768 px s postranní lištou má na obsah 448 px
           a tři tlačítka s menu přes 480) a drží se vpravo; název (`flex-1`)
           se nikdy nesmrskne na nulu — má minimální šířku a akce jdou pod něj. */}
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-3.5">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-4">
         <div className="min-w-0 flex-1 basis-[12rem]">
           <Nadpis className="t-page text-balance">{title}</Nadpis>
           {showSubtitle && (
-            <p className="mt-1.5 max-w-[70ch] text-sm leading-snug text-black/60 text-pretty group">
+            <p className="mt-1 max-w-[70ch] text-sm leading-snug text-black/60 text-pretty group">
               {subtitle}
               {hintId && (
                 <button type="button"
@@ -109,11 +116,13 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
             ) : maMenu && <Menu items={menu!} />}
           </div>
         )}
+        {/* Hlavní akce = stupeň L (52, `.ph-hlavni`): na telefonu L→R pod nadpisem, na monitoru vpravo v řadě. */}
         {primary && (
-          <div className="max-sm:order-last max-sm:basis-full sm:ml-auto sm:flex-none flex flex-col sm:flex-row gap-2 [&>*]:w-full sm:[&>*]:w-auto">{primary}</div>
+          <div className="ph-hlavni max-sm:order-last max-sm:basis-full sm:ml-auto sm:flex-none flex flex-col sm:flex-row gap-2 [&>*]:w-full sm:[&>*]:w-auto">{primary}</div>
         )}
       </div>
-      {aside}
+      {/* Segment / filtr pod hlavičkou: 12 pod hlavní akcí, jinak 16 pod nadpisem. */}
+      {aside && <div className={primary ? 'mt-4 max-sm:mt-3' : 'mt-4'}>{aside}</div>}
     </div>
   );
 }

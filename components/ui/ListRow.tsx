@@ -45,14 +45,19 @@ export function ListRow({
   const interactive = !!(onClick || href);
   const Tag = (as ?? 'li') as any;
   const maCislo = value != null || valueMeta != null;
-  const maOcas = maCislo || aside != null || !!right || !!actions;
-  const jenDoplnek = aside != null && !maCislo && !right && !actions;
+  // v4 (P15, V4): číslo stojí MIMO ocas — na telefonu tak zůstane v prvním řádku vpravo
+  // (zarovnané na R, se šipkou R − 28) a do druhého řádku jdou jen chipy a akce. Dřív se
+  // s ocasem odlomilo pod text a sedělo vlevo („4 lidé" jako třetí řádek, částka pod textem).
+  // Na počítači je ocas `display: contents`, takže pořadí sloupců (číslo, doplněk, akce) platí dál.
+  const maOcas = aside != null || !!right || !!actions;
+  const jenDoplnek = aside != null && !right && !actions;
   const akceMimoOcas = akceVRadku && !maCislo && !!actions && !!right;
   const inner = (
     <>
       {lead && <span className="shrink-0 flex items-center">{lead}</span>}
       <span className="min-w-0 flex-1">
-        <span className="block font-medium text-[15px] leading-snug text-[#16181A] truncate">{title}</span>
+        {/* v4 (V4): titul smí na dva řádky — s hodnotou v témže řádku by se jinak useknul („Po 19. října · 07:"). */}
+        <span className="block font-medium text-[15px] leading-snug text-[#16181A] line-clamp-2 break-words">{title}</span>
         {meta && <span className="block text-[13px] text-black/55 leading-snug mt-0.5 truncate">{meta}</span>}
         {detail && <span className="block text-[13px] text-black/55 leading-snug mt-0.5 text-pretty">{detail}</span>}
       </span>
@@ -66,13 +71,13 @@ export function ListRow({
           třídou, která prázdný ocas skrývala. Ocas jen s doplňkem dostane
           `list-tail-tichy`: doplněk je pod `lg` skrytý, na telefonu by
           z ocasu zbyl prázdný druhý řádek. */}
+      {maCislo && (
+        <span className="list-value shrink-0">
+          {value != null && <span className="block font-bold text-[15px] leading-snug text-[#16181A]">{value}</span>}
+          {valueMeta != null && <span className="block text-[13px] text-black/55 leading-snug mt-0.5">{valueMeta}</span>}
+        </span>
+      )}
       {maOcas && <span className={`list-tail${jenDoplnek ? ' list-tail-tichy' : ''}`}>
-        {(value != null || valueMeta != null) && (
-          <span className="list-value shrink-0">
-            {value != null && <span className="block font-bold text-[15px] leading-snug text-[#16181A]">{value}</span>}
-            {valueMeta != null && <span className="block text-[13px] text-black/55 leading-snug mt-0.5">{valueMeta}</span>}
-          </span>
-        )}
         {/* Doplněk se zapíná až od `lg`, ne od `md`.
             Na 768 px se objevil, ale řádek na něj místo neměl: pevné sloupce
             (číslo 7rem + doplněk 8,5rem) plus ikona, akce a šipka vytlačily
@@ -90,7 +95,8 @@ export function ListRow({
       {/* Šipka stojí v DOM za ocasem (na počítači je tak poslední sloupec),
           ale na telefonu ji globals.css posune `order` před ocas — sedí
           vedle názvu a ocas se odlomí až pod ni. */}
-      {(chevron ?? interactive) && <Icon name="chevron" size={16} className="shrink-0 -rotate-90 text-black/30" />}
+      {/* Box 20 končí na R, 8 od hodnoty (V4) — ve všech řádcích tentýž svislý sloupec. */}
+      {(chevron ?? interactive) && <span aria-hidden className="list-sipka"><Icon name="chevron" size={16} className="-rotate-90 text-black/30" /></span>}
     </>
   );
   const cls = `list-row ${interactive ? 'list-row-tap' : ''} ${className}`;

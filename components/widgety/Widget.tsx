@@ -17,6 +17,7 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Card, ErrorState, Menu, MenuPanel, Modal, Skeleton, type MenuItem } from '../ui';
+import { StavovaKarta } from '../ui/StavovaKarta';
 import type { LoadState } from '../ui/useLoad';
 import type { DefiniceWidgetu, Kostra, PoleNastaveni, Rozhrani, Smi, Tarif, Velikost } from '@/lib/widgety/typy';
 import { kostraWidgetu } from '@/lib/widgety/rozlozeni';
@@ -168,9 +169,11 @@ export function Zkratitelne({ id, velikost, children }: { id: string; velikost: 
         style={zkraceno ? { maxHeight: prah, overflow: 'hidden', maskImage: maska, WebkitMaskImage: maska } : undefined}>
         <div ref={vnitrek}>{children}</div>
       </div>
+      {/* v4 (P2): pod obsahem karty stojí ovládání přes celou šířku L→R, ne osamělá
+          obsahová pilulka vlevo (audit V16). Stupeň S (36) — je to přepínač, ne akce. */}
       {dlouhy && (
-        <Button variant="ghost" size="sm" icon={zkraceno ? 'chevron' : 'chevronUp'} aria-expanded={!zkraceno} onClick={prepni}
-          className="mt-1">
+        <Button variant="secondary" size="sm" icon={zkraceno ? 'chevron' : 'chevronUp'} aria-expanded={!zkraceno} onClick={prepni}
+          className="mt-3 w-full">
           {zkraceno ? t('Zobrazit vše') : t('Ukázat méně')}
         </Button>
       )}
@@ -213,14 +216,20 @@ export function poleRychlehoFiltru(def: DefiniceWidgetu | undefined, smi: Smi, t
 /** Nad tuhle délku chip nese jen hodnotu („Moje a pro kohokoli ▾"), název pole zůstává v aria-label. */
 const MAX_POPISEK_CHIPU = 22;
 
-function RychlyFiltr({ pole, hodnota, onZmena, inkoust, idTitulku, uzky }: {
+function RychlyFiltr({ pole, hodnota, onZmena, inkoust, idTitulku, uzky, jenHodnota = false }: {
   pole: PoleVyberu;
   hodnota: unknown;
   onZmena: (id: string) => void;
   inkoust: boolean;
   idTitulku: string;
-  /** Malá karta: chip má vlastní řádek a smí být nejvýš tak široký jako karta. */
+  /**
+   * v4: filtr je DÍL ŘADY filtrů pod hlavičkou (V2) — vyplní svůj díl L→R (sám celou
+   * šířku, se sousedem ½ + ½), výška 36. Bez toho stojí jako obsahová pilulka 36 v hlavičce
+   * (monitor, střední a velká karta).
+   */
   uzky: boolean;
+  /** Úzký díl (malá karta na telefonu): jen hodnota („Tento ▾"), název pole nese aria-label. */
+  jenHodnota?: boolean;
 }) {
   const t = useT('widgety');
   const smi = useSmi();
@@ -233,7 +242,7 @@ function RychlyFiltr({ pole, hodnota, onZmena, inkoust, idTitulku, uzky }: {
   if (!aktualni) return null;
   const nazevPole = t(pole.nazev);
   const popisek = `${nazevPole}: ${t(aktualni.nazev)}`;
-  const text = popisek.length > MAX_POPISEK_CHIPU ? t(aktualni.nazev) : popisek;
+  const text = jenHodnota || popisek.length > MAX_POPISEK_CHIPU ? t(aktualni.nazev) : popisek;
   const vyber = (id: string) => { setOpen(false); if (id !== aktualni.id) onZmena(id); };
   const volby = (role: 'menuitemradio' | 'radio', vysoke: boolean) => moznosti.map(m => {
     const je = m.id === aktualni.id;
@@ -246,13 +255,14 @@ function RychlyFiltr({ pole, hodnota, onZmena, inkoust, idTitulku, uzky }: {
     );
   });
   return (
-    <div ref={pop.ref} className={`relative min-w-0 ${uzky ? 'max-w-full' : 'shrink-0'}`} data-rychly-filtr={pole.klic}>
+    <div ref={pop.ref} className={`relative min-w-0 ${uzky ? '' : 'shrink-0'}`} data-rychly-filtr={pole.klic}>
       <button ref={pop.triggerRef} type="button" onClick={() => setOpen(v => !v)} onKeyDown={pop.onTriggerKeyDown}
         aria-haspopup={telefon ? 'dialog' : 'menu'} aria-expanded={open} aria-label={popisek} aria-describedby={idTitulku} title={popisek}
-        // 28 px vysoký chip, dotyková plocha 44 px (tap-target): dřív 17 px s cílem 36 — na telefonu hádanka.
-        className={`chip chip-sm min-h-7 !px-2.5 tap-target transition-colors ${uzky ? 'max-w-full' : 'max-w-[11rem]'} ${inkoust ? 'bg-white/10 text-white/80 hover:bg-white/15' : 'chip-muted hover:bg-black/10'} ${open ? 'ring-2 ring-[#C8F542]' : ''}`}>
+        // v4: filtr je ovládání stupně S (36), ne 28px štítek — v řadě filtrů vyplní svůj díl
+        // (text vlevo, šipka na pravé hraně dílu), v hlavičce je to obsahová pilulka.
+        className={`filtr-vyber tap-target ${uzky ? 'w-full' : 'max-w-[11rem]'} ${inkoust ? 'filtr-vyber-inkoust' : ''} ${open ? 'ring-2 ring-[#C8F542]' : ''}`}>
         <span className="truncate">{text}</span>
-        <Icon name="chevron" size={11} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <Icon name="chevron" size={14} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && !telefon && (
         <MenuPanel ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} aria-label={nazevPole} className="absolute top-full mt-2 right-0 origin-top-right">
@@ -305,6 +315,27 @@ export interface ObalWidgetuProps {
    * (v úpravách ukáže „Teď tu nic není.").
    */
   prazdno?: React.ReactNode | null;
+  // ---- Skladba v4 (spec-skladba V2): sloty pod hlavičkou, v tomhle pořadí a rytmu ----
+  //   hlavička 44 → 12 → [filtry ½ × 36 v jedné řadě] → 12 → [segment L→R × 36]
+  //   → 12 → souhrn (t-meta) → 8 → obsah → 16 → [akce widgetu L→R × 44]
+  // Slot se kreslí jen v klidu s daty (ne v kostře, chybě ani prázdnu bez dat: tam by
+  // ovládání ovládalo nic) — kromě `filtry` a `segment`, které zůstávají i nad prázdnem
+  // (V7: filtr nad prázdným stavem zůstává na svém místě).
+  /**
+   * Další filtry widgetu (výběr člověka…) — stojí v JEDNÉ řadě s rychlým filtrem z katalogu
+   * jako rovné díly (2 × ½, 3 × ⅓), výška 36. Každý přímý potomek je jeden díl; výběr dej
+   * jako `<select className="field field-s">`, tlačítko jako `<Button size="sm">`.
+   */
+  filtry?: React.ReactNode;
+  /** Přepínač stavů (`<Segmented size="sm">`) — přes celou šířku L→R, pod řadou filtrů. */
+  segment?: React.ReactNode;
+  /** Souhrnná věta nad seznamem („Tento měsíc · 6 uznáno · 55 b") — t-meta, 8 nad obsahem. */
+  souhrn?: React.ReactNode;
+  /**
+   * Akce widgetu na KONCI karty (ne mezi filtry a seznamem): jedno tlačítko přes celou
+   * šířku, dvě jako ½ + ½; výška 44 (stupeň M). Typicky `<Button variant="secondary" icon=…>`.
+   */
+  patka?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -351,7 +382,7 @@ function KostraTela({ tvar, velikost }: { tvar: Kostra; velikost: Velikost }) {
  * poctivými stavy (DP §5.3). Autor widgetu dodá data (`nacteni`), obsah
  * (children) a případně prázdno — o kostru, chybu a skrytí se postará obal.
  */
-export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkraceni, ton, nacteni, kostra, prazdno, children }: ObalWidgetuProps) {
+export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkraceni, ton, nacteni, kostra, prazdno, filtry, segment, souhrn, patka, children }: ObalWidgetuProps) {
   const k = useWidget();
   const nav = useNavigace();
   const smi = useSmi();
@@ -399,32 +430,30 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   // je připojená a hlásí, kdyby zase bylo co řešit.
   if (k.mini != null && !k.upravy && !k.nahled) {
     return (
-      <Card as="section" pad="sm" aria-label={t('{nazev} — vyřízeno', { nazev })} className="relative min-w-0 flex items-center gap-3">
+      // v4: stavová karta podle vzoru V8 — kruh 40 začíná na L karty (stejně jako ikona hlavičky
+      // widgetu pod ní, P5), titul 15/600 s meta, ∨ 36 končí na R (jako „^ Sbalit", P4). Dřív
+      // fajfka 24 v kartě s jiným odsazením: na Uzávěrkách x 37 vs. 44,5 u karet pod ní.
+      <Card as="section" pad="md" aria-label={t('{nazev} — vyřízeno', { nazev })} className="relative min-w-0">
         {smiCil && (
           <button type="button" onClick={otevriCil} aria-label={t('Otevřít {nazev}', { nazev })}
             className="absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]" />
         )}
-        {/* Fajfka bez záře: stav, ne akce (DP T3) — proto ne .dot-ok (ten má prstenec) a žádný button.on-accent. */}
-        <span aria-hidden className="relative shrink-0 grid h-6 w-6 place-items-center rounded-full bg-ok on-accent">
-          <Icon name="check" size={14} strokeWidth={2.5} />
-        </span>
-        <div className="relative min-w-0 flex-1">
-          {/* tabIndex -1 + data-w-titulek: cíl fokusu po výměně karet (plocha sem vrátí
-              fokus, když klávesnicí ovládané tlačítko, které ho neslo, zmizelo z DOM). */}
-          {/* Název na jeden řádek (celý v `title`), souhrn pod ním smí na dva — plocha minimalizované
-              kartě dává aspoň půl řádku na monitoru a celý řádek na telefonu, takže se neutínají. */}
-          <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} title={nazev} className={`t-card truncate ${FOKUS_TITULKU}`}>{nazev}</h2>
-          <p className="t-meta line-clamp-2 break-words" title={k.mini}>{k.mini}</p>
-        </div>
-        <Button variant="ghost" size="sm" icon="chevron" aria-label={t('Ukázat celý widget {nazev}', { nazev })}
-          className="relative shrink-0 -my-1 -mr-2" onClick={k.rozbal} />
+        {/* Fajfka bez záře: stav, ne akce (DP T3) — proto ne .dot-ok (ten má prstenec) a žádný button.on-accent.
+            tabIndex -1 + data-w-titulek: cíl fokusu po výměně karet (plocha sem vrátí fokus, když
+            klávesnicí ovládané tlačítko, které ho neslo, zmizelo z DOM). Název na jeden řádek (celý
+            v `title`), souhrn pod ním smí na dva. */}
+        <StavovaKarta ikona="check" ton="ok" titul={nazev} meta={<span title={k.mini}>{k.mini}</span>}
+          className="relative"
+          nadpis={<h2 id={idTitulku} data-w-titulek="" tabIndex={-1} title={nazev} className={`stav-titul truncate ${FOKUS_TITULKU}`}>{nazev}</h2>}
+          akce={<Button variant="ghost" size="sm" iconOnly icon="chevron" aria-label={t('Ukázat celý widget {nazev}', { nazev })}
+            className="relative tap-target w-ovladani" onClick={k.rozbal} />} />
       </Card>
     );
   }
 
   let obsah: React.ReactNode;
   if (nacitam) obsah = <KostraTela tvar={kostra ?? kostraWidgetu(k.definice, k.velikost)} velikost={k.velikost} />;
-  else if (chyba) obsah = <ErrorState compact title={t('Widget se nenačetl')} onRetry={zkusitZnovu} detail={chyba} className="!py-3" />;
+  else if (chyba) obsah = <ErrorState compact vlevo title={t('Widget se nenačetl')} onRetry={zkusitZnovu} detail={chyba} />;
   else if (prazdno === null) obsah = <p className="t-meta">{t('Teď tu nic není.')}</p>;
   else if (prazdno !== undefined) obsah = prazdno;
   else obsah = children;
@@ -436,34 +465,65 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   // Dřív `justify-end` a min. výška 8,5 rem nechaly samotnou větu u dna prázdné karty — vypadalo to
   // jako chyba vykreslení („Nikdo není napíchnutý déle, než měl." u spodní hrany 136px karty).
   const prazdnyStav = !nacitam && !chyba && prazdno !== undefined;
+  const sData = !nacitam && !chyba && prazdno === undefined;
   // Šipka „Otevřít" navigovatelné karty. U malé karty nestojí v hlavičce, ale vpravo dole vedle čísla:
   // v polovině telefonu (171 px) by v hlavičce vzala názvu 40 px a „Docházející zásoby" se lámal
   // uvnitř slova („Docház / ející…"). Odkaz s textem nebo „···" zůstávají v hlavičce jako dřív.
   const sipkaCile = klepnutelna && !vidiOdkaz && !(akce && akce.length > 0);
   const sipkaDole = S && sipkaCile;
-  // Rychlý filtr (kolo 8): období / řazení / kategorie z nastavení přímo v hlavičce.
+  // Rychlý filtr (kolo 8): období / řazení / kategorie z nastavení.
   const poleFiltru = !k.nahled && !k.upravy && k.zmenNastaveni ? poleRychlehoFiltru(k.definice, smi, k.tarif ?? 'max', k.velikost) : null;
-  // Chip má vlastní řádek pod hlavičkou u malé karty (171 px) a na telefonu u každé: v jednom
-  // sloupci je karta ~358 px a vedle Zvětšit, Sbalit a šipky by chip („Měsíc: Tento ▾" ≤ 176 px)
-  // nechal názvu pár desítek pixelů — „Dostupnost týmu" se lámal a v polštině na 320 px hlavička
-  // přetékala (sondy k68-design 7, preteceni-jazyky). Na monitoru a tabletu má střední karta
-  // nejméně dva sloupce a chip se vedle názvu vejde.
-  const filtrPod = S || telefon;
+  // v4 (spec V1/V2): filtr NIKDY nestojí sám jako obsahová pilulka na vlastním řádku (Martinův
+  // „Měsíc: Tento" nad tlačítkem, segmentem a výběrem — pět pravých hran). Je to díl ŘADY FILTRŮ
+  // pod hlavičkou: s vlastními filtry widgetu (`filtry`) ½ + ½, sám přes celou šířku L→R, výška 36.
+  // Jen na monitoru u střední a velké karty bez dalších filtrů zůstává v hlavičce před ovládáním
+  // karty — tam má místo a řada pod hlavičkou by nesla jediný prvek přes 600 px.
+  const maFiltry = filtry != null && filtry !== false;
+  const filtrVRade = !!poleFiltru && (S || telefon || maFiltry);
   const filtr = poleFiltru ? (
-    <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={filtrPod}
+    <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={filtrVRade}
+      jenHodnota={S && telefon}
       onZmena={id => k.zmenNastaveni?.({ [poleFiltru.klic]: id })} />
   ) : null;
-  const filtrVHlavicce = filtr && !filtrPod ? filtr : null;
+  const filtrVHlavicce = filtr && !filtrVRade ? filtr : null;
+  const radaFiltru = (filtrVRade && filtr) || maFiltry ? (
+    <div className="rada rada-rovne rada-s" data-w-filtry="">
+      {filtrVRade && filtr}
+      {filtry}
+    </div>
+  ) : null;
+  const ovladaniInkoust = '!text-white/70 hover:!text-white hover:!bg-white/10';
   const tlacitkoCile = sipkaCile ? (
-    <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
-      className={`${sipkaDole ? 'shrink-0 -mb-1.5 -mr-2 self-end' : ''} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}`}
+    <Button variant="ghost" size="sm" iconOnly icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
+      className={`tap-target ${sipkaDole ? 'shrink-0 self-end' : ''} ${inkoust ? ovladaniInkoust : 'w-ovladani'}`}
       onClick={otevriCil} />
   ) : null;
+  // Ovládání karty vpravo v hlavičce: nejvýš DVĚ ikonová tlačítka na telefonu (› proklik, ^ Sbalit),
+  // Sbalit vždy úplně vpravo a pravá hrana jeho kruhu 36 = R (P4). Zvětšit ⤢ až od sm.
+  const maOvladani = !!(filtrVHlavicce || mozeSbalit || mozeZvetsit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (sipkaCile && !sipkaDole));
+  // Tělo: sloty v pořadí V2 s mezerami ze škály (gap), ne mt-* v obsahu (audit V14).
+  const sloty = !(mozeSbalit && k.sbaleno);
+  const maSegment = segment != null && segment !== false && !nacitam && !chyba;
+  const maSouhrn = souhrn != null && souhrn !== false && sData;
+  const maPatku = patka != null && patka !== false && sData;
+  const jadro = sipkaDole ? (
+    // Chyba se „Zkusit znovu" potřebuje celou šířku karty — šipka jde pod ni, ne vedle.
+    // v4 (P14): obsah malé karty stojí NAHOŘE (štítek → číslo na stejné y ve dvojici karet),
+    // šipka zůstává vpravo dole.
+    <div className={`flex-1 min-h-0 ${chyba ? 'flex flex-col gap-1' : 'flex items-stretch gap-1'}`}>
+      <div className={`min-w-0 ${chyba ? '' : 'flex-1'}`}>{obsah}</div>
+      {tlacitkoCile}
+    </div>
+  ) : !S && !bezZkraceni && !k.nahled && !k.upravy && sData
+    ? <Zkratitelne id={k.instance} velikost={k.velikost as 'M' | 'L'}>{obsah}</Zkratitelne>
+    : obsah;
   return (
     <Card
       as="section"
       tone={ton === 'wait' && !inkoust ? 'wait' : 'default'}
-      pad={S ? 'sm' : 'md'}
+      // v4 (P1, audit V09): jedno odsazení pro všechny velikosti — 16 na telefonu, 20 od sm.
+      // Dřív malá karta p-4 a střední p-5 pod sebou v jednom sloupci: obsah skákal 17 ↔ 21 px.
+      pad="md"
       aria-labelledby={idTitulku}
       aria-busy={nacitam || undefined}
       // V režimu úprav je karta jen „dlaždice ke skládání": nic uvnitř se
@@ -472,7 +532,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
       inert={k.upravy || undefined}
       className={[
         'min-w-0 h-full flex flex-col',
-        S ? `sm:p-5 relative ${prazdnyStav ? '' : 'min-h-[8.5rem]'}` : '',
+        S ? `relative ${prazdnyStav ? '' : 'min-h-[8.5rem]'}` : '',
         // Klepnutelná karta (natažený odkaz, nebo cíl z katalogu) se na hover jemně zvedne.
         otevrit || klepnutelna ? 'relative transition-shadow hover:shadow-[shadow:var(--shadow-float)]' : '',
         // Jediná tmavá plocha v obsahu: hlavní číslo peněz (DP §2.10), v3 bez záře v rohu.
@@ -481,34 +541,36 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
     >
       {/* v3: žádná limetková záře v rohu inkoustové karty ani limetkový dotek
           v rohu malých karet — dekorativní přechody dělaly z plochy „polévku z karet". */}
-      <div className={`relative flex items-start justify-between gap-3 ${naCili && mozeSbalit ? 'cursor-pointer' : ''}`}
+      {/* v4 hlavička (V1): výška 44, [ikona 20 v boxu 24] 12 [titul flex:1, jeden řádek s „…"] 8 [čip počtu]
+          … [› 36] 4 [^ 36]. Titul má přednost (min. 55 % šířky) — ovládání je nejvýš dvě ikony. */}
+      <div className={`w-hlavicka relative ${S ? 'w-hlavicka-s' : ''} ${naCili && mozeSbalit ? 'cursor-pointer' : ''}`}
         // Okno rychlého filtru je portál do <body>, ale React jeho klepnutí bublá sem — pozadí okna kartu sbalit nesmí.
         onClick={naCili && mozeSbalit ? (e => { if (!(e.target as Element).closest('button, a, [role="menu"], [role="menuitem"], [role="dialog"], .modal-overlay')) k.prepniSbaleni(); }) : undefined}>
-        {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~107 px:
-            „Docházející zásoby" by skončil jako „Docházející zá…" a číslo pod
-            ním by nemělo jméno. U S proto dva řádky, ikona u prvního. Dlouhé
-            slovo se dělí podle jazyka stránky (hyphens, <html lang>), ale jen
-            slovo od 10 znaků a nejméně po 5 znacích na každé straně — „schvá-lení"
-            by vypadalo hůř než celé slovo na dalším řádku (Safari zná jen
-            limit před/za). Rozlomení bez spojovníku (break-words) je až poslední
-            záchrana proti přetečení (německá složená slova). */}
-        <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${FOKUS_TITULKU} ${inkoust ? '!text-white' : ''}`}>
-          {/* v3: ikona bez barevného čtverečku, jen tlumeně monochromní vedle titulku —
-              limetková dlaždička u každé karty (kolo 71) byla šum navíc. */}
-          <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={17}
-            className={`shrink-0 ${S ? 'mt-px' : ''} ${inkoust ? 'text-white/60' : 'w-ikona'}`} />
-          <span className="line-clamp-2 break-words hyphens-auto [hyphenate-limit-chars:10_5_5] [-webkit-hyphenate-limit-before:5] [-webkit-hyphenate-limit-after:5]" title={nazev}>{nazev}</span>
+        {/* Malá karta (dlaždice, V9) je na telefonu široká ~171 px: titul smí na DVA řádky
+            a má je rezervované (min. výška), ať jsou štítky a čísla dvou dlaždic vedle sebe
+            na stejné y (P14). Dlouhé slovo se dělí podle jazyka stránky (hyphens, <html lang>),
+            ale jen slovo od 10 znaků a nejméně po 5 znacích na každé straně. Rozlomení bez
+            spojovníku (break-words) je až poslední záchrana proti přetečení (německá složená slova).
+            Střední a velká karta: titul na JEDEN řádek s „…" (celý v `title`). */}
+        <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`w-titul t-card ${FOKUS_TITULKU} ${inkoust ? '!text-white' : ''}`}>
+          {/* v3: ikona bez barevného čtverečku, jen tlumeně monochromní vedle titulku. v4: 20 v boxu 24, text na L + 36. */}
+          <span aria-hidden className="w-ikona-box">
+            <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={20} className={inkoust ? 'text-white/60' : 'w-ikona'} />
+          </span>
+          <span className={S
+            ? 'line-clamp-2 break-words hyphens-auto [hyphenate-limit-chars:10_5_5] [-webkit-hyphenate-limit-before:5] [-webkit-hyphenate-limit-after:5] max-sm:min-h-[2.6em]'
+            : 'truncate'} title={nazev}>{nazev}</span>
           {doplnek}
         </h2>
         {/* Ovládací prvky vpravo v jedné skupině a Sbalit VŽDY úplně vpravo: dřív stál mezi názvem a odkazem
             („Finance ›"), takže se podle toho, jaké další prvky karta měla, posouval a „plaval". */}
-        {(filtrVHlavicce || mozeSbalit || mozeZvetsit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (sipkaCile && !sipkaDole)) && (
-          <div className="flex items-center shrink-0 -my-1.5 -mr-2">
+        {maOvladani && (
+          <div className="w-ovladani-skupina">
             {/* Filtr před ovládáním karty: Sbalit zůstává vždy úplně vpravo. */}
-            {filtrVHlavicce && <span className={`flex min-w-0 ${mozeSbalit || mozeZvetsit || vidiOdkaz || (akce && akce.length > 0) || (sipkaCile && !sipkaDole) ? 'mr-1' : 'mr-2'}`}>{filtrVHlavicce}</span>}
+            {filtrVHlavicce && <span className="flex min-w-0 mr-1">{filtrVHlavicce}</span>}
             {vidiOdkaz && (
               <Button variant="ghost" size="sm" iconAfter="chevronRight"
-                className={`max-sm:w-9 max-sm:!px-0 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}`}
+                className={`tap-target max-sm:w-9 max-sm:!px-0 ${inkoust ? ovladaniInkoust : 'w-ovladani'}`}
                 onClick={() => nav.onNavigate(odkaz!.pohled, odkaz!.arg)}>
                 {/* Na telefonu je odkaz jen šipka (text čte odečítač): „Sklad ›" vedle Sbalit
                     bral názvu místo a titulky se lámaly na dva řádky. */}
@@ -523,32 +585,33 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
                 protože <li> v klidu tabIndex nemá (sonda k68-klavesnice 5). */}
             {!sipkaDole && tlacitkoCile}
             {mozeZvetsit && (
-              <Button variant="ghost" size="sm" icon="expand" aria-haspopup="dialog" aria-describedby={idTitulku} aria-label={t('Zvětšit widget')}
-                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}
+              // Na telefonu by Zvětšit byl třetí ikonou a titul by se zalomil (V1: nejvýš dvě) — od sm.
+              <Button variant="ghost" size="sm" iconOnly icon="expand" aria-haspopup="dialog" aria-describedby={idTitulku} aria-label={t('Zvětšit widget')}
+                className={`tap-target max-sm:!hidden ${inkoust ? ovladaniInkoust : 'w-ovladani'}`}
                 onClick={k.zvetsit!} />
             )}
             {mozeSbalit && (
               // Jméno widgetu v popisku by se pletlo s tlačítky hledanými podle názvu widgetu — nese ho nadpis (aria-describedby).
-              <Button variant="ghost" size="sm" icon={k.sbaleno ? 'chevron' : 'chevronUp'} aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
+              <Button variant="ghost" size="sm" iconOnly icon={k.sbaleno ? 'chevron' : 'chevronUp'} aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
                 aria-label={k.sbaleno ? t('Rozbalit widget') : t('Sbalit widget')}
-                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}
+                className={`tap-target ${inkoust ? ovladaniInkoust : 'w-ovladani'}`}
                 onClick={k.prepniSbaleni} />
             )}
           </div>
         )}
       </div>
-      {filtrPod && filtr && <div className="relative mt-2 flex min-w-0">{filtr}</div>}
-      {!(mozeSbalit && k.sbaleno) && (
-        <div className={`relative mt-3 flex-1 min-h-0 ${sipkaDole ? (chyba ? 'flex flex-col justify-end gap-1' : 'flex items-end gap-1') : S && !prazdnyStav ? 'flex flex-col justify-end' : ''}`}>
-          {sipkaDole ? (
-            // Chyba se „Zkusit znovu" potřebuje celou šířku karty — šipka jde pod ni, ne vedle.
-            <>
-              <div className={`min-w-0 ${chyba ? '' : 'flex-1'} ${prazdnyStav ? 'self-start' : ''}`}>{obsah}</div>
-              {tlacitkoCile}
-            </>
-          ) : !S && !bezZkraceni && !k.nahled && !k.upravy && !nacitam && !chyba && prazdno === undefined
-            ? <Zkratitelne id={k.instance} velikost={k.velikost as 'M' | 'L'}>{obsah}</Zkratitelne>
-            : obsah}
+      {sloty && (
+        // `mt-3` (12 pod hlavičkou) zůstává i jako háček sond (widgety-sbalit hledá tělo karty).
+        <div className={`w-telo relative mt-3 flex-1 min-h-0`}>
+          {radaFiltru}
+          {maSegment && <div className="min-w-0" data-w-segment="">{segment}</div>}
+          {maSouhrn ? (
+            <div className="w-skupina-obsah">
+              <p className="t-meta" data-w-souhrn="">{souhrn}</p>
+              {jadro}
+            </div>
+          ) : jadro}
+          {maPatku && <div className="rada rada-rovne rada-m w-patka" data-w-patka="">{patka}</div>}
         </div>
       )}
       {otevrit && (

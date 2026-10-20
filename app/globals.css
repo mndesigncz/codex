@@ -75,6 +75,38 @@
      pruh, pás režimu s sebou). Tentýž odstín, jen posazený výš — proto se
      v tmavém režimu nepřevrací. */
   --bad-lift-rgb: 255 138 128;
+
+  /* ---------- Skladba v4 (DESIGN.md „Výšky ovládání", „Vertikální rytmus") ----------
+     Čtyři výškové stupně a nic mezi nimi (spec-skladba P6). Dřív žilo v systému
+     28/32/35/36/40/44/46/48/50/52 a komponenty je míchaly bez pravidla — Martinův
+     widget „Navíc v týmu" měl pod sebou 28 / 36 / 36 / 46.
+       XS 28  jen neinteraktivní: stavový čip, odznak (klikací má cíl 44 přes tap-target)
+       S  36  ikonové tlačítko v kartě a řádku, čip filtru, segment v kartě, Button sm
+       M  44  tlačítko, výběr, pole v toolbaru a hledání, segment stránky
+       L  52  hlavní akce stránky, pole formuláře v okně, patička okna
+     40 zůstává jen ikonovým kruhům v horní liště (a pilulce vedle nich). */
+  --h-xs: 28px;
+  --h-s: 36px;
+  --h-m: 44px;
+  --h-l: 52px;
+  --h-lista: 40px;
+  /* Škála mezer (P13): 4 štítek↔číslo · 8 v řadě · 12 ve skupině · 16 pole↔pole,
+     odsazení karty · 24 mezi skupinami · 32 nad nadpisem sekce; 20 jen okraj
+     stránky a mezera mezi widgety na telefonu. Pravidlo blízkosti: mezera uvnitř
+     skupiny < polovina mezery mezi skupinami. */
+  --m-1: 4px;
+  --m-2: 8px;
+  --m-3: 12px;
+  --m-4: 16px;
+  --m-5: 20px;
+  --m-6: 24px;
+  --m-8: 32px;
+  /* Mřížka (P1): hrana karty → L obsahu 16 na telefonu, 20 od sm; okno 20 / 24. */
+  --pad-karta: 16px;
+  --pad-okno: 20px;
+}
+@media (min-width: 640px) {
+  :root { --pad-karta: 20px; --pad-okno: 24px; }
 }
 
 * { box-sizing: border-box; padding: 0; margin: 0; }
@@ -176,13 +208,17 @@ button:where(.well) { background: var(--well); }
 @layer components {
 .field {
   /* v3: pole je jemně šedá jamka bez rámečku (rámeček průhledný, ať se
-     rozměr nemění) a při psaní zbělá s limetkovým prstencem. Výška 48 px. */
+     rozměr nemění) a při psaní zbělá s limetkovým prstencem.
+     v4: výška 44 (stupeň M, jako tlačítko vedle v toolbaru) — 48 bylo mimo
+     stupně a nikdy nelícovalo s ničím vedle (P9). Ve formuláři v okně 52
+     (níž `.modal-sheet .field`, nebo ručně `.field-lg`). Svislé odsazení
+     9 px: i s písmem 16 px na dotyku (řádek 22,4) zůstane pole na 44. */
   width: 100%;
-  min-height: 3rem;
+  min-height: var(--h-m);
   border-radius: var(--r-md);
   background: rgba(22,24,26,0.045);
   border: 1px solid transparent;
-  padding: 0.6875rem 1rem;
+  padding: 0.5625rem 1rem;
   font-size: 0.9375rem;
   line-height: 1.4;
   color: var(--ink);
@@ -195,6 +231,28 @@ textarea.field { min-height: 0; }
 .field:disabled { color: rgba(22,24,26,0.5); cursor: not-allowed; }
 .field-label { display: block; font-size: 0.8125rem; font-weight: 500; color: rgba(22,24,26,0.70); margin-bottom: 0.375rem; }
 }
+/* Formulář v okně (spec V6): pole 52, stejně jako patička okna. Kontextem, ne
+   třídou u každého pole — oken je přes šedesát a ručně psaná by zůstala na 44.
+   Mimo @layer, ať přebije `.field` i `input[type=date]` níž. Hledání a toolbar
+   uvnitř okna drží 44 třídou `.field-m`; samostatné pole 52 mimo okno `.field-lg`. */
+.modal-sheet .field:not(textarea):not(.field-m), .field-lg:not(textarea) { min-height: var(--h-l); padding-top: 0.8125rem; padding-bottom: 0.8125rem; }
+.modal-sheet select.field:not(.field-m), select.field-lg { padding-top: 0; padding-bottom: 0; }
+/* Výběr (select) má výšku přesně podle stupně, ne podle písma: s odsazením 9 px
+   a písmem 16 px na dotyku by Safari dal 45. */
+select.field { height: var(--h-m); padding-top: 0; padding-bottom: 0; }
+.modal-sheet select.field:not(.field-m), select.field-lg { height: var(--h-l); }
+/* Kompaktní výběr do řady filtrů v kartě (V2: ½ × 36 vedle čipu filtru). */
+select.field-s, .field.field-s { height: var(--h-s); min-height: var(--h-s); padding-top: 0; padding-bottom: 0; font-size: 0.8125rem; font-weight: 500; border-radius: var(--r-chip); }
+/* Výběr ve filtru vypadá jako `.filtr-vyber` vedle něj: šedá pilulka, text vlevo, šipka na pravé hraně. */
+select.field-s {
+  -webkit-appearance: none; appearance: none; padding-left: 0.875rem; padding-right: 2.25rem; text-overflow: ellipsis;
+  background-color: rgba(22,24,26,0.055);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2316181A' stroke-opacity='.5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0.75rem center;
+}
+:root[data-theme="dark"] select.field-s { background-color: rgba(255,255,255,0.08); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23EDF2E4' stroke-opacity='.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+/* Na dotyku 16 px (Safari jinak při fokusu přiblíží) — a filtr-pilulka vedle stejně, ať se v řadě nemíchají dvě písma. */
+@media (pointer: coarse) { select.field-s, .field.field-s, .filtr-vyber { font-size: 1rem; } }
 /* Na dotykovém zařízení má pole aspoň 16 px: Safari na iPhonu každé pole
    s menším písmem při fokusu přiblíží a po zavření klávesnice nechá stránku
    zvětšenou s vodorovným posuvem (audit kola 6, Z12). Viewport `maximum-scale`
@@ -228,6 +286,10 @@ textarea.field { min-height: 0; }
   white-space: nowrap;
 }
 .chip-sm { padding: 0.125rem 0.5rem; font-size: 0.6875rem; }
+/* v4 (P6): čip, na který jde klepnout (filtr, rychlá volba), je ovládání stupně S
+   — 36, ne 28. 28 a méně patří jen neinteraktivnímu štítku stavu. */
+:is(button, a, [role=button]):where(.chip) { min-height: var(--h-s); }
+:is(button, a, [role=button]):where(.chip-sm) { padding-left: 0.75rem; padding-right: 0.75rem; font-size: 0.75rem; }
 .chip-ok    { background: var(--ok-bg);    color: var(--ok-ink); }
 .chip-wait  { background: var(--wait-bg);  color: var(--wait-ink); }
 .chip-bad   { background: var(--bad-bg);   color: var(--bad-ink); }
@@ -293,9 +355,12 @@ textarea.field { min-height: 0; }
    v každé obrazovce zvlášť jako `px-4 py-2 rounded-full text-xs …`; tady je
    jednou. Barvu stavu dodá `.seg-on` / `.seg-off glass`. */
 .filter-pill {
-  display: inline-flex; align-items: center; gap: 0.35rem;
+  /* v4: klikací filtr = stupeň S (36), dřív 32 — mimo stupně a vedle
+     tlačítka 36 o 4 px nižší (P6, audit V03/V04). */
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
   flex-shrink: 0; white-space: nowrap;
-  border-radius: 9999px; padding: 0.5rem 1rem;
+  min-height: var(--h-s);
+  border-radius: 9999px; padding: 0.375rem 1rem;
   font-size: 0.75rem; font-weight: 500; line-height: 1.2;
   transition: background-color .16s ease-out, color .16s ease-out;
 }
@@ -363,7 +428,8 @@ textarea.field { min-height: 0; }
    Řádky dělí linka, kterou kreslí seznam; řádek sám je jen obsah. */
 .list > * + * { border-top: 1px solid var(--surface-line); }
 /* Řádek seznamu v3: 56 px, víc vzduchu, linka mezi řádky tenká (kreslí .list). */
-:where(.list-row) { display: flex; align-items: center; gap: 0.875rem; padding: 0.875rem 0; min-height: 3.5rem; }
+/* v4 (V4): rozteč 56 (jeden řádek) · 64 (titul + meta) · 72 (avatar 48) — odsazení 12, ne 14. */
+:where(.list-row) { display: flex; align-items: center; gap: 0.875rem; padding: 0.75rem 0; min-height: 3.5rem; }
 :where(.list-row-tap) { border-radius: var(--r-md); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; transition: background-color var(--dur-2, .22s) ease; }
 /* Klikací řádek bývá <button>. Preflight Tailwindu mu dává `padding: 0;
    margin: 0` se specifičností (0,0,1) a :where() výš má nulu — tatáž past
@@ -373,7 +439,7 @@ textarea.field { min-height: 0; }
    Tlačítko se navíc samo neroztáhne (i s display:flex má šířku podle obsahu),
    proto šířku dodává pravidlo: 100 % + oba přesahy. Utility (0,1,0) pořád
    přebijí, takže `w-full` na klikací řádek nepatří — posunul by ho doleva. */
-button:where(.list-row) { padding: 0.875rem 0; }
+button:where(.list-row) { padding: 0.75rem 0; }
 button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; width: calc(100% + 1rem); }
 @media (hover: hover) { .list-row-tap:hover { background: var(--well); } }
 .list-row-tap:active { background: rgba(22,24,26,0.06); }
@@ -385,6 +451,8 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
 /* Akce mají vlastní sloupec, ať hlavní tlačítko začíná u všech řádků
    na stejné svislici, i když má jeden řádek akce dvě a druhý jednu. */
 .list-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; }
+/* Šipka řádku (V4): box 20 končí na R, od hodnoty 8 (mezera řádku 14 − 6). */
+.list-sipka { display: flex; justify-content: flex-end; width: 1.25rem; margin-left: -0.375rem; flex-shrink: 0; }
 /* Na počítači ocas neexistuje a jeho děti sedí přímo v řádku — jen tak
    drží sloupce svisle přes všechny řádky. */
 .list-tail { display: contents; }
@@ -398,7 +466,10 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
   .list-tail { display: flex; flex: 1 1 100%; flex-wrap: wrap; order: 1; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
   /* Ocas jen se skrytým doplňkem by byl prázdný řádek navíc. */
   .list-tail-tichy { display: none; }
-  .list-value { width: auto; text-align: left; }
+  /* v4 (P15): hodnota zůstává v PRVNÍM řádku vpravo, zarovnaná na R (nebo R − 28
+     se šipkou) — nikdy nespadne na vlastní řádek pod text vlevo. ListRow ji proto
+     kreslí mimo ocas; do druhého řádku jdou jen akce a chipy. */
+  .list-value { width: auto; max-width: 45%; text-align: right; }
   /* Když se číslo, chip a dvě ikony do 320 px nevejdou (německé „Vergessener
      Abgang?"), akce se zalomí na další řádek a drží se vpravo — dřív koš
      vyčuhoval z karty. Zalamuje se i uvnitř akcí: krokovač skladu + Uložit
@@ -428,16 +499,14 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
 [data-tesne="2"] .stat-hodnota { font-size: 0.9375rem; }
 [data-tesne="2"] .stat-jednotka { font-size: 0.75rem; }
 
+/* v4 (V3, audit V10): řada statů začíná na L karty — žádný záporný okraj
+   a vnitřní odsazení buněk (dřív −8 + 16 posouvalo čísla o 8 px proti ikoně
+   titulku), žádné svislé linky; sloupce repeat(n, 1fr), mezera 16. */
 .statrow-karta { container-type: inline-size; }
-.statrow-karta-v { display: grid; margin-inline: -0.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 1rem; }
-.statrow-karta-v > * { padding-inline: 1rem; min-width: 0; }
-.statrow-karta-v > :nth-child(n+3) { border-top: 1px solid var(--surface-line); padding-top: 1rem; }
-.statrow-karta-v > :last-child:nth-child(odd) { grid-column: span 2; }
+.statrow-karta-v { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--m-4); row-gap: var(--m-4); }
+.statrow-karta-v > * { min-width: 0; }
 @container (min-width: 34rem) {
-  .statrow-karta-v { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); row-gap: 0; }
-  .statrow-karta-v > :nth-child(n+3) { border-top: 0; padding-top: 0; }
-  .statrow-karta-v > :last-child:nth-child(odd) { grid-column: auto; }
-  .statrow-karta-v > * + * { border-left: 1px solid var(--surface-line); }
+  .statrow-karta-v { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 }
 
 @layer components {
@@ -465,7 +534,8 @@ input[type="date"], input[type="time"], input[type="month"] {
   -webkit-appearance: none;
   appearance: none;
   min-width: 0;
-  min-height: 2.875rem;
+  /* v4: stupeň M (44) jako pole a tlačítko vedle; dřív 46 — mimo stupně. */
+  min-height: var(--h-m);
   text-align: left;
 }
 input::-webkit-date-and-time-value { text-align: left; }
@@ -1153,9 +1223,12 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 
 /* ===== Plocha s widgety (kolo 68): mřížka, režim úprav, vlnění, tah ===== */
 /* --sloupcu nastaví JS podle šířky plochy (ResizeObserver); do té doby náhradní počet podle okna. */
-.plocha-mrizka { --sloupcu-z: 1; display: grid; gap: .875rem; grid-template-columns: repeat(var(--sloupcu, var(--sloupcu-z)), minmax(0, 1fr)); }
+/* v4 (P13, V9): dvojice karet vedle sebe 12 (telefon) / 16 (≥ sm), widget pod
+   widgetem 20 — mezera uvnitř dvojice je menší než mezi řadami, takže se dvojice
+   čte jako skupina. Dřív 14 / 20 dokola (14 mimo škálu). */
+.plocha-mrizka { --sloupcu-z: 1; display: grid; column-gap: var(--m-3); row-gap: var(--m-5); grid-template-columns: repeat(var(--sloupcu, var(--sloupcu-z)), minmax(0, 1fr)); }
 @media (min-width: 332px) { .plocha-mrizka { --sloupcu-z: 2; } }
-@media (min-width: 640px) { .plocha-mrizka { gap: 1.25rem; } }
+@media (min-width: 640px) { .plocha-mrizka { column-gap: var(--m-4); row-gap: var(--m-5); } }
 @media (min-width: 1024px) { .plocha-mrizka { --sloupcu-z: 4; } }
 .plocha-mrizka > li { position: relative; min-width: 0; }
 /* Tři vrstvy, každá má svou transformaci:
@@ -1776,3 +1849,109 @@ html[data-obal] .jen-web { display: none !important; }
 :root[data-contrast="high"] .card-info { border-color: rgb(var(--info-ink-rgb) / 0.7); }
 :root[data-contrast="high"] .field { border-color: rgba(22,24,26,0.55); }
 :root[data-contrast="high"][data-theme="dark"] .field { border-color: rgba(237,242,228,0.6); }
+
+/* =====================================================================
+   SKLADBA v4 (DESIGN.md „Mřížka a hrany", „Výšky ovládání", „Řady ovládání",
+   „Vertikální rytmus"; spec-skladba P1–P18, vzory V0–V9).
+   Jedna mřížka (hrana L a R v každém kontejneru), čtyři výšky (28/36/44/52),
+   řada vyplní L→R a má jednu výšku, mezery ze škály 4/8/12/16/24/32 (+20).
+   Mimo @layer schválně: pravidla řad musí přebít výšku a zalamování z utilit
+   (`h-9`, `whitespace-nowrap` u Button), jinak by díl řady měl výšku podle sebe.
+   ===================================================================== */
+
+/* ---------- Řady (components/ui/Rada.tsx) ---------- */
+.rada { display: flex; align-items: stretch; gap: var(--m-2); width: 100%; min-width: 0; }
+.rada-mezera-3 { gap: var(--m-3); }
+/* Rovné díly: 2 × ½, 3 × ⅓ — každý přímý potomek stejně široký, nikdy přes R. */
+.rada-rovne > * { flex: 1 1 0; min-width: 0; }
+/* Pružný + pevný: první díl (pole, titul, segment) bere zbytek, ostatní obsahová šířka na R. */
+.rada-pruzna > :first-child { flex: 1 1 auto; min-width: 0; }
+.rada-pruzna > :not(:first-child) { flex: 0 0 auto; }
+/* Jedna výška v řadě (P7). Díl, který je obal (div s tlačítkem a nabídkou), předá výšku svému ovládání. */
+.rada-s > * { height: var(--h-s); min-height: var(--h-s); }
+.rada-m > * { height: var(--h-m); min-height: var(--h-m); }
+.rada-l > * { height: var(--h-l); min-height: var(--h-l); }
+.rada > :is(div, span) > :is(button, select, input, a, .btn):first-child { height: 100%; min-height: 0; }
+.rada-rovne > :is(div, span) > :is(button, select, input, a, .btn):first-child { width: 100%; }
+/* Dlouhý popisek (de/pl) se v dílu zalomí, díl nepřeteče (P2, §8). */
+.rada > :is(button, a, .btn) { white-space: normal; line-height: 1.15; text-align: center; overflow: hidden; }
+.rada-rovne > :is(button, a, .btn) { padding-left: 0.75rem; padding-right: 0.75rem; }
+/* select v řadě: výška z řady, ne z `.field` (44/52). */
+.rada > select.field, .rada > div > select.field { height: 100%; min-height: 0; }
+
+/* ---------- Sloupec (skupiny pod sebou s mezerou ze škály) ---------- */
+.sloupec { display: flex; flex-direction: column; min-width: 0; }
+.sloupec-1 { gap: var(--m-1); } .sloupec-2 { gap: var(--m-2); } .sloupec-3 { gap: var(--m-3); }
+.sloupec-4 { gap: var(--m-4); } .sloupec-5 { gap: var(--m-5); } .sloupec-6 { gap: var(--m-6); } .sloupec-8 { gap: var(--m-8); }
+
+/* ---------- Karta: jedno odsazení (P1, audit V09) ----------
+   Hrana karty → L obsahu: 16 na telefonu, 20 od sm, bez ohledu na to, kdo kartu
+   kreslí. Nástroje stránek si psaly `card p-5` / `card px-5` (20 i na telefonu)
+   vedle widgetů s 16 — v jednom sloupci pod sebou skákal obsah o 4 px. */
+@media (max-width: 639.98px) {
+  :is(.card, .glass-card).p-5 { padding: var(--pad-karta); }
+  :is(.card, .glass-card).px-5 { padding-left: var(--pad-karta); padding-right: var(--pad-karta); }
+  /* Nástroj jako `<Card pad="none">` s vlastním `px-5 pt-5` uvnitř (Seznam uzávěrek, Lidé v podniku):
+     totéž odsazení — v jednom sloupci s widgety pod sebou. Tlačítka mají px-5 jako vnitřek, ne mřížku. */
+  :is(.card, .glass-card) :not(button, a, .btn).px-5 { padding-left: var(--pad-karta); padding-right: var(--pad-karta); }
+  :is(.card, .glass-card) > :not(button, a, .btn).pt-5 { padding-top: var(--pad-karta); }
+}
+
+/* ---------- Hlavička widgetu (V1) ---------- */
+.w-hlavicka { display: flex; align-items: center; justify-content: space-between; gap: var(--m-2); min-height: var(--h-m); min-width: 0; }
+.w-titul { display: flex; align-items: center; gap: var(--m-3); min-width: 0; flex: 1 1 auto; }
+/* Titul si drží aspoň 55 % šířky hlavičky — ovládání se mu nesmí vecpat do textu. */
+.w-titul > :nth-child(2) { min-width: 0; }
+.w-titul > .chip, .w-titul > :last-child:not(:nth-child(2)) { flex-shrink: 0; }
+.w-ikona-box { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; flex-shrink: 0; }
+/* Malá karta na telefonu (dlaždice ½, 171 px): titul na dva řádky zarovnaný nahoru, text na
+   L + 28 (ikona 20, mezera 8) — s L + 36 by „Nehodnocené" (101 px) nezbylo na jeden řádek ani slovo. */
+@media (max-width: 639.98px) {
+  .w-hlavicka-s, .w-hlavicka-s .w-titul { align-items: flex-start; }
+  .w-hlavicka-s .w-titul { gap: var(--m-2); }
+  .w-hlavicka-s .w-ikona-box { width: 1.25rem; margin-top: -0.0625rem; }
+}
+.w-ovladani-skupina { display: flex; align-items: center; gap: var(--m-1); flex-shrink: 0; max-width: 45%; }
+/* Tělo widgetu: sloty a obsah s jednou mezerou 12 (skupina); souhrn ↔ obsah 8; obsah ↔ akce 16. */
+.w-telo { display: flex; flex-direction: column; gap: var(--m-3); }
+.w-skupina-obsah { display: flex; flex-direction: column; gap: var(--m-2); min-width: 0; }
+.w-patka { margin-top: var(--m-1); }
+
+/* ---------- Filtr jako díl řady (V2) ----------
+   „Měsíc: Tento ▾": šedá pilulka 36, text vlevo, šipka na pravé hraně dílu. */
+.filtr-vyber {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 0.375rem;
+  height: var(--h-s); min-width: 0; padding: 0 0.75rem 0 0.875rem;
+  border-radius: var(--r-chip); background: rgba(22,24,26,0.055); color: var(--ink);
+  font-size: 0.8125rem; font-weight: 500; line-height: 1.2; white-space: nowrap;
+  transition: background-color var(--dur-2, .22s) ease;
+}
+@media (hover: hover) { .filtr-vyber:hover { background: rgba(22,24,26,0.085); } }
+.filtr-vyber > svg { color: rgba(22,24,26,0.5); }
+:root[data-theme="dark"] .filtr-vyber { background: rgba(255,255,255,0.08); color: #EDF2E4; }
+:root[data-theme="dark"] .filtr-vyber > svg { color: rgba(237,242,228,0.6); }
+@media (pointer: coarse) { .filtr-vyber { font-size: 1rem; } }
+.filtr-vyber-inkoust, :root[data-theme="dark"] .filtr-vyber-inkoust { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.85); }
+
+/* ---------- Stavová karta (V8) ---------- */
+.stav-radek { display: flex; align-items: center; gap: var(--m-3); min-height: var(--h-m); min-width: 0; }
+.stav-kruh { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 9999px; flex-shrink: 0; }
+.stav-titul { font-size: 0.9375rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.006em; color: var(--ink); }
+:root[data-theme="dark"] .stav-titul { color: #EDF2E4; }
+
+/* ---------- Hlavní akce stránky a patička okna: stupeň L (52) ---------- */
+.ph-hlavni > :is(button, a, .btn) { height: var(--h-l); font-size: 1rem; padding-left: 1.5rem; padding-right: 1.5rem; }
+.okno-paticka > :is(button, a, .btn) { height: var(--h-l); }
+
+/* Položka nabídky oddělená linkou (lišta „···": akce stránky nahoře, akce lišty pod linkou). */
+.menu-oddelit { margin-top: 0.375rem; position: relative; }
+.menu-oddelit::before { content: ''; position: absolute; left: 0.75rem; right: 0.75rem; top: -0.25rem; border-top: 1px solid var(--surface-line); }
+@media (min-width: 768px) { .menu-oddelit-mobil { margin-top: 0; } .menu-oddelit-mobil::before { display: none; } }
+
+/* ---------- Segment L→R (Segmented sirka="plna", P11) ----------
+   Položky rovným dílem; když se dlouhá nevejde, dostane svůj obsah a ostatní
+   se dělí o zbytek; když se nevejde celý segment, je to posuvný pás (a na
+   telefonu přeteče k hraně obrazovky — Segmented.tsx, `data-presah`).
+   V řadě s dalším prvkem ho dělá pružným dílem `Rada deleni="pruzne"` (nebo `sirka="obsah"`). */
+.seg-plna { width: 100%; }
+.seg-plna-pas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); }

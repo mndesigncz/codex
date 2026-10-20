@@ -10,7 +10,8 @@ import { predejPohledu } from '@/lib/predaniPohledu';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher, { uklidKonceptu } from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
-import { Avatar, ErrorBoundary, IconButton, Menu, MenuPanel, MenuItemButton, type MenuItem } from '../ui';
+import { Avatar, ErrorBoundary, IconButton, MenuPanel, MenuItemButton, type MenuItem } from '../ui';
+import { MenuListy, MenuStrankyProvider } from '../ui/MenuStranky';
 import { Dock } from '../ui/Dock';
 import { usePopover } from '@/lib/usePopover';
 import NotificationBell from '../NotificationBell';
@@ -441,6 +442,8 @@ export default function EmployerLayout({ user }: Props) {
   return (
     <NavigaceKontext.Provider value={navigaceWidgetu}>
     <ProfileLinkProvider>
+    {/* v4: „···" stránky (PageHeader) se kreslí v liště — jedno na obrazovce (MenuStranky). */}
+    <MenuStrankyProvider>
     <div className="flex h-[100dvh] overflow-hidden">
       <DiscardGuard guard={straz.guard} what={coSeZahodi()} />
       {/* Desktop sidebar */}
@@ -546,8 +549,9 @@ export default function EmployerLayout({ user }: Props) {
           <IconButton icon="search" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog" />
           <NotificationBell />
           {/* Všechno ostatní z lišty: Účtenky, přepnutí do Managero client a do TO GO.
-              Položky jsou tytéž akce co dřív, jen bez pěti ikon vedle sebe. */}
-          <Menu label={t('Další možnosti')} items={[
+              Položky jsou tytéž akce co dřív, jen bez pěti ikon vedle sebe.
+              v4: v tomtéž „···" jsou nahoře i akce stránky (dřív druhé „···" vedle h1). */}
+          <MenuListy label={t('Další možnosti')} polozky={[
             ...(ma(UCTENKY) ? [{ label: t('Účtenky'), icon: 'receipt', onClick: () => setReceiptsOpen(true) }] : []),
             ...(smiKlient ? [{ label: t('Přepnout do Managero client'), icon: 'gift', onClick: () => switchMode('client') }] : []),
             { label: t('Přepnout do TO GO režimu'), icon: 'cup', onClick: () => switchMode('togo') },
@@ -652,6 +656,7 @@ export default function EmployerLayout({ user }: Props) {
         hoste={smiKlient && ma('zakaznici.zobrazit')} rezervace={smiKlient && ma('rezervace.zobrazit')} receptury={smiPohled('recipes')} menu={smiKlient && ma('menu.zobrazit')} uzaverky={smiPohled('reports')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
+    </MenuStrankyProvider>
     </ProfileLinkProvider>
     </NavigaceKontext.Provider>
   );

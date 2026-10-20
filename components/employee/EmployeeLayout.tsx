@@ -9,6 +9,7 @@ import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, Badge, ErrorBoundary, IconButton, MenuPanel, MenuItemButton } from '../ui';
+import { MenuListy, MenuStrankyProvider } from '../ui/MenuStranky';
 import { Dock } from '../ui/Dock';
 import { usePopover } from '@/lib/usePopover';
 import NotificationBell from '../NotificationBell';
@@ -201,6 +202,8 @@ export default function EmployeeLayout({ user }: Props) {
 
   return (
     <NavigaceKontext.Provider value={navigaceWidgetu}>
+    {/* v4: „···" stránky (PageHeader) se kreslí v liště — jedno na obrazovce (MenuStranky). */}
+    <MenuStrankyProvider>
     <div className="flex h-[100dvh] overflow-hidden">
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-[width] duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
@@ -301,6 +304,8 @@ export default function EmployeeLayout({ user }: Props) {
           {/* Lupa i na telefonu (kolo 6, Z9): hledání najde úkoly, položky skladu, návody i akce. */}
           <IconButton icon="search" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog" />
           <NotificationBell />
+          {/* v4: „···" jen když stránka nějaké akce má (Upravit stránku…) — dřív stálo vedle h1. */}
+          <MenuListy />
         </header>
 
         {/* relative: absolutně umístěné prvky uvnitř (skryté popisky pro
@@ -358,6 +363,7 @@ export default function EmployeeLayout({ user }: Props) {
         hledatReceptury={smiPohled('recipes')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
+    </MenuStrankyProvider>
     </NavigaceKontext.Provider>
   );
 }

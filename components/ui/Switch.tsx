@@ -89,7 +89,8 @@ export function SwitchRow({ title, hint, checked, onChange, disabled, as: Tag = 
   const idNazvu = `${uid}-n`;
   const idPopisu = `${uid}-h`;
   return (
-    <Tag className={`flex items-center justify-between gap-4 py-3 min-h-[3.25rem] ${className}`}>
+    // v4 (V5): řádek nastavení 56, přepínač vpravo na R.
+    <Tag className={`flex items-center justify-between gap-4 py-3 min-h-14 ${className}`}>
       {/* Název i popis jsou uvnitř popisku (label), aby se dalo klepnout kamkoli na
           text. Přístupný název ale nese jen titulek (aria-labelledby) a popis
           jde zvlášť jako popis — jinak by odečítač četl celý odstavec jako

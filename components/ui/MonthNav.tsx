@@ -52,7 +52,9 @@ export function MonthNav({ value, onChange, min, max, className = '' }: {
   const zamcena = 'aria-disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:active:scale-100';
   return (
     <div role="group" aria-label={t('Měsíc')}
-      className={`flex items-center gap-1 glass rounded-full p-1 min-w-0 w-full sm:w-fit ${className}`}>
+      // v4 (P6/P7): celková výška 44 (stupeň M) — šipky 36 v dráze s odsazením 3 + linkou 1;
+      // dřív 46 a vedle tlačítka „Filtry" 36 tři výšky v jedné řadě.
+      className={`flex items-center gap-1 glass rounded-full h-11 p-[3px] min-w-0 w-full sm:w-fit ${className}`}>
       <button type="button" onClick={() => { if (!naZacatku) onChange(posunMesic(value, -1)); }}
         aria-disabled={naZacatku || undefined}
         aria-label={t('Předchozí měsíc')} className={`tap-target btn-icon ${zamcena}`}>
