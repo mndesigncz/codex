@@ -1,82 +1,128 @@
-# Managero — DESIGN.md (v2, „Managero 2“)
+# Managero — DESIGN.md (v3, „Managero 3“)
 
 Vizuální systém zachycený z kódu (app/globals.css, components/ui). Jedna
 aplikace, tři prostředí: administrace, TO GO/kiosk, Managero client — vše
-mluví jedním jazykem. Verze 2 vznikla po redesignu celé aplikace: místo
-skla a devíti druhů karet jsou tři vrstvy ploch, tři rádiusy, jedna
-typografická škála a jedna sada stavových barev.
+mluví jedním jazykem. Verze 2 po redesignu sjednotila plochy (tři vrstvy,
+tři rádiusy, jedna typografická škála, jedna sada stavových barev). Verze 3
+(redesign „na refero.design“, inspirace Bond, Roi, Pinterest, [untitled],
+World App) bere stejné stavební kameny a ubírá: **méně prvků na obrazovce,
+jeden velký nadpis, čisté plátno, karty s linkou místo stínu, štítky větou,
+ikonová tlačítka v šedém kruhu.** Písmo, limetka, inkoust, logo, ikony,
+struktura aplikace, widgetová plocha i tmavý režim zůstávají.
 
 ## Tón
 
-Světlé, klidné, papírově zelenkavé pozadí s jemným zrnem. Obsah leží na
-bílých kartách s měkkým stínem; uvnitř karet jsou „jamky“ (well) — tónované
-plochy bez stínu. Jedna limetková akce na obrazovce; tmavá inkoustová pro
-vybraný stav a sekundární akce. Sklo (blur) zůstává jen na plovoucí liště,
-docku a topbaru, nikde jinde.
+Čisté světlé plátno s jemným teplým zelenkavým nádechem, bez zrna a bez
+barevných světel v rozích. Obsah leží buď přímo na plátně, nebo v bílé kartě
+s vláskovou linkou a stínem jen náznakem — **jedna vrstva hloubky**. Uvnitř
+karet jsou „jamky“ (well) — tónované plochy bez stínu. Hodně vzduchu, málo
+ovládání: v liště nejvýš tři ikony, na obrazovce jeden nadpis, nejvýš jedna
+limetková akce. Sklo (blur) zůstává jen na plovoucím chromu (dock, menu,
+boční pás), nikde jinde.
+
+**Měřítko „hotovo“ pro každou obrazovku na 390 px:** jeden nadpis, nejvýš
+jedna limetková akce, žádný VERZÁLKOVÝ štítek (výjimka: kód v Geist Mono),
+ikonová tlačítka v lištách ≤ 3, karty bez dekorativních přechodů, vzduch
+mezi sekcemi ≥ 20 px, nic nepřetéká, cíle ≥ 44 px, tmavý režim stejně čistý.
 
 ## Tokeny (app/globals.css, `:root`)
 
-- Pozadí `--bg #F3F4F0` + `--bg-gradient` (dvě radiální světla). Zrno přes
-  celou stránku (`body::after`), vypíná se při `prefers-reduced-transparency`
-  a v tisku.
+- Plátno `--bg #F6F7F3` (v2 `#F3F4F0` + radiální limetkové světlo a zrno —
+  obojí ve v3 pryč; `--bg-gradient` je `none` a zůstává jen kvůli čtenářům).
 - Inkoust `--ink #16181A`; sekundární text `black/55–70`, meta `black/60`.
-- Limetka `--lime #C8F542` (vždy tmavý text na ní); limetkový text na světlém
-  podkladu ztmavený na `#3E5406`/`#5B7A08`.
-- Plochy: `--surface #fff`, `--surface-line` (7 % inkoustu), `--well`
-  (3,5 %), stíny `--shadow-card` / `--shadow-float` / `--shadow-modal`.
+- Limetka `--lime #C8F542` (vždy tmavý text na ní), **bez záře** — pozná se
+  barvou, ne svitem; limetkový text na světlém podkladu ztmavený na
+  `#3E5406`/`#5B7A08`.
+- Plochy: `--surface #fff`, `--surface-line` (7,5 % inkoustu — nese hranu
+  karty), `--well` (4,5 % — pole, ikonové kruhy, sekundární pilulky), stíny
+  `--shadow-card` (jen náznak: `0 1px 2px`), `--shadow-float` (menu, dok,
+  zvednutý widget), `--shadow-modal`.
 - Rádiusy — tři a dost: `--r-lg 20px` (karta, modál), `--r-md 14px` (pole,
-  dlaždice, řádek), `--r-sm 10px` (drobnosti), `--r-chip` kulatý. Tailwind
-  `rounded-3xl/2xl/xl` na ně míří (tailwind.config.js).
+  dlaždice, řádek), `--r-sm 10px` (drobnosti), `--r-chip` kulatý (tlačítka,
+  segment, čipy, ikonové kruhy). Tailwind `rounded-3xl/2xl/xl` na ně míří.
 - Stavové barvy, jedna sada pro chipy, panely, hlášky i text:
   `--ok`, `--wait`, `--bad`, `--info`, `--muted`, vždy dvojice `-bg` / `-ink`.
-- Tmavý motiv: přemapování týchž tokenů pod `[data-theme="dark"]`;
-  hostovská část se připíná na světlý.
+- Tmavý motiv: přemapování týchž tokenů pod `[data-theme="dark"]`, plátno
+  `#0C0D0F` bez barevných světel; hostovská část se připíná na světlý.
 
 ## Vrstvy ploch (CSS třídy)
 
 | Třída | Použití |
 |---|---|
-| `.card` (alias `.glass-card`) | bílá karta se stínem — obsahová jednotka obrazovky |
-| `.card-accent` / `.card-wait` / `.card-danger` / `.card-info` | tónovaná karta jen pro výpadek nebo chybějící uzávěrku (danger), nejvýš jedna na obrazovce; fronty („Čeká na tebe“) jsou bílá karta s chipem |
-| `.well` | jamka uvnitř karty: sloupec kanbanu, pole formuláře v modálu, kód k zkopírování |
+| `.card` (alias `.glass-card`) | bílá karta s linkou a stínem jen náznakem — obsahová jednotka obrazovky; drobné věci (věta, jeden údaj) smí ležet rovnou na plátně |
+| `.card-accent` / `.card-wait` / `.card-danger` / `.card-info` | **plochý** tón (v3 bez přechodu shora dolů) jen pro výpadek nebo chybějící uzávěrku (danger), nejvýš jedna na obrazovce; fronty („Čeká na tebe“) jsou bílá karta s chipem |
+| `.well` | jamka uvnitř karty: sloupec kanbanu, kód k zkopírování, seskupené ovládání |
 | `.note` + `note-danger/wait/info/ok` | inline hláška (chyba, čeká, info); nikdy ručně `bg-red-500/10` |
-| `.glass` | tónovaný povrch bez bluru (starší kód); `.glass-strong` blur jen pro plovoucí chrome |
-| `.list` + `.list-row` (+ `.list-row-tap`) | seznam v jedné kartě, linky mezi řádky kreslí `.list` |
+| `.glass` | tónovaná plocha ovládacích prvků (5 % inkoustu, v3 bez viditelného rámečku); `.glass-strong` blur jen pro plovoucí chrome |
+| `.list` + `.list-row` (+ `.list-row-tap`) | seznam v jedné kartě, řádek 56 px, linky mezi řádky kreslí `.list` |
 
 Karty v kartách jsou zakázané — uvnitř karty je jamka nebo seznam.
+**Dekorativní přechody v kartách jsou zakázané** (limetkový „dotek“ v rohu
+malých karet `.w-dotek` a záře v rohu inkoustového widgetu jsou ve v3 pryč).
 
 ## Typografická škála
 
 Písmo **Geist** (balíček `geist`, `--font-geist-sans`), kódy kartiček a kuponů
 **Geist Mono**. Pět velikostí a dost:
 
-- `.t-page` 28 px bold (jediný h1 na obrazovce; kreslí ho `PageHeader`)
-- `.t-section` 18 px semibold (h2 sekce; kreslí `Section`)
-- `.t-card` 15 px semibold (titulek karty, dlaždice, modálu)
-- `.t-meta` 13 px, 60 % inkoustu (podtitulky, meta řádky)
-- `.t-label` 11 px caps, tracking 0.08em (štítek nad blokem, ne popisek pole)
+- `.t-page` 32 px bold, proklad 1,08, prostrkání −0,028 em (jediný h1 na
+  obrazovce; kreslí ho `PageHeader`); podtitulek pod ním 15 px šedě
+- `.t-section` 20 px semibold (h2 sekce; kreslí `Section`; titulek okna
+  `Modal` je táž třída zvětšená na 22 px bold)
+- `.t-card` 16 px semibold (titulek karty, widgetu, dlaždice)
+- `.t-meta` 13 px, 62 % inkoustu (podtitulky, meta řádky)
+- `.t-label` **13 px medium, větou** (v3: žádné verzálky ani prostrkání —
+  „Tržba“, ne „TRŽBA“); štítek nad číslem nebo blokem, ne popisek pole
 - Popisky polí `.field-label` 13 px medium, bez verzálek.
 
-Čísla `tabular-nums`; odstavce `text-wrap: pretty`; minimum písma 11 px
-(hlídá `scripts/check-contrast-classes.mjs`).
+Čísla `tabular-nums`; velké číslo `Stat` 30 px bold s jednotkou o stupeň
+tenčí a menší (`stat-jednotka`); odstavce `text-wrap: pretty`; minimum písma
+11 px (hlídá `scripts/check-contrast-classes.mjs`). Ručně psané
+`uppercase tracking-…` štítky jsou zakázané — výjimkou je jen kód v mono.
 
 ## Ovládací prvky
 
-- Pole: jedna třída `.field` (bílé, 14px rádius, limetkový focus ring).
+- **Tlačítka:** `<Button>` z `components/ui`, nebo třídy `.btn` +
+  `btn-accent` (limetková, jediná hlavní, bez záře) / `btn-primary`
+  (inkoustová — ostatní důležité akce) / `btn-secondary` (jemně šedá
+  pilulka bez rámečku) / `btn-ghost`; destruktivní `danger` je červený
+  text. Výšky `sm` 36, základ 44, `lg` 52 (hlavní akce dole přes šířku).
+  Všechna jsou pilulka. Ručně psané pilulky `rounded-full bg-[#16181A] …`
+  jsou zakázané. **Nejvýš jedna limetka na obrazovce**; další důležitá akce
+  je inkoustová, běžná šedá.
+- **Ikonová tlačítka:** `<IconButton>` — ikona v jemně šedém kruhu bez
+  rámečku, `md` 40 px (lišta, hlavička), `sm` 36 px (řádek, karta = `.btn-icon`);
+  dotyková plocha vždy 44 px (`tap-target`), `aria-label` povinný. Totéž
+  „···“ (`Menu`) a zvonek (`NotificationBell`). Zavírací kříž okna je
+  `.btn-icon` — šedý kruh.
+- **Pole:** jedna třída `.field` — v3 jemně šedá jamka bez viditelného
+  rámečku, výška 48 px, 14px rádius; při psaní zbělá a dostane limetkový
+  prstenec. Popisek nad polem (`Field`/`Label`), nápověda a chyba pod ním.
   Ikonové pole doplní odsazení jako `!pl-10` — `.field` sedí v
   `@layer components`, takže běžné utility přebije jen s `!`.
-- Tlačítka: `<Button>` z `components/ui`, nebo třídy `.btn` +
-  `btn-accent` (limetková, jediná hlavní) / `btn-primary` (tmavá) /
-  `btn-secondary` (tónovaná) / `btn-ghost`; výšky `btn-sm` 36, základ 44,
-  `btn-lg` 48. Ručně psané pilulky `rounded-full bg-[#16181A] …` jsou
-  zakázané.
-- Chipy stavu: `.chip` + `chip-ok/wait/bad/info/muted/ink`, `chip-sm`.
-- Přepínač pohledu: `Segmented` (tmavá pilulka klouže, `aria-selected`,
-  vždy jeden řádek, co se nevejde, posouvá se do strany).
-- Statistiky: `Stat` / `StatRow` (štítek `.t-label`, číslo 28 px tabular).
-  Číslo se nezalamuje ani nezkracuje; když se do sloupce nevejde (dva
-  sloupce na 320 px), Stat ho zmenší o stupeň škály (28 → 18 → 14) a v řadě
-  všechna stejně (`data-tesne` na obalu, měří Stat.tsx).
+- **Stavové pilulky:** `.chip` + `chip-ok/wait/bad/info/muted/ink`,
+  `chip-sm`; `<Chip icon="check">` — ikona + věta („Ověřuje se“ ⟳,
+  „Rezervováno“ ✓), polotučně, nikdy verzálkami.
+- **Segment (přepínač pohledu):** `Segmented` — v3 **jemný segment**: šedá
+  dráha bez rámečku, bílý jezdec se stínem jen náznakem, který klouže
+  (`.seg-draha`, `.seg-jezdec`, `.seg-vybrano`); `aria-selected`, vždy jeden
+  řádek, co se nevejde, posouvá se do strany. Inkoustová pilulka `.seg-on`
+  zůstává **filtrovacím čipům** (`.filter-pill`) a výběru v navigaci —
+  segment je pohled, čip je výběr.
+- **Jedna řada záložek.** Obrazovka má jednu primární řadu (segment);
+  druhotné filtry jdou do „Filtry“ nebo do jedné vodorovné řady čipů. Dvě
+  tři řady přepínačů nad sebou jsou zakázané.
+- **Statistiky:** `Stat` / `StatRow` (štítek `.t-label` větou, číslo 30 px
+  tabular). Číslo se nezalamuje ani nezkracuje; když se do sloupce nevejde
+  (dva sloupce na 320 px), Stat ho zmenší o stupeň škály (30 → 20 → 15)
+  a v řadě všechna stejně (`data-tesne` na obalu, měří Stat.tsx).
+- **Spodní okna:** `Modal` — na telefonu vyjede zdola, velký titulek 22 px,
+  krátká věta pod ním, zavírací kříž v šedém kruhu a tlačítka v patičce
+  přes šířku (jedno nebo dvě pilulky vedle sebe).
+- **Prázdný stav:** `EmptyState` — velký klidný symbol v šedém kruhu (ne
+  limetková dlaždice), jedna věta titulku, nanejvýš jedna věta nápovědy
+  a jedna akce.
+- **Přepínač:** `Switch` / `SwitchRow` — limetka bez záře je stav, ne akce.
 - Nic nepřetéká: žádný vodorovný posuv stránky, nic nevyčuhuje z karty,
   widgetu ani okna — hlídají sondy `preteceni-*` (vedení, zaměstnanec,
   tablet + veřejné stránky, okna) na 320/390/768/1024 px, česky, německy
@@ -99,8 +145,9 @@ avatar dostane `title`, který se stane jeho přístupným jménem. Lokální
 `Initials` v `components/client/ClientShell.tsx` je starší duplikát, nový kód
 ho nepoužívá.
 
-**Ovládání:** Button, Segmented (vždy jeden posuvný řádek — viz „Posuvný
-pás a rozbalovací panely"), Menu (roste z tlačítka, `pop-in` 160 ms)
+**Ovládání:** Button, IconButton (v3, ikona v šedém kruhu), Segmented (vždy
+jeden posuvný řádek — viz „Posuvný pás a rozbalovací panely"), Menu (roste
+z tlačítka, `pop-in` 160 ms; spoušť „···“ je IconButton, malá v řádku 36 px)
 a z něj vytažené `MenuPanel` + `MenuItemButton` pro panel, který z tlačítka
 neroste (kontextové menu widgetu vypadá přesně jako „···"),
 Field/Label/Input/Select/Textarea, SearchField (poslední hledání, návrhy,
@@ -149,11 +196,25 @@ Klient navíc: StatCard, SectionTitle, TableMap.
 
 ## Vzory obrazovek
 
-- Každá obrazovka: `PageHeader` (h1 + podtitulek, vpravo přepínač a jedna
-  limetková akce), pak karty. Šířka obsahu: seznamové obrazovky `max-w-4xl`,
+- **Horní lišta (chrome)** — `EmployerLayout`, `EmployeeLayout`: vlevo
+  značka a přepínač podniku (na monitoru přepínač bočního pásu), vpravo
+  nejvýš dvě akce — hledání a oznámení — a „···“ se vším ostatním (Účtenky,
+  Managero client, TO GO). Všechny tři jako šedé kruhy 40 px. **Název
+  stránky v liště není** (čte ho jen odečítač, `sr-only`); stojí jednou,
+  jako h1 pod lištou. Hostovská lišta (`ClientShell`): značka, záložky od
+  md, hledání/kód v šedém kruhu, jazyk, účet; „Přihlásit“ je inkoustová
+  pilulka — limetka patří hlavní akci obrazovky.
+- Každá obrazovka: `PageHeader` (h1 32 px + podtitulek 15 px; vpravo „···“
+  a vedlejší akce v šedých kruzích, jedna limetková akce — na telefonu pod
+  nadpisem přes šířku), pak obsah. Okraj obsahu na telefonu 20 px (plocha
+  widgetů), od `sm` 24 px. Šířka obsahu: seznamové obrazovky `max-w-4xl`,
   datové (finance, docházka, sklad) plná šířka `max-w-7xl`.
+- Mezi sekcemi aspoň 20 px vzduchu (`space-y-6` stránky, mřížka plochy
+  14 px na telefonu / 20 px od `sm`).
 - Seznam = jedna karta s `.list`; ne jedna karta na položku (Úkoly, Nápady,
-  Průběhy). Dlaždice (návody, kategorie skladu) max. 2 sloupce vedle railu.
+  Průběhy). Řádek 56–64 px: ikona/avatar 36–40 px, titulek 15 px medium,
+  podtitulek šedý 13 px, hodnota vpravo zarovnaná (`ListRow`).
+  Dlaždice (návody, kategorie skladu) max. 2 sloupce vedle railu.
 - „Čeká na tebe“: bílá karta (ne `card-wait`), stav nese jantarový chip
   s počtem u titulku („5 čeká“, odečítači celá věta přes `czCount`),
   prokliky na fronty jsou `Button secondary sm`. Tónovaná karta zabrala na
@@ -161,20 +222,25 @@ Klient navíc: StatCard, SectionTitle, TableMap.
   uzávěrku (danger), nejvýš jedna na obrazovce.
 - Kanban: sloupce `well`, karty `card` s `hover:shadow-float`.
 - Navigace: desktop levý rail (administrace) nebo horní záložky (client);
-  mobil spodní dock `dock-strong`.
+  mobil spodní dock `dock-strong`, list „Více“ (`MobileMoreSheet`) s
+  dlaždicemi: ikona v šedém kruhu, vybraná v inkoustovém.
 - Destruktivní akce vždy s confirm; hlášky přes `.note`.
 
 ## Pohyb a přístupnost
 
-Křivky `--ease-out` pro vstupy/výstupy, `--ease-in-out` pro pohyb po
-obrazovce, `--ease-drawer` pro zásuvky. Doby: stisk 120 ms, změna stavu
-220 ms, příchod plochy 340 ms; menu ≤ 160 ms; nic přes 300 ms mimo modály.
-Vstup z 0.96 s opacitou, nikdy ze `scale(0)`. `active:scale-[0.97]` globálně
-na `button`. Hover jen pod kurzorem (`future.hoverOnlyWhenSupported`).
-Dotykové cíle ≥ 36 px (`tap-target(-sm)`), `aria-pressed` na přepínačích,
-`role=status` na toastech, `role=dialog` + fokus trap (`useModal`).
+Jemně a krátce (150–250 ms), nic okázalého. Křivky `--ease-out` pro
+vstupy/výstupy, `--ease-in-out` pro pohyb po obrazovce, `--ease-drawer` pro
+zásuvky. Doby: stisk 120 ms, změna stavu 220 ms, příchod plochy 340 ms;
+menu ≤ 160 ms; nic přes 300 ms mimo modály. Vstup z 0.96 s opacitou, nikdy
+ze `scale(0)`; příchod plochy (`surface-in`) ve v3 bez rozmazání, jen 6 px
+posun a opacita. Zvonek s novými oznámeními zazvoní dvakrát a ztichne —
+trvalý pohyb v liště je zakázaný. `active:scale-[0.97]` globálně na
+`button`. Hover jen pod kurzorem (`future.hoverOnlyWhenSupported`).
+Dotykové cíle ≥ 44 px (`tap-target`, v hustém seznamu `tap-target-sm` 36),
+`aria-pressed` na přepínačích, `role=status` na toastech, `role=dialog` +
+fokus trap (`useModal`).
 `prefers-reduced-motion`: pohyb pryč, opacita zůstává;
-`prefers-reduced-transparency`: blur i zrno pryč; `prefers-contrast: more`:
+`prefers-reduced-transparency`: blur pryč; `prefers-contrast: more`:
 tvrdší okraje.
 
 ## Ověření
@@ -622,10 +688,11 @@ horizontálních přetečení a chyb v konzoli na všech obrazovkách.
   Pozice + barva nesou význam, ne jen text.
 - **Dlouhé seznamy řeší `SearchField`**, ne scrollování: klik nabídne
   předvolby (kategorie, dodavatelé, poslední hledání), psaní filtruje.
-- **Přepínače pohledů** (`.seg-on`/`.seg-off`) při přetečení scrollují
+- **Přepínače pohledů** (`Segmented`) při přetečení scrollují
   horizontálně uvnitř vlastního pásu, nikdy nerozbíjí stránku.
-- **Hlavičková akce** (`PageHeader`) je na mobilu vpravo pod titulkem —
-  jednotně na všech obrazovkách, jediná limetková akce na stránce.
+- **Hlavičková akce** (`PageHeader`) je na mobilu pod titulkem přes celou
+  šířku, „···“ zůstává vpravo vedle titulku — jednotně na všech obrazovkách,
+  jediná limetková akce na stránce.
 - **Tablet (768–1024)**: postranní menu se zužuje na ikony, obsah drží
   dvousloupcové karty; kiosk běží na plné šířce s pilulkovou navigací.
 
@@ -1624,8 +1691,12 @@ API: `app/api/rozlozeni/route.ts` (GET/PUT/DELETE osobního),
 ### Vzhled
 
 - **Widget** je vždy `<Widget>` z `components/widgety/Widget.tsx` =
-  `Card as="section"`: titulek `h2.t-card` s ikonou 17 px `text-black/40`
-  (bez kolečka), odkaz dál jako `Button ghost sm` s chevronem, čísla `Stat`,
+  `Card as="section"`: titulek `h2.t-card` (16 px) s ikonou 17 px `.w-ikona`
+  **bez podkladového čtverečku** (v3; limetková dlaždička z kola 71 je pryč),
+  ovládání v hlavičce tiché (`.w-ovladani`, 50 % inkoustu, plný pod kurzorem):
+  odkaz dál jako `Button ghost sm` s chevronem, Zvětšit, a **Sbalit vždy úplně
+  vpravo**. Karta bez dekorativních přechodů (žádný `.w-dotek`, žádná záře
+  v rohu inkoustového widgetu). Čísla `Stat`,
   seznamy `.list` + `ListRow` (ve střední velikosti nejvýš 5 a „…a dalších
   N"). Všechny čtyři stavy: kostra, `ErrorState compact` se „Zkusit znovu",
   prázdno větou, a bez oprávnění nic. Pád jednoho widgetu neshodí plochu.
@@ -1779,7 +1850,7 @@ telefonu zalomilo na dva řádky a přepínač vypadal jako hromádka textu, ne
 jako jedna ovládací lišta. Že je kus mimo, prozradí vyblednutý okraj
 (jen na straně, kde něco je) a vybraná položka se sama posune do záběru —
 přes `scrollLeft` pásu, ne `scrollIntoView`, který by posunul i celou
-stránku. Tmavá pilulka leží uvnitř pásu, takže jede s obsahem. Filtrovací
+stránku. Jezdec (v3 bílý na šedé dráze) leží uvnitř pásu, takže jede s obsahem. Filtrovací
 pás pilulek se chová stejně.
 
 **Rozbalovací panel se vejde na obrazovku.** Panely se kotví k tlačítku
@@ -1846,8 +1917,11 @@ aplikace jede jako dřív.
 
 ## Anti-vzory (zdejší zákazy)
 
-Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
-pilulky, panely a štítky místo `.btn`/`.note`/`.t-label`; nové rádiusy
+Karta v kartě; víc než jedna limetková akce na obrazovce; název stránky
+dvakrát (v liště i jako h1); víc než tři ikonová tlačítka v liště; dvě a víc
+řad přepínačů nad sebou; VERZÁLKOVÉ štítky s prostrkáním (mimo kód v mono);
+dekorativní přechody a záře v kartách; ikona widgetu v barevném čtverečku;
+ručně psané pilulky, panely a štítky místo `.btn`/`.note`/`.t-label`; nové rádiusy
 mimo tři tokeny; nové barvy mimo paletu; Title Case v češtině; `capitalize`
 na datech; `String(date).slice` a `toDateString()` místo pragueTime; písmo pod 11 px;
 `transition: all`; `ease-in` na UI; hover efekt bez `hover: hover`;
