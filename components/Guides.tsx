@@ -486,9 +486,11 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
           </div>
         )}
       </div>
-      <div id="navody-pasy-filtru" className={`space-y-3 ${ukazPasy ? '' : 'max-sm:hidden'}`}>
+      {/* v3: od sm kategorie a stav v jedné řadě (dřív dvě řady pilulek pod hledáním); na telefonu
+          jsou obě za „Filtry" a pod sebou, ať se dají projet palcem. */}
+      <div id="navody-pasy-filtru" className={`space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-3 ${ukazPasy ? '' : 'max-sm:hidden'}`}>
       {maPasKategorii && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 items-center" role="group" aria-label={t('Kategorie návodů')}>
+        <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 items-center sm:min-w-0 sm:flex-1" role="group" aria-label={t('Kategorie návodů')}>
           {pilulka('all', t('Vše'), counts.get('vse') ?? 0)}
           {categories.map(c => pilulka(c.id, c.name, counts.get(c.id) ?? 0))}
           {hasUncategorized && pilulka(-1, t('Bez kategorie'), counts.get(-1) ?? 0)}
@@ -499,7 +501,7 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
       )}
       {/* Co čeká na člověka: přečíst nebo schválit. Jen když takový návod je (nebo je filtr zapnutý). */}
       {maPasStavu && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 items-center" role="group" aria-label={t('Stav návodů')}>
+        <div className="flex gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 items-center sm:shrink-0 sm:max-w-[50%]" role="group" aria-label={t('Stav návodů')}>
           {([['kprecteni', t('K přečtení'), nKPrecteni], ['navrhy', t('Čeká na schválení'), nNavrhu]] as const)
             .filter(([id, , n]) => n > 0 || stav === id)
             .map(([id, label, n]) => (
