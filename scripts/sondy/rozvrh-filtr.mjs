@@ -65,11 +65,26 @@ async function nactiRozvrh(p) {
   // Kolo 6 UX (V02): plánovač se otevírá na aktuálním měsíci, dokud v něm jsou směny po dnešku
   // (fixtura je má až do 12. dne) — sonda pracuje s příštím měsícem, tak si ho vybere sama.
   const pristi = p.getByRole('button', { name: 'Příští měsíc' });
-  await dokud(() => pristi.isVisible(), 6000);
+  if (!(await dokud(() => pristi.isVisible(), 6000))) { await mesicSipkami(p, 1); return true; }
   if ((await pristi.getAttribute('aria-pressed')) !== 'true') await pristi.click();
   await dokud(async () => (await pristi.getAttribute('aria-pressed')) === 'true', 3000);
   return dokud(() => pas(p).isVisible(), 6000);
 }
+
+// Redesign v3: na telefonu nad mřížkou není „Tento / Příští měsíc" (jen ‹ měsíc › a Filtry);
+// měsíc se tam přepíná šipkami podle nadpisu plánovače (sr-only, pro odečítač).
+async function mesicSipkami(p, posun) {
+  const ted = new Date(); const d = new Date(Date.UTC(ted.getUTCFullYear(), ted.getUTCMonth() + posun, 15));
+  const cil = new Intl.DateTimeFormat('cs-CZ', { month: 'long', year: 'numeric', timeZone: 'Europe/Prague' }).format(d).toLowerCase();
+  const nadpis = p.locator('#planovac-nadpis');
+  const text = async () => (await nadpis.innerText()).trim().toLowerCase();
+  for (let i = 0; i < 3 && (await text()) !== cil; i++) {
+    await p.getByRole('button', { name: posun > 0 ? 'Další měsíc' : 'Předchozí měsíc' }).first().click();
+    await dokud(async () => (await text()) === cil, 1500);
+  }
+  return (await text()) === cil;
+}
+
 
 // 1) Počty v pásu, výběr člověka, dva lidé, typ, jen díry, reset.
 {

@@ -416,8 +416,23 @@ const FIX_VYCHOZI = {
 };
 const mrizka = (p) => widgetLi(p, 'nastroj').locator('[aria-label="Mřížka rozvrhu"]');
 const bunkaDne = (p, d) => widgetLi(p, 'nastroj').locator('[aria-label="Mřížka rozvrhu"] + div > button').filter({ has: p.locator(`span:text-is("${Number(d.slice(8, 10))}")`) }).first();
+
+// Redesign v3: na telefonu nad mřížkou není „Tento / Příští měsíc" (jen ‹ měsíc › a Filtry);
+// měsíc se tam přepíná šipkami podle nadpisu plánovače (sr-only, pro odečítač).
+async function mesicSipkami(p, posun) {
+  const ted = new Date(); const d = new Date(Date.UTC(ted.getUTCFullYear(), ted.getUTCMonth() + posun, 15));
+  const cil = new Intl.DateTimeFormat('cs-CZ', { month: 'long', year: 'numeric', timeZone: 'Europe/Prague' }).format(d).toLowerCase();
+  const nadpis = p.locator('#planovac-nadpis');
+  const text = async () => (await nadpis.innerText()).trim().toLowerCase();
+  for (let i = 0; i < 3 && (await text()) !== cil; i++) {
+    await p.getByRole('button', { name: posun > 0 ? 'Další měsíc' : 'Předchozí měsíc' }).first().click();
+    await dokud(async () => (await text()) === cil, 1500);
+  }
+  return (await text()) === cil;
+}
 async function naTentoMesic(p) {
   const b = widgetLi(p, 'nastroj').getByRole('button', { name: 'Tento měsíc' });
+  if (!(await b.isVisible())) { await mesicSipkami(p, 0); await dokud(() => mrizka(p).isVisible(), 3000); await p.waitForTimeout(300); return; }
   if ((await b.getAttribute('aria-pressed')) !== 'true') await b.click();
   await dokud(async () => (await b.getAttribute('aria-pressed')) === 'true' && await mrizka(p).isVisible(), 3000);
   await p.waitForTimeout(300);
