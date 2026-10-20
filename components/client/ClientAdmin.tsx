@@ -303,8 +303,8 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
                 {tab === 'customers' && <ZakazniciStranka oznam={oznam} hledat={hledatHosta} />}
                 {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} promos={<PromoKody oznam={oznam} />} oznam={oznam} otevriCast={castVernosti} />}
                 {tab === 'cards' && <KartickySprava oznam={oznam} />}
-                {tab === 'brand' && <div className="p-4 sm:p-6"><BrandTab toast={t => oznam(t)} onChange={obnovSouhrn} /></div>}
-                {tab === 'settings' && <div className="p-4 sm:p-6"><SettingsTab oznam={oznam} onChange={obnovSouhrn} /></div>}
+                {tab === 'brand' && <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6"><BrandTab toast={t => oznam(t)} onChange={obnovSouhrn} /></div>}
+                {tab === 'settings' && <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6"><SettingsTab oznam={oznam} onChange={obnovSouhrn} /></div>}
               </ErrorBoundary>
             </div>
           </main>
@@ -1226,7 +1226,7 @@ function StolyStranka({ oznam }: { oznam: Hlaska }) {
               <Input id="t-name" autoFocus value={okno.name} maxLength={60} onChange={e => setOkno({ ...okno, name: e.target.value })} placeholder="U okna" />
             </Field>
             <Field id="t-seats" label="Kolik míst">
-              <Input id="t-seats" type="number" min={1} max={40} className="!w-28" value={okno.seats}
+              <Input id="t-seats" type="number" min={1} max={40} value={okno.seats}
                 onChange={e => setOkno({ ...okno, seats: Math.max(1, parseInt(e.target.value || '1', 10) || 1) })} />
             </Field>
           </form>
@@ -1471,20 +1471,25 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
     <div className="space-y-6 max-w-3xl">
     <form onSubmit={save} className="space-y-6">
       <PageHeader hintId="clientadmin-8" title="Nastavení" subtitle="Jak podnik vidí hosté a co u něj můžou dělat." primary={<Button type="submit" variant="accent" loading={busy}>Uložit</Button>} />
-      <Card className="space-y-4">
+      {/* v4 (P13): karty nastavení jedna stupnice — skupiny 12 (řádek přepínače má vlastních 12),
+          pole ↔ pole 16, popisek ↔ pole 6; řady 44 přes celou šířku (P2, P7). */}
+      <Card className="sloupec sloupec-3">
         <ul className="list">
           <SwitchRow title="Zapnout pro hosty" hint="Podnik se ukáže na své adrese a hosté se k němu můžou přidat." checked={!!p.enabled} onChange={v => setP({ ...p, enabled: v })} />
         </ul>
         <Field id="s-slug" label="Veřejná adresa" hint={<span className="break-all">{d.url}</span>}>
-          <div className="flex gap-2 items-center flex-wrap">
-            <span className="text-sm text-black/50">/client/</span>
-            <Input id="s-slug" value={p.slug} onChange={e => setP({ ...p, slug: e.target.value })} className="flex-1 min-w-[10rem] !w-auto" />
-            <Button type="button" variant="secondary" size="sm" icon="copy" onClick={copy}>Kopírovat</Button>
+          <div className="rada rada-pruzna rada-m">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm text-black/50 shrink-0">/client/</span>
+              <Input id="s-slug" value={p.slug} onChange={e => setP({ ...p, slug: e.target.value })} className="flex-1 min-w-0 !w-auto" />
+            </div>
+            {/* Na telefonu jen ikona (popisek zůstává čtečce a v bublině), ať zbude místo na adresu. */}
+            <Button type="button" variant="secondary" icon="copy" title="Kopírovat" className="max-sm:!w-11 max-sm:!px-0" onClick={copy}><span className="max-sm:sr-only">Kopírovat</span></Button>
           </div>
         </Field>
         {!hoursOk && <p className="note note-wait">Podnik nemá vyplněnou otevírací dobu (Rozvrh → Otevírací doba). Bez ní hosté nemůžou rezervovat.</p>}
       </Card>
-      <Card className="grid gap-4">
+      <Card className="sloupec sloupec-4">
         <h2 className="t-card">Nabídka pro hosty</h2>
         <Field id="s-menu" label="Které menu se hostům ukáže" hint="Nabídku spravuješ v záložce Menu. Logo, fotky a text o podniku najdeš ve Vzhledu.">
           <Select id="s-menu" value={p.menu_slug ?? ''} onChange={e => setP({ ...p, menu_slug: e.target.value })}>
@@ -1500,8 +1505,10 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
           </p>
         )}
       </Card>
-      <Card className="grid gap-4">
+      <Card className="sloupec sloupec-3">
         <h2 className="t-card">Rezervace a objednávky</h2>
+        {/* Tři přepínače v jednom seznamu (dřív dva seznamy po sobě — mezera 36 uprostřed karty);
+            hranice automatického potvrzení je řádek seznamu hned pod svým přepínačem. */}
         <ul className="list">
           <SwitchRow title="Hosté můžou rezervovat" checked={!!p.reservations_on} onChange={v => setP({ ...p, reservations_on: v })} />
           {/* Malá kavárna nemá nikoho, kdo by požadavky hlídal: rezervace se potvrdí sama
@@ -1511,24 +1518,25 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
               ? `Větší skupiny (od ${Number(p.auto_confirm_max_party) + 1} osob) dál čekají na tvé potvrzení.`
               : 'Host má potvrzeno hned po odeslání. Hranici pro velké skupiny nastavíš pod přepínačem.'}
             checked={p.auto_confirm === true} onChange={v => setP({ ...p, auto_confirm: v })} />
-        </ul>
-        {p.auto_confirm === true && (
-          <Field id="s-auto-max" label="Samy se potvrdí skupiny do (osob)" hint="0 = všechny velikosti. Větší skupiny počkají, až je potvrdíš v Rezervacích.">
-            <Input id="s-auto-max" type="number" inputMode="numeric" min={0} max={40} className="!w-full sm:!w-28" value={p.auto_confirm_max_party ?? 0}
-              onChange={e => setP({ ...p, auto_confirm_max_party: e.target.value })} />
-          </Field>
-        )}
-        <ul className="list">
+          {p.auto_confirm === true && (
+            <li className="pb-3">
+              <Field id="s-auto-max" label="Samy se potvrdí skupiny do (osob)" hint="0 = všechny velikosti. Větší skupiny počkají, až je potvrdíš v Rezervacích.">
+                <Input id="s-auto-max" type="number" inputMode="numeric" min={0} max={40} value={p.auto_confirm_max_party ?? 0}
+                  onChange={e => setP({ ...p, auto_confirm_max_party: e.target.value })} />
+              </Field>
+            </li>
+          )}
           <SwitchRow title="Hosté můžou objednávat od stolu" hint="Objednávky potřebují stoly (záložka Stoly) a nabídku z Menu. S napojenou pokladnou jdou přijaté objednávky rovnou na stůl v kase."
             checked={!!p.ordering_on} onChange={v => setP({ ...p, ordering_on: v })} />
         </ul>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Tři krátká čísla jako 3 × ⅓ i na telefonu (P2). */}
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <Field id="s-party" label="Nejvíc osob"><Input id="s-party" type="number" min={1} max={40} value={p.max_party} onChange={e => setP({ ...p, max_party: e.target.value })} /></Field>
           <Field id="s-lead" label="Dní dopředu"><Input id="s-lead" type="number" min={1} max={180} value={p.lead_days} onChange={e => setP({ ...p, lead_days: e.target.value })} /></Field>
           <Field id="s-slot" label="Krok (min)"><Input id="s-slot" type="number" min={15} max={120} step={15} value={p.slot_minutes} onChange={e => setP({ ...p, slot_minutes: e.target.value })} /></Field>
         </div>
       </Card>
-      <Card className="grid gap-4">
+      <Card className="sloupec sloupec-3">
         <div>
           <h2 className="t-card">Ochrana objednávek od stolu</h2>
           <p className="t-meta mt-0.5">Aby objednával jen ten, kdo u stolu opravdu sedí. Dvě nezávislé stopy: QR kód na stole a poloha telefonu.</p>
@@ -1545,13 +1553,14 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
           </Select>
         </Field>
         {p.order_geo !== 'off' && !hasCoords && <p className="note note-wait">Poloha podniku není nastavená, ověření polohy zatím neběží. Stoupni si v podniku s telefonem a klepni na „Použít moji polohu".</p>}
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-4 items-end">
+        {/* Šířka a délka 2 × ½, „Použít moji polohu" pod nimi přes celou šířku (na telefonu se dřív zalomila vlevo). */}
+        <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto] gap-x-3 gap-y-4 items-end">
           <Field id="s-lat" label="Zeměpisná šířka"><Input id="s-lat" inputMode="decimal" value={p.lat ?? ''} onChange={e => setP({ ...p, lat: e.target.value })} placeholder="49.1951" /></Field>
           <Field id="s-lng" label="Zeměpisná délka"><Input id="s-lng" inputMode="decimal" value={p.lng ?? ''} onChange={e => setP({ ...p, lng: e.target.value })} placeholder="16.6068" /></Field>
-          <Button type="button" variant="secondary" icon="location" loading={locating} onClick={useMyPosition}>Použít moji polohu</Button>
+          <Button type="button" variant="secondary" icon="location" className="col-span-2 sm:col-span-1" loading={locating} onClick={useMyPosition}>Použít moji polohu</Button>
         </div>
         <Field id="s-radius" label="Poloměr (m)" hint="K poloměru se přičítá přesnost telefonu (nejvýš 50 m). Sto metrů pokryje podnik i zahrádku.">
-          <Input id="s-radius" type="number" min={30} max={1000} step={10} className="!w-36" value={p.geo_radius_m ?? 100} onChange={e => setP({ ...p, geo_radius_m: e.target.value })} />
+          <Input id="s-radius" type="number" min={30} max={1000} step={10} value={p.geo_radius_m ?? 100} onChange={e => setP({ ...p, geo_radius_m: e.target.value })} />
         </Field>
         <ul className="list">
           <SwitchRow title="Ověřené objednávky posílat rovnou do pokladny"
@@ -1570,14 +1579,12 @@ function DataZKarticky({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => void 
   const imp = useImportKarticky(oznam, onZmena);
   if (!imp.smi) return null;
   return (
-    <Card className="grid gap-3" aria-labelledby="s-karticka">
+    <Card className="sloupec sloupec-4" aria-labelledby="s-karticka">
       <div>
         <h2 id="s-karticka" className="t-card">{PRECHOD_OTAZKA}</h2>
         <p className="t-meta mt-0.5 text-pretty">{PRECHOD_POPIS}</p>
       </div>
-      <div>
-        <Button type="button" variant="secondary" icon="upload" className="max-sm:w-full" onClick={imp.otevri}>{PRECHOD_TLACITKO}</Button>
-      </div>
+      <Button type="button" variant="secondary" icon="upload" className="w-full" onClick={imp.otevri}>{PRECHOD_TLACITKO}</Button>
       {imp.okno}
     </Card>
   );

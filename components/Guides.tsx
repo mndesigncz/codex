@@ -449,7 +449,8 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
               return (
                 // Vlastní <li> + ListRow as="div": obal <li className="contents"> by .list nenakreslil linku (DP §3.6).
                 <li key={g.id}>
-                  <ListRow as="div" title={g.title} meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
+                  {/* v4 (V4, P15): stav čtení je stavový řádek na ose textu; datum úpravy sloupec u pravé hrany. */}
+                  <ListRow as="div" title={g.title} meta={meta} detail={stav} aside={kdyUpraveno(g.updatedAt)}
                     onClick={() => { void openReader(g.id); }} />
                 </li>
               );
@@ -462,7 +463,7 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
                 // Akce leží nad ním, protože jsou pozicované a v DOM později (Menu je relative,
                 // Spustit dostal `relative`). Fokus = limetkový prstenec řádku jako u Button.
                 title={<button type="button" onClick={() => { void openReader(g.id); }} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none after:absolute after:inset-0 after:rounded-[var(--r-md)] after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[#C8F542]">{g.title}</button>}
-                meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
+                meta={meta} detail={stav} aside={kdyUpraveno(g.updatedAt)}
                 actions={<Menu size="sm" label={t('Další akce s návodem {nazev}', { nazev: g.title })} items={polozky} />} />
             );
           })}
@@ -1019,11 +1020,12 @@ function GuideEditor({
             onBlur={(e) => { kurzorRef.current = e.currentTarget.selectionStart; }}
             placeholder={`${t('Sem napiš návod…')}\n\n${t('Tip: řádky **tučně** a odrážky pomocí „- “.')}`} className="leading-relaxed !resize-y" />
         </Field>
-        <div className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        {/* v4 (P2, V17): Přidat fotku přes celou šířku okna, vysvětlení pod ním — ne osamělé tlačítko vlevo. */}
+        <div className="-mt-1 sloupec sloupec-2">
           {/* accept="image/*" bez capture: telefon nabídne foťák i galerii. */}
           <input ref={fotkaRef} id={`${uid}-fotka`} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
             onChange={(e) => { void pridatFotku(e.target.files?.[0] ?? null); }} />
-          <Button variant="secondary" icon="camera" loading={nahravam} onClick={() => fotkaRef.current?.click()}>{t('Přidat fotku')}</Button>
+          <Button variant="secondary" size="lg" icon="camera" className="w-full" loading={nahravam} onClick={() => fotkaRef.current?.click()}>{t('Přidat fotku')}</Button>
           <span className="t-meta min-w-0 text-pretty">{t('Vloží se na místo kurzoru jako řádek ![popis](…) — popis můžeš přepsat.')}</span>
           {chybaFotky && <p className="note note-danger w-full text-sm" role="alert">{chybaFotky}</p>}
         </div>
@@ -1047,23 +1049,24 @@ function GuideEditor({
             <ol className="space-y-2 mb-3">
               {steps.map((s, i) => (
                 <li key={i} className="space-y-2">
+                  {/* v4 (P7): řádek kroku má jednu výšku 44 — pole i ikonová tlačítka (dřív pole 52 v okně vedle 36). */}
                   <div className="flex items-center gap-1.5">
                     <span className="t-meta w-5 text-right shrink-0 tabular-nums">{i + 1}.</span>
                     <Input value={s.text} onChange={(e) => patchStep(i, { text: e.target.value })}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (i === steps.length - 1) addStep(); } }}
-                      placeholder={t('Krok {n}', { n: i + 1 })} aria-label={t('Krok {n}', { n: i + 1 })} className="flex-1 min-w-0" />
-                    <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={t('Posunout krok {n} výš', { n: i + 1 })}
+                      placeholder={t('Krok {n}', { n: i + 1 })} aria-label={t('Krok {n}', { n: i + 1 })} className="field-m flex-1 min-w-0" />
+                    <Button variant="ghost" iconOnly icon="chevron" className="rotate-180" aria-label={t('Posunout krok {n} výš', { n: i + 1 })}
                       onClick={() => moveStep(i, -1)} disabled={i === 0} />
-                    <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-label={t('Posunout krok {n} níž', { n: i + 1 })}
+                    <Button variant="ghost" iconOnly icon="chevron" aria-label={t('Posunout krok {n} níž', { n: i + 1 })}
                       onClick={() => moveStep(i, 1)} disabled={i === steps.length - 1} />
                     <button type="button" aria-pressed={surovina(s)}
                       onClick={() => patchStep(i, surovina(s) ? { itemId: null, amount: null, unit: null } : { itemId: null, amount: null, unit: '' })}
                       aria-label={surovina(s) ? t('Krok {n}: zrušit surovinu', { n: i + 1 }) : t('Krok {n}: označit jako surovinu', { n: i + 1 })}
                       title={surovina(s) ? t('Zrušit surovinu') : t('Označit jako surovinu')}
-                      className={`filter-pill tap-target grid h-9 w-9 place-items-center !px-0 shrink-0 ${surovina(s) ? 'seg-on' : 'seg-off glass'}`}>
-                      <Icon name="box" size={14} />
+                      className={`filter-pill tap-target grid !h-11 w-11 place-items-center !px-0 shrink-0 ${surovina(s) ? 'seg-on' : 'seg-off glass'}`}>
+                      <Icon name="box" size={16} />
                     </button>
-                    <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat krok {n}', { n: i + 1 })} onClick={() => removeStep(i)} />
+                    <Button variant="ghost" iconOnly icon="close" aria-label={t('Odebrat krok {n}', { n: i + 1 })} onClick={() => removeStep(i)} />
                   </div>
                   {surovina(s) && (
                     <div className="pl-7">
@@ -1076,7 +1079,8 @@ function GuideEditor({
               ))}
             </ol>
           )}
-          <Button variant="secondary" size="sm" icon="plus" onClick={addStep}>{t('Přidat krok')}</Button>
+          {/* V okně jsou pole 52 — akce formuláře stejně vysoké (P8: v okně dva stupně, 52 a řádky 44). */}
+          <Button variant="secondary" size="lg" icon="plus" className="w-full" onClick={addStep}>{t('Přidat krok')}</Button>
 
           {productId && steps.some(st => st.itemId != null && (st.amount ?? 0) > 0) && (
             <ul className="list mt-3">
@@ -1124,7 +1128,7 @@ function StavCteni({ g }: { g: NavodApi }) {
   const precteno = predUzaverkou ? g.myReadCurrent === true : g.myRead === true;
   const znovu = predUzaverkou && g.myRead === true && !precteno;
   return (
-    <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+    <span className="inline-flex flex-wrap items-center gap-1.5">
       <Chip tone={precteno ? 'ok' : 'wait'} size="sm" icon={precteno ? 'check' : znovu ? 'refresh' : 'book'}>
         {precteno ? t('Přečteno') : znovu ? t('Přečíst znovu') : t('Povinné čtení')}
       </Chip>

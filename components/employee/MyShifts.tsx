@@ -158,7 +158,10 @@ export default function MyShifts({ user }: Props) {
                 const nabidnuto = vBurze.has(Number(s.id));
                 return (
                   <ListRow key={s.id}
-                    title={<span className="cz-sentence">{denKratce(d)}</span>}
+                    // v4 (V4, P15): stavový čip patří k titulku, akce má pevnou šířku (a prázdný řádek stejně
+                    // široké místo) — časy jsou svislý sloupec u pravé hrany ve všech řádcích.
+                    title={<span className="flex items-center gap-2 min-w-0"><span className="cz-sentence truncate">{denKratce(d)}</span>
+                      {nabidnuto ? <Chip tone="info" size="sm" className="shrink-0">{t('V burze')}</Chip> : d === dnes ? <Chip tone="ok" size="sm" className="shrink-0">{t('Dnes')}</Chip> : null}</span>}
                     meta={<>
                       <span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />
                       {popisekTypu(s)}
@@ -174,18 +177,17 @@ export default function MyShifts({ user }: Props) {
                       {tym.zapnuto && <span className="block"><KolegoveSmeny kolegove={kolegoveKeSmene(s, tym.smeny)} hotovo={tym.hotovo} /></span>}
                     </> : undefined}
                     value={`${fmtHM(s.startTime ?? s.start_time)}–${fmtHM(s.endTime ?? s.end_time)}`}
-                    right={nabidnuto ? <Chip tone="info" size="sm">{t('V burze')}</Chip> : d === dnes ? <Chip tone="ok" size="sm">{t('Dnes')}</Chip> : undefined}
                     // Jediná akce směny rovnou jako tlačítko (audit kola 6, Z10) — u zaměstnance i vedení:
                     // „···" s jednou položkou stálo tři klepnutí a dvě vrstvy za to, co se z telefonu
                     // dělá nejčastěji. Okno s poznámkou zůstává (nabídnout = dvě klepnutí).
-                    actions={smiBurza && !nabidnuto ? (
-                      <Button variant="secondary" size="sm" icon="handover"
+                    actions={smiBurza ? (!nabidnuto ? (
+                      <Button variant="secondary" size="sm" icon="handover" className="max-sm:!w-9 max-sm:!px-0 sm:w-32"
                         aria-label={t('Nabídnout do burzy směnu {den}', { den: denVeVete(d) })}
                         title={t('Kolega si ji může vzít, vedení výměnu schválí.')}
                         onClick={() => { setNabidnout(s); setPoznamka(''); setChyba(null); }}>
-                        {t('Nabídnout')}
+                        <span className="max-sm:sr-only">{t('Nabídnout')}</span>
                       </Button>
-                    ) : undefined}
+                    ) : <span aria-hidden className="block w-9 sm:w-32 shrink-0" />) : undefined}
                   />
                 );
               })}

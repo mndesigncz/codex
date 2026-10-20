@@ -66,7 +66,7 @@ export default function JazykKarta({ onZmena, jenZarizeni = false }: {
       {jazyk !== 'cs' && STROJOVY_PREKLAD.includes(jazyk) && (
         <p className="note note-info">{t('Tenhle překlad je zatím strojový a může obsahovat chyby.')}</p>
       )}
-      <p role="status" aria-live="polite" className="t-meta min-h-[1.25rem]">{zmeneno ? t('Jazyk je nastaven.') : ''}</p>
+      <p role="status" aria-live="polite" className="t-meta empty:sr-only">{zmeneno ? t('Jazyk je nastaven.') : ''}</p>
     </div>
   );
 }

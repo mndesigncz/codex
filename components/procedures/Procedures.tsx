@@ -681,10 +681,11 @@ function ProcedureEditor({
 
         <div role="group" aria-labelledby={`${uid}-ikona`}>
           <p id={`${uid}-ikona`} className="field-label">{t('Ikona')}</p>
-          <div className="flex flex-wrap gap-2">
+          {/* v4 (P1, P2): ikony jako mřížka rovných dílů až k pravé hraně (6 na telefonu, 12 od sm). */}
+          <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
             {ikonyPostupu(t).map(ic => (
               <button key={ic.id} type="button" onClick={() => setIcon(ic.id)} aria-label={t('Ikona {nazev}', { nazev: ic.nazev })} aria-pressed={icon === ic.id}
-                className={`filter-pill tap-target grid h-11 w-11 place-items-center !px-0 ${icon === ic.id ? 'seg-on' : 'seg-off glass'}`}>
+                className={`filter-pill tap-target grid h-11 w-full place-items-center !px-0 ${icon === ic.id ? 'seg-on' : 'seg-off glass'}`}>
                 <Icon name={ic.id} size={20} />
               </button>
             ))}
@@ -701,37 +702,50 @@ function ProcedureEditor({
           <ol className="space-y-2.5">
             {steps.map((s, i) => (
               <li key={i} className="space-y-2">
-                <div className="well p-2.5 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Input value={s.emoji ?? ''} onChange={e => patchStep(i, { emoji: e.target.value })} placeholder="🙂" maxLength={4}
-                      aria-label={t('Emoji kroku {n} (nepovinné)', { n: i + 1 })} className="!w-12 shrink-0 text-center !px-1" />
+                {/* v4 (P2, P7, V17): krok je karta s hlavičkou (číslo kroku + posun/odebrat 36 na pravé hraně)
+                    a pod ní řady jedné výšky 44 přes celou šířku — dřív tři výšky (52 / 36 / 44) a sedm
+                    prvků vlastní šířky zalomených pod sebe. */}
+                <div className="well p-3 space-y-3">
+                  <div className="flex items-center gap-1">
+                    <h4 className="t-label flex-1 min-w-0">{t('Krok {n}', { n: i + 1 })}</h4>
+                    <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={t('Posunout krok {n} výš', { n: i + 1 })}
+                      onClick={() => move(i, -1)} disabled={i === 0} />
+                    <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-label={t('Posunout krok {n} níž', { n: i + 1 })}
+                      onClick={() => move(i, 1)} disabled={i === steps.length - 1} />
+                    <Button variant="ghost" size="sm" iconOnly icon="close" className="-mr-1.5" aria-label={t('Odebrat krok {n}', { n: i + 1 })} onClick={() => removeStep(i)} />
+                  </div>
+                  <div className="rada rada-pruzna rada-m">
                     <Input value={s.text} onChange={e => patchStep(i, { text: e.target.value })} placeholder={t('Krok {n}', { n: i + 1 })}
-                      aria-label={t('Krok {n}', { n: i + 1 })} className="flex-1 min-w-0" />
+                      aria-label={t('Krok {n}', { n: i + 1 })} className="field-m min-w-0" />
+                    <Input value={s.emoji ?? ''} onChange={e => patchStep(i, { emoji: e.target.value })} placeholder="🙂" maxLength={4}
+                      aria-label={t('Emoji kroku {n} (nepovinné)', { n: i + 1 })} className="field-m !w-12 text-center !px-1" />
                     <Input type="number" min={0} inputMode="numeric" value={s.minutes ?? ''}
                       onChange={e => patchStep(i, { minutes: e.target.value ? Math.max(0, parseInt(e.target.value)) : null })}
-                      placeholder="min" aria-label={t('Minuty kroku {n} (nepovinné)', { n: i + 1 })} className="!w-20 shrink-0 tabular-nums" />
+                      placeholder="min" aria-label={t('Minuty kroku {n} (nepovinné)', { n: i + 1 })} className="field-m !w-20 tabular-nums" />
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Důležitost řídí automatické body: hotovo = +, vynecháno = − */}
-                    <Segmented size="sm" ariaLabel={t('Důležitost kroku {n}', { n: i + 1 })} value={s.weight ?? 'normal'}
-                      onChange={w => patchStep(i, { weight: w })}
-                      options={STEP_WEIGHTS.map(w => ({ id: w.id, label: vahaKroku(t)[w.id] ?? w.label }))} />
+                  {/* Důležitost řídí automatické body: hotovo = +, vynecháno = − */}
+                  <Segmented ariaLabel={t('Důležitost kroku {n}', { n: i + 1 })} value={s.weight ?? 'normal'}
+                    onChange={w => patchStep(i, { weight: w })}
+                    options={STEP_WEIGHTS.map(w => ({ id: w.id, label: vahaKroku(t)[w.id] ?? w.label }))} />
+                  <div className="rada rada-pruzna rada-m">
+                    <Input value={s.note ?? ''} onChange={e => patchStep(i, { note: e.target.value })}
+                      aria-label={t('Poznámka ke kroku {n} (nepovinné)', { n: i + 1 })} placeholder={t('Poznámka (nepovinné)')} className="field-m min-w-0" />
                     {rezimKroku === 'kroky' ? (
                       // Kolo 91: „Za každý krok“ — vlastní plus body za splnění místo srážky.
                       <Input type="number" min={0} inputMode="numeric" value={s.points ?? ''}
                         onChange={e => patchStep(i, { points: e.target.value === '' ? null : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })}
                         placeholder={`+${weightSpec(s.weight ?? 'normal').plus}`}
-                        aria-label={t('Vlastní body kroku {n} za splnění', { n: i + 1 })} className="!w-20 shrink-0 tabular-nums" />
+                        aria-label={t('Vlastní body kroku {n} za splnění', { n: i + 1 })} className="field-m !w-20 tabular-nums" />
                     ) : (
                       <Input type="number" min={0} inputMode="numeric" value={s.penalty ?? ''}
                         onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
                         placeholder={`−${weightSpec(s.weight ?? 'normal').minus}`}
-                        aria-label={t('Vlastní minus body kroku {n}, když se neudělá', { n: i + 1 })} className="!w-20 shrink-0 tabular-nums" />
+                        aria-label={t('Vlastní minus body kroku {n}, když se neudělá', { n: i + 1 })} className="field-m !w-20 tabular-nums" />
                     )}
-                    <Input value={s.note ?? ''} onChange={e => patchStep(i, { note: e.target.value })}
-                      aria-label={t('Poznámka ke kroku {n} (nepovinné)', { n: i + 1 })} placeholder={t('Poznámka (nepovinné)')} className="flex-1 min-w-[10rem]" />
-                    {/* Poznámka je na jednu větu. „Vyčistit kávovar" chce celý
-                        postup — a ten v Návodech nejspíš už je. */}
+                  </div>
+                  {/* Poznámka je na jednu větu. „Vyčistit kávovar" chce celý
+                      postup — a ten v Návodech nejspíš už je. Návod a měřená hodnota jako 2 × ½ (P12). */}
+                  <div className="grid grid-cols-2 gap-2 items-start [&>[role=group]]:col-span-2">
                     <StepGuidePicker guides={guideOptions} value={s.guideId ?? null} stepNumber={i + 1}
                       onChange={g => patchStep(i, { guideId: g })} />
                     {/* Měřená hodnota (kolo 7, HACCP): v běhu se u kroku zapíše číslo s jednotkou. */}
@@ -740,16 +754,9 @@ function ProcedureEditor({
                         ? { valueKind: null, valueUnit: null, valueMin: null, valueMax: null }
                         : { valueKind: 'number', valueUnit: s.valueUnit ?? null })}
                       aria-label={t('Krok {n}: měřená hodnota', { n: i + 1 })}
-                      className={`filter-pill tap-target shrink-0 whitespace-nowrap ${s.valueKind === 'number' ? 'seg-on' : 'seg-off glass'}`}>
+                      className={`filter-pill tap-target !h-11 justify-center whitespace-nowrap ${s.valueKind === 'number' ? 'seg-on' : 'seg-off glass'}`}>
                       {t('Měřená hodnota')}
                     </button>
-                    <div className="flex shrink-0 items-center">
-                      <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={t('Posunout krok {n} výš', { n: i + 1 })}
-                        onClick={() => move(i, -1)} disabled={i === 0} />
-                      <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-label={t('Posunout krok {n} níž', { n: i + 1 })}
-                        onClick={() => move(i, 1)} disabled={i === steps.length - 1} />
-                      <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat krok {n}', { n: i + 1 })} onClick={() => removeStep(i)} />
-                    </div>
                   </div>
                   {s.valueKind === 'number' && (
                     // Telefon: tři pole vedle sebe přes celou šířku; od sm úzká pole v řádku.
@@ -779,7 +786,7 @@ function ProcedureEditor({
               </li>
             ))}
           </ol>
-          <Button variant="secondary" size="sm" icon="plus" className="mt-2.5" onClick={addStep}>{t('Přidat krok')}</Button>
+          <Button variant="secondary" size="lg" icon="plus" className="mt-3 w-full" onClick={addStep}>{t('Přidat krok')}</Button>
         </div>
 
         {/* Kolo 91: způsob počítání bodů u postupu (návrh zaměstnance ho nenastavuje). */}
@@ -809,7 +816,7 @@ function ProcedureEditor({
             {remindAnchor === 'time' ? (
               <div className="flex items-center gap-2">
                 <Input type="time" aria-label={t('Čas připomenutí')} value={remindAt ?? ''} onChange={e => setRemindAt(e.target.value)}
-                  className="flex-1 min-w-0 tabular-nums" />
+                  className="field-m flex-1 min-w-0 tabular-nums" />
                 {remindAt && (
                   <Button variant="ghost" iconOnly icon="close" aria-label={t('Zrušit připomínku')} onClick={() => { setRemindAt(''); setRemindDays([]); }} />
                 )}
@@ -823,12 +830,13 @@ function ProcedureEditor({
           {(remindAnchor !== 'time' || remindAt) && (
             <div className="mt-2.5" role="group" aria-labelledby={`${uid}-dny`}>
               <p id={`${uid}-dny`} className="t-meta mb-1.5">{t('Ve dnech (nevybráno = každý den)')}</p>
-              <div className="flex flex-wrap gap-1.5">
+              {/* v4 (P2): sedm dnů jako 7 rovných dílů přes celou šířku, 44 — ne zalomené pilulky. */}
+              <div className="grid grid-cols-7 gap-1.5">
                 {dnyTydne(t).map((label, d) => {
                   const on = remindDays.includes(d);
                   return (
                     <button key={d} type="button" onClick={() => toggleDay(d)} aria-pressed={on}
-                      className={`filter-pill tap-target min-w-[2.75rem] justify-center ${on ? 'seg-on' : 'seg-off glass'}`}>
+                      className={`filter-pill tap-target !h-11 !px-0 justify-center ${on ? 'seg-on' : 'seg-off glass'}`}>
                       {label}
                     </button>
                   );

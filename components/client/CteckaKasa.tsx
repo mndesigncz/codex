@@ -388,9 +388,10 @@ export default function CteckaKasa() {
         tabIndex={-1} onInput={poVstupu} data-testid="ctecka-pole"
         className="fixed left-0 top-0 h-px w-px opacity-0 pointer-events-none" />
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <Chip tone={stav.tone} size="sm" icon={offline ? 'warning' : 'card'}><span data-testid="ctecka-stav">{stav.text}</span></Chip>
-        <Button size="sm" variant="ghost" aria-pressed={zvuk} onClick={prepniZvuk} icon={zvuk ? 'bell' : 'close'} className="sm:ml-auto">{zvuk ? 'Zvuk zapnutý' : 'Zvuk vypnutý'}</Button>
+      {/* v4: stav vlevo, zvuk na pravé hraně v jednom řádku (nezalamuje se pod stav). */}
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <Chip tone={stav.tone} size="sm" icon={offline ? 'warning' : 'card'} className="min-w-0"><span data-testid="ctecka-stav">{stav.text}</span></Chip>
+        <Button size="sm" variant="ghost" aria-pressed={zvuk} onClick={prepniZvuk} icon={zvuk ? 'bell' : 'close'} className="shrink-0 -mr-2">{zvuk ? 'Zvuk zapnutý' : 'Zvuk vypnutý'}</Button>
       </div>
 
       {/* Potvrzení po akci a odpočet návratu. Živá oblast, ať ji odečítač přečte. */}
@@ -407,7 +408,7 @@ export default function CteckaKasa() {
               </div>
             )}
             {potvrzeni.ok && (
-              <div className="flex gap-2 flex-wrap">
+              <div className="rada rada-rovne rada-l">
                 {zbyva != null && <Button size="lg" variant="secondary" onClick={() => setZustat(true)}>Zůstat u hosta</Button>}
                 <Button size="lg" variant="primary" onClick={dalsi}>Další karta</Button>
               </div>
@@ -429,7 +430,7 @@ export default function CteckaKasa() {
         {faze.druh === 'chyba' && (
           <div className="space-y-3" data-testid="ctecka-chyba">
             <p role="alert" className="note note-danger font-semibold break-words">{faze.text}</p>
-            <Button size="lg" variant="primary" onClick={dalsi}>Čekám na další kartu</Button>
+            <Button size="lg" variant="primary" className="w-full" onClick={dalsi}>Čekám na další kartu</Button>
           </div>
         )}
 
@@ -464,7 +465,7 @@ export default function CteckaKasa() {
             {!h.member && (
               <div className="space-y-2">
                 <p className="note note-wait">Host není členem tohoto podniku. Přidej ho jedním klepnutím, nebo mu rovnou dej razítko.</p>
-                <Button size="lg" variant="primary" icon="plus" block loading={busy === 'join'} onClick={() => akce('join')}>Přidat jako člena</Button>
+                <Button size="lg" variant="primary" icon="plus" className="w-full" loading={busy === 'join'} onClick={() => akce('join')}>Přidat jako člena</Button>
               </div>
             )}
 
@@ -473,7 +474,7 @@ export default function CteckaKasa() {
 
             {/* Nejčastější akce nahoře: razítko, účtenky, body z částky. */}
             <div className="space-y-2">
-              <Button size="lg" variant="primary" icon="check" block loading={busy === 'stamp'}
+              <Button size="lg" variant="primary" icon="check" className="w-full" loading={busy === 'stamp'}
                 disabled={h.stampedToday || (!h.rules?.stampTarget && !h.campaigns?.some((c: any) => c.ruleType === 'visit')) || (h.campaigns?.some((c: any) => c.ruleType === 'visit') && !h.campaigns.some((c: any) => c.ruleType === 'visit' && c.platiTed !== false))}
                 onClick={() => akce('stamp')}>
                 {h.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
@@ -489,14 +490,14 @@ export default function CteckaKasa() {
                 </div>
               )}
               {smiBody && (h.rules?.pointsPer100 > 0 || h.campaigns?.some((c: any) => c.ruleType === 'min_value')) && (
-                <form onSubmit={e => { e.preventDefault(); if (cislo > 0) void akce('points', { amount: cislo }); }} className="flex gap-2">
-                  <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={castka} onChange={e => setCastka(e.target.value)} placeholder={`Útrata ${symbol}`} className="!w-36 text-center !h-12" />
+                <form onSubmit={e => { e.preventDefault(); if (cislo > 0) void akce('points', { amount: cislo }); }} className="rada rada-pruzna rada-l">
+                  <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={castka} onChange={e => setCastka(e.target.value)} placeholder={`Útrata ${symbol}`} className="text-center min-w-0" />
                   <Button type="submit" size="lg" variant="secondary" loading={busy === 'points'} disabled={!(cislo > 0)}>Body z částky</Button>
                 </form>
               )}
               {smiKredit && h.credit > 0 && (
-                <form onSubmit={e => { e.preventDefault(); if (cislo >= 1) void akce('credit', { amount: cislo }); }} className="flex gap-2">
-                  <Input aria-label="Kolik kreditu uplatnit" type="number" inputMode="numeric" min={1} max={h.credit} value={castka} onChange={e => setCastka(e.target.value)} placeholder={`Max ${h.credit}`} className="!w-36 text-center !h-12" />
+                <form onSubmit={e => { e.preventDefault(); if (cislo >= 1) void akce('credit', { amount: cislo }); }} className="rada rada-pruzna rada-l">
+                  <Input aria-label="Kolik kreditu uplatnit" type="number" inputMode="numeric" min={1} max={h.credit} value={castka} onChange={e => setCastka(e.target.value)} placeholder={`Max ${h.credit}`} className="text-center min-w-0" />
                   <Button type="submit" size="lg" variant="secondary" icon="card" loading={busy === 'credit'} disabled={!(cislo >= 1)}>Uplatnit kredit</Button>
                 </form>
               )}
@@ -556,7 +557,7 @@ export default function CteckaKasa() {
               </div>
             )}
             {faze.data.problem && <p role="alert" className="note note-danger">{faze.data.problem}</p>}
-            <div className="flex gap-2 flex-wrap">
+            <div className="rada rada-rovne rada-l">
               <Button size="lg" variant="primary" icon="check" loading={busy === 'kupon:' + faze.data.code} disabled={!faze.data.usable} onClick={() => uplatniKupon(faze.data.code, true)}>Uplatnit</Button>
               <Button size="lg" variant="secondary" onClick={dalsi}>Zrušit</Button>
             </div>
@@ -572,31 +573,33 @@ export default function CteckaKasa() {
               <p className="t-meta tabular-nums">z {money(faze.data.value_amount)}{faze.data.valid_until ? ` · platí do ${faze.data.valid_until}` : ''}{faze.data.recipient_name ? ` · pro ${faze.data.recipient_name}` : ''}</p>
             </div>
             {faze.data.stav === 'active' ? (
-              <form onSubmit={e => { e.preventDefault(); if (poukazOk) void uplatniPoukaz(Number(poukazCastka)); }} className="flex flex-wrap items-center gap-2">
-                <Input aria-label={`Částka k uplatnění v ${symbol}`} type="number" inputMode="numeric" min={1} max={faze.data.balance} step={1} value={poukazCastka}
-                  onChange={e => { setPoukazCastka(e.target.value); poukazRef.current = null; }} placeholder={`Max ${faze.data.balance}`} className="!w-36 text-center !h-12" />
-                <Button type="submit" size="lg" variant="primary" icon="check" loading={busy === 'poukaz'} disabled={!poukazOk}>Uplatnit</Button>
-                <Button type="button" size="lg" variant="secondary" disabled={busy === 'poukaz'} onClick={() => { setPoukazCastka(String(faze.data.balance)); poukazRef.current = null; void uplatniPoukaz(faze.data.balance); }}>Celý zůstatek</Button>
+              <form onSubmit={e => { e.preventDefault(); if (poukazOk) void uplatniPoukaz(Number(poukazCastka)); }} className="sloupec sloupec-2">
+                <div className="rada rada-pruzna rada-l">
+                  <Input aria-label={`Částka k uplatnění v ${symbol}`} type="number" inputMode="numeric" min={1} max={faze.data.balance} step={1} value={poukazCastka}
+                    onChange={e => { setPoukazCastka(e.target.value); poukazRef.current = null; }} placeholder={`Max ${faze.data.balance}`} className="text-center min-w-0" />
+                  <Button type="submit" size="lg" variant="primary" icon="check" loading={busy === 'poukaz'} disabled={!poukazOk}>Uplatnit</Button>
+                </div>
+                <Button type="button" size="lg" variant="secondary" className="w-full" disabled={busy === 'poukaz'} onClick={() => { setPoukazCastka(String(faze.data.balance)); poukazRef.current = null; void uplatniPoukaz(faze.data.balance); }}>Celý zůstatek</Button>
               </form>
             ) : (
               <p className="note note-wait">{faze.data.stav === 'expired' ? 'Platnost poukazu skončila, uplatnit ho nejde.' : faze.data.stav === 'used' ? 'Poukaz je vyčerpaný.' : 'Poukaz je zrušený.'}</p>
             )}
-            <Button size="lg" variant="secondary" onClick={dalsi}>Jiný kód</Button>
+            <Button size="lg" variant="secondary" className="w-full" onClick={dalsi}>Jiný kód</Button>
           </div>
         )}
       </Well>
 
       {/* Ruční zadání: když čtečka nečte nebo host ukazuje kód na displeji. */}
-      <form onSubmit={e => { e.preventDefault(); const t = rucne; setRucne(''); void nactiRef.current(t); }} className="flex gap-2 flex-wrap">
+      <form onSubmit={e => { e.preventDefault(); const t = rucne; setRucne(''); void nactiRef.current(t); }} className="rada rada-pruzna rada-l">
         <Input aria-label="Kód opsaný ručně" value={rucne} onChange={e => setRucne(/[^A-Za-z0-9 -]/.test(e.target.value) ? e.target.value.slice(0, 200) : formatujPriPsani(e.target.value).slice(0, 12))}
-          placeholder="Opsat kód ručně" autoCapitalize="characters" autoComplete="off" className="font-mono tracking-[0.15em] flex-1 basis-40 uppercase placeholder:font-sans placeholder:tracking-normal placeholder:normal-case !w-auto !h-12" />
+          placeholder="Opsat kód ručně" autoCapitalize="characters" autoComplete="off" className="font-mono tracking-[0.15em] min-w-0 uppercase placeholder:font-sans placeholder:tracking-normal placeholder:normal-case" />
         <Button type="submit" size="lg" variant="secondary" icon="search" disabled={rucneRozpoznano === 'prazdny'}>Najít</Button>
       </form>
 
       {/* Čekající párování a spárované účty (jen s pokladnou Storyous). Hláška jde do historie, ať nepřeruší dalšího hosta. */}
       <CekaNaZaplaceni obnovit={obnovaParovani} velke onToast={t => { zapis(t, true); pipni(true); }} />
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="sloupec sloupec-2">
         <span className="t-label">Návrat na čekání</span>
         <Segmented size="sm" ariaLabel="Za jak dlouho se po akci vrátit na čekání" value={String(navrat)} onChange={nastavNavrat}
           options={NAVRAT_MOZNOSTI.map(s => ({ id: String(s), label: navratPopisek(s) }))} />

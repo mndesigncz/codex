@@ -677,13 +677,14 @@ export function WhoIsWorking() {
 
   return (
     <Card as="section" aria-labelledby="kiosk-kdo-pracuje">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      {/* v4 (P2): na telefonu akce pod titulem přes celou šířku (ne zalomená vlevo v půlce), od sm vpravo v řádku. */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 id="kiosk-kdo-pracuje" className="t-card flex items-center gap-2 min-w-0">
           <Icon name="clock" size={17} className="shrink-0 text-black/40" />
           <span className="truncate">{t('Kdo teď pracuje')}</span>
         </h2>
         {/* Na tabletu u baru cíle nejméně 44 px (DESIGN.md, Kiosk) — proto md, ne sm. */}
-        <Button variant="secondary" icon={adding ? 'close' : 'plus'} aria-expanded={adding} onClick={() => setAdding(v => !v)}>
+        <Button variant="secondary" icon={adding ? 'close' : 'plus'} aria-expanded={adding} className="w-full sm:w-auto" onClick={() => setAdding(v => !v)}>
           {adding ? t('Zavřít') : t('Další příchod')}
         </Button>
       </div>

@@ -56,7 +56,9 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
     <div className="min-h-[100dvh] flex flex-col" style={{ background: 'var(--bg)', color: '#16181A' }}>
       <header className="sticky top-0 z-30 chrome-edge">
         <div className="glass-strong !border-x-0 !border-t-0 !shadow-none border-b border-black/[0.06]">
-          <div className="mx-auto max-w-5xl px-3 sm:px-6 h-16 flex items-center gap-2 sm:gap-3 min-w-0">
+          {/* v4 (V0, P1, P18): lišta má stejné boční okraje jako obsah (16 / 20 / 24) a všechny prvky
+              jednu výšku 40 — odkazy, sken, jazyk, účet i Přihlásit (dřív odkazy 36 vedle kruhů 40). */}
+          <div className="mx-auto max-w-5xl px-4 min-[360px]:px-5 sm:px-6 h-16 flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Na 320 px se značka, dvě záložky a účet do řádku nevešly a stránka
                 se dala odrolovat do strany. Slovo „client" jde na telefonu pryč,
                 celý nápis až pod 360 px — logo zůstává vždy. Nepřihlášený má navíc
@@ -71,10 +73,10 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                   aplikace; nahoře zůstává jen značka a účet. Nepřihlášený
                   dock nemá, tak mu odkaz Podniky zůstává i na telefonu. */}
               <Link href="/client" aria-current={active('/client') && path === '/client' ? 'page' : undefined}
-                className={`${me ? 'hidden md:inline-block' : ''} tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'bg-black/[0.06] text-[#16181A]' : 'seg-off'}`}>{t('Podniky')}</Link>
+                className={`${me ? 'hidden md:inline-flex' : 'inline-flex'} tap-target-sm items-center h-10 rounded-full px-3 sm:px-3.5 text-sm font-medium transition ${path === '/client' ? 'bg-black/[0.06] text-[#16181A]' : 'seg-off'}`}>{t('Podniky')}</Link>
               {me && (
                 <Link href="/client/me" aria-current={active('/client/me') ? 'page' : undefined}
-                  className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'bg-black/[0.06] text-[#16181A]' : 'seg-off'}`}>{t('Moje')}</Link>
+                  className={`hidden md:inline-flex tap-target-sm items-center h-10 rounded-full px-3 sm:px-3.5 text-sm font-medium transition ${active('/client/me') ? 'bg-black/[0.06] text-[#16181A]' : 'seg-off'}`}>{t('Moje')}</Link>
               )}
               {/* Sken QR a kód podniku. Přihlášený má na telefonu tlačítko uprostřed spodního doku, tady jen od md. */}
               <button type="button" onClick={otevriNajit} aria-label={sken.umi ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}
@@ -89,8 +91,8 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                   <button ref={pop.triggerRef} onClick={() => setOpen(v => !v)}
                     onKeyDown={pop.onTriggerKeyDown}
                     aria-haspopup="menu" aria-expanded={open} title={me.name}
-                    className="tap-target flex items-center gap-1.5 rounded-full p-1 sm:pr-2.5 hover:bg-black/[0.05] transition">
-                    <Initials name={me.name} size={30} />
+                    className="tap-target flex h-10 items-center gap-1.5 rounded-full p-1 sm:pr-2.5 hover:bg-black/[0.05] transition">
+                    <Initials name={me.name} size={32} />
                     <Icon name="chevron" size={14} className={`hidden sm:block text-black/45 transition-transform ${open ? 'rotate-180' : ''}`} />
                   </button>
                   {open && (
@@ -114,7 +116,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
               ) : (
                 // v3: v liště inkoustová pilulka, ne limetka — jediná limetka patří hlavní akci obrazovky
                 // („Založit účet", „Přihlásit se" ve formuláři).
-                <Link href="/client/login" className="tap-target-sm ml-0.5 sm:ml-1 btn btn-primary btn-sm !px-3 sm:!px-4 text-sm">{t('Přihlásit')}</Link>
+                <Link href="/client/login" className="tap-target-sm ml-0.5 sm:ml-1 btn btn-primary btn-sm !h-10 !px-3 sm:!px-4 text-sm">{t('Přihlásit')}</Link>
               )}
             </nav>
           </div>

@@ -26,20 +26,20 @@ export default function SekceData() {
 
   return (
     <div>
-      <section className="card p-6 space-y-4" aria-labelledby="nast-export-t">
+      <section className="card p-5 sloupec sloupec-6" aria-labelledby="nast-export-t">
         <div>
           <h2 id="nast-export-t" className="t-card">{t('Stáhnout moje data')}</h2>
           <p className="t-meta mt-1">
             {t('Soubor JSON s tvým profilem, nastavením, směnami, docházkou, žádostmi o volno, dostupností a tvými zprávami z chatu. Zprávy ostatních a data podniku v něm nejsou.')}
           </p>
         </div>
-        <div>
-          <Button variant="secondary" icon="download" loading={bezi} onClick={stahnout}>{t('Stáhnout data')}</Button>
-        </div>
-        <p role="status" aria-live="polite" className="t-meta min-h-[1.25rem]">
+        {/* v4 (P2, V5): jediná akce karty přes celou šířku — ne osamělé tlačítko vlevo.
+            Stavový řádek je prázdný schovaný jen vizuálně (aria-live musí zůstat v DOM). */}
+        <Button variant="secondary" icon="download" className="w-full" loading={bezi} onClick={stahnout}>{t('Stáhnout data')}</Button>
+        <p role="status" aria-live="polite" className="t-meta -mt-3 empty:sr-only">
           {vysledek === 'stazeno' ? t('Soubor je stažený.') : vysledek === 'sdileno' ? t('Soubor je připravený ke sdílení.') : ''}
         </p>
-        {vysledek === 'nejde' && <p role="alert" className="note note-danger">{t('Data se nepodařilo stáhnout. Zkus to za chvíli znovu.')}</p>}
+        {vysledek === 'nejde' && <p role="alert" className="note note-danger -mt-3">{t('Data se nepodařilo stáhnout. Zkus to za chvíli znovu.')}</p>}
       </section>
 
       <SmazatUcet jeHost={false} />
