@@ -1660,7 +1660,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               by ji spolu s dostupností odsunul pod ohyb (kolo 6 UX). */}
           {maPasy && !loading && !loadError && (
             <div className="sm:hidden shrink-0">
-              <Button variant="secondary" size="sm" aria-expanded={filtryTel || filtrAktivni} aria-controls="rozvrh-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
+              {/* Řada 44 jako MonthNav vedle (P7) — dřív 36 vedle 44. */}
+              <Button variant="secondary" aria-expanded={filtryTel || filtrAktivni} aria-controls="rozvrh-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
                 {t('Filtry')}{pocetAktivnich > 0 ? ` · ${pocetAktivnich}` : ''}
               </Button>
             </div>

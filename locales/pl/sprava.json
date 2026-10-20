@@ -896,7 +896,6 @@
   "Smazat záznam?": "Usunąć wpis?",
   "Smazat {n, plural, one {# položka} few {# položky} other {# položek}}?": "Usunąć {n, plural, one {# pozycję} few {# pozycje} many {# pozycji} other {# pozycji}}?",
   "Smazat {nazev}": "Usuń {nazev}",
-  "Smazat úkol {nazev}": "Usuń zadanie {nazev}",
   "Smazat úkol?": "Usunąć zadanie?",
   "Smazat účtenku {dodavatel}": "Usuń paragon {dodavatel}",
   "Smazat účtenku?": "Usunąć paragon?",

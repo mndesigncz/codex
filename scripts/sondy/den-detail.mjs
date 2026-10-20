@@ -1,6 +1,7 @@
 // Rozklik dne napříč aplikací + otevřené účty + poloha tlačítka Sbalit.
 //  1) widget Otevřené účty (Finance): kolik je nezaplaceno, stoly, „dlouho otevřený"; bez finance.trzby se nekreslí,
-//  2) Uzávěrky: „Celý den" u řádku i v detailu uzávěrky otevře detail dne s uzávěrkami nahoře,
+//  2) Uzávěrky: „Celý den" v detailu uzávěrky otevře detail dne s uzávěrkami nahoře (v4: řádek seznamu už
+//     ikonu dne nemá — tržba a › stojí na pravé hraně; den je v detailu uzávěrky a ve výběru dne),
 //  3) zaměstnanec s náhledem rozvrhu: štítek dne v „Kdo má směnu" otevře „Den v podniku" jen se směnami (bez financí),
 //  3b) klepnutí na kartu Pokladna dnes otevře rozbor dnešního dne (ne jen stránku Financí),
 //  4) tlačítko Sbalit stojí vždy úplně vpravo v hlavičce karty, ať má karta odkaz („Finance ›"), nebo ne.
@@ -86,12 +87,13 @@ for (const w of [1280, 390]) {
   await otevri(p, '/employer/overview?view=reports', 'vedeni.uzaverky');
   const nastroj = p.locator('li[data-widget="nastroj"]');
   await nastroj.locator('ul.list > li').first().waitFor({ timeout: 10000 });
-  await nastroj.getByRole('button', { name: /^Celý den/ }).first().click();
+  await nastroj.locator('ul.list > li').first().locator('button').first().click();
+  await p.getByRole('button', { name: 'Celý den', exact: true }).first().click();
   const okno = p.getByRole('dialog', { name: 'Uzávěrky dne' }).first();
   await okno.waitFor({ timeout: 8000 });
   await dokud(async () => /tržba/i.test(await okno.innerText()), 8000);
   const t = (await okno.innerText()).replace(/\s+/g, ' ');
-  tvrdi(`2 ${w}: z řádku Uzávěrek se otevře „Uzávěrky dne"`, /uzávěrky dne/i.test(t), t.slice(0, 200));
+  tvrdi(`2 ${w}: z detailu uzávěrky (řádek Uzávěrek) se otevře „Uzávěrky dne"`, /uzávěrky dne/i.test(t), t.slice(0, 200));
   tvrdi(`2 ${w}: uzávěrky dne jsou NAD tržbou (z Uzávěrek je to první)`, t.toLowerCase().search(/ranní|8:00/) !== -1 && t.toLowerCase().indexOf('uzávěrky dne', 20) < t.toLowerCase().indexOf('tržba', 20), t.slice(0, 400));
   tvrdi(`2 ${w}: nad dnešní tržbou stojí otevřené účty a nikoli „Otevřít Uzávěrky"`, !/Otevřít Uzávěrky/.test(t));
   const pres = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);

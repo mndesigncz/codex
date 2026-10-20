@@ -39,7 +39,7 @@ export default function SkladZalozky({ aktivni, onNavigate, smiReceptury, smiInv
   if (options.length < 2) return null;
   return (
     <div className="flex min-w-0" data-sklad-zalozky>
-      <Segmented ariaLabel={t('Části skladu')} size="sm" value={aktivni}
+      <Segmented ariaLabel={t('Části skladu')} value={aktivni}
         options={options}
         onChange={id => {
           if (id === 'inventura') { if (onInventura) onInventura(); else onNavigate?.('inventory', AKCE_INVENTURA); return; }

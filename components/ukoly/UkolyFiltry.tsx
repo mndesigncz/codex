@@ -103,10 +103,11 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
           storageKey="ukoly"
           className={`min-w-0 flex-1 ${vlevo ? 'md:flex-none md:w-60' : ''} ${kompaktniNaTelefonu ? 'max-md:order-last max-md:basis-full' : ''} ${hledaniSbalene ? 'max-md:hidden' : ''}`} />
         {hledaniSbalene && (
-          <Button variant="secondary" size="sm" iconOnly icon="search" aria-label={t('Hledat v úkolech')} aria-expanded={false}
+          <Button variant="secondary" iconOnly icon="search" aria-label={t('Hledat v úkolech')} aria-expanded={false}
             className={`md:hidden shrink-0 ${vlevo ? '' : 'ml-auto'}`} onClick={otevriHledani} />
         )}
-        <Button variant="secondary" size="sm" aria-expanded={otevreno} onClick={() => setOtevreno(o => !o)}
+        {/* Toolbar = jedna řada 44 (P10): pole, lupa i „Filtry" stejně vysoké (dřív 48 / 36 / 36). */}
+        <Button variant="secondary" aria-expanded={otevreno} onClick={() => setOtevreno(o => !o)}
           className={`shrink-0 ${kompaktniNaTelefonu && !hledaniSbalene && !vlevo ? 'max-md:ml-auto' : ''}`}>
           {t('Filtry')}{n > 0 ? ` · ${n}` : ''}
         </Button>

@@ -157,7 +157,7 @@ function RewardsViewInner() {
           subtitle: t('Úrovně, body a hodnocení směn týmu.'),
           hintId: 'rewardsview',
           aside: casti.length > 1 && cast
-            ? <Segmented size="sm" ariaLabel={t('Část stránky')} value={cast} onChange={setVolba} options={casti} />
+            ? <Segmented ariaLabel={t('Část stránky')} value={cast} onChange={setVolba} options={casti} />
             : undefined,
         }}
         nastroj={nastroj}
@@ -225,7 +225,8 @@ function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onPochval
             const meta = stav ? <><span className="block truncate">{uroven}</span>{stav}</> : uroven;
             const lead = (
               <span className="flex items-center gap-2">
-                <span className="t-label w-6 text-right tabular-nums">{i + 1}.</span>
+                {/* Pořadí začíná na L karty (P5) — dřív zarovnané doprava v boxu 24, číslice o 13 px dovnitř. */}
+                <span className="t-label w-6 text-left tabular-nums">{i + 1}.</span>
                 <Avatar emoji={s.avatar} size="sm" />
               </span>
             );
