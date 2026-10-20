@@ -48,6 +48,9 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
   // Na serveru a při hydrataci false (žádný document), hned potom true.
   const vBody = useSyncExternalStore(() => () => {}, () => true, () => false);
   if (!open || !vBody) return null;
+  // Okno jen s titulkem, větou a tlačítky (potvrzení): prázdné tělo by mezi podtitulkem a patičkou
+  // složilo 24 px vzduchu navíc. `toArray` zahodí null/false/undefined; prázdný řetězec taky nic není.
+  const prazdneTelo = React.Children.toArray(children).every(c => c === '');
   const width = size === 'sm' ? 'max-w-sm' : size === 'xl' ? 'max-w-5xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-md';
   return createPortal(
     <div
@@ -61,7 +64,7 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
         onClick={e => e.stopPropagation()}>
         <DiscardGuard guard={modal.guard} />
         {/* v3: velký titulek (22 px), krátká věta pod ním a zavírací kříž v šedém kruhu. */}
-        <div className="flex items-start gap-3 p-6 pb-4">
+        <div className={`flex items-start gap-3 p-6 ${prazdneTelo ? (footer ? 'pb-5' : 'pb-6') : 'pb-4'}`}>
           <div className="min-w-0 flex-1">
             <h3 className="t-section text-[1.375rem] leading-tight font-bold tracking-[-0.02em] text-balance">{title}</h3>
             {subtitle && <p className="mt-1.5 text-[15px] leading-snug text-black/60 text-pretty">{subtitle}</p>}
@@ -69,7 +72,7 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
           <button type="button" onClick={modal.guard.attemptClose} aria-label={t('Zavřít')}
             className="btn-icon shrink-0 -mt-1 -mr-1"><Icon name="close" size={16} /></button>
         </div>
-        <div className="px-6 pb-6 overflow-y-auto scrollbar-thin">{children}</div>
+        {!prazdneTelo && <div className="px-6 pb-6 overflow-y-auto scrollbar-thin">{children}</div>}
         {/* Tlačítka se zalamují: na 320 px má tělo okna 240 px a „Stornieren" +
             „Eintrag speichern" mají 270 — bez zalomení vyjelo Zrušit za levý okraj. */}
         {/* Na telefonu (spodní okno) jdou tlačítka přes šířku jako v inspiracích: jedno nebo dvě pilulky
