@@ -696,8 +696,11 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
         <Textarea id={`${id}-text`} rows={okno ? 4 : 2} maxLength={MAX_OZNAMENI} value={text}
           onChange={e => setText(e.target.value)} />
       </Field>
-      <SwitchRow as="div" className="!py-1" title={t('Poslat i do týmového chatu')} checked={doChatu} onChange={setDoChatu} />
-      <SwitchRow as="div" className="!py-1" title={t('Vyžadovat potvrzení')} hint={t('Každý pod oznámením klepne na „Rozumím" a uvidíš, kdo ještě ne.')} checked={potvrzeni} onChange={setPotvrzeni} />
+      {/* v4 (V5): přepínače jako řádky seznamu (název vlevo, přepínač na R), ne volné ovládání pod polem. */}
+      <ul className="list">
+        <SwitchRow className="list-row" title={t('Poslat i do týmového chatu')} checked={doChatu} onChange={setDoChatu} />
+        <SwitchRow className="list-row" title={t('Vyžadovat potvrzení')} hint={t('Každý pod oznámením klepne na „Rozumím" a uvidíš, kdo ještě ne.')} checked={potvrzeni} onChange={setPotvrzeni} />
+      </ul>
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
     </Sloupec>
   );
@@ -912,6 +915,9 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
   return (
     <>
       <Widget nacteni={ceka ? CEKA : nacteniData} prazdno={prazdno}
+        // Velká nástěnka se nezkracuje pod „Zobrazit vše": formulář nahoře by jinak připnutá oznámení
+        // (to hlavní, co tým čte) odsunul pod odlesk. Zkracuje se jen střední karta s pěti řádky.
+        bezZkraceni={!M}
         // v4 (V16): na střední nástěnce je „Nové oznámení" akce widgetu v patce (L→R × 44), ne pilulka pod seznamem.
         patka={M && spravuje ? <Button variant="secondary" icon="plus" onClick={() => setPisu(true)}>{t('Nové oznámení')}</Button> : undefined}
         doplnek={kPotvrzeni > 0 ? <Chip tone="wait" size="sm" aria-label={t('{n, plural, one {# oznámení k potvrzení} few {# oznámení k potvrzení} other {# oznámení k potvrzení}}', { n: kPotvrzeni })}>{cislo(kPotvrzeni)}</Chip>
