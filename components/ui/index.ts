@@ -40,4 +40,4 @@ export { ObdobiLista } from './ObdobiLista';
 // stavová karta (V8) a „···" stránky v liště (V0).
 export { Rada, Sloupec, type VyskaRady } from './Rada';
 export { StavovaKarta, StavovyKruh } from './StavovaKarta';
-export { MenuListy, MenuStrankyProvider, useOdevzdejMenu } from './MenuStranky';
+export { MenuListy, MenuStrankyProvider, usePrevzitMenuListy } from './MenuStranky';

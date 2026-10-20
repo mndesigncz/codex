@@ -439,11 +439,18 @@ export default function EmployerLayout({ user }: Props) {
     );
   }
 
+  // Položky „···" lišty (MenuStranky je přibere do „···" hlavičky, má-li stránka vlastní).
+  const polozkyListy: MenuItem[] = [
+    ...(ma(UCTENKY) ? [{ label: t('Účtenky'), icon: 'receipt', onClick: () => setReceiptsOpen(true) }] : []),
+    ...(smiKlient ? [{ label: t('Přepnout do Managero client'), icon: 'gift', onClick: () => switchMode('client') }] : []),
+    { label: t('Přepnout do TO GO režimu'), icon: 'cup', onClick: () => switchMode('togo') },
+  ];
+
   return (
     <NavigaceKontext.Provider value={navigaceWidgetu}>
     <ProfileLinkProvider>
-    {/* v4: „···" stránky (PageHeader) se kreslí v liště — jedno na obrazovce (MenuStranky). */}
-    <MenuStrankyProvider>
+    {/* v4 (P18): „···" jedno na obrazovce — hlavička s vlastními akcemi přibere položky lišty (MenuStranky). */}
+    <MenuStrankyProvider polozky={polozkyListy}>
     <div className="flex h-[100dvh] overflow-hidden">
       <DiscardGuard guard={straz.guard} what={coSeZahodi()} />
       {/* Desktop sidebar */}
@@ -550,12 +557,9 @@ export default function EmployerLayout({ user }: Props) {
           <NotificationBell />
           {/* Všechno ostatní z lišty: Účtenky, přepnutí do Managero client a do TO GO.
               Položky jsou tytéž akce co dřív, jen bez pěti ikon vedle sebe.
-              v4: v tomtéž „···" jsou nahoře i akce stránky (dřív druhé „···" vedle h1). */}
-          <MenuListy label={t('Další možnosti')} polozky={[
-            ...(ma(UCTENKY) ? [{ label: t('Účtenky'), icon: 'receipt', onClick: () => setReceiptsOpen(true) }] : []),
-            ...(smiKlient ? [{ label: t('Přepnout do Managero client'), icon: 'gift', onClick: () => switchMode('client') }] : []),
-            { label: t('Přepnout do TO GO režimu'), icon: 'cup', onClick: () => switchMode('togo') },
-          ]} />
+              v4: na obrazovce, jejíž hlavička má vlastní „···", jsou tyhle položky v něm
+              pod linkou a lišta své kolečko nekreslí (dřív dvě „···" nad sebou). */}
+          <MenuListy label={t('Další možnosti')} />
         </header>
 
         {/* Bannery předplatného vedou rovnou na záložku Předplatné, ne na Účet.

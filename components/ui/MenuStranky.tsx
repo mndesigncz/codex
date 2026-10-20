@@ -1,72 +1,76 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useId, useLayoutEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useId, useLayoutEffect, useMemo, useState } from 'react';
 import { Menu, type MenuItem } from './Menu';
 
 // „···" jen JEDNOU na obrazovce (spec-skladba P18, vzor V0).
 //
 // Do v3 měla horní lišta svoje „···" (Účtenky, Managero client, TO GO) a hlavička
 // stránky (PageHeader) druhé hned pod ním (Upravit stránku, Export…): na Úkolech,
-// ve Skladu, Týmu, Rozvrhu i Uzávěrkách dvě stejná kolečka nad sebou a h1 se dělil
-// o řádek s ikonou. Teď lišta drží jedno „···" pro obojí: PageHeader své položky
-// lištové nabídce ODEVZDÁ (useOdevzdejMenu) a sám žádné kolečko nekreslí; h1 má
-// celou šířku L→R. Položky stránky jsou v nabídce první, položky lišty pod linkou.
+// ve Skladu, Týmu, Rozvrhu i Uzávěrkách dvě stejná kolečka nad sebou. P18 dovoluje
+// jedno z dvojího — v liště, nebo v hlavičce. Platí: **má-li stránka vlastní „···",
+// nese ho hlavička a přibírá do něj (pod linku) položky lišty; lišta své „···" na té
+// obrazovce nekreslí.** Stránka bez vlastních akcí (Chat, Nastavení…) má „···" v liště.
+// Žádná funkce nezmizí, jen se nezdvojuje kolečko.
 //
-// Mimo lištu (správa platformy, okna, ukázky bez layoutu) poskytovatel chybí
-// a PageHeader kreslí své „···" jako dřív — žádná funkce nezmizí.
+// Proč hlavička, ne lišta: „···" hlavičky je akce obrazovky (Upravit stránku, Export) —
+// patří k nadpisu a k ploše, kde ho hledá i klávesnice a odečítač; položky lišty
+// (přepnutí režimu, Účtenky) jsou doplněk a v nabídce stojí pod linkou.
 
-interface Zapis { menu: MenuItem[]; mobil: MenuItem[] }
+interface Lista {
+  /** Položky „···" lišty — hlavička s vlastním „···" je přibere pod linku. */
+  polozky: MenuItem[];
+  /** Hlavička ohlásí, že „···" převzala: 'vzdy' = na každé šířce, 'mobil' = jen pod md (má jen položky menuMobile). */
+  prevzit: (id: string, jak: 'vzdy' | 'mobil' | null) => void;
+}
 
-const ZapisCtx = createContext<{ zapis: (id: string, z: Zapis | null) => void } | null>(null);
-const CteniCtx = createContext<Zapis[]>([]);
+const ListaCtx = createContext<Lista | null>(null);
+const PrevzatoCtx = createContext<'vzdy' | 'mobil' | null>(null);
 
-/** Obal layoutu (lišta + obsah): sbírá položky „···" hlaviček stránky pro nabídku v liště. */
-export function MenuStrankyProvider({ children }: { children: React.ReactNode }) {
-  const [mapa, setMapa] = useState<ReadonlyMap<string, Zapis>>(() => new Map());
-  const zapis = useCallback((id: string, z: Zapis | null) => {
-    setMapa(m => {
-      if (!z && !m.has(id)) return m;
+/**
+ * Obal layoutu s horní lištou. `polozky` = co nabízí „···" lišty (Účtenky, Managero client, TO GO).
+ * Lišta pak místo vlastního `<Menu>` kreslí `<MenuListy>`, který se schová, když „···" převzala hlavička.
+ */
+export function MenuStrankyProvider({ polozky = [], children }: { polozky?: MenuItem[]; children: React.ReactNode }) {
+  const [mapa, setMapa] = useState<ReadonlyMap<string, 'vzdy' | 'mobil'>>(() => new Map());
+  const api = useMemo<Lista>(() => ({
+    polozky,
+    prevzit: (id, jak) => setMapa(m => {
+      if ((m.get(id) ?? null) === jak) return m;
       const n = new Map(m);
-      if (z) n.set(id, z); else n.delete(id);
+      if (jak) n.set(id, jak); else n.delete(id);
       return n;
-    });
-  }, []);
-  const api = useMemo(() => ({ zapis }), [zapis]);
-  const cteni = useMemo(() => [...mapa.values()], [mapa]);
-  return <ZapisCtx.Provider value={api}><CteniCtx.Provider value={cteni}>{children}</CteniCtx.Provider></ZapisCtx.Provider>;
+    }),
+  }), [polozky]);
+  const hodnoty = [...mapa.values()];
+  const prevzato = hodnoty.includes('vzdy') ? 'vzdy' : hodnoty.includes('mobil') ? 'mobil' : null;
+  return <ListaCtx.Provider value={api}><PrevzatoCtx.Provider value={prevzato}>{children}</PrevzatoCtx.Provider></ListaCtx.Provider>;
 }
 
 /**
- * Hlavička stránky odevzdá položky „···" liště. Vrací true, když lišta existuje —
- * pak hlavička vlastní „···" nekreslí. `mobil` jsou položky jen pod `md`
- * (vedlejší akce, které jsou na monitoru vidět jako tlačítka).
+ * Pro PageHeader: vrátí položky lišty, které má přibrat do svého „···" (pod linku), a ohlásí
+ * liště, že „···" převzal. `menu` = položky na každé šířce, `mobil` = jen pod md.
  */
-export function useOdevzdejMenu(menu: MenuItem[] | undefined, mobil: MenuItem[] | undefined): boolean {
-  const lista = useContext(ZapisCtx);
+export function usePrevzitMenuListy(menu: MenuItem[] | undefined, mobil: MenuItem[] | undefined): MenuItem[] {
+  const lista = useContext(ListaCtx);
   const id = useId();
-  useLayoutEffect(() => {
-    if (!lista) return;
-    const ma = (menu?.length ?? 0) + (mobil?.length ?? 0) > 0;
-    lista.zapis(id, ma ? { menu: menu ?? [], mobil: mobil ?? [] } : null);
-  }, [lista, id, menu, mobil]);
-  useLayoutEffect(() => () => lista?.zapis(id, null), [lista, id]);
-  return !!lista;
+  const maVzdy = (menu?.length ?? 0) > 0;
+  const maMobil = (mobil?.length ?? 0) > 0;
+  const jak: 'vzdy' | 'mobil' | null = !lista || !lista.polozky.length ? null : maVzdy ? 'vzdy' : maMobil ? 'mobil' : null;
+  useLayoutEffect(() => { lista?.prevzit(id, jak); }, [lista, id, jak]);
+  useLayoutEffect(() => () => lista?.prevzit(id, null), [lista, id]);
+  if (!lista || !jak) return [];
+  // Pod linkou; když hlavička nese na monitoru jen mobilní položky, je na monitoru „···" v liště
+  // a tyhle přibrané položky jsou taky jen pro telefon.
+  return lista.polozky.map((p, i) => ({ ...p, ...(jak === 'mobil' ? { jenMobil: true } : {}), ...(i === 0 ? { oddelit: true } : {}) }));
 }
 
-/**
- * „···" v horní liště: položky stránky (z PageHeader) nahoře, položky lišty pod linkou.
- * Bez položek stránky nese jméno `label` (např. „Další možnosti"), s nimi „Další akce" —
- * je to pak nabídka akcí obrazovky (a sondy ji hledají pod stejným jménem jako dřív v hlavičce).
- */
-export function MenuListy({ polozky = [], label }: { polozky?: MenuItem[]; label?: string }) {
-  const zapisy = useContext(CteniCtx);
-  const stranky: MenuItem[] = zapisy.flatMap(z => [...z.menu, ...z.mobil.map(i => ({ ...i, jenMobil: true }))]);
-  const vzdy = stranky.some(i => !i.jenMobil);
-  const items: MenuItem[] = [
-    ...stranky,
-    ...polozky.map((p, i) => (i === 0 && stranky.length ? { ...p, oddelit: vzdy ? true : 'mobil' as const } : p)),
-  ];
-  return <Menu items={items} label={stranky.length ? undefined : label} />;
+/** „···" horní lišty: na obrazovce, jejíž hlavička má vlastní „···", se nekreslí (P18). */
+export function MenuListy({ label }: { label?: string }) {
+  const lista = useContext(ListaCtx);
+  const prevzato = useContext(PrevzatoCtx);
+  if (!lista || !lista.polozky.length || prevzato === 'vzdy') return null;
+  return <Menu items={lista.polozky} label={label} className={prevzato === 'mobil' ? 'max-md:hidden' : ''} />;
 }
 
 export default MenuListy;

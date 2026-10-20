@@ -38,7 +38,6 @@ import PodnikSwitcher from '../PodnikSwitcher';
 import NotificationBell from '../NotificationBell';
 import MobileMoreSheet, { type MoreAction, type MoreGroup } from '../MobileMoreSheet';
 import { Button } from '../ui';
-import { MenuListy, MenuStrankyProvider } from '../ui/MenuStranky';
 import { Dock, type DockItem } from '../ui/Dock';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useHlavickaPrehledu } from '../useHlavickaPrehledu';
@@ -66,7 +65,6 @@ export default function ToGoMode({ user, onExit, onOpenView, dok }: {
 
   return (
     // Pod dokem zůstává místo (pb-36 jako v administraci), ať dok nepřekryje poslední widget.
-    <MenuStrankyProvider>
     <div className={`min-h-[100dvh] ${dok ? 'pb-36 md:pb-[env(safe-area-inset-bottom)]' : 'pb-[env(safe-area-inset-bottom)]'}`}>
       {/* Chrom aplikace jako lišta v3 administrace: vlevo značka a přepínač podniku (jen s víc
           podniky), vpravo zvonek v šedém kruhu a cesta do administrace jako šedá pilulka — nejvýš
@@ -77,8 +75,6 @@ export default function ToGoMode({ user, onExit, onOpenView, dok }: {
         <PodnikSwitcher compact jenPrepinani onOverview={() => onOpenView('org')} />
         <div className="flex-1 min-w-0" />
         <NotificationBell />
-        {/* v4 (P18): „···" plochy (Upravit stránku…) je v liště, ne vedle h1 — jedno na obrazovce. */}
-        <MenuListy />
         {/* Pilulka vedle kruhů v liště má jejich výšku 40 (dřív 36 vedle zvonku 40). */}
         <Button variant="secondary" size="sm" icon="swap" onClick={onExit} className="shrink-0 ml-1 !h-10 !px-4">{t('Administrace')}</Button>
       </header>
@@ -95,6 +91,5 @@ export default function ToGoMode({ user, onExit, onOpenView, dok }: {
         </>
       )}
     </div>
-    </MenuStrankyProvider>
   );
 }

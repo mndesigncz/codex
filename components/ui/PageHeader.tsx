@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { Menu, type MenuItem } from './Menu';
-import { useOdevzdejMenu } from './MenuStranky';
+import { usePrevzitMenuListy } from './MenuStranky';
 import { useT } from '@/lib/i18n/client';
 
 // Hlavička obrazovky — jedna pro všechny.
@@ -13,7 +13,7 @@ import { useT } from '@/lib/i18n/client';
 // monitoru), menu „···" a jedna hlavní akce. Na telefonu jdou vedlejší akce
 // do menu a hlavní akce pod nadpis přes šířku (52).
 // Dřív měla každá obrazovka svůj nadpis (osm variant) a svou řadu tlačítek.
-// v4: „···" stránky se kreslí v horní liště (MenuStranky) — na obrazovce je jedno.
+// v4: „···" je na obrazovce jedno — hlavička s vlastními akcemi přibere položky lišty (MenuStranky).
 
 export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, menuMobile, aside, className = '', as: Nadpis = 'h1' }: {
   title: React.ReactNode;
@@ -66,13 +66,14 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
   }, [hintId]);
 
   const showSubtitle = subtitle && !(hintId && subtitleHidden);
-  // v4 (V0, P18): „···" je na obrazovce JEDNOU — v horní liště. Hlavička své položky liště
-  // odevzdá (MenuStranky) a h1 má celou šířku L→R. Bez lišty (správa platformy, okna)
-  // kreslí „···" sama jako dřív.
-  const vListe = useOdevzdejMenu(menu, menuMobile);
-  const maMenu = !vListe && !!menu && menu.length > 0;
-  const maMenuMobil = !vListe && !!menuMobile && menuMobile.length > 0;
-  const maAkce = !!(secondary || maMenu || maMenuMobil);
+  // v4 (P18): „···" je na obrazovce JEDNOU. Má-li stránka vlastní akce, nese „···" hlavička
+  // a pod linku přibere položky horní lišty (MenuStranky) — lišta své „···" schová. Jedna
+  // nabídka: položky `menuMobile` jsou v ní jen pod md (`jenMobil`), takže na monitoru, kde je
+  // vedlejší akce vidět jako tlačítko, se neopakuje.
+  const zListy = usePrevzitMenuListy(menu, menuMobile);
+  const polozkyMenu: MenuItem[] = [...(menu ?? []), ...(menuMobile ?? []).map(i => ({ ...i, jenMobil: true })), ...zListy];
+  const maMenu = (menu?.length ?? 0) + (menuMobile?.length ?? 0) > 0;
+  const maAkce = !!(secondary || maMenu);
 
   // v3: jeden velký nadpis vlevo a vedle něj tiché akce v šedých kruzích
   // („···", vedlejší akce od md). Hlavní (limetková) akce stojí na monitoru
@@ -108,12 +109,7 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
           // Vedlejší akce + „···" mají v němčině přes 300 px — zalamují se mezi sebou a drží se vpravo.
           <div className="flex flex-wrap items-center justify-end gap-2 min-w-0 max-w-full ml-auto">
             {secondary && <div className="hidden md:flex flex-wrap items-center justify-end gap-2">{secondary}</div>}
-            {maMenuMobil ? (
-              <>
-                <div className="md:hidden"><Menu items={[...(menu ?? []), ...menuMobile!]} /></div>
-                {maMenu && <div className="hidden md:block"><Menu items={menu!} /></div>}
-              </>
-            ) : maMenu && <Menu items={menu!} />}
+            {maMenu && <Menu items={polozkyMenu} />}
           </div>
         )}
         {/* Hlavní akce = stupeň L (52, `.ph-hlavni`): na telefonu L→R pod nadpisem, na monitoru vpravo v řadě. */}

@@ -294,7 +294,7 @@ klávesnice), Modal (sm/md/lg + `sheet`), Switch/SwitchRow.
 
 **Skladba v4:** `Rada` / `Sloupec` (řady L→R s jednou výškou, skupiny s mezerou
 ze škály — viz „Řady ovládání“), `StavovaKarta` / `StavovyKruh` (vzor V8),
-`MenuStrankyProvider` + `MenuListy` + `useOdevzdejMenu` („···“ stránky v liště —
+`MenuStrankyProvider` + `MenuListy` + `usePrevzitMenuListy` („···“ jednou na obrazovce —
 viz „Vzory obrazovek“), sloty `Widget` `filtry` / `segment` / `souhrn` / `patka`
 (vzor V2), `ErrorState vlevo` (chyba v kartě), `Segmented sirka`.
 
@@ -345,19 +345,20 @@ Klient navíc: StatCard, SectionTitle, TableMap.
   značka a přepínač podniku (na monitoru přepínač bočního pásu), vpravo
   nejvýš dvě akce — hledání a oznámení — a „···“ se vším ostatním (Účtenky,
   Managero client, TO GO). Všechny tři jako šedé kruhy 40 px. **v4: „···“ je
-  na obrazovce jednou** — akce stránky (`PageHeader menu`/`menuMobile`) se
-  přes `MenuStrankyProvider` + `MenuListy` (components/ui/MenuStranky.tsx)
-  kreslí v témže „···“ lišty nahoře, akce lišty pod linkou; s akcemi stránky
-  nese tlačítko jméno „Další akce“. Lišta zaměstnance a TO GO má „···“ jen tehdy,
-  když ho stránka potřebuje. Pilulka v liště má výšku kruhů (40). **Název
+  na obrazovce jednou** (P18 dovoluje lištu, nebo hlavičku): má-li stránka
+  vlastní akce (`PageHeader menu`/`menuMobile`), nese „···“ hlavička a pod linku
+  přibere položky lišty; lišta své kolečko na té obrazovce nekreslí
+  (`MenuStrankyProvider polozky` + `MenuListy`, components/ui/MenuStranky.tsx).
+  Stránka bez vlastních akcí má „···“ v liště. Dřív dvě kolečka nad sebou
+  (Úkoly, Sklad, Tým, Rozvrh, Uzávěrky). Pilulka v liště má výšku kruhů (40). **Název
   stránky v liště není** (čte ho jen odečítač, `sr-only`); stojí jednou,
   jako h1 pod lištou. Hostovská lišta (`ClientShell`): značka, záložky od
   md, hledání/kód v šedém kruhu, jazyk, účet; „Přihlásit“ je inkoustová
   pilulka — limetka patří hlavní akci obrazovky.
 - Každá obrazovka: `PageHeader` (h1 32 px L→R + podtitulek 14 px; vpravo
   vedlejší akce od md, jedna limetková akce 52 — na telefonu pod nadpisem přes
-  šířku; „···“ je v liště, viz výš; mimo layout s lištou ho PageHeader kreslí
-  sám), pak obsah. Rytmus V0: h1 → 4 → podtitulek → 16 → hlavní akce → 12 →
+  šířku; „···“ stránky v řádku nadpisu je zároveň jediné „···“ obrazovky,
+  viz výš), pak obsah. Rytmus V0: h1 → 4 → podtitulek → 16 → hlavní akce → 12 →
   segment L→R × 44 → 20 → obsah. Okraj obsahu na telefonu 20 px (pod 360 px 16 px; plocha
   widgetů), od `sm` 24 px. Šířka obsahu: seznamové obrazovky `max-w-4xl`,
   datové (finance, docházka, sklad) plná šířka `max-w-7xl`.
@@ -383,9 +384,9 @@ Klient navíc: StatCard, SectionTitle, TableMap.
 Rozměry pro telefon 390: stránka L = 20, R = 370; karta: hrana 20 + linka 1 +
 odsazení 16 → L = 37, R = 353. Vzory jsou změřené z inspirací (spec-skladba §7).
 
-- **V0 Hlavička stránky** — lišta 56: [logo 32] … [🔍 40] 8 [🔔 40] 8 [··· 40], kruhy
-  končí na R → 12 → h1 L→R → 4 → podtitulek → 16 → hlavní akce L→R × 52 → 12 →
-  segment L→R × 44 → 20 → obsah.
+- **V0 Hlavička stránky** — lišta 56: [logo 32] … [🔍 40] 8 [🔔 40] (8 [··· 40]), kruhy
+  končí na R → 12 → h1 (s „···“ 40 na R, když má stránka vlastní akce — pak v liště
+  není) → 4 → podtitulek → 16 → hlavní akce L→R × 52 → 12 → segment L→R × 44 → 20 → obsah.
 - **V1 Hlavička widgetu** (`Widget`) — výška 44: [ikona 20 v boxu 24] 12 [titul 16/600,
   jeden řádek s „…“, aspoň 55 % šířky] 8 [čip počtu] … [› 36] 4 [^ 36]; nejvýš dvě
   ikonová tlačítka na telefonu (Zvětšit ⤢ až od sm), Sbalit úplně vpravo a jeho kruh
