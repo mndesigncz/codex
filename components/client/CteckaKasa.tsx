@@ -589,7 +589,7 @@ export default function CteckaKasa() {
       {/* Ruční zadání: když čtečka nečte nebo host ukazuje kód na displeji. */}
       <form onSubmit={e => { e.preventDefault(); const t = rucne; setRucne(''); void nactiRef.current(t); }} className="flex gap-2 flex-wrap">
         <Input aria-label="Kód opsaný ručně" value={rucne} onChange={e => setRucne(/[^A-Za-z0-9 -]/.test(e.target.value) ? e.target.value.slice(0, 200) : formatujPriPsani(e.target.value).slice(0, 12))}
-          placeholder="Opsat kód ručně" autoCapitalize="characters" autoComplete="off" className="font-mono tracking-[0.15em] flex-1 basis-40 uppercase !w-auto !h-12" />
+          placeholder="Opsat kód ručně" autoCapitalize="characters" autoComplete="off" className="font-mono tracking-[0.15em] flex-1 basis-40 uppercase placeholder:font-sans placeholder:tracking-normal placeholder:normal-case !w-auto !h-12" />
         <Button type="submit" size="lg" variant="secondary" icon="search" disabled={rucneRozpoznano === 'prazdny'}>Najít</Button>
       </form>
 

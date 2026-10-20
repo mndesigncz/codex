@@ -38,7 +38,7 @@ export default function ZpravyNahled({ nazev, title, body, priloha, linkKind, zk
           <Icon name="bell" size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] uppercase tracking-wide text-black/50 truncate">{nazev || 'Tvůj podnik'} · teď</p>
+          <p className="text-xs font-medium text-black/55 truncate">{nazev || 'Tvůj podnik'} · teď</p>
           <p className={`text-[15px] font-semibold leading-snug break-words ${prazdne ? 'text-black/40' : 'text-[#16181A]'}`}>{zkouska && !prazdne ? `[Zkouška] ${t.title}` : t.title}</p>
           {t.body && <p className="text-sm text-black/70 whitespace-pre-line break-words mt-0.5">{t.body}</p>}
         </div>

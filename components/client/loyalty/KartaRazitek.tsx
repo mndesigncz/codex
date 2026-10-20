@@ -60,7 +60,7 @@ export default function KartaRazitek({ karta, clen = true, nahled = false }: { k
           {Array.from({ length: slotu }).map((_, i) => {
             const plny = i < k.stamps;
             return (
-              <span key={i} aria-hidden className={`h-8 rounded-lg border flex items-center justify-center ${plny ? 'bg-[#C8F542] border-[#C8F542] text-[#16181A]' : maVzhled ? 'border-current/30 bg-white/10' : 'bg-white/60 border-black/[0.08]'}`}>
+              <span key={i} aria-hidden className={`h-8 rounded-[10px] border flex items-center justify-center ${plny ? 'bg-[#C8F542] border-[#C8F542] text-[#16181A]' : maVzhled ? 'border-current/30 bg-white/10' : 'bg-black/[0.06] border-transparent'}`}>
                 {plny && <Icon name={ikona} size={14} />}
               </span>
             );
