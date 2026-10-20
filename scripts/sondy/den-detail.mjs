@@ -58,7 +58,8 @@ for (const w of [1280, 390]) {
   const hrana = async (id) => p.evaluate((i) => {
     const li = document.querySelector(`[data-instance="${i}"]`);
     const card = li?.querySelector('section');
-    const b = [...(li?.querySelectorAll('button') ?? [])].find(x => /widget$/.test(x.getAttribute('aria-label') ?? ''));
+    // v4: „Zvětšit widget" je na telefonu skryté (V1: nejvýš dvě ikony) — měří se první VIDITELNÉ ovládání karty.
+    const b = [...(li?.querySelectorAll('button') ?? [])].find(x => /widget$/.test(x.getAttribute('aria-label') ?? '') && x.getBoundingClientRect().width > 0);
     if (!card || !b) return null;
     const c = card.getBoundingClientRect(), r = b.getBoundingClientRect();
     return { odOkraje: Math.round(c.right - r.right), vyska: Math.round(r.top - c.top) };

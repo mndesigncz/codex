@@ -59,7 +59,11 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
 }) {
   // Výška položky 28 / 36 v dráze s odsazením 4 → segment 36 / 44 (stupně S a M).
   const pad = size === 'sm' ? 'h-7 px-3 text-xs' : 'h-9 px-4 text-sm';
-  const plna = sirka === 'plna';
+  // Segment, který stojí v ŘADĚ s dalším prvkem (flex řádek s viditelným sourozencem — MonthNav,
+  // výběr, tlačítko), se nesmí roztáhnout přes celý řádek: vytlačil by souseda za R (finance-uzaverky
+  // C7). Tam je to pružný/obsahový díl řady; L→R platí, když stojí na řádku sám.
+  const [vRade, setVRade] = useState(false);
+  const plna = sirka === 'plna' && !vRade;
   const obalRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -68,6 +72,16 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
   const [presah, setPresah] = useState(0);
   const presahRef = useRef(0);
   presahRef.current = presah;
+
+  useLayoutEffect(() => {
+    const obal = obalRef.current, rodic = obal?.parentElement;
+    if (!obal || !rodic || sirka !== 'plna') return;
+    const cs = getComputedStyle(rodic);
+    const radek = /flex/.test(cs.display) && !cs.flexDirection.startsWith('column');
+    const soused = radek && Array.from(rodic.children).some(c => c !== obal && (c as HTMLElement).offsetParent !== null
+      && getComputedStyle(c).position !== 'absolute');
+    setVRade(soused);
+  }, [sirka, options.length]);
 
   // Vejde se? Přirozená šířka položek (obsah + odsazení + mezery) proti šířce, kterou by
   // segment měl bez přesahu. Měří se z obsahu položek, ne ze scrollWidth: ten po přesahu

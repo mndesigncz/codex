@@ -238,15 +238,17 @@ for (const w of [1280, 390]) {
   tvrdi('T1 (V04): na telefonu v hlavičce žádná limetka', await p.locator('[data-plocha] button.on-accent:visible').count() === 0);
   const seznamTop = await widgetLi(p, 'nastroj').evaluate(el => el.getBoundingClientRect().top);
   tvrdi('T1 (V04): seznam uzávěrek začíná nad ohybem (i se dvěma plnými frontami)', seznamTop < 844, String(Math.round(seznamTop)));
-  // Řádek uzávěrky: posádka na vlastním řádku bez useknutí, tržba a rozdíl kasy na jednom řádku pod ní.
+  // Řádek uzávěrky: posádka bez useknutí, tržba jako číslo. v4 (spec P15/V4): tržba stojí v PRVNÍM řádku
+  // vpravo na R − 28 (šipka) — dřív s rozdílem kasy v druhém řádku vlevo; rozdíl kasy (chip) je pod ní.
   const radek = await widgetLi(p, 'nastroj').locator('ul.list button.list-row').first().evaluate(b => {
     const posadka = [...b.querySelectorAll('span')].find(x => x.textContent?.startsWith('Směna:') && x.className.includes('line-clamp'));
     const cislo = b.querySelector('.list-value')?.getBoundingClientRect();
     const chip = b.querySelector('.list-tail .chip')?.getBoundingClientRect();
+    const rr = b.getBoundingClientRect(), pr = parseFloat(getComputedStyle(b).paddingRight);
     return { posadka: !!posadka && posadka.scrollWidth <= posadka.clientWidth + 1 && posadka.scrollHeight <= posadka.clientHeight + 1,
-      cislo: !!cislo, vedleSebe: !!cislo && !!chip && Math.abs((cislo.top + cislo.height / 2) - (chip.top + chip.height / 2)) < 12 && chip.left > cislo.right };
+      cislo: !!cislo, vpravo: !!cislo && Math.abs(cislo.right - (rr.right - pr - 28)) <= 2, rozdilPod: !!cislo && !!chip && chip.top >= cislo.bottom - 1 };
   });
-  tvrdi('T1 (V04): řádek uzávěrky — posádka celá, tržba jako číslo a rozdíl kasy vedle ní', radek.posadka && radek.cislo && radek.vedleSebe, JSON.stringify(radek));
+  tvrdi('T1 (V04): řádek uzávěrky — posádka celá, tržba jako číslo vpravo na R a rozdíl kasy pod ní', radek.posadka && radek.cislo && radek.vpravo && radek.rozdilPod, JSON.stringify(radek));
   await p.locator('[data-plocha]').getByRole('button', { name: 'Další akce' }).first().click();
   const nova = p.getByRole('menuitem', { name: 'Nová uzávěrka' });
   tvrdi('T1: „Nová uzávěrka" je v „···" vidět a povolená', await dokud(() => nova.isVisible(), 3000) && await nova.isEnabled());
