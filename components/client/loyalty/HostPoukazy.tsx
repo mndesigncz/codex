@@ -100,7 +100,7 @@ export default function HostPoukazy({ poukazy }: { poukazy: Poukaz[] }) {
   if (seznam.length === 0) return null;
   return (
     <section aria-labelledby="h-poukazy" className="max-w-md">
-      <h2 id="h-poukazy" className="text-lg font-bold tracking-tight">{t('Moje poukazy')}</h2>
+      <h2 id="h-poukazy" className="t-section">{t('Moje poukazy')}</h2>
       <p className="text-sm text-black/55 mt-1 mb-3">{t('Kód ukaž obsluze u kasy.')}</p>
       <ul className="space-y-2">{seznam.map(p => <Karta key={p.id} p={p} onOdebrano={id => setSeznam(s => s.filter(x => x.id !== id))} />)}</ul>
     </section>

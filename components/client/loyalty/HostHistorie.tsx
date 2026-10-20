@@ -76,7 +76,7 @@ function HostHistorie({ slug, showBusiness = false }: { slug?: string; showBusin
   if (polozky.length === 0) return <EmptyState compact icon="clock" title={t('Zatím tu nic není')} hint={t('Jakmile získáš body, razítko nebo kupon, uvidíš to tady.')} />;
   return (
     <div>
-      <ul className="divide-y divide-black/[0.06]">
+      <ul className="list">
         {polozky.map(p => {
           const h = hodnota(p);
           const dne = pragueDaySafe(p.at);

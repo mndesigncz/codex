@@ -134,7 +134,8 @@ function Slide({ b, accent, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; acc
     const cil = b.linkKind === 'event' ? 'h-events' : b.linkKind === 'coupon' && b.linkRef ? `kupon-${b.linkRef}` : b.linkKind === 'campaign' && b.linkRef ? `karta-${b.linkRef}` : null;
     if (cil) setTimeout(() => document.getElementById(cil)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
   };
-  const cta = 'tap-target inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold active:scale-[0.98] transition';
+  // Tvar tlačítka je společný (.btn), barvu dává podnik.
+  const cta = 'tap-target btn btn-sm !gap-1.5';
   return (
     <div className={`relative overflow-hidden rounded-3xl border border-black/[0.06] ${foto ? 'bg-[#16181A] text-white' : ''}`}
       style={foto ? undefined : { background: `${accent}22`, borderColor: `${accent}66` }}>
@@ -144,7 +145,7 @@ function Slide({ b, accent, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; acc
       )}
       {foto && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/90 via-[#16181A]/50 to-[#16181A]/10" aria-hidden />}
       <div className={`relative p-5 sm:p-6 flex flex-col gap-2 ${foto ? 'min-h-[11rem] sm:min-h-[13rem] justify-end' : 'min-h-[7rem]'}`}>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight text-balance break-words">{b.title}</h2>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-[-0.02em] leading-tight text-balance break-words">{b.title}</h2>
         {b.text && <p className={`text-sm sm:text-base leading-snug text-pretty break-words max-w-[60ch] ${foto ? 'text-white/85' : 'text-black/70'}`}>{b.text}</p>}
         {(url || vnitrni) && (
           <div className="mt-1">
