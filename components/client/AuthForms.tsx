@@ -135,7 +135,7 @@ export function AuthCard({ title, lead, children }: { title: string; lead: strin
         <h1 className="t-page sm:text-[2.5rem] sm:leading-[1.05] text-balance">{title}</h1>
         <p className="mt-2 text-[15px] sm:text-base text-black/60 leading-relaxed max-w-[40ch] text-pretty">{lead}</p>
       </div>
-      <div className="w-full max-w-md md:bg-[var(--surface)] md:border md:border-[var(--surface-line)] md:rounded-3xl md:p-8 md:shadow-[shadow:var(--shadow-card)]">{children}</div>
+      <div className="w-full max-w-md karta-od-md md:p-8">{children}</div>
     </div>
   );
 }

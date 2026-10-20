@@ -119,10 +119,30 @@ p { text-wrap: pretty; }
    :where() má nulu, takže klikací karta zůstávala bez bílé — šedé dlaždice
    na Přehledu, v TO GO i v Uzávěrkách. Utility bg-* (0,1,0) přebijí dál.
    Tóny (.card-wait…) mají (0,1,0) taky, takže tónovaná karta tón neztratí.
-   `button:where(.glass)` sem schválně nepatří: srovnal by ~74 ručních
-   přepínačů pohledu naráz a to je samostatný krok se snímky před a po. */
+   Tlačítko `.glass` (pilulky `seg-off glass`) řeší vrstva components níž —
+   preflight tam má `[type='button']` (0,1,0), na které `button:where()` nestačí. */
 button:where(.card, .glass-card) { background: var(--surface); }
 button:where(.well) { background: var(--well); }
+/* Nevybraná pilulka `seg-off glass` na <button> byla holý text: preflight
+   (`[type='button']`, 0,1,0) přebil :where(.glass) s nulovou specifičností —
+   mřížka štětce v Dostupnosti, druh pohybu v uzávěrce a ~90 dalších přepínačů.
+   Ve vrstvě components má pravidlo (0,1,0) a stojí za preflightem, ale před
+   utilitami (`bg-*` dál přebijí) i před `.seg-on` (vybraná zůstane inkoustová). */
+@layer components {
+  :where(button, [type='button'], [type='submit'], [type='reset']).glass { background-color: rgba(22,24,26,0.05); }
+  /* Formulář (přihlášení, registrace, obnova hesla): na telefonu leží rovnou
+     na plátně, od md v bílé kartě. Dřív pět `md:` utilit opsaných ve třech
+     souborech. Ve vrstvě components, ať odsazení a jiný stín (`md:p-8`,
+     `md:shadow-…`) dodají utility. */
+  @media (min-width: 768px) {
+    .karta-od-md {
+      background: var(--surface);
+      border: 1px solid var(--surface-line);
+      border-radius: var(--r-lg);
+      box-shadow: var(--shadow-card);
+    }
+  }
+}
 /* Tónovaná karta v3 je plochý tón, ne přechod shora dolů: stav, ne dekorace.
    (Dvě stejné zarážky = plná barva přes bílou kartu, bez míchání v CSS.) */
 .card-accent { background: linear-gradient(rgba(200,245,66,0.10), rgba(200,245,66,0.10)), var(--surface); border-color: rgba(143,184,17,0.35); }
@@ -386,10 +406,10 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
   .list-tail .list-actions { margin-left: auto; flex-wrap: wrap; }
   /* Když v ocase nic než akce není, `space-between` položí jediný prvek
      doleva a pravá půlka řádku zůstane prázdná — „QR na stůl" končící
-     v třetině. Hlavní akce v takovém řádku dojede až k okraji, tiché
-     „···" zůstane vedle ní. */
+     v třetině. Akce proto vyplní řádek a drží se u pravého okraje; samo
+     tlačítko se nenatahuje (v3: jediné „Do plánování" přes celou šířku
+     vypadalo jako hlavní akce obrazovky, ne jako akce řádku). */
   .list-actions:only-child { flex: 1 1 auto; }
-  .list-actions:only-child > :first-child { flex: 1 1 auto; }
   /* Akce mimo ocas (ListRow akceVRadku) zůstávají v prvním řádku vedle názvu. */
   .list-actions-radek { order: 0; }
 }

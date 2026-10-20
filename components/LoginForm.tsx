@@ -56,7 +56,7 @@ export default function LoginForm() {
     // v3: na telefonu leží přihlášení přímo na plátně (žádná karta ani sklo — blur patří jen plovoucímu
     // chromu); od md karta s linkou: vlevo fotka baru, vpravo formulář.
     <div className="min-h-[100dvh] w-full flex items-center justify-center sm:p-6">
-      <div className="w-full max-w-5xl grid md:grid-cols-2 md:rounded-3xl md:overflow-hidden md:bg-[var(--surface)] md:border md:border-[var(--surface-line)] md:shadow-[shadow:var(--shadow-float)]">
+      <div className="w-full max-w-5xl grid md:grid-cols-2 karta-od-md md:overflow-hidden md:shadow-[shadow:var(--shadow-float)]">
         {/* Left — brand panel */}
         <div className="relative hidden md:flex flex-col justify-between p-10 min-h-[560px] overflow-hidden">
           {/* Místo přechodu limetka→tyrkys (nejčastější otisk generovaného

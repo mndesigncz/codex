@@ -19,7 +19,7 @@ function Obal({ klient, children }: { klient: boolean; children: React.ReactNode
   // Host: na telefonu formulář leží přímo na plátně (nadpis, věta, pole, tlačítko), karta až od md.
   if (klient) return (
     <div className="grid place-items-start md:place-items-center pt-2">
-      <div className="max-w-md w-full md:bg-[var(--surface)] md:border md:border-[var(--surface-line)] md:rounded-3xl md:p-8 md:shadow-[shadow:var(--shadow-card)]">{children}</div>
+      <div className="max-w-md w-full karta-od-md md:p-8">{children}</div>
     </div>
   );
   return (
