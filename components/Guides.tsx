@@ -449,7 +449,8 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
               return (
                 // Vlastní <li> + ListRow as="div": obal <li className="contents"> by .list nenakreslil linku (DP §3.6).
                 <li key={g.id}>
-                  <ListRow as="div" title={g.title} meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
+                  {/* v4 (V4, P15): stav čtení je stavový řádek na ose textu; datum úpravy sloupec u pravé hrany. */}
+                  <ListRow as="div" title={g.title} meta={meta} detail={stav} aside={kdyUpraveno(g.updatedAt)}
                     onClick={() => { void openReader(g.id); }} />
                 </li>
               );
@@ -462,7 +463,7 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
                 // Akce leží nad ním, protože jsou pozicované a v DOM později (Menu je relative,
                 // Spustit dostal `relative`). Fokus = limetkový prstenec řádku jako u Button.
                 title={<button type="button" onClick={() => { void openReader(g.id); }} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none after:absolute after:inset-0 after:rounded-[var(--r-md)] after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[#C8F542]">{g.title}</button>}
-                meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
+                meta={meta} detail={stav} aside={kdyUpraveno(g.updatedAt)}
                 actions={<Menu size="sm" label={t('Další akce s návodem {nazev}', { nazev: g.title })} items={polozky} />} />
             );
           })}
@@ -1127,7 +1128,7 @@ function StavCteni({ g }: { g: NavodApi }) {
   const precteno = predUzaverkou ? g.myReadCurrent === true : g.myRead === true;
   const znovu = predUzaverkou && g.myRead === true && !precteno;
   return (
-    <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+    <span className="inline-flex flex-wrap items-center gap-1.5">
       <Chip tone={precteno ? 'ok' : 'wait'} size="sm" icon={precteno ? 'check' : znovu ? 'refresh' : 'book'}>
         {precteno ? t('Přečteno') : znovu ? t('Přečíst znovu') : t('Povinné čtení')}
       </Chip>

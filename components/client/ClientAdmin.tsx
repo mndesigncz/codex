@@ -1483,7 +1483,8 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
               <span className="text-sm text-black/50 shrink-0">/client/</span>
               <Input id="s-slug" value={p.slug} onChange={e => setP({ ...p, slug: e.target.value })} className="flex-1 min-w-0 !w-auto" />
             </div>
-            <Button type="button" variant="secondary" icon="copy" onClick={copy}>Kopírovat</Button>
+            {/* Na telefonu jen ikona (popisek zůstává čtečce a v bublině), ať zbude místo na adresu. */}
+            <Button type="button" variant="secondary" icon="copy" title="Kopírovat" className="max-sm:!w-11 max-sm:!px-0" onClick={copy}><span className="max-sm:sr-only">Kopírovat</span></Button>
           </div>
         </Field>
         {!hoursOk && <p className="note note-wait">Podnik nemá vyplněnou otevírací dobu (Rozvrh → Otevírací doba). Bez ní hosté nemůžou rezervovat.</p>}
