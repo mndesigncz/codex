@@ -250,9 +250,9 @@ select.field-s {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2316181A' stroke-opacity='.5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 0.75rem center;
 }
-:root[data-theme="dark"] select.field-s { background-color: rgba(255,255,255,0.08); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23EDF2E4' stroke-opacity='.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+:root[data-theme="dark"] select.field-s { background-repeat: no-repeat; background-position: right 0.75rem center; background-color: rgba(255,255,255,0.08); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23EDF2E4' stroke-opacity='.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
 /* Na dotyku 16 px (Safari jinak při fokusu přiblíží) — a filtr-pilulka vedle stejně, ať se v řadě nemíchají dvě písma. */
-@media (pointer: coarse) { select.field-s, .field.field-s, .filtr-vyber { font-size: 1rem; } }
+@media (pointer: coarse) { select.field-s, .field.field-s { font-size: 1rem; } }
 /* Na dotykovém zařízení má pole aspoň 16 px: Safari na iPhonu každé pole
    s menším písmem při fokusu přiblíží a po zavření klávesnice nechá stránku
    zvětšenou s vodorovným posuvem (audit kola 6, Z12). Viewport `maximum-scale`
@@ -1935,7 +1935,8 @@ html[data-obal] .jen-web { display: none !important; }
 .filtr-vyber > svg { color: rgba(22,24,26,0.5); }
 :root[data-theme="dark"] .filtr-vyber { background: rgba(255,255,255,0.08); color: #EDF2E4; }
 :root[data-theme="dark"] .filtr-vyber > svg { color: rgba(237,242,228,0.6); }
-@media (pointer: coarse) { .filtr-vyber { font-size: 1rem; } }
+/* Na dotyku 15 px (výběr vedle má 16 kvůli přiblížení v Safari; pilulka se nepíše, 15 se do ½ dílu vejde i s „Měsíc: Tento"). */
+@media (pointer: coarse) { .filtr-vyber { font-size: 0.9375rem; padding-left: 0.75rem; } }
 .filtr-vyber-inkoust, :root[data-theme="dark"] .filtr-vyber-inkoust { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.85); }
 
 /* ---------- Stavová karta (V8) ---------- */

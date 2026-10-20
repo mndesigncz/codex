@@ -92,9 +92,10 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
     const rr = rodic?.getBoundingClientRect();
     const rodicR = rr && rodic ? rr.right - (parseFloat(getComputedStyle(rodic).paddingRight) || 0) - (parseFloat(getComputedStyle(rodic).borderRightWidth) || 0) : pravaBez;
     if (potreba <= zakladni + 0.5 || window.innerWidth >= TELEFON || Math.abs(pravaBez - rodicR) > 1.5) { if (presahRef.current) setPresah(0); return; }
-    // Přetéká jen pás na stránce (k hraně obrazovky). V kartě a v okně zůstává mezi L a R
-    // s vyblednutím: pás uříznutý o linku karty vypadal jako chyba, ne jako posuv.
-    if (obal.parentElement?.closest('.card, .glass-card, [role=dialog]')) { if (presahRef.current) setPresah(0); return; }
+    // Přetéká jen pás v hlavičce stránky (k hraně obrazovky). V kartě, v okně a v buňce plochy
+    // (nástroj bez karty) zůstává mezi L a R s vyblednutím: pás uříznutý o linku karty vypadal
+    // jako chyba a z buňky plochy nesmí nic vylézt (sondy preteceni-*).
+    if (obal.parentElement?.closest('.card, .glass-card, [role=dialog], li[data-widget]')) { if (presahRef.current) setPresah(0); return; }
     const hrana = document.documentElement.clientWidth;
     const novy = Math.max(0, Math.floor(hrana - pravaBez));
     if (novy !== presahRef.current) setPresah(novy);
