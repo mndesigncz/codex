@@ -218,7 +218,7 @@ export function GlobalniHledani({ open, onClose, stranky, akce = [], onStranka, 
           <input ref={vstup} data-transient autoFocus value={q} onChange={e => setQ(e.target.value)} role="combobox" aria-expanded aria-controls="globalni-hledani-vysledky" aria-autocomplete="list"
             aria-activedescendant={plocha[aktivni] ? `gh-${plocha[aktivni].klic}` : undefined} aria-label={t('Hledat v aplikaci')}
             placeholder={t('Stránka, akce, úkol, host, receptura, uzávěrka…')} maxLength={80} enterKeyHint="go"
-            className="min-w-0 flex-1 bg-transparent py-3 text-[15px] text-[#16181A] placeholder:text-black/40 focus:outline-none" />
+            className="min-w-0 flex-1 bg-transparent py-3 text-[15px] text-[#16181A] placeholder:text-black/40 dark:placeholder:text-white/40 focus:outline-none" />
         </div>
         <div id="globalni-hledani-vysledky" role="listbox" aria-label={t('Výsledky hledání')} className="max-h-[50vh] overflow-y-auto scrollbar-thin -mx-1 px-1">
           {skupiny.map(g => (
