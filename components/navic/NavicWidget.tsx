@@ -144,10 +144,11 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
   // Pilulky nabídky NAD seznamem (hlavní věc widgetu je zapsat; starší zápisy se smí schovat pod „Zobrazit vše").
   // „Zapsat navíc" a „Úkoly za body" jsou v patce: ta stojí mimo zkrácení, takže je odlesk neschová.
   const pilulky = smiZapsat && nabidka.length > 0 ? (
-    // Pás pilulek přesahuje kvůli prstenci fokusu o 4 px do odsazení karty — obsah karty pak začínal 4 px
-    // před levou osou (P5). Přesah 2 px prstenec ještě unese a osa zůstane v toleranci.
-    <div data-navic-akce className="[&_.scroll-fade-x]:-mx-0.5 [&_.scroll-fade-x]:px-0.5">
-      <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} obsazene={obsazene} label={t('Co se dá udělat navíc')} pas={!L} />
+    // Pás pilulek přesahoval kvůli prstenci fokusu o 4 px do odsazení karty — obsah karty pak začínal
+    // před levou osou (P5). Ve widgetu pás začíná přesně na L; pás i ve velké kartě (ne zalomené pilulky
+    // různé šířky pod sebou — zubatý sloupec, audit V03).
+    <div data-navic-akce className="[&_.scroll-fade-x]:mx-0 [&_.scroll-fade-x]:px-0">
+      <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} obsazene={obsazene} label={t('Co se dá udělat navíc')} pas />
     </div>
   ) : null;
   const patka = smiZapsat ? (

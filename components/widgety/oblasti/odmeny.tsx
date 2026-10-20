@@ -918,7 +918,7 @@ function KatalogOdmen({ velikost, nahled }: WidgetProps) {
             hint={spravuje ? t('Přidej první odměnu, ať mají body smysl.') : t('Vedení zatím žádné odměny nenabízí.')}
             action={tlacitkoPridat ?? undefined} />
         ) : undefined}>
-        <Sloupec mezera={6}>
+        <Sloupec mezera={3}>
         <Sloupec mezera={2}>
         <ul className="list">
           {videt.map(o => (
@@ -1841,9 +1841,9 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
       ) : undefined}
       souhrn={<span data-tresty-souhrn>{souhrnText.join(' · ')}</span>}
       patka={tlacitko || undefined}>
-      {/* v4 (V14): skupiny seznamu (Nesouhlasí, Návrhy, Tresty) pod sebou s mezerou 24 ze škály, uvnitř
-          skupiny štítek → seznam 4 — dřív mt-3 / mt-1 / mt-2 a souhrn bez skupin (7 různých mezer). */}
-      <Sloupec mezera={6} className={OSA_TEXTU}>
+      {/* v4 (V14): skupiny seznamu (Nesouhlasí, Návrhy, Tresty) pod sebou viditelně 24 (gap 12 + spodní
+          odsazení řádku 12), uvnitř skupiny štítek → seznam 4 — dřív mt-3 / mt-1 / mt-2 (7 různých mezer). */}
+      <Sloupec mezera={3} className={OSA_TEXTU}>
         {sporne.length > 0 && (
           <Sloupec mezera={1} data-tresty-sporne>
             <p className="t-label">{t('Nesouhlasí')}</p>
@@ -1925,7 +1925,7 @@ function ZaBodyTymu({ velikost, nahled }: WidgetProps) {
       patka={tlacitko || undefined}>
       {/* Dnešní úkoly první (hlavní údaj karty — na telefonu nesmí skončit pod „Zobrazit vše"), čekající pod nimi
           (skupina 24); že něco čeká, říká už chip v hlavičce. */}
-      <Sloupec mezera={6} className={OSA_TEXTU}>
+      <Sloupec mezera={3} className={OSA_TEXTU}>
         {ukoly.length > 0 ? (
           <Sloupec mezera={1} style={osaTextu(OSA_JAMKA)}>
             <ul className="list" data-za-body-seznam>{videt.map(u => <RadekUkoluDnes key={u.nabidka.id} u={u} />)}</ul>

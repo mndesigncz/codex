@@ -439,6 +439,9 @@ function Tyden({ nahled }: WidgetProps) {
   const podle = (t: { id: number }) => ukoly.find(x => x.id === t.id);
   return (
     <Widget nacteni={ja.stav ?? data} kostra="graf" odkaz={{ popisek: t('Úkoly'), pohled: 'tasks' }}>
+      {/* v4 (P5): ve widgetu sedí název dne na téže levé ose jako karty úkolů pod ním (tabule mu dává
+          px-1 navíc — ve widgetu 4 px vedle osy). Tabule patří jiné oblasti, proto obal. */}
+      <div className="[&_.well>div.px-1]:px-0 [&_.well_p.px-1]:px-0">
       <TaskWeekBoard tasks={ukoly} weekStart={weekStart}
         // Budoucí úkol se odškrtnout nedá — v nástroji by se ptal „Tohle není dnešní úkol",
         // widget okno nemá, tak ho radši nepustí (splní se v den termínu nebo v Úkolech).
@@ -447,6 +450,7 @@ function Tyden({ nahled }: WidgetProps) {
         labelFor={t => { const u = podle(t); return !u ? '' : u.assignedTo == null ? proKohokoli : celyTym && u.assignedTo !== ja.id ? (u.assigneeName ?? '') : ''; }}
         onMove={nahled ? undefined : (t, datum) => { const u = podle(t); if (u) void presun(u, datum); }}
         canMove={t => { const u = podle(t); return !!u && (u.createdBy === ja.id || presunCizi); }} />
+      </div>
       {(o.chyba || chybaPresunu) && <p className="note note-danger mt-3" role="alert">{o.chyba ?? chybaPresunu}</p>}
       {o.okno}
     </Widget>

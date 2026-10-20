@@ -396,7 +396,7 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
     >
       <Sloupec mezera={2}>
       {velikost === 'L' && razeni !== 'dojde' ? (
-        <Sloupec mezera={6}>
+        <Sloupec mezera={3}>
           {skupiny.map(s => (
             <section key={s.nazev} aria-label={s.nazev} className="sloupec sloupec-1">
               <p className="t-label">{s.nazev}</p>
@@ -480,7 +480,7 @@ function NakupniSeznam({ velikost, nastaveni, nahled }: WidgetProps<NastaveniNak
     >
       <Sloupec mezera={2}>
       {L ? (
-        <Sloupec mezera={6}>
+        <Sloupec mezera={3}>
           {poDodavatelich(ukazat).map(s => (
             <section key={s.dodavatel ?? '-'} aria-label={s.dodavatel ?? t('Bez dodavatele')} className="sloupec sloupec-1">
               <p className="t-label">{s.dodavatel ?? t('Bez dodavatele')}</p>

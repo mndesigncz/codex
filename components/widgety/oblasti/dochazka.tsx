@@ -64,6 +64,7 @@ import { ulozSoubor } from '@/lib/stahni';
 import type { Jazyk } from '@/lib/i18n/config';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
+import { OSA_TEXTU } from '../osaTextu';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { premieZaNavic } from '../../navic/logika';
@@ -488,7 +489,7 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
     );
   } else {
     telo = (
-      <ul className="list">
+      <ul className={`list ${OSA_TEXTU}`}>
         {lide.map(({ r, od }) => {
           const zapomenuty = ted - od.getTime() > ZAPOMENUTY_MS;
           const smena = r.shiftStart ? t('směna {cas}', { cas: `${fmtHM(r.shiftStart)}–${fmtHM(r.shiftEnd)}` }) : t('bez plánované směny');
@@ -1096,7 +1097,7 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
       {L && radky.length > 2 && (
         <Segmented size="sm" ariaLabel={t('Řadit souhrn')} value={razeni} onChange={v => setRazeni(v)} options={moznosti} />
       )}
-      <ul className="list">
+      <ul className={`list ${OSA_TEXTU}`}>
         {zobrazene.map(r => {
           const meta = [
             r.pocet > 0 ? t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: r.pocet }) : t('bez směny'), r.bezi ? t('právě běží') : null,
@@ -1359,7 +1360,8 @@ function DnesVPodniku(_: WidgetProps) {
     <Widget nacteni={data}
       doplnek={chybi > 0 ? <Chip tone="wait" size="sm">{t('{n} bez příchodu', { n: chybi.toLocaleString('cs-CZ') })}</Chip> : undefined}
       prazdno={radky.length === 0 ? <p className="t-meta">{t('Dnes nemá nikdo naplánovanou směnu.')}</p> : undefined}>
-      <ul className="list">
+      {/* v4 (V4): chip stavu na ose textu, ne pod avatarem. */}
+      <ul className={`list ${OSA_TEXTU}`}>
         {radky.slice(0, RADKU_DNES).map(r => (
           <ListRow key={r.id} lead={<Avatar emoji={r.avatar} size="sm" />} title={r.jmeno}
             meta={r.plan ? t('směna {cas}', { cas: r.plan }) : t('bez plánované směny')} right={chipDne(r, t)} />
