@@ -1023,12 +1023,13 @@ function ZadostiOOdmeny({ velikost, nahled }: WidgetProps) {
                 : <Avatar emoji={z.avatar} size="sm" />}
               title={z.jmeno ?? t('Člen týmu')} meta={`${z.nazev} · ${cislo(z.cena)} ${bodTvar(t, z.cena)}`}
               actions={vyber.selecting ? undefined : (
-                <>
-                  <Button variant="primary" size="sm" loading={pracuji === z.id} disabled={pracuji != null && pracuji !== z.id}
+                <span className="flex items-center justify-end gap-1">
+                  {/* v3: v řádku fronty šedá pilulka, ne inkoust — pět inkoustových „Schválit“ pod sebou tahalo oko víc než hlavní akce (DESIGN „max jedno inkoustové v zorném poli“). Obal drží akce u pravého okraje, .list-actions by první natáhl přes šířku. */}
+                  <Button variant="secondary" size="sm" icon="check" loading={pracuji === z.id} disabled={pracuji != null && pracuji !== z.id}
                     aria-label={t('Schválit: {jmeno}, {nazev}', { jmeno: z.jmeno ?? '', nazev: z.nazev })} onClick={() => jedna(z, 'approve')}>{t('Schválit')}</Button>
                   <Button variant="danger" size="sm" disabled={pracuji != null}
                     aria-label={t('Zamítnout: {jmeno}, {nazev}', { jmeno: z.jmeno ?? '', nazev: z.nazev })} onClick={() => jedna(z, 'decline')}>{t('Zamítnout')}</Button>
-                </>
+                </span>
               )} />
           ))}
         </ul>
