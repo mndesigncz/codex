@@ -142,12 +142,12 @@ export default function SekceOznameni() {
   const maSouhrn = ma('notifikace.denni_souhrn');
 
   if (ucet.error) {
-    return <section className="card p-6"><ErrorState compact title={t('Předvolby se nepodařilo načíst')} detail={ucet.error} onRetry={ucet.reload} /></section>;
+    return <section className="card p-5"><ErrorState compact title={t('Předvolby se nepodařilo načíst')} detail={ucet.error} onRetry={ucet.reload} /></section>;
   }
 
   return (
     <div className="space-y-6">
-      <section className="card p-6 space-y-2" aria-labelledby="nast-oz-t">
+      <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-oz-t">
         <div>
           <h2 id="nast-oz-t" className="t-card">{t('Předvolby notifikací')}</h2>
           <p className="t-meta mt-1">{t('Nastav, o čem chceš dostávat informace. Platí na všech tvých zařízeních.')}</p>
@@ -183,16 +183,17 @@ export default function SekceOznameni() {
         )}
       </section>
 
-      <section className="card p-6 space-y-3" aria-labelledby="nast-ticho-t">
+      <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-ticho-t">
         <div>
           <h2 id="nast-ticho-t" className="t-card">{t('Tiché hodiny')}</h2>
           <p className="t-meta mt-1">{t('V tuhle dobu se upozornění do telefonu ani prohlížeče neodešle. Najdeš ho v centru oznámení.')}</p>
         </div>
-        <ul className="list">
+        <ul className="list -my-1">
           <SwitchRow title={t('Zapnout tiché hodiny')} checked={ticho.zap} disabled={ucet.loading}
             onChange={v => uloz({ ticho: { ...ticho, zap: v } })} />
         </ul>
-        <div className="grid grid-cols-2 gap-4 max-w-sm">
+        {/* v4 (V6): dvojice polí 2 × ½ přes celou šířku karty — ne dvě úzká pole vlevo (P2). */}
+        <div className="rada rada-rovne rada-mezera-3">
           <div>
             <label htmlFor="nast-ticho-od" className="field-label">{t('Od')}</label>
             <Input id="nast-ticho-od" type="time" value={ticho.od} disabled={!ticho.zap}
@@ -204,11 +205,11 @@ export default function SekceOznameni() {
               onChange={e => { if (e.target.value) void uloz({ ticho: { ...ticho, do: e.target.value } }); }} />
           </div>
         </div>
-        <p className="t-meta">{t('Čas se bere podle pražských hodin. Okno může přecházet přes půlnoc, třeba od {od} do {do}.', { od: VYCHOZI_TICHO.od, do: VYCHOZI_TICHO.do })}</p>
+        <p className="t-meta -mt-1.5">{t('Čas se bere podle pražských hodin. Okno může přecházet přes půlnoc, třeba od {od} do {do}.', { od: VYCHOZI_TICHO.od, do: VYCHOZI_TICHO.do })}</p>
       </section>
 
       {maSouhrn && (
-        <section className="card p-6 space-y-2" aria-labelledby="nast-souhrn-t">
+        <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-souhrn-t">
           <h2 id="nast-souhrn-t" className="t-card">{t('Denní souhrn')}</h2>
           <ul className="list">
             <SwitchRow title={t('Večerní souhrn dne')} hint={t('Tržby, kasa, kdo pracoval a co dochází; chodí večer v oznámení a e-mailem. Vypnutí platí jen pro tebe.')}
@@ -217,7 +218,7 @@ export default function SekceOznameni() {
         </section>
       )}
 
-      <section className="card p-6 space-y-3" aria-labelledby="nast-zarizeni-t">
+      <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-zarizeni-t">
         <div>
           <h2 id="nast-zarizeni-t" className="t-card">{t('Zařízení s upozorněními')}</h2>
           <p className="t-meta mt-1">{t('Prohlížeče, do kterých ti chodí push. Odebrané zařízení se vrátí, až na něm aplikaci znovu otevřeš a povolíš upozornění.')}</p>

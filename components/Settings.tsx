@@ -79,8 +79,9 @@ interface Sekce { id: SectionId; label: string; icon: string; desc: string; skup
 
 const AVATARS = ['👤', '👩‍💼', '👨‍🍳', '🧑‍🍳', '👩‍🍳', '🧑‍💼', '🙂', '😎', '🌿', '🍵', '🧋', '☕'];
 
-const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
+// v4: pole v kartě nastavení = `.field` (44, stupeň M). Dřív vlastní `px-4 py-3` → 46 px,
+// o dva víc než tlačítko vedle a mimo stupně (P6, P9).
+const inputClass = 'field';
 const labelClass = 'field-label';
 // Nadpis karty skupiny = h2.t-card (DP §3.3). Dřív ruční `font-bold
 // tracking-tight` a hlavní akce formulářů ručně psanou limetkou.
@@ -475,7 +476,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     : null;
 
   return (
-    <div ref={korenRef} className={vOkne ? 'space-y-4' : 'p-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
+    <div ref={korenRef} className={vOkne ? 'space-y-4' : 'px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
       {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')}
         className={zobrazeni === 'sekce' ? 'hidden md:block' : ''} />}
       <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
@@ -507,7 +508,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
       {/* Telefon v sekci: hlavička s názvem sekce a cesta zpět na seznam (jako „Zpět na uzávěrky"). */}
       {zobrazeni === 'sekce' && (
-        <div className="md:hidden space-y-1">
+        <div className="md:hidden space-y-1 !mt-0">
           <Button variant="ghost" icon="chevron" className="-ml-3 [&>svg]:rotate-90" onClick={() => setZobrazeni('seznam')}>{t('Zpět')}</Button>
           <PageHeader as={vOkne ? 'h2' : 'h1'} title={aktivni?.label ?? (section === 'team' ? t('Tým') : t('Nastavení'))} subtitle={aktivni?.desc} />
         </div>
@@ -518,7 +519,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
         <nav className="hidden md:flex flex-col gap-1 w-60 flex-shrink-0" aria-label={t('Sekce nastavení')}>
           {skupiny.map((g, gi) => (
             <div key={g.id} className={`flex flex-col gap-1 ${gi > 0 ? 'pt-3' : ''}`}>
-              {sNadpisy && <h2 className="t-label px-4 pb-0.5">{g.nazev}</h2>}
+              {sNadpisy && <h2 className="t-label px-4">{g.nazev}</h2>}
               {g.polozky.map(s => (
                 <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
                   className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition duration-200 ${
@@ -543,7 +544,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           {loading ? (
             <Skeleton className="h-72 rounded-3xl" />
           ) : section === 'account' ? (
-            <form onSubmit={saveProfile} className="card p-6 space-y-6">
+            <form onSubmit={saveProfile} className="card p-5 sloupec sloupec-6">
               {profileMsg && (
                 <div role="status" className="note note-ok p-4 text-sm flex items-center gap-2">
                   <Icon name="check" size={16} className="shrink-0" /> {profileMsg}
@@ -557,16 +558,18 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
               <div>
                 <label className={labelClass} id="nast-avatar">{t('Avatar')}</label>
-                <div className="flex items-center gap-4 flex-wrap">
+                {/* v4 (P1, P2): volba avatara je mřížka rovných dílů až k pravé hraně (6 na telefonu, 12 od sm) —
+                    dřív zalomené dlaždice končily 78 px před hranou polí pod nimi. */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="w-16 h-16 rounded-full bg-[var(--well)] border border-[var(--well-line)] flex items-center justify-center text-3xl flex-shrink-0" aria-hidden>
                     {avatar}
                   </div>
-                  <div className="flex flex-wrap gap-2 min-w-0 max-w-full" role="group" aria-labelledby="nast-avatar">
+                  <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 min-w-0 flex-1" role="group" aria-labelledby="nast-avatar">
                     {AVATARS.map(a => (
                       // Vybraný avatar nese inkoustový prstenec, ne limetkový tón —
                       // limetka na obrazovce patří tlačítku Uložit.
                       <button key={a} type="button" onClick={() => setAvatar(a)} aria-pressed={avatar === a} aria-label={t('Avatar {a}', { a })}
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition ${
+                        className={`w-full aspect-square max-sm:max-h-11 sm:max-h-10 rounded-xl flex items-center justify-center text-xl transition ${
                           avatar === a ? 'bg-black/[0.04] ring-2 ring-[#16181A]' : 'bg-black/[0.04] border border-black/[0.08] hover:bg-black/[0.06]'
                         }`}>
                         {a}
@@ -608,18 +611,17 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:justify-end">
-                <Button type="submit" variant="accent" block loading={savingProfile}>{t('Uložit změny')}</Button>
-              </div>
+              {/* v4: akce formuláře přes celou šířku karty, 16 pod posledním polem (P2, P13) — ne osamělá vpravo. */}
+              <Button type="submit" variant="accent" className="w-full -mt-2" loading={savingProfile}>{t('Uložit změny')}</Button>
             </form>
           ) : section === 'jazyk' ? (
             <SekceJazyk />
           ) : section === 'app' ? (
             <div className="space-y-6">
               <SekceVzhled />
-              <section className="card p-6 space-y-3" aria-labelledby="nast-o-aplikaci">
+              <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-o-aplikaci">
                 <h2 id="nast-o-aplikaci" className={cardTitle}>{t('O aplikaci')}</h2>
-                <p className="t-meta">{t('Právní informace a kontakt na podporu.')}</p>
+                <p className="t-meta -mt-2">{t('Právní informace a kontakt na podporu.')}</p>
                 <PravniOdkazy className="text-sm" />
               </section>
             </div>
@@ -627,8 +629,11 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
             <div className="space-y-6">
             <SekceOznameni />
 
-            <section className="card p-6 space-y-4" aria-labelledby="nast-centrum-t">
-              <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+            <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-centrum-t">
+              {/* v4 (V1, P2): hromadná akce vpravo v řádku s titulem (na telefonu jen ikona 36, popisek
+                  zůstává pro čtečku a v bublině), segment pod ní L→R. Dřív se akce zalomila nad segment
+                  a každý z nich měl jinou šířku. */}
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 id="nast-centrum-t" className={cardTitle}>{t('Centrum oznámení')}</h2>
                   <p className="t-meta mt-1">
@@ -636,7 +641,10 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                   </p>
                 </div>
                 {unreadCount > 0 && (
-                  <Button variant="secondary" size="sm" icon="check" onClick={markAllRead}>{t('Označit vše jako přečtené')}</Button>
+                  <Button variant="secondary" size="sm" icon="check" onClick={markAllRead} title={t('Označit vše jako přečtené')}
+                    className="shrink-0 max-sm:!w-9 max-sm:!px-0">
+                    <span className="max-sm:sr-only">{t('Označit vše jako přečtené')}</span>
+                  </Button>
                 )}
               </div>
 
@@ -693,13 +701,13 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                 </ul>
               )}
               {!notifsLoading && !notifsErr && maStarsi && (
-                <Button variant="secondary" block icon="refresh" loading={nacitamStarsi} onClick={nactiStarsi}>{t('Načíst starší')}</Button>
+                <Button variant="secondary" icon="refresh" className="w-full" loading={nacitamStarsi} onClick={nactiStarsi}>{t('Načíst starší')}</Button>
               )}
             </section>
             </div>
           ) : section === 'security' ? (
             <div>
-            <form onSubmit={savePassword} className="card p-6 space-y-6">
+            <form onSubmit={savePassword} className="card p-5 sloupec sloupec-6">
               <div>
                 <h2 className={cardTitle}>{t('Změna hesla')}</h2>
                 <p className="t-meta mt-1">{t('Nové heslo musí mít alespoň 8 znaků.')}</p>
@@ -731,9 +739,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                 </div>
               </div>
 
-              <div className="flex justify-end">
-                <Button type="submit" variant="accent" block loading={savingPwd}>{t('Změnit heslo')}</Button>
-              </div>
+              <Button type="submit" variant="accent" className="w-full -mt-2" loading={savingPwd}>{t('Změnit heslo')}</Button>
             </form>
             <OvereniEmailuNastaveni />
             <ZamekAplikace obal="karta" />
@@ -756,7 +762,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
             <Billing />
           ) : section === 'pos' ? (
             // i18n-ok: Pokladna (napojení Storyous) zůstává česky — česká služba, klíče a hlášky z jejího back-office.
-            <section className="card p-6">
+            <section className="card p-5">
               <h2 className={cardTitle}>Napojení pokladny Storyous</h2>
               <p className="t-meta mt-1 mb-4">
                 Jen čtení: appka si bere tržby z účtenek — nic do pokladny nezapisuje. Klíče se ukládají bezpečně na serveru.
@@ -802,7 +808,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                       <p className="text-xs text-black/60">
                         Synchronizuje se při každém otevření aplikace i kiosku (nejvýš jednou za pár minut), ráno cronem a večer před souhrnem. Ručně jen když nechceš čekat.
                       </p>
-                      <div className="flex flex-wrap gap-2">
+                      {/* v4 (P12): dvě rovnocenné akce jako 2 × ½ (36), dlouhý popisek se zalomí v dílu. */}
+                      <div className="rada rada-rovne rada-s">
                         {/* Ruční synchronizace je jen doplněk (appka se synchronizuje
                             sama) — vedlejší akce, ne limetka. */}
                         <Button variant="secondary" size="sm" icon="refresh" loading={posAction === 'sync'} disabled={!!posAction}
@@ -841,13 +848,13 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                             </div>
                           ))}
                           <p className="t-meta">Metoda POST, data od dneška. Bez tajemství v hlavičce se požadavek zahodí.</p>
-                          <Button variant="danger" size="sm" onClick={() => setPotvrzeni({
+                          <Button variant="danger" size="sm" className="w-full bg-black/[0.04]" onClick={() => setPotvrzeni({
                             title: 'Vypnout příjem změn?', text: 'Staré tajemství přestane platit. Znovu zapnout půjde jen s novým tajemstvím přes podporu Storyous.',
                             label: 'Vypnout příjem', danger: true, akce: () => posDo('webhook-off'),
                           })}>Vypnout</Button>
                         </div>
                       ) : (
-                        <Button variant="secondary" size="sm" icon="key" loading={posAction === 'webhook-secret'} disabled={!!posAction}
+                        <Button variant="secondary" size="sm" icon="key" className="w-full" loading={posAction === 'webhook-secret'} disabled={!!posAction}
                           onClick={() => posDo('webhook-secret')}>
                           Vygenerovat adresu a tajemství
                         </Button>
@@ -855,7 +862,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                     </div>
                   )}
 
-                  <Button variant="danger" onClick={() => setPotvrzeni({
+                  <Button variant="danger" className="w-full bg-black/[0.04]" onClick={() => setPotvrzeni({
                     title: 'Odpojit pokladnu?', text: 'Tržby se přestanou načítat. Účtenky, které už v aplikaci jsou, zůstanou.',
                     label: 'Odpojit pokladnu', danger: true,
                     akce: async () => {
@@ -877,11 +884,11 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                       <Label htmlFor={`pos-${k}`}>{lbl}</Label>
                       <input id={`pos-${k}`} value={(posForm as any)[k]} onChange={e => setPosForm(f => ({ ...f, [k]: e.target.value }))}
                         type={k === 'clientSecret' ? 'password' : 'text'} autoComplete="off"
-                        className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] font-mono focus:border-[#C8F542]/50 focus:outline-none" />
+                        className="field font-mono" />
                     </div>
                   ))}
                   {/* Jediná akce sekce → limetka (DP §3.1). */}
-                  <Button variant="accent" block loading={posBusy} disabled={Object.values(posForm).some(v => !v.trim())} onClick={posConnect}>
+                  <Button variant="accent" className="w-full" loading={posBusy} disabled={Object.values(posForm).some(v => !v.trim())} onClick={posConnect}>
                     Připojit a ověřit
                   </Button>
                   <p className="t-meta">Klíče získáš v back-office Storyous/Teya (API přístup).</p>

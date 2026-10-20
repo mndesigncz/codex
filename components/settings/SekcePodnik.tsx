@@ -97,13 +97,13 @@ export default function SekcePodnik({ pravidelneNaklady }: {
   };
 
   const naklady = pravidelneNaklady != null && pravidelneNaklady !== false && (
-    <section className="card p-6 space-y-3" aria-labelledby="nast-p-naklady-t">
+    <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-p-naklady-t">
       <h2 id="nast-p-naklady-t" className="t-card">{t('Pravidelné náklady')}</h2>
       {pravidelneNaklady}
     </section>
   );
   if (!smiProfil) return <div className="space-y-6"><ProvozPodniku />{naklady}</div>;
-  if (podnik.error) return <section className="card p-6"><ErrorState compact title={t('Profil podniku se nepodařilo načíst')} detail={podnik.error} onRetry={podnik.reload} /></section>;
+  if (podnik.error) return <section className="card p-5"><ErrorState compact title={t('Profil podniku se nepodařilo načíst')} detail={podnik.error} onRetry={podnik.reload} /></section>;
   if (podnik.loading) return <Skeleton className="h-72 rounded-3xl" />;
 
   const smiPrahy = ma('sklad.kategorie');
@@ -115,7 +115,7 @@ export default function SekcePodnik({ pravidelneNaklady }: {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={ulozProfil} className="card p-6 space-y-4" aria-labelledby="nast-profil-t">
+      <form onSubmit={ulozProfil} className="card p-5 sloupec sloupec-6" aria-labelledby="nast-profil-t">
         <div>
           <h2 id="nast-profil-t" className="t-card">{t('Profil podniku')}</h2>
           <p className="t-meta mt-1">{t('Základní údaje o podniku. IČO a DIČ se jen uloží a zobrazí; aplikace je neověřuje v registrech.')}</p>
@@ -141,14 +141,13 @@ export default function SekcePodnik({ pravidelneNaklady }: {
             <Input id="nast-p-dic" value={dic} maxLength={16} autoCapitalize="characters" disabled={!icoDic} onChange={e => setDic(e.target.value)} />
           </Field>
         </div>
-        {!icoDic && <p className="t-meta">{t('IČO a DIČ půjdou uložit po aktualizaci databáze.')}</p>}
+        {!icoDic && <p className="t-meta -mt-4">{t('IČO a DIČ půjdou uložit po aktualizaci databáze.')}</p>}
         {hlaska('profil')}
-        <div className="flex flex-col sm:flex-row sm:justify-end">
-          <Button type="submit" variant="accent" block loading={uklada === 'profil'}>{t('Uložit profil')}</Button>
-        </div>
+        {/* v4 (P2, P13): akce formuláře přes celou šířku karty, 16 pod obsahem. */}
+        <Button type="submit" variant="accent" className="w-full -mt-2" loading={uklada === 'profil'}>{t('Uložit profil')}</Button>
       </form>
 
-      <form onSubmit={ulozPrahy} className="card p-6 space-y-4" aria-labelledby="nast-prahy-t">
+      <form onSubmit={ulozPrahy} className="card p-5 sloupec sloupec-6" aria-labelledby="nast-prahy-t">
         <div>
           <h2 id="nast-prahy-t" className="t-card">{t('Výchozí prahy skladu')}</h2>
           <p className="t-meta mt-1">{t('Pod tímhle množstvím se položka bez vlastního limitu označí jako nízká, resp. kritická. Platí pro nové položky a položky bez vlastního nastavení.')}</p>
@@ -161,12 +160,10 @@ export default function SekcePodnik({ pravidelneNaklady }: {
             <Input id="nast-p-kriticky" type="number" inputMode="numeric" min={0} step={1} value={kriticky} disabled={!smiPrahy} onChange={e => setKriticky(e.target.value)} />
           </Field>
         </div>
-        {!smiPrahy && <p className="t-meta">{t('Prahy skladu mění jen ten, kdo smí spravovat kategorie skladu.')}</p>}
+        {!smiPrahy && <p className="t-meta -mt-4">{t('Prahy skladu mění jen ten, kdo smí spravovat kategorie skladu.')}</p>}
         {hlaska('prahy')}
-        <div className="flex flex-col sm:flex-row sm:justify-end">
-          {/* Jediná limetka plochy je Uložit profil (DESIGN); prahy jsou vedlejší formulář. */}
-          <Button type="submit" variant="primary" block loading={uklada === 'prahy'} disabled={!smiPrahy}>{t('Uložit prahy')}</Button>
-        </div>
+        {/* Jediná limetka plochy je Uložit profil (DESIGN); prahy jsou vedlejší formulář. */}
+        <Button type="submit" variant="primary" className="w-full -mt-2" loading={uklada === 'prahy'} disabled={!smiPrahy}>{t('Uložit prahy')}</Button>
       </form>
 
       {/* Měna, formát čísel, země, jazyk, čas a cíl mezd — dřív v Nastavení týmu, sem vedl jen odkaz. */}

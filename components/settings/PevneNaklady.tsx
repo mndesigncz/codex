@@ -117,8 +117,9 @@ export default function PevneNaklady({ onUlozeno }: { onUlozeno?: () => void }) 
         </ul>
       )}
 
-      {/* Přidání řádku: název a částka vedle sebe; na telefonu pod sebou (pole nesmí skončit v půlce). */}
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_9rem_auto] gap-2 sm:items-end">
+      {/* Přidání řádku: název a částka vedle sebe (pružný + 7–9 rem), Přidat na telefonu pod nimi přes
+          celou šířku, od sm na konci řady. v4: pole i tlačítko 44, žádné pole v půlce (P2, P7). */}
+      <div className="grid grid-cols-[minmax(0,1fr)_7rem] sm:grid-cols-[minmax(0,1fr)_9rem_auto] gap-x-2 gap-y-3 items-end">
         <Field id="pevne-nazev" label={t('Název')}>
           <Input id="pevne-nazev" value={nazev} maxLength={MAX_NAZEV_NAKLADU} placeholder={t('Nájem, energie…')} autoComplete="off"
             disabled={plno} onChange={e => setNazev(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); pridat(); } }} />
@@ -127,14 +128,12 @@ export default function PevneNaklady({ onUlozeno }: { onUlozeno?: () => void }) 
           <Input id="pevne-castka" value={castka} inputMode="decimal" className="text-right tabular-nums" placeholder="0" autoComplete="off"
             disabled={plno} onChange={e => setCastka(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); pridat(); } }} />
         </Field>
-        <Button variant="secondary" icon="plus" disabled={plno} onClick={pridat}>{t('Přidat')}</Button>
+        <Button variant="secondary" icon="plus" className="col-span-2 sm:col-span-1" disabled={plno} onClick={pridat}>{t('Přidat')}</Button>
       </div>
       {chybaPole && <p role="alert" className="note note-danger">{chybaPole}</p>}
       {plno && <p className="t-meta">{t('Nejvýš {n} řádků.', { n: MAX_PEVNYCH_NAKLADU })}</p>}
 
-      <div className="flex justify-end">
-        <Button variant="accent" loading={ukladam} disabled={!zmeneno} onClick={ulozit}>{t('Uložit')}</Button>
-      </div>
+      <Button variant="accent" className="w-full" loading={ukladam} disabled={!zmeneno} onClick={ulozit}>{t('Uložit')}</Button>
       {toast && <Toast key={toast.id} id={toast.id} message={toast.text} tone={toast.ton} onClose={() => setToast(null)} />}
     </div>
   );

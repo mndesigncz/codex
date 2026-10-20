@@ -78,7 +78,7 @@ export default function ProvozPodniku() {
   };
   const ulozeno = t('Nastavení provozu je uložené.');
 
-  if (data.error) return <section className="card p-6"><ErrorState compact title={t('Nastavení se nepodařilo načíst')} detail={data.error} onRetry={data.reload} /></section>;
+  if (data.error) return <section className="card p-5"><ErrorState compact title={t('Nastavení se nepodařilo načíst')} detail={data.error} onRetry={data.reload} /></section>;
   if (!team) return <Skeleton className="h-72 rounded-3xl" />;
 
   const navrh = (() => {
@@ -88,7 +88,7 @@ export default function ProvozPodniku() {
     const shoda = (team.currency ?? 'CZK') === n.currency && (team.locale ?? 'cs-CZ') === n.locale && (team.week_start ?? 1) === n.weekStart
       && (cistyJazyk(team.default_lang) ?? 'cs') === n.defaultLang && (team.time_format === '12' ? '12' : '24') === n.timeFormat;
     return (
-      <div className="well mt-4 p-4 space-y-2" role="group" aria-label={t('Návrh podle země')}>
+      <div className="well mt-6 p-4 space-y-2" role="group" aria-label={t('Návrh podle země')}>
         <p className="text-sm font-semibold text-[#16181A]">{t('Návrh pro zemi {zeme}', { zeme: p.nazev })}</p>
         <p className="t-meta text-pretty">
           {t('Jazyk {jazyk}, měna {mena}, formát čísel {locale}, týden od {den}, {hodiny} hodin.', { jazyk: JAZYK_NAZEV[p.jazyk], mena: p.mena, locale: p.locale, den: p.zacatekTydne === 1 ? t('pondělí') : t('neděle'), hodiny: p.hodiny })}{' '}
@@ -96,7 +96,7 @@ export default function ProvozPodniku() {
         </p>
         {shoda
           ? <p className="t-meta">{t('Nastavení už návrhu odpovídá.')}</p>
-          : <Button variant="secondary" size="sm" loading={ukladam}
+          : <Button variant="secondary" size="sm" className="w-full mt-1" loading={ukladam}
               onClick={() => prepni(n, { default_lang: n.defaultLang, currency: n.currency, locale: n.locale, week_start: n.weekStart, time_format: n.timeFormat, timezone: n.timezone }, t('Návrh podle země je použitý.'))}>
               {t('Předvyplnit podle země')}
             </Button>}
@@ -106,11 +106,11 @@ export default function ProvozPodniku() {
 
   return (
     <>
-      {/* Stejná karta jako profil a prahy nad ní (card p-6, nadpis t-card bez ikony). */}
-      <section className="card p-6" aria-labelledby="nast-provoz-t">
+      {/* Stejná karta jako profil a prahy nad ní (card p-5 = 16/20, nadpis t-card bez ikony). */}
+      <section className="card p-5" aria-labelledby="nast-provoz-t">
         <h2 id="nast-provoz-t" className="t-card">{t('Provoz podniku')}</h2>
         <p className="t-meta mt-1">{t('Měna, formát čísel a cíle — přizpůsob aplikaci svému podniku.')}</p>
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field id="tym-mena" label={t('Měna')}>
             <Select id="tym-mena" value={team.currency ?? 'CZK'} disabled={ukladam || !smiPodnik}
               onChange={e => prepni({ currency: e.target.value }, { currency: e.target.value }, ulozeno)}>

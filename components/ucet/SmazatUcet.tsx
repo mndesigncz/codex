@@ -48,16 +48,15 @@ export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
   const kSmazani = dopad ? (potvrzeni.trim() === 'SMAZAT' && heslo.length > 0) : heslo.length > 0;
 
   return (
-    <section aria-labelledby="h-smazat-ucet" className="mt-10 pt-6 border-t border-black/[0.08]">
+    <section aria-labelledby="h-smazat-ucet" className="mt-8 pt-6 border-t border-black/[0.08]">
       <h2 id="h-smazat-ucet" className="t-section">{t('Smazat účet')}</h2>
       <p className="t-meta mt-1.5 max-w-[60ch] text-pretty">
         {jeHost
           ? t('Smaže se profil, věrnostní karta, členství, body, razítka, kupony a hodnocení. Nejde to vrátit. Budoucí rezervace se zruší, vyřízené objednávky zůstanou u podniku bez vašeho jména.')
           : t('Smaže se váš přístup, osobní údaje a členství v podnicích. Směny, docházka a uzávěrky zůstanou podniku bez vašeho jména. Nejde to vrátit.')}
       </p>
-      <div className="mt-4">
-        <Button variant="danger" icon="trash" onClick={() => setOtevreno(true)}>{t('Smazat účet')}</Button>
-      </div>
+      {/* v4 (V5): destruktivní akce jako řádkové tlačítko 44 přes celou šířku, červený text — ne osamělé vlevo. */}
+      <Button variant="danger" icon="trash" className="mt-4 w-full bg-black/[0.04]" onClick={() => setOtevreno(true)}>{t('Smazat účet')}</Button>
 
       <Modal open={otevreno} onClose={zavrit} size="sm" title={dopad ? t('Smazat i podnik?') : t('Opravdu smazat účet?')}
         subtitle={dopad ? undefined : t('Potvrďte to svým heslem. Nejde to vrátit.')}

@@ -54,7 +54,7 @@ export default function SekceJazyk() {
 
   return (
     <div className="space-y-6">
-      <section className="card p-6 space-y-4" aria-labelledby="nast-jazyk-t">
+      <section className="card p-5 sloupec sloupec-4" aria-labelledby="nast-jazyk-t">
         <div>
           <h2 id="nast-jazyk-t" className="t-card">{t('Jazyk aplikace')}</h2>
           <p className="t-meta mt-1">{t('Platí na všech tvých zařízeních. Na zařízení, kde je jazyk zvolený ručně, zůstane tahle volba.')}</p>
@@ -62,7 +62,7 @@ export default function SekceJazyk() {
         <JazykKarta />
       </section>
 
-      <section className="card p-6 space-y-4" aria-labelledby="nast-formaty-t">
+      <section className="card p-5 sloupec sloupec-4" aria-labelledby="nast-formaty-t">
         <div>
           <h2 id="nast-formaty-t" className="t-card">{t('Osobní formáty')}</h2>
           <p className="t-meta mt-1">{t('Čas, datum, týden a čísla podle tebe. Výchozí je nastavení podniku a jazyka; tady ho přepíšeš jen pro sebe.')}</p>
@@ -102,7 +102,7 @@ export default function SekceJazyk() {
           {t('Ukázka: {cas} · {datum} · {cislo}', ukazka)}
         </p>
         {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
-        <p role="status" aria-live="polite" className="t-meta min-h-[1.25rem]">{uklada ? t('Ukládám…') : ulozeno ? t('Formáty jsou uložené.') : ''}</p>
+        <p role="status" aria-live="polite" className="t-meta empty:sr-only">{uklada ? t('Ukládám…') : ulozeno ? t('Formáty jsou uložené.') : ''}</p>
       </section>
     </div>
   );
