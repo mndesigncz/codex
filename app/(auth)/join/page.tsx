@@ -10,8 +10,8 @@ import JazykMenu from '@/components/ui/JazykMenu';
 import { useT } from '@/lib/i18n/client';
 import SouhlasPodminek from '@/components/pravni/SouhlasPodminek';
 
-const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
+// Jedna podoba pole pro celou aplikaci (v3: šedá jamka, při psaní zbělá s limetkovým prstencem).
+const inputClass = 'field';
 
 // Připojení k týmu: vykání jako v originálu (německy „Sie“), veřejný vstup jako přihlášení.
 function JoinForm() {
@@ -74,55 +74,56 @@ function JoinForm() {
   };
 
   return (
-    <div className="relative min-h-[100dvh] flex items-center justify-center p-4">
+    // v3: na telefonu formulář přímo na plátně (nadpis, věta, pole, tlačítko přes šířku), karta až od sm.
+    <div className="relative min-h-[100dvh] flex items-start sm:items-center justify-center px-5 pt-5 pb-10 sm:p-6">
       {/* Přepínač jazyka: malá pilulka v rohu stránky. */}
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6"><JazykMenu /></div>
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#16181A] mb-2">
+        <div className="mb-8 pt-1 sm:pt-0 sm:text-center">
+          <div className="flex sm:justify-center mb-8 sm:mb-5"><LogoMark size={44} /></div>
+          <h1 className="t-page mb-2 text-balance">
             {token ? t('Přijmout pozvánku') : t('Připojit se k týmu')}
           </h1>
-          <p className="text-black/45 text-sm">
+          <p className="text-[15px] text-black/60 text-pretty">
             {token && teamName ? t('Byli jste pozváni do týmu {tym}.', { tym: teamName }) : t('Zadejte kód týmu od svého zaměstnavatele.')}
           </p>
         </div>
 
-        <div className="glass-card p-8">
+        <div className="sm:bg-[var(--surface)] sm:border sm:border-[var(--surface-line)] sm:rounded-3xl sm:p-8 sm:shadow-[shadow:var(--shadow-card)]">
           <form onSubmit={handleSubmit} className="space-y-5">
             {!token && (
               <div>
-                <label htmlFor="join-kod" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Kód týmu')}</label>
+                <label htmlFor="join-kod" className="field-label">{t('Kód týmu')}</label>
                 <input id="join-kod" autoComplete="one-time-code" type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder={t('Např. K7QP2M')} required
-                  className={`${inputClass} tracking-[0.25em] font-semibold text-center uppercase`} maxLength={6} />
+                  className={`${inputClass} font-mono tracking-[0.2em] font-semibold text-center uppercase placeholder:font-sans placeholder:tracking-normal placeholder:normal-case placeholder:font-normal`} maxLength={6} />
               </div>
             )}
             <div>
-              <label htmlFor="join-jmeno" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Vaše jméno')}</label>
+              <label htmlFor="join-jmeno" className="field-label">{t('Vaše jméno')}</label>
               <input id="join-jmeno" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t('Jana Nováková')} required className={inputClass} />
             </div>
             <div>
-              <label htmlFor="join-email" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Email')}</label>
+              <label htmlFor="join-email" className="field-label">{t('Email')}</label>
               <input id="join-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('vas@email.cz')} required disabled={!!token}
                 className={`${inputClass} ${token ? 'opacity-60' : ''}`} />
             </div>
             <div>
-              <label htmlFor="join-heslo" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Heslo')}</label>
+              <label htmlFor="join-heslo" className="field-label">{t('Heslo')}</label>
               <input id="join-heslo" autoComplete="new-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('Minimálně 8 znaků')} required className={inputClass} />
             </div>
 
             <SouhlasPodminek id="join-souhlas" checked={souhlas} chyba={chybaSouhlasu}
               onChange={v => { setSouhlas(v); if (v) setChybaSouhlasu(null); }} />
 
-            {error && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{error}</div>}
+            {error && <p role="alert" className="note note-danger">{error}</p>}
 
-            <button type="submit" disabled={isLoading} className="w-full py-3 rounded-full bg-[#C8F542] hover:brightness-110 disabled:opacity-50 text-black font-semibold transition text-sm active:scale-[0.98]">
+            <button type="submit" disabled={isLoading} className="tap-target btn btn-accent btn-lg w-full disabled:opacity-50">
               {isLoading ? t('Připojování…') : t('Připojit se')}
             </button>
           </form>
 
-          <p className="text-center text-black/45 text-sm mt-6">
-            {t('Už máte účet?')} <Link href="/login" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">{t('Přihlásit se')}</Link>
+          <p className="text-center text-black/60 text-sm mt-6">
+            {t('Už máte účet?')} <Link href="/login" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Přihlásit se')}</Link>
           </p>
         </div>
       </div>

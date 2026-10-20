@@ -120,8 +120,9 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-10">{children}</main>
-      <footer className={`mx-auto max-w-5xl w-full px-4 sm:px-6 pt-8 ${me ? 'pb-28 md:pb-8' : 'pb-8'} text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1`}>
+      {/* v3: okraj obsahu na telefonu 20 px (pod 360 px 16 px), od sm 24 px — stejně jako administrace. */}
+      <main className="flex-1 w-full mx-auto max-w-5xl px-4 min-[360px]:px-5 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-10">{children}</main>
+      <footer className={`mx-auto max-w-5xl w-full px-4 min-[360px]:px-5 sm:px-6 pt-8 ${me ? 'pb-28 md:pb-8' : 'pb-8'} text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1`}>
         <span>Managero client</span>
         <span>{t('Rezervace, věrnost a objednávky pro podniky, kam chodíš.')}</span>
         {jeObal

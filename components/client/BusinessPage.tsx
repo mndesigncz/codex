@@ -206,10 +206,10 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
   return (
     <div className="space-y-8">
       {(gallery?.length ?? 0) > 0 && (
-        <section aria-label={t('Fotky z podniku')} className="-mx-4 sm:mx-0">
+        <section aria-label={t('Fotky z podniku')} className="-mx-4 min-[360px]:-mx-5 sm:mx-0">
           {/* Pás fotek: na telefonu se posouvá prstem, na monitoru se zarovná
               do mřížky. První fotka je větší — podnik má čím začít. */}
-          <ul className="flex gap-2.5 overflow-x-auto px-4 sm:px-0 sm:grid sm:grid-cols-4 scrollbar-thin snap-x">
+          <ul className="flex gap-2.5 overflow-x-auto px-4 min-[360px]:px-5 sm:px-0 sm:grid sm:grid-cols-4 scrollbar-thin snap-x">
             {gallery!.slice(0, 8).map((g, i) => (
               <li key={g} className={`shrink-0 snap-start rounded-2xl overflow-hidden border border-black/[0.06] ${i === 0 ? 'w-64 sm:w-auto sm:col-span-2 sm:row-span-2 aspect-[4/3]' : 'w-40 sm:w-auto aspect-square'}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}

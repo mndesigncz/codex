@@ -104,14 +104,15 @@ export default function NajitPodnik({ open, onClose, skenovatHned, jeObal }: {
       <div className="space-y-4">
         {umi && (
           <div className="space-y-3">
-            <Button variant="primary" icon="camera" block className="!w-full" onClick={() => void skenuj()} disabled={!nativni && !kamera}>
+            <Button variant="accent" size="lg" icon="camera" block className="!w-full" onClick={() => void skenuj()} disabled={!nativni && !kamera}>
               {kameraZap ? t('Zavřít kameru') : t('Naskenovat QR kód')}
             </Button>
             {kameraZap && !nativni && (
               <KameraQr onCesta={otevri} onCizi={() => setChyba(t('Tohle není QR kód podniku z Managera. Zkus jiný, nebo zadej kód podniku.'))}
                 onChyba={() => { setKameraZap(false); setChyba(t('Kamera není k dispozici. Zadej kód podniku.')); }} />
             )}
-            <p className="t-label text-center" aria-hidden>{t('nebo')}</p>
+            {/* „nebo" jako tichý předěl mezi dvěma cestami, ne další štítek. */}
+            <p className="t-label flex items-center gap-3 before:h-px before:flex-1 before:bg-black/[0.08] after:h-px after:flex-1 after:bg-black/[0.08]" aria-hidden>{t('nebo')}</p>
           </div>
         )}
         <form onSubmit={odeslat} className="space-y-3" noValidate>
@@ -119,7 +120,8 @@ export default function NajitPodnik({ open, onClose, skenovatHned, jeObal }: {
             <Input id="kod-podniku" value={kod} onChange={e => { setKod(e.target.value); setChyba(''); }} placeholder="cafe-demo"
               autoCapitalize="none" autoCorrect="off" autoComplete="off" spellCheck={false} inputMode="url" enterKeyHint="go" maxLength={300} data-transient />
           </Field>
-          <Button type="submit" variant="accent" block className="!w-full" loading={hleda}>{t('Otevřít podnik')}</Button>
+          {/* Jedna limetka na okno: když jde skenovat, je hlavní akcí sken a kód je druhá cesta (šedá). */}
+          <Button type="submit" variant={umi ? 'secondary' : 'accent'} size="lg" block className="!w-full" loading={hleda}>{t('Otevřít podnik')}</Button>
         </form>
         {chyba && <p role="alert" className="note note-danger text-sm">{chyba}</p>}
       </div>
