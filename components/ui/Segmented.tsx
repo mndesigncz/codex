@@ -22,8 +22,8 @@ import { Icon } from '../Icons';
 //
 // v4 (spec-skladba P11, audit V07): segment buď vyplní šířku L→R (položky
 // rovným dílem, `sirka="plna"`, výchozí), nebo — když se nevejde — je to
-// posuvný pás, který na telefonu PŘETÉKÁ AŽ K HRANĚ OBRAZOVKY (v kartě k její
-// vnitřní hraně) s vyblednutím 24 px. Dřív měl šířku podle obsahu: stál sám
+// posuvný pás, který na telefonu PŘETÉKÁ AŽ K HRANĚ OBRAZOVKY (v kartě a v okně
+// zůstává mezi L a R) s vyblednutím 24 px. Dřív měl šířku podle obsahu: stál sám
 // na řádku v půlce šířky, nebo končil o 6–8 px před R (Úkoly 363,5, Sklad
 // 361,5) a vypadal jako chyba, ne jako posuv. Výška 44 na stránce (md), 36 v kartě (sm).
 // `sirka="obsah"` jen tam, kde segment stojí v řadě s jiným prvkem a má být obsahový.
@@ -92,10 +92,10 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
     const rr = rodic?.getBoundingClientRect();
     const rodicR = rr && rodic ? rr.right - (parseFloat(getComputedStyle(rodic).paddingRight) || 0) - (parseFloat(getComputedStyle(rodic).borderRightWidth) || 0) : pravaBez;
     if (potreba <= zakladni + 0.5 || window.innerWidth >= TELEFON || Math.abs(pravaBez - rodicR) > 1.5) { if (presahRef.current) setPresah(0); return; }
-    // Hrana, ke které pás přeteče: vnitřní hrana karty / okna, jinak obrazovka.
-    const kontejner = obal.parentElement?.closest<HTMLElement>('.card, .glass-card, [role=dialog]');
-    let hrana = document.documentElement.clientWidth;
-    if (kontejner) { const kr = kontejner.getBoundingClientRect(); hrana = kr.right - (parseFloat(getComputedStyle(kontejner).borderRightWidth) || 0); }
+    // Přetéká jen pás na stránce (k hraně obrazovky). V kartě a v okně zůstává mezi L a R
+    // s vyblednutím: pás uříznutý o linku karty vypadal jako chyba, ne jako posuv.
+    if (obal.parentElement?.closest('.card, .glass-card, [role=dialog]')) { if (presahRef.current) setPresah(0); return; }
+    const hrana = document.documentElement.clientWidth;
     const novy = Math.max(0, Math.floor(hrana - pravaBez));
     if (novy !== presahRef.current) setPresah(novy);
   }, [plna]);

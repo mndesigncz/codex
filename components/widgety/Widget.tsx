@@ -482,7 +482,6 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const filtrVRade = !!poleFiltru && (S || telefon || maFiltry);
   const filtr = poleFiltru ? (
     <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={filtrVRade}
-      jenHodnota={S && telefon}
       onZmena={id => k.zmenNastaveni?.({ [poleFiltru.klic]: id })} />
   ) : null;
   const filtrVHlavicce = filtr && !filtrVRade ? filtr : null;
