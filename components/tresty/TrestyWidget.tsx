@@ -20,7 +20,7 @@
 // components/widgety/oblasti/moje-smeny.tsx (KOMPONENTY).
 
 import { useMemo, useState } from 'react';
-import { Button, EmptyState, ListRow, Segmented, Toast } from '../ui';
+import { Button, EmptyState, ListRow, Segmented, Sloupec, Toast } from '../ui';
 import { Widget, useWidget } from '../widgety/Widget';
 import { useMoney } from '../CurrencyProvider';
 import type { WidgetProps } from '@/lib/widgety/typy';
@@ -88,9 +88,17 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
     const skryt = pohledStranky === 'home' && !!data.data && !prvni;
     return (
       <>
-        <Widget nacteni={data} kostra="text" prazdno={skryt ? null : undefined}>
+        <Widget nacteni={data} kostra="text" prazdno={skryt ? null : undefined}
+          // v4 (V16, P17): „Beru na vědomí" je akce widgetu — v patce L→R × 44 na konci karty.
+          // Šedá pilulka, ne inkoustová (v3): na Přehledu stojí nad Píchačkami, jejichž
+          // „Odpíchnout příchod" je hlavní akce obrazovky. Potvrzení je drobnost, kterou člověk udělá cestou.
+          patka={prvni ? (
+            <Button variant="secondary" icon="check" loading={potvrzuji} disabled={nahled} onClick={() => void beruNaVedomi(prvni)} data-beru-na-vedomi>
+              {t('Beru na vědomí')}
+            </Button>
+          ) : undefined}>
           {prvni ? (
-            <div className="space-y-2" data-tresty-k-potvrzeni={kPotvrzeni.length}>
+            <Sloupec mezera={2} data-tresty-k-potvrzeni={kPotvrzeni.length}>
               <p className="t-label">{t('{n, plural, one {# trest k potvrzení} few {# tresty k potvrzení} other {# trestů k potvrzení}}', { n: kPotvrzeni.length })}</p>
               <button type="button" onClick={() => setOtevreny(prvni.id)} disabled={nahled}
                 className="block w-full min-w-0 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
@@ -99,22 +107,16 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
                   <span className="cz-sentence inline-block">{denKratce(prvni.day)}</span> · {dopadTrestu(t, prvni, money)}
                 </span>
               </button>
-              {/* Šedá pilulka, ne inkoustová (v3): na Přehledu stojí nad Píchačkami, jejichž
-                  „Odpíchnout příchod" je hlavní akce obrazovky — dvě plná tlačítka v sousedních
-                  kartách soupeřila. Potvrzení je drobnost, kterou člověk udělá cestou. */}
-              <Button variant="secondary" block icon="check" loading={potvrzuji} disabled={nahled} onClick={() => void beruNaVedomi(prvni)} className="w-full justify-center" data-beru-na-vedomi>
-                {t('Beru na vědomí')}
-              </Button>
-            </div>
+            </Sloupec>
           ) : (
-            <div data-tresty-souhrn-s>
+            <Sloupec mezera={1} data-tresty-souhrn-s>
               <p className="t-label cz-sentence">{nazevMesice}</p>
-              <p className="mt-1 text-[17px] font-semibold leading-snug text-[#16181A] text-pretty tabular-nums">
+              <p className="text-[17px] font-semibold leading-snug text-[#16181A] text-pretty tabular-nums">
                 {souhrn.pocet === 0
                   ? (minuly ? t('Minulý měsíc bez trestů') : t('Tento měsíc bez trestů'))
                   : souhrnKratce(t, souhrn, money)}
               </p>
-            </div>
+            </Sloupec>
           )}
         </Widget>
         {okna}
@@ -155,20 +157,21 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
         prazdno={data.data && items.length === 0 ? (
           <EmptyState compact illustration="odmeny" title={minuly ? t('Minulý měsíc bez trestů') : t('Tento měsíc bez trestů')}
             hint={t('Když vedení něco vytkne, uvidíš to tady a potvrdíš, že o tom víš.')} />
-        ) : undefined}>
-        <div className="space-y-3" data-tresty-widget={velikost}>
-          {L && <p className="t-meta tabular-nums text-pretty" data-tresty-souhrn><span className="cz-sentence inline-block">{nazevMesice}</span>: {souhrnDlouze(t, souhrn, money)}</p>}
-          {L && (
-            <Segmented size="sm" ariaLabel={t('Stav')} value={filtr} onChange={setFiltr}
-              options={[{ id: 'vse', label: t('Vše') }, { id: 'plati', label: t('Platné'), count: pocty.plati }, { id: 'zruseno', label: t('Zrušené'), count: pocty.zruseno }]} />
-          )}
+        ) : undefined}
+        // v4 skladba (V2): segment L→R × 36 pod hlavičkou, souhrn měsíce nad seznamem (slot obalu, rytmus 12 / 8).
+        segment={L ? (
+          <Segmented size="sm" ariaLabel={t('Stav')} value={filtr} onChange={setFiltr}
+            options={[{ id: 'vse', label: t('Vše') }, { id: 'plati', label: t('Platné'), count: pocty.plati }, { id: 'zruseno', label: t('Zrušené'), count: pocty.zruseno }]} />
+        ) : undefined}
+        souhrn={L ? <span className="tabular-nums text-pretty" data-tresty-souhrn><span className="cz-sentence inline-block">{nazevMesice}</span>: {souhrnDlouze(t, souhrn, money)}</span> : undefined}>
+        <Sloupec mezera={2} data-tresty-widget={velikost}>
           {videt.length > 0 ? (
             <ul className="list" data-tresty-seznam>{videt.map(radek)}</ul>
           ) : (
             <p className="t-meta">{L ? t('Žádný trest v tomhle stavu.') : prazdnoText}</p>
           )}
           {!L && items.length > videt.length && <p className="t-meta">{t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n: items.length - videt.length })}</p>}
-        </div>
+        </Sloupec>
       </Widget>
       {okna}
     </>

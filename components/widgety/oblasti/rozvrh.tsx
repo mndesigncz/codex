@@ -45,12 +45,13 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import {
-  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, PersonChip, SelectBox, Stat, Textarea, Toast,
+  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, PersonChip, SelectBox, Sloupec, Stat, Textarea, Toast,
   runBulk, useSelection, type MenuItem,
 } from '../../ui';
 import { useMoney } from '../../CurrencyProvider';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, type StavNacteni } from '../Widget';
+import { OSA_TEXTU } from '../osaTextu';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { otevriDen } from '@/lib/denUdalost';
 import { Icon } from '../../Icons';
@@ -347,8 +348,10 @@ function DnesniSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ den?: string
         <Stat label={kdy} value={pocet}
           note={chciPrichody ? t('{n, plural, one {# člověk} few {# lidé} other {# lidí}} na směně', { n: naSmene }) : smeny[0] ? t('první od {cas}', { cas: smeny[0].od }) : undefined} />
       ) : (
-        <>
-          <ul className="list">
+        <Sloupec mezera={2}>
+          {/* v4 (P15, V12): čas je poslední sloupec řádku na R — chip příchodu (různé šířky) stojí PŘED ním,
+              jinak by konec času skákal podle délky chipu (audit: 07:30–14:00 na 1126 vs 1025). */}
+          <ul className={`list sm:[&_.list-value]:order-1 ${OSA_TEXTU}`}>
             {radky.map(s => (
               <ListRow key={s.klic}
                 lead={<Avatar emoji={s.avatar} size="sm" />}
@@ -359,8 +362,8 @@ function DnesniSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ den?: string
               />
             ))}
           </ul>
-          {!L && smeny.length > 5 && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (smeny.length - 5).toLocaleString('cs-CZ') })}</p>}
-        </>
+          {!L && smeny.length > 5 && <p className="t-meta">{t('…a dalších {n}', { n: (smeny.length - 5).toLocaleString('cs-CZ') })}</p>}
+        </Sloupec>
       )}
     </Widget>
   );
@@ -640,6 +643,8 @@ function PripominkaDostupnosti({ velikost, nahled }: WidgetProps) {
       nacteni={data}
       odkaz={!S && odeslano ? { popisek: t('Upravit'), pohled } : undefined}
       otevrit={S && muze ? () => nav.onNavigate(pohled) : undefined}
+      // v4 (V16): „Zadat dostupnost" je akce widgetu — patka L→R × 44 na konci karty.
+      patka={!S && !odeslano && muze ? <Button variant="primary" icon="calendar" onClick={() => nav.onNavigate(pohled)}>{t('Zadat dostupnost')}</Button> : undefined}
     >
       {S ? (
         <div className="space-y-1.5">
@@ -649,12 +654,9 @@ function PripominkaDostupnosti({ velikost, nahled }: WidgetProps) {
       ) : odeslano ? (
         <p className="t-meta">{t('Dostupnost na {mesic} máš odeslanou.', { mesic: naMesic })}</p>
       ) : (
-        <div className="space-y-3">
-          <div>
-            <p className="text-[15px] font-medium leading-snug text-[#16181A] text-pretty">{t('Dostupnost na {mesic} ještě nemáš zadanou.', { mesic: naMesic })}</p>
-            <p className="t-meta mt-1 text-pretty">{t('Dej vedení vědět, kdy nemůžeš — podle toho sestaví rozvrh.')}</p>
-          </div>
-          {muze && <Button variant="primary" size="sm" icon="calendar" onClick={() => nav.onNavigate(pohled)}>{t('Zadat dostupnost')}</Button>}
+        <div>
+          <p className="text-[15px] font-medium leading-snug text-[#16181A] text-pretty">{t('Dostupnost na {mesic} ještě nemáš zadanou.', { mesic: naMesic })}</p>
+          <p className="t-meta mt-1 text-pretty">{t('Dej vedení vědět, kdy nemůžeš — podle toho sestaví rozvrh.')}</p>
         </div>
       )}
     </Widget>
@@ -1295,19 +1297,26 @@ function TymNahled({ velikost, nastaveni }: WidgetProps<{ rozsah?: string }>) {
 
   return (
     <Widget nacteni={[prvni, druhy]} prazdno={prazdno}>
+      <Sloupec mezera={2}>
       <ul className="list">
         {(velikost === 'L' ? dnyTymu : dnyTymu.slice(0, DNU_M)).map(({ den: d, smeny }) => (
-          <li key={d} className="py-3 first:pt-0 last:pb-0">
+          <li key={d} className="sloupec sloupec-2 py-3 first:pt-0 last:pb-0">
             {/* Štítek dne otevře detail dne (kdo měl směnu; s právy i tržba a uzávěrky). */}
             <button type="button" onClick={() => otevriDen(d, 'obecne')} aria-label={t('Detail dne {den}', { den: denKratce(d, dnes, t) })}
-              className="t-label mb-2 cz-sentence inline-flex items-center gap-1 rounded-lg hover:text-[#16181A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+              className="t-label cz-sentence inline-flex self-start items-center gap-1 rounded-lg hover:text-[#16181A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
               {denKratce(d, dnes, t)}<Icon name="chevronRight" size={12} className="opacity-50" />
             </button>
-            <ul className="flex flex-wrap gap-1.5" aria-label={t('Směny {kdy}', { kdy: denKratce(d, dnes, t).toLowerCase() })}>
+            {/* v4 (P15, V12): každý člověk na vlastním řádku — avatar a jméno vlevo, čas jako hodnota
+                na R (tabulkové číslice, jeden svislý sloupec přes všechny dny). Dřív pilulky podle délky
+                jména zalomené za sebou: časy končily na 187 až 333 px. Vlastní směna „Ty" tónem ok. */}
+            <ul className="sloupec sloupec-2" aria-label={t('Směny {kdy}', { kdy: denKratce(d, dnes, t).toLowerCase() })}>
               {smeny.map(s => (
-                <li key={s.id} className="min-w-0 max-w-full">
-                  <PersonChip size="sm" name={s.isMine ? t('Ty') : (s.employeeName ?? t('Kolega'))} avatar={s.employeeAvatar}
-                    tone={s.isMine ? 'ok' : 'muted'} meta={<span className="tabular-nums">{casSmeny(s.startTime, s.endTime)}</span>} />
+                <li key={s.id} className="flex min-w-0 items-center gap-3">
+                  <Avatar emoji={s.employeeAvatar} name={s.employeeName ?? undefined} size="xs" />
+                  <span className={`min-w-0 flex-1 truncate text-[15px] leading-snug ${s.isMine ? 'font-semibold text-ok-ink' : 'text-[#16181A]'}`}>
+                    {s.isMine ? t('Ty') : (s.employeeName ?? t('Kolega'))}
+                  </span>
+                  <span className="shrink-0 text-right text-[13px] text-black/55 tabular-nums">{casSmeny(s.startTime, s.endTime)}</span>
                 </li>
               ))}
             </ul>
@@ -1315,8 +1324,9 @@ function TymNahled({ velikost, nastaveni }: WidgetProps<{ rozsah?: string }>) {
         ))}
       </ul>
       {velikost !== 'L' && dnyTymu.length > DNU_M && (
-        <p className="t-meta mt-2">{t('{n, plural, one {…a další # den} few {…a další # dny} other {…a dalších # dní}}', { n: dnyTymu.length - DNU_M })}</p>
+        <p className="t-meta">{t('{n, plural, one {…a další # den} few {…a další # dny} other {…a dalších # dní}}', { n: dnyTymu.length - DNU_M })}</p>
       )}
+      </Sloupec>
     </Widget>
   );
 }

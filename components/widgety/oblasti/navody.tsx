@@ -233,13 +233,19 @@ function NavrhyNavodu({ velikost, nahled }: WidgetProps) {
       doplnek={!S && navrhy.length > 0 ? <Chip tone="wait" size="sm">{navrhy.length}</Chip> : undefined}
       // Fronta: bez návrhů se v klidu nekreslí.
       prazdno={navrhy.length === 0 ? null : undefined}
+      // v4 (V16, P17): „Schválit (vše)" je akce widgetu — patka L→R × 44 na konci karty (střední a velká).
+      patka={!S && !nahled ? (
+        <Button variant="primary" icon="check" loading={pracuji} onClick={schval}>
+          {navrhy.length > 1 ? t('Schválit vše ({n})', { n: navrhy.length }) : t('Schválit')}
+        </Button>
+      ) : undefined}
       otevrit={S && muze && navrhy[0] ? () => otevriNavodZWidgetu(nav, navrhy[0].id) : undefined}
     >
       {S ? (
         <Stat label={t('Čeká')} value={navrhy.length.toLocaleString('cs-CZ')} note={navrhyTvar(t, navrhy.length)} />
       ) : (
-        <div className="space-y-3">
-          {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+        <>
+          {chyba && <p className="note note-danger text-sm mb-3" role="alert">{chyba}</p>}
           <ul className="list">
             {navrhy.slice(0, 5).map(g => (
               <Radek key={g.id} title={g.title} meta={g.excerpt || undefined} aside={kdyTxt(g.updatedAt)}
@@ -247,12 +253,7 @@ function NavrhyNavodu({ velikost, nahled }: WidgetProps) {
             ))}
           </ul>
           <ADalsich n={navrhy.length - Math.min(navrhy.length, 5)} />
-          {!nahled && (
-            <Button variant="primary" size="sm" icon="check" loading={pracuji} onClick={schval}>
-              {navrhy.length > 1 ? t('Schválit vše ({n})', { n: navrhy.length }) : t('Schválit')}
-            </Button>
-          )}
-        </div>
+        </>
       )}
     </Widget>
   );

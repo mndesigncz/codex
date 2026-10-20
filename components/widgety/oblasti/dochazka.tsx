@@ -58,12 +58,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
-import { Avatar, BulkBar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Select, SelectBox, Stat, StatRow, SwitchRow, Textarea, Well, runBulk, useSelection, type MenuItem } from '../../ui';
+import { Avatar, BulkBar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Select, SelectBox, Sloupec, Stat, StatRow, SwitchRow, Textarea, Well, runBulk, useSelection, type MenuItem } from '../../ui';
 import { usePlan, UpgradeModal } from '../../Pro';
 import { ulozSoubor } from '@/lib/stahni';
 import type { Jazyk } from '@/lib/i18n/config';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
+import { OSA_TEXTU } from '../osaTextu';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { premieZaNavic } from '../../navic/logika';
@@ -315,20 +316,20 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   };
 
   // Na směně dvě tlačítka vedle sebe (Odchod primary, Pauza secondary); na pauze „Konec pauzy" a tiché „Odchod".
-  // Ve střední velikosti dotykové cíle 44 px (md); malá karta má na půl obrazovky jen 36 px jako dřív.
-  const vel = S ? 'sm' : 'md';
+  // v4 (V16, P12, P17): akce jsou PATKA widgetu — L→R × 44 na konci karty (pár ½ + ½), v každé velikosti.
+  // Dřív „Odpíchnout příchod" na monitoru obsahová pilulka 172 px vlevo (block je přes šířku jen na telefonu).
   const tlacitko = naPauze ? (
-    <div className="grid grid-cols-2 gap-2">
-      <Button variant="primary" size={vel} block icon="play" loading={pise} onClick={() => { void pauzuj('end'); }}>{t('Konec pauzy')}</Button>
-      <Button variant="secondary" size={vel} block icon="logout" disabled={pise} onClick={() => { void pauzuj('odchod'); }} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
-    </div>
+    <>
+      <Button variant="primary" icon="play" loading={pise} onClick={() => { void pauzuj('end'); }}>{t('Konec pauzy')}</Button>
+      <Button variant="secondary" icon="logout" disabled={pise} onClick={() => { void pauzuj('odchod'); }} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
+    </>
   ) : naSmene ? (
-    <div className="grid grid-cols-2 gap-2">
-      <Button variant="primary" size={vel} block icon="logout" loading={pise} onClick={() => { void pichni(); }} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
-      <Button variant="secondary" size={vel} block icon="cup" disabled={pise} onClick={() => { void pauzuj('start'); }} aria-label={t('Začít pauzu')}>{t('Pauza')}</Button>
-    </div>
+    <>
+      <Button variant="primary" icon="logout" loading={pise} onClick={() => { void pichni(); }} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
+      <Button variant="secondary" icon="cup" disabled={pise} onClick={() => { void pauzuj('start'); }} aria-label={t('Začít pauzu')}>{t('Pauza')}</Button>
+    </>
   ) : (
-    <Button variant="primary" size="sm" block icon="clock" loading={pise} onClick={() => { void pichni(); }} aria-label={t('Odpíchnout příchod')}>
+    <Button variant="primary" icon="clock" loading={pise} onClick={() => { void pichni(); }} aria-label={t('Odpíchnout příchod')}>
       {S ? t('Příchod') : t('Odpíchnout příchod')}
     </Button>
   );
@@ -382,9 +383,10 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
       doplnek={S ? undefined : zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip>
         : naPauze ? <Chip tone="info" size="sm">{t('Na pauze')}</Chip>
         : naSmene ? <Chip tone="ok" size="sm">{t('Na směně')}</Chip> : undefined}
+      patka={tlacitko}
     >
       {S ? (
-        <div className="space-y-2.5">
+        <Sloupec mezera={2}>
           {zapomenuty ? (
             <p className="note note-wait !px-3 !py-2 text-[13px]">{t('Běží od {cas}', { cas: odKdy(openSince) })}</p>
           ) : naPauze ? (
@@ -395,10 +397,9 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
             <p className="t-meta">{t('Teď nejsi na směně.')}</p>
           )}
           {hlaseni}
-          {tlacitko}
-        </div>
+        </Sloupec>
       ) : (
-        <div className="space-y-3">
+        <Sloupec mezera={3}>
           {zapomenuty ? (
             <p className="note note-wait">
               {t('Příchod běží od {cas} — to je {delka}. Odpíchni odchod, ať docházka sedí.', { cas: odKdy(openSince), delka: delkaSlovy(t, bezi) })}
@@ -413,8 +414,7 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
           )}
           {!zapomenuty && !naPauze && rozvrh}
           {hlaseni}
-          {tlacitko}
-        </div>
+        </Sloupec>
       )}
       {otazkaPauzy}
       {oknoPolohy}
@@ -472,20 +472,24 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
     );
   } else if (!L) {
     telo = (
-      <>
-        <ul className="flex flex-wrap gap-2" aria-label={t('Kdo je na směně')}>
+      // v4 (P2, P15): lidé jako řádky přes šířku (avatar + jméno vlevo, „od 14:03" jako hodnota na R),
+      // ne pilulky podle délky jména — jedna pilulka vlevo vypadala jako zapomenutá, víc se lámalo zubatě.
+      <Sloupec mezera={3}>
+        <ul className="sloupec sloupec-2" aria-label={t('Kdo je na směně')}>
           {lide.slice(0, PILULEK_M).map(({ r, od }) => (
-            <li key={r.id} className="min-w-0 max-w-full">
-              <PersonChip name={r.name ?? t('Bez jména')} avatar={r.avatar} tone={jeZapomenuty(od) ? 'wait' : 'ok'} meta={t('od {cas}', { cas: odKdy(r.openSince) })} />
+            <li key={r.id} className="flex min-w-0 items-center gap-3">
+              <Avatar emoji={r.avatar} name={r.name} size="xs" />
+              <span className="min-w-0 flex-1 truncate text-[15px] leading-snug text-[#16181A]">{r.name ?? t('Bez jména')}</span>
+              <span className={`shrink-0 text-right text-[13px] tabular-nums ${jeZapomenuty(od) ? 'font-semibold text-wait-ink' : 'text-black/55'}`}>{t('od {cas}', { cas: odKdy(r.openSince) })}</span>
             </li>
           ))}
         </ul>
-        {n > PILULEK_M && <p className="t-meta mt-3">{aDalsich(t, n - PILULEK_M)}</p>}
-      </>
+        {n > PILULEK_M && <p className="t-meta">{aDalsich(t, n - PILULEK_M)}</p>}
+      </Sloupec>
     );
   } else {
     telo = (
-      <ul className="list">
+      <ul className={`list ${OSA_TEXTU}`}>
         {lide.map(({ r, od }) => {
           const zapomenuty = ted - od.getTime() > ZAPOMENUTY_MS;
           const smena = r.shiftStart ? t('směna {cas}', { cas: `${fmtHM(r.shiftStart)}–${fmtHM(r.shiftEnd)}` }) : t('bez plánované směny');
@@ -1049,10 +1053,13 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
     <Widget nacteni={data}
       doplnek={!L && radky.length > 0 ? <Chip tone="muted" size="sm">{nazevDni(t, dni)}</Chip> : undefined}
       prazdno={!L && radky.length === 0 ? <p className="t-meta">{t('Za {n, plural, one {# den} few {# dny} other {# dní}} nikdo nic neodpíchl.', { n: dni })}</p> : undefined}>
+      {/* v4 (V14, V07): skupiny období → čísla → graf → (řazení + seznam) pod sebou 24; řazení stojí přes
+          celou šířku těsně nad seznamem, který řadí (12), „…a další" 8 pod seznamem. */}
+      <Sloupec mezera={6}>
       {L && (
-        <div className="mb-4 space-y-4">
+        <>
           <ObdobiLista value={obdobi} onChange={nastav} volby={['dnes', 'vcera', 'tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} porovnat={porovnat} onPorovnat={setPorovnat} />
-          <div>
+          <Sloupec mezera={2}>
             {/* Hodiny, mzdy a spropitné za období vedle sebe — co člověk hledá v „kdo kolik odpracoval a kolik to stálo".
                 Mzdy jen s finance.mzdy, spropitné jen s celými tržbami. */}
             <StatRow podleKarty>
@@ -1076,20 +1083,21 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
               )}
             </StatRow>
             {zmena != null && (
-              <p className="t-meta mt-2 text-pretty">
+              <p className="t-meta text-pretty">
                 <Chip tone={zmena >= 0 ? 'ok' : 'wait'} size="sm">{zmena > 0 ? '+' : ''}{zmena} %</Chip> {t('proti předchozímu období')} ({hodinyText(sumPred!)})
               </p>
             )}
-          </div>
+          </Sloupec>
           <CasovyGraf sloty={sloty} porovnani={slotyPred} druh="sloupce" vyska={170} format={hodinyText} kratce={v => String(Math.round(v))}
             jmenoSlotu={jmenoSlotu} popisekOsy={popisekOsy} zvyraznit={dnesKlic} popisekPorovnani={t('předchozí období')}
             label={t('Odpracované hodiny: {obdobi}', { obdobi: `${kratceDatum(r.od)} – ${kratceDatum(r.do)}` })} />
-        </div>
+        </>
       )}
+      <Sloupec mezera={L ? 3 : 2}>
       {L && radky.length > 2 && (
-        <Segmented size="sm" ariaLabel={t('Řadit souhrn')} value={razeni} onChange={v => setRazeni(v)} options={moznosti} className="mb-2" />
+        <Segmented size="sm" ariaLabel={t('Řadit souhrn')} value={razeni} onChange={v => setRazeni(v)} options={moznosti} />
       )}
-      <ul className="list">
+      <ul className={`list ${OSA_TEXTU}`}>
         {zobrazene.map(r => {
           const meta = [
             r.pocet > 0 ? t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: r.pocet }) : t('bez směny'), r.bezi ? t('právě běží') : null,
@@ -1143,11 +1151,13 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
           ) : <ListRow key={r.id} {...radek} />;
         })}
       </ul>
+      {!L && radky.length > RADKU_M && <p className="t-meta">{aDalsich(t, radky.length - RADKU_M)}</p>}
+      </Sloupec>
+      </Sloupec>
       {okno && (
         <UpravaMzdyOkno clovek={okno} rozmezi={r} upravy={upravyObdobi.filter(u => String(u.userId) === okno.id)} onClose={() => setOkno(null)} />
       )}
       {smiTrest && <DatTrest open={!!trest} predvolby={trest} onClose={() => setTrest(null)} />}
-      {!L && radky.length > RADKU_M && <p className="t-meta mt-2">{aDalsich(t, radky.length - RADKU_M)}</p>}
     </Widget>
   );
 }
@@ -1350,7 +1360,8 @@ function DnesVPodniku(_: WidgetProps) {
     <Widget nacteni={data}
       doplnek={chybi > 0 ? <Chip tone="wait" size="sm">{t('{n} bez příchodu', { n: chybi.toLocaleString('cs-CZ') })}</Chip> : undefined}
       prazdno={radky.length === 0 ? <p className="t-meta">{t('Dnes nemá nikdo naplánovanou směnu.')}</p> : undefined}>
-      <ul className="list">
+      {/* v4 (V4): chip stavu na ose textu, ne pod avatarem. */}
+      <ul className={`list ${OSA_TEXTU}`}>
         {radky.slice(0, RADKU_DNES).map(r => (
           <ListRow key={r.id} lead={<Avatar emoji={r.avatar} size="sm" />} title={r.jmeno}
             meta={r.plan ? t('směna {cas}', { cas: r.plan }) : t('bez plánované směny')} right={chipDne(r, t)} />

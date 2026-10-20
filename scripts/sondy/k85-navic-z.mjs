@@ -307,7 +307,8 @@ for (const [nazev, volby] of [['390', { viewport: TEL, mobil: true }], ['1280', 
   const navic = w.locator('[data-navic-smeny]');
   tvrdi('Z3b (390): běžící směna („Právě probíhá") má akci „Navíc"', await dokud(() => navic.isVisible().catch(() => false), 6000) && /Právě probíhá/i.test(await text(w)) && await navic.getByRole('button', { name: 'Navíc' }).count() === 1, (await text(w)).replace(/\n/g, ' | ').slice(0, 160));
   // Fixtura má dnešní uznaný zápis bez směny (z Domů) — k běžící dnešní směně se počítá podle dne.
-  tvrdi('Z3b (390): dnešní zápis bez směny se počítá k běžící směně (chip navíc: 1)', /navíc: 1/.test(await text(navic)), (await text(navic)).replace(/\n/g, ' | '));
+  // Skladba v4: „Navíc" je akce v patce karty, chip počtu zůstává v obsahu (u času směny) — hledá se v celé kartě.
+  tvrdi('Z3b (390): dnešní zápis bez směny se počítá k běžící směně (chip navíc: 1)', /navíc: 1/.test(await text(w)), (await text(w)).replace(/\n/g, ' | '));
   await navic.getByRole('button', { name: 'Navíc' }).click();
   const d = dialogNavic(p);
   await dokud(() => d.isVisible().catch(() => false), 3000);

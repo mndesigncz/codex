@@ -30,7 +30,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import { Button, CasovyGraf, Chip, ListRow, Menu, Modal, MonthNav, ObdobiLista, Segmented, Stat, StatRow, posunMesic } from '../../ui';
+import { Button, CasovyGraf, Chip, ListRow, Menu, Modal, MonthNav, ObdobiLista, Segmented, Sloupec, Stat, StatRow, posunMesic } from '../../ui';
 import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
@@ -110,7 +110,8 @@ function RozdilChip({ rozdil, money }: { rozdil: number; money: (n: number) => s
 /** „…a dalších N" pod useknutým seznamem (DP §3.6: tichý strop seznamu je zákaz). */
 function ADalsich({ n }: { n: number }) {
   const t = useT('widgety');
-  return n > 0 ? <p className="t-meta mt-2">{t('…a dalších {n}', { n: cislo(n) })}</p> : null;
+  // v4: mezeru nad sebou nenese (dřív mt-2) — dává ji Sloupec, ve kterém stojí pod seznamem.
+  return n > 0 ? <p className="t-meta">{t('…a dalších {n}', { n: cislo(n) })}</p> : null;
 }
 
 /**
@@ -239,7 +240,7 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
   const muze = !nahled && nav.smiPohled(pohled);
   const vyplnitDen = (d: string) => predejNastroji(nav, UDALOST_VYPLNIT, KLIC_VYPLNIT, d, pohled);
   const vyplnit = muze ? (
-    <Button variant="primary" size="sm" icon="coins" onClick={() => vyplnitDen(smeny[0]?.den ?? pragueToday())}>{t('Vyplnit')}</Button>
+    <Button variant="primary" icon="coins" onClick={() => vyplnitDen(smeny[0]?.den ?? pragueToday())}>{t('Vyplnit')}</Button>
   ) : null;
   const S = velikost === 'S';
   const n = smeny.length;
@@ -250,10 +251,7 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
     telo = S ? (
       <p className="t-meta text-pretty">{t('Uzávěrku vyplníš za kteroukoli směnu.')}</p>
     ) : (
-      <div className="space-y-3">
-        <p className="t-meta text-pretty">{t('Uzávěrku vyplníš za kteroukoli směnu a den — i za kolegu.')}</p>
-        {vyplnit}
-      </div>
+      <p className="t-meta text-pretty">{t('Uzávěrku vyplníš za kteroukoli směnu a den — i za kolegu.')}</p>
     );
   } else if (n === 0) {
     prazdno = <p className="t-meta text-pretty">{S ? t('Uzávěrky máš hotové.') : t('Uzávěrky máš hotové. Na konci směny ji vyplníš tady.')}</p>;
@@ -261,7 +259,7 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
     telo = <Stat label={t('Chybí')} value={cislo(n)} note={smenaTvar(t, n)} />;
   } else {
     telo = (
-      <div className="space-y-3">
+      <Sloupec mezera={2}>
         <p className="text-[15px] font-medium leading-snug text-[#16181A] text-pretty">
           {n === 1 ? t('Vyplň uzávěrku ze své směny.') : t('Máš {pocet}.', { pocet: smenaPocet(t, n) })}
         </p>
@@ -277,8 +275,7 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
           ))}
         </ul>
         <ADalsich n={n - 5} />
-        {vyplnit}
-      </div>
+      </Sloupec>
     );
   }
 
@@ -287,6 +284,8 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
       nacteni={ceka ? CEKA : data}
       otevrit={S && muze ? () => vyplnitDen(smeny[0]?.den ?? pragueToday()) : undefined}
       prazdno={prazdno}
+      // v4 (V16): „Vyplnit" je akce widgetu — patka L→R × 44 na konci karty (střední a velká; malá je celá proklik).
+      patka={!S && telo ? vyplnit ?? undefined : undefined}
     >
       {telo}
     </Widget>
@@ -329,7 +328,7 @@ function Chybejici({ velikost, nastaveni, nahled }: WidgetProps<{ dnes?: boolean
       {S ? (
         <Stat label={t('Chybí')} value={cislo(dny.length)} note={dnesni ? `${denTvar(t, dny.length)} · ${t('dnes čeká')}` : denTvar(t, dny.length)} />
       ) : (
-        <>
+        <Sloupec mezera={2}>
           {velikost === 'L' && <p className="t-meta text-pretty">{t('Tyhle dny někdo pracoval, ale uzávěrku nikdo neudělal. Stačí jedna za celou směnu.')}</p>}
           <ul className="list">
             {vse.slice(0, limit).map(d => (
@@ -347,7 +346,7 @@ function Chybejici({ velikost, nastaveni, nahled }: WidgetProps<{ dnes?: boolean
             ))}
           </ul>
           <ADalsich n={vse.length - Math.min(vse.length, limit)} />
-        </>
+        </Sloupec>
       )}
     </Widget>
   );
@@ -403,8 +402,8 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
       {S ? (
         <Stat label={t('Čeká')} value={cislo(cekaji.length)} note={uzaverekTvar(t, cekaji.length)} />
       ) : (
-        <>
-          {chyba && <p className="note note-danger text-sm mb-2" role="alert">{chyba}</p>}
+        <Sloupec mezera={2}>
+          {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
           <ul className="list">
             {cekaji.slice(0, 5).map(c => {
               const r = smiRozdil ? rozdilUzaverky(c) : null;
@@ -431,7 +430,7 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
             })}
           </ul>
           <ADalsich n={cekaji.length - 5} />
-        </>
+        </Sloupec>
       )}
       {mazat && (
         <Modal open onClose={() => setMazat(null)} size="sm" title={t('Smazat uzávěrku?')}
@@ -615,7 +614,7 @@ function RozdilPokladny({ velikost, nastaveni }: WidgetProps<{ obdobi?: '7_dni' 
           {r.dny.length === 0 ? (
             <p className="t-meta">{t('Kasa seděla — žádný den nepřesáhl práh {prah}.', { prah: money(prah) })}</p>
           ) : (
-            <>
+            <Sloupec mezera={2}>
               <ul className="list">
                 {r.dny.slice(0, 5).map(d => (
                   <ListRow key={d.den} title={<span className="cz-sentence block truncate">{denVetou(d.den, t.jazyk)}</span>}
@@ -624,7 +623,7 @@ function RozdilPokladny({ velikost, nastaveni }: WidgetProps<{ obdobi?: '7_dni' 
                 ))}
               </ul>
               <ADalsich n={r.dny.length - 5} />
-            </>
+            </Sloupec>
           )}
         </div>
       ))}
@@ -787,7 +786,9 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="graf">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* v4 (V14): měsíc → mřížka → legenda s jednou mezerou 12 (Sloupec), ne mt-3 v obsahu. */}
+      <Sloupec mezera={3}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <MonthNav value={mesic} onChange={m => setMesic(m)} max={tento} />
         <p className="t-meta tabular-nums">
           {uzaverekPocet(t, hotovych)}
@@ -797,7 +798,7 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
       </div>
       {/* Žádné role=grid: slibovalo by řádky a šipky, které tu nejsou. Každý den nese
           celé datum a stav v popisku, zkratky dnů jsou jen pro oko. */}
-      <div className="mt-3 grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label={t('Uzávěrky po dnech')}>
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label={t('Uzávěrky po dnech')}>
         {zkratky.map(z => <div key={z} aria-hidden className="text-center text-[11px] font-semibold text-black/45 pb-1">{z}</div>)}
         {bunky.map((d, i) => {
           if (!d) return <div key={`p${i}`} aria-hidden />;
@@ -835,11 +836,12 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
           );
         })}
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 t-meta">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 t-meta">
         <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.hotovo}`} /> {t('Hotová')}</span>
         <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.chybi}`} /> {t('Chybí')}</span>
         <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.ceka}`} /> {t('Čeká')}</span>
       </div>
+      </Sloupec>
     </Widget>
   );
 }
@@ -898,13 +900,15 @@ function MojeHistorie({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: str
 
   return (
     <Widget nacteni={ceka ? CEKA : data}
-      prazdno={moje.length === 0 ? <p className="t-meta text-pretty">{t('Zatím žádná uzávěrka. Po směně ji vyplníš ve formuláři na téhle stránce.')}</p> : undefined}>
-      <ul className="list">{moje.slice(0, pocet).map(radek)}</ul>
-      {zbyva > 0 && (nahled ? <ADalsich n={zbyva} /> : (
-        <Button variant="ghost" size="sm" className="mt-2" onClick={() => setVse(true)}>
-          {t('Zobrazit všechny ({n})', { n: cislo(moje.length) })}
-        </Button>
-      ))}
+      prazdno={moje.length === 0 ? <p className="t-meta text-pretty">{t('Zatím žádná uzávěrka. Po směně ji vyplníš ve formuláři na téhle stránce.')}</p> : undefined}
+      // v4 (V16): „Zobrazit všechny" v patce přes celou šířku (jako „Zobrazit vše" obalu), ne ghost vlevo pod seznamem.
+      patka={zbyva > 0 && !nahled ? (
+        <Button variant="ghost" onClick={() => setVse(true)}>{t('Zobrazit všechny ({n})', { n: cislo(moje.length) })}</Button>
+      ) : undefined}>
+      <Sloupec mezera={2}>
+        <ul className="list">{moje.slice(0, pocet).map(radek)}</ul>
+        {zbyva > 0 && nahled && <ADalsich n={zbyva} />}
+      </Sloupec>
       {vse && (
         <Modal open onClose={() => setVse(false)} size="lg" title={t('Moje uzávěrky')}
           subtitle={uzaverekPocet(t, moje.length)}>

@@ -12,7 +12,7 @@
 // components/widgety/oblasti/ukoly.tsx (KOMPONENTY).
 
 import { useMemo, useState } from 'react';
-import { Button, Chip, EmptyState } from '../ui';
+import { Button, Chip, EmptyState, Sloupec } from '../ui';
 import { Widget } from '../widgety/Widget';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
@@ -44,8 +44,8 @@ export function UkolyZaBodyWidget({ velikost, nahled }: WidgetProps) {
   const L = velikost === 'L';
   const odkaz = !naTabletu && !S ? { popisek: t('Úkoly'), pohled: 'tasks', arg: ARG_ZA_BODY } : undefined;
 
-  const tlacitkoZapsat = (size: 'sm' | 'md' = 'md') => !nahled && smiZapsat ? (
-    <Button variant="secondary" size={size} icon="plus" onClick={() => setZapsat(true)} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
+  const tlacitkoZapsat = () => !nahled && smiZapsat ? (
+    <Button variant="secondary" icon="plus" onClick={() => setZapsat(true)} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
   ) : null;
   const okno = !nahled ? (
     <ZapsatNavic open={zapsat} onClose={() => setZapsat(false)} actingAs={actingAs} jmeno={naTabletu ? osoba?.jmeno ?? null : null} />
@@ -54,11 +54,10 @@ export function UkolyZaBodyWidget({ velikost, nahled }: WidgetProps) {
   // Tablet bez vybraného člověka: zeptat se, kdo jsi — ne ukázat úkoly „nikoho" (DESIGN: Prázdný odznak je horší než otázka).
   if (naTabletu && actingAs == null) {
     return (
-      <Widget nacteni={undefined}>
-        <div className="space-y-3" data-za-body-kdo>
-          <p className="t-meta text-pretty">{t('Kdo u tabletu stojí? Vyber se a uvidíš své úkoly za body.')}</p>
-          {!nahled && vyzadej && <Button variant="secondary" size="lg" icon="user" onClick={() => void vyzadej()}>{t('Kdo jsi?')}</Button>}
-        </div>
+      // v4 (V16): „Kdo jsi?" je akce widgetu — v patce přes celou šířku, ne obsahová pilulka pod větou.
+      <Widget nacteni={undefined}
+        patka={!nahled && vyzadej ? <Button variant="secondary" icon="user" onClick={() => void vyzadej()}>{t('Kdo jsi?')}</Button> : undefined}>
+        <p className="t-meta text-pretty" data-za-body-kdo>{t('Kdo u tabletu stojí? Vyber se a uvidíš své úkoly za body.')}</p>
       </Widget>
     );
   }
@@ -71,8 +70,11 @@ export function UkolyZaBodyWidget({ velikost, nahled }: WidgetProps) {
     return (
       <>
         <Widget nacteni={data} kostra="cislo"
-          prazdno={data.data && souhrn.kVzeti === 0 ? <p className="t-meta text-pretty">{t('Dnes tu nic za body není.')}</p> : undefined}>
-          <div className="space-y-2" data-za-body-s>
+          prazdno={data.data && souhrn.kVzeti === 0 ? <p className="t-meta text-pretty">{t('Dnes tu nic za body není.')}</p> : undefined}
+          // v4 (V16): akce prvního volného úkolu v patce (L→R × 44; dvě akce ½ + ½) — název a body nese karta nahoře,
+          // celý seznam je v Úkolech.
+          patka={prvni && akce ? <UkolyZaBody ukoly={[prvni]} actingAs={actingAs} jmeno={osoba?.jmeno ?? null} velke={naTabletu} jenAkce tiche /> : undefined}>
+          <Sloupec mezera={1} data-za-body-s>
             <p className="t-card text-pretty">
               {t('{n, plural, one {# úkol za body} few {# úkoly za body} other {# úkolů za body}}', { n: souhrn.kVzeti })}
               {souhrn.body > 0 && <> · <span className="tabular-nums">{t('až +{n} b', { n: souhrn.body })}</span></>}
@@ -80,11 +82,7 @@ export function UkolyZaBodyWidget({ velikost, nahled }: WidgetProps) {
             {prvni && (
               <p className="t-meta truncate" title={prvni.nabidka.title}>{prvni.nabidka.title}{odmenaKratce(prvni.nabidka, money) ? ` · ${odmenaKratce(prvni.nabidka, money)}` : ''}</p>
             )}
-            {prvni && akce && (
-              // Malá karta má jen akci prvního volného úkolu — název a body nese nahoře, celý seznam je v Úkolech.
-              <UkolyZaBody ukoly={[prvni]} actingAs={actingAs} jmeno={osoba?.jmeno ?? null} velke={naTabletu} jenAkce tiche />
-            )}
-          </div>
+          </Sloupec>
         </Widget>
         {okno}
       </>
@@ -97,12 +95,13 @@ export function UkolyZaBodyWidget({ velikost, nahled }: WidgetProps) {
       <Widget nacteni={data} odkaz={odkaz} bezZkraceni={!L}
         doplnek={souhrn.kVzeti > 0 ? <Chip tone="muted" size="sm">{souhrn.kVzeti}</Chip> : undefined}
         prazdno={data.data && ukoly.length === 0 ? (
-          <EmptyState compact illustration="odmeny" title={t('Dnes nic za body')} hint={prazdnoText} action={tlacitkoZapsat('md')} />
-        ) : undefined}>
-        <div className="space-y-3" data-za-body-widget={velikost}>
-          {naTabletu && osoba && <p className="t-meta">{t('Pro: {jmeno}', { jmeno: osoba.jmeno })}</p>}
+          <EmptyState compact illustration="odmeny" title={t('Dnes nic za body')} hint={prazdnoText} action={tlacitkoZapsat()} />
+        ) : undefined}
+        // v4: „Pro: Eva" je souhrn nad seznamem (slot, 8 nad seznamem), „Zapsat navíc" akce widgetu v patce.
+        souhrn={naTabletu && osoba ? t('Pro: {jmeno}', { jmeno: osoba.jmeno }) : undefined}
+        patka={L ? tlacitkoZapsat() ?? undefined : undefined}>
+        <div data-za-body-widget={velikost}>
           <UkolyZaBody ukoly={ukoly} actingAs={actingAs} jmeno={naTabletu ? osoba?.jmeno ?? null : null} velke={naTabletu} nahled={nahled} max={L ? undefined : 3} popisy={L || naTabletu} tiche />
-          {L && tlacitkoZapsat('md')}
         </div>
       </Widget>
       {okno}

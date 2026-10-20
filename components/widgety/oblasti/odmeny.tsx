@@ -76,8 +76,9 @@ import {
   type DenHodnoceni, type MojeUroven, type NabidkaOdmeny, type ObdobiZebricku, type Zadost,
 } from '@/lib/odmenyPrehled';
 import { Icon } from '../../Icons';
+import { OSA_JAMKA, OSA_TEXTU, osaTextu } from '../osaTextu';
 import {
-  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented, Select, SelectBox, Stat, StatRow, Toast, Well,
+  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented, Select, SelectBox, Sloupec, Stat, StatRow, Toast, Well,
   runBulk, useSelection,
 } from '../../ui';
 import { BODY_DIKU, MAX_VETA_DIKU, vyberZed } from '@/lib/podekovani';
@@ -130,6 +131,13 @@ function sTucnym(t: PrekladFn, klic: string, tucne: React.ReactNode, className: 
   return <>{pred}<b className={className}>{tucne}</b>{po}</>;
 }
 const sZnamenkem = (n: number) => `${n > 0 ? '+' : ''}${cislo(n)}`;
+
+// v4 (V4, P12): seznam řádků s avatarem — stavový řádek a akce na ose textu (OSA_TEXTU, ../osaTextu).
+
+/** Akce v prázdném stavu widgetu (patka se nad prázdnem nekreslí): L→R × 44 pod větou. */
+function AkcePrazdna({ children }: { children: React.ReactNode }) {
+  return <div className="rada rada-rovne rada-m">{children}</div>;
+}
 
 /** Klíč části widgetu z katalogu (`opravneni.pole`) — jeden zdroj pravdy s galerií a serverem. */
 function klicCasti(idWidgetu: string, cast: string): Klic | null {
@@ -292,10 +300,13 @@ function OhodnotitSmeny({ velikost }: WidgetProps) {
   return (
     <>
       <NavigaceKontext.Provider value={navKalendar}>
-      <Widget nacteni={ceka ? CEKA : [sVcera, sDnes]} odkaz={{ popisek: t('Kalendář'), pohled: 'rewards' }}>
-        <Segmented size="sm" ariaLabel={t('Den')} value={vybrany} onChange={setDen}
-          options={[{ id: 'vcera', label: t('Včera'), count: cekaVcera }, { id: 'dnes', label: t('Dnes'), count: cekaDnes }]} />
-        <div className="mt-3 space-y-3">
+      {/* v4 (V2): přepínač dne je slot `segment` obalu (L→R × 36, 12 pod hlavičkou), ne první řádek obsahu. */}
+      <Widget nacteni={ceka ? CEKA : [sVcera, sDnes]} odkaz={{ popisek: t('Kalendář'), pohled: 'rewards' }}
+        segment={(
+          <Segmented size="sm" ariaLabel={t('Den')} value={vybrany} onChange={setDen}
+            options={[{ id: 'vcera', label: t('Včera'), count: cekaVcera }, { id: 'dnes', label: t('Dnes'), count: cekaDnes }]} />
+        )}>
+        <Sloupec mezera={3}>
           {radky.length === 0 ? (
             <p className="t-meta">{vybrany === 'dnes' ? t('Dnes zatím nikdo nepracoval.') : t('Včera nikdo nepracoval.')}</p>
           ) : (
@@ -303,7 +314,7 @@ function OhodnotitSmeny({ velikost }: WidgetProps) {
               {radky.every(r => r.hodnoceno) && (
                 <p className="note note-ok flex items-center gap-2"><Icon name="check" size={15} className="shrink-0" />{t('Vše ohodnoceno')}</p>
               )}
-              <ul className="list">
+              <ul className={`list ${OSA_TEXTU}`}>
                 {videt.map(r => (
                   <ListRow key={r.id} lead={<Avatar emoji={r.avatar} size="sm" />} title={r.jmeno} meta={metaSmeny(r, t)}
                     right={!r.hodnoceno ? <Chip tone="wait" size="sm">{t('Čeká')}</Chip>
@@ -322,7 +333,7 @@ function OhodnotitSmeny({ velikost }: WidgetProps) {
               {radky.length > videt.length && <p className="t-meta">{aDalsich(t, radky.length - videt.length)}</p>}
             </>
           )}
-        </div>
+        </Sloupec>
       </Widget>
       </NavigaceKontext.Provider>
       {hodnotim && !nahled && (
@@ -422,13 +433,15 @@ function ZpetnaVazba({ velikost }: WidgetProps) {
     }
   };
 
+  // v4 (V16, P17): „Beru na vědomí" je akce widgetu — patka L→R × 44 na konci karty, ne pilulka pod textem.
+  const patka = neco ? <Button variant="primary" loading={potvrzuji} onClick={beruNaVedomi}>{t('Beru na vědomí')}</Button> : undefined;
   const noveHodnoceni = neco && (
-    <div className="space-y-3">
+    <Sloupec mezera={3}>
       <div>
         <p className="text-[15px] font-medium leading-snug text-[#16181A] text-balance">
           {vytka ? t('U tvé směny je něco k nápravě') : t('Vedení ohodnotilo tvou směnu')}
         </p>
-        <p className="t-meta mt-0.5 text-pretty">
+        <p className="t-meta mt-1 text-pretty">
           {vytka ? t('Podívej se, co je potřeba probrat, a potvrď, že to víš.')
             : posledni ? t('{den} — přečti si, co vedení napsalo.', { den: denVetou(posledni.den) }) : ''}
         </p>
@@ -444,14 +457,13 @@ function ZpetnaVazba({ velikost }: WidgetProps) {
       )}
       {posledni?.poznamka && <p className="text-sm text-black/70 text-pretty line-clamp-3">„{posledni.poznamka}“</p>}
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
-      <Button variant="primary" size="sm" loading={potvrzuji} onClick={beruNaVedomi}>{t('Beru na vědomí')}</Button>
-    </div>
+    </Sloupec>
   );
 
   if (velikost === 'M') {
     // Nic nového = nic k řešení: v klidu se střední widget nekreslí (jako dřív karta na Přehledu).
     return (
-      <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz} prazdno={neco ? undefined : null}>
+      <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz} prazdno={neco ? undefined : null} patka={patka}>
         {noveHodnoceni}
       </Widget>
     );
@@ -459,11 +471,14 @@ function ZpetnaVazba({ velikost }: WidgetProps) {
   // Velký: nové nahoře a pod ním historie hodnocení.
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
-      prazdno={vse.length === 0 ? <p className="t-meta">{t('Zatím žádné hodnocení směn.')}</p> : undefined}>
+      prazdno={vse.length === 0 ? <p className="t-meta">{t('Zatím žádné hodnocení směn.')}</p> : undefined}
+      patka={patka}>
+      {/* Skupiny pod sebou 24 (nové hodnocení → historie), uvnitř skupiny štítek → seznam 4. */}
+      <Sloupec mezera={6}>
       {noveHodnoceni}
-      <div className={neco ? 'mt-5' : ''}>
+      <Sloupec mezera={1}>
         <p className="t-label">{t('Poslední hodnocení')}</p>
-        <ul className="list mt-1">
+        <ul className="list">
           {vse.slice(0, 5).map(r => (
             <ListRow key={`${r.den}-${r.celaSmena ? 's' : 'i'}`} title={denVetou(r.den)}
               meta={r.poznamka ?? (r.celaSmena ? t('Hodnocení celé směny') : t('Bez poznámky'))}
@@ -478,8 +493,9 @@ function ZpetnaVazba({ velikost }: WidgetProps) {
               )} />
           ))}
         </ul>
-        {vse.length > 5 && <p className="t-meta mt-2">{aDalsich(t, vse.length - 5)}</p>}
-      </div>
+        {vse.length > 5 && <p className="t-meta mt-1">{aDalsich(t, vse.length - 5)}</p>}
+      </Sloupec>
+      </Sloupec>
     </Widget>
   );
 }
@@ -667,7 +683,8 @@ function Urovne(_: WidgetProps) {
   const moje = data.data?.ja?.index ?? -1;
   return (
     <Widget nacteni={ceka ? CEKA : data} prazdno={data.data && urovne.length === 0 ? <p className="t-meta">{t('Úrovně zatím nejsou nastavené.')}</p> : undefined}>
-      <ul className="list">
+      {/* v4 (P15): body jsou poslední sloupec na R i na monitoru — chip „Teď" stojí před nimi, ne za nimi. */}
+      <ul className="list sm:[&_.list-value]:order-1">
         {urovne.map((u, i) => (
           <ListRow key={`${i}-${u.nazev}`}
             lead={<Jamka>{i <= moje ? <Icon name="check" size={16} /> : <span className="text-sm font-semibold tabular-nums">{i + 1}</span>}</Jamka>}
@@ -887,19 +904,23 @@ function KatalogOdmen({ velikost, nahled }: WidgetProps) {
   };
 
   const tlacitkoPridat = spravuje && !nahled ? (
-    <Button variant="secondary" size="sm" icon="plus" onClick={() => setPridat(true)}>{t('Přidat odměnu')}</Button>
+    <Button variant="secondary" icon="plus" onClick={() => setPridat(true)}>{t('Přidat odměnu')}</Button>
   ) : null;
 
   return (
     <>
+      {/* v4 (V16): „Přidat odměnu" je akce widgetu v patce (L→R × 44), zůstatek bodů souhrn nad seznamem. */}
       <Widget nacteni={ceka || nacitam ? CEKA : [katalog, odmeny]}
+        souhrn={moje ? sTucnym(t, volne !== moje.body ? 'Máš k dispozici {tucne} (zbytek drží čekající žádosti).' : 'Máš k dispozici {tucne}.', bodu(t, volne), 'font-semibold text-[#16181A] tabular-nums') : undefined}
+        patka={tlacitkoPridat ?? undefined}
         prazdno={katalog.data && nabizene.length === 0 ? (
           <EmptyState compact icon="gift" title={t('Katalog je zatím prázdný')}
             hint={spravuje ? t('Přidej první odměnu, ať mají body smysl.') : t('Vedení zatím žádné odměny nenabízí.')}
             action={tlacitkoPridat ?? undefined} />
         ) : undefined}>
-        {moje && <p className="t-meta">{sTucnym(t, volne !== moje.body ? 'Máš k dispozici {tucne} (zbytek drží čekající žádosti).' : 'Máš k dispozici {tucne}.', bodu(t, volne), 'font-semibold text-[#16181A] tabular-nums')}</p>}
-        <ul className={`list ${moje ? 'mt-1' : ''}`}>
+        <Sloupec mezera={3}>
+        <Sloupec mezera={2}>
+        <ul className="list">
           {videt.map(o => (
             <ListRow key={o.id} lead={<IkonaOdmeny ikona={o.ikona} />} title={o.nazev}
               meta={[
@@ -918,19 +939,20 @@ function KatalogOdmen({ velikost, nahled }: WidgetProps) {
               ) : undefined} />
           ))}
         </ul>
-        {nabizene.length > videt.length && <p className="t-meta mt-2">{aDalsich(t, nabizene.length - videt.length)}</p>}
+        {nabizene.length > videt.length && <p className="t-meta">{aDalsich(t, nabizene.length - videt.length)}</p>}
+        </Sloupec>
         {velikost === 'L' && zadosti.length > 0 && (
-          <div className="mt-4">
+          <Sloupec mezera={1}>
             <p className="t-label">{t('Moje žádosti')}</p>
-            <ul className="list mt-1">
+            <ul className="list">
               {zadosti.slice(0, 3).map(z => (
                 <ListRow key={z.id} title={z.nazev} meta={`${cislo(z.cena)} ${bodTvar(t, z.cena)}`}
                   right={<Chip tone={stavy[z.stav].ton} size="sm">{stavy[z.stav].text}</Chip>} />
               ))}
             </ul>
-          </div>
+          </Sloupec>
         )}
-        {tlacitkoPridat && <div className="mt-3">{tlacitkoPridat}</div>}
+        </Sloupec>
       </Widget>
       {vymena && !nahled && (
         <NadPlochou>
@@ -1012,9 +1034,25 @@ function ZadostiOOdmeny({ velikost, nahled }: WidgetProps) {
   }
   return (
     <>
+      {/* v4 (V16, P12): „Ukázat všech" a „Vybrat víc" jsou akce widgetu — v patce ½ + ½ na konci karty
+          (dřív ghost vlevo a pilulka vpravo každá na svém řádku); Schválit / Zamítnout v řádku na ose textu. */}
       <Widget nacteni={ceka ? CEKA : data}
         doplnek={fronta.length > 0 ? <Chip tone="wait" size="sm">{cislo(fronta.length)}</Chip> : undefined}
-        prazdno={data.data && fronta.length === 0 ? <p className="t-meta">{t('Žádná žádost nečeká.')}</p> : undefined}>
+        prazdno={data.data && fronta.length === 0 ? <p className="t-meta">{t('Žádná žádost nečeká.')}</p> : undefined}
+        patka={(fronta.length > videt.length || (fronta.length > 1 && !vyber.selecting)) ? (
+          <>
+            {/* „Vybrat víc" se ukáže, až je co vybírat (DP §3.19). Tichý „Ukázat všech" vpravo, text u pravé hrany. */}
+            {fronta.length > 1 && !vyber.selecting && (
+              <Button variant="secondary" icon="check" disabled={pracuji != null} onClick={() => { if (!nahled) vyber.start(); }}>{t('Vybrat víc')}</Button>
+            )}
+            {fronta.length > videt.length && (
+              <Button variant="ghost" iconAfter="chevron" className="justify-end !pr-2" onClick={() => setRozbaleno(true)}>
+                {t('Ukázat všech {pocet}', { pocet: cislo(fronta.length) })}
+              </Button>
+            )}
+          </>
+        ) : undefined}>
+        <Sloupec mezera={3} className={OSA_TEXTU}>
         <ul className="list">
           {videt.map(z => (
             <ListRow key={z.id}
@@ -1023,30 +1061,18 @@ function ZadostiOOdmeny({ velikost, nahled }: WidgetProps) {
                 : <Avatar emoji={z.avatar} size="sm" />}
               title={z.jmeno ?? t('Člen týmu')} meta={`${z.nazev} · ${cislo(z.cena)} ${bodTvar(t, z.cena)}`}
               actions={vyber.selecting ? undefined : (
-                <span className="flex items-center justify-end gap-1">
-                  {/* v3: v řádku fronty šedá pilulka, ne inkoust — pět inkoustových „Schválit“ pod sebou tahalo oko víc než hlavní akce (DESIGN „max jedno inkoustové v zorném poli“). Obal drží akce u pravého okraje, .list-actions by první natáhl přes šířku. */}
+                <>
+                  {/* v3: v řádku fronty šedá pilulka, ne inkoust — pět inkoustových „Schválit“ pod sebou tahalo oko víc než hlavní akce (DESIGN „max jedno inkoustové v zorném poli“). v4: na telefonu pár ½ + ½ na ose textu (OSA_TEXTU). */}
                   <Button variant="secondary" size="sm" icon="check" loading={pracuji === z.id} disabled={pracuji != null && pracuji !== z.id}
                     aria-label={t('Schválit: {jmeno}, {nazev}', { jmeno: z.jmeno ?? '', nazev: z.nazev })} onClick={() => jedna(z, 'approve')}>{t('Schválit')}</Button>
                   <Button variant="danger" size="sm" disabled={pracuji != null}
                     aria-label={t('Zamítnout: {jmeno}, {nazev}', { jmeno: z.jmeno ?? '', nazev: z.nazev })} onClick={() => jedna(z, 'decline')}>{t('Zamítnout')}</Button>
-                </span>
+                </>
               )} />
           ))}
         </ul>
-        {fronta.length > videt.length && (
-          <div className="mt-2">
-            <Button variant="ghost" size="sm" iconAfter="chevron" onClick={() => setRozbaleno(true)}>
-              {t('Ukázat všech {pocet}', { pocet: cislo(fronta.length) })}
-            </Button>
-          </div>
-        )}
-        {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
-        {/* „Vybrat víc" se ukáže, až je co vybírat (DP §3.19). */}
-        {fronta.length > 1 && !vyber.selecting && (
-          <div className="mt-3 flex justify-end">
-            <Button variant="secondary" size="sm" icon="check" disabled={pracuji != null} onClick={() => { if (!nahled) vyber.start(); }}>{t('Vybrat víc')}</Button>
-          </div>
-        )}
+        {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
+        </Sloupec>
       </Widget>
       {vyber.selecting && !nahled && (
         <NadPlochou>
@@ -1080,14 +1106,16 @@ function Zebricek({ velikost, nastaveni }: WidgetProps<{ pocet?: string; obdobi?
   const videt = poradi.slice(0, strop);
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={velikost === 'S' ? undefined : odkaz}
-      prazdno={data.data && poradi.length === 0 ? <p className="t-meta">{t('V týmu zatím nikdo není.')}</p> : undefined}>
-      {obdobi === 'mesic' && velikost !== 'S' && <p className="t-meta mb-1">{t('Body získané tento měsíc (bez odečtů za odměny).')}</p>}
+      prazdno={data.data && poradi.length === 0 ? <p className="t-meta">{t('V týmu zatím nikdo není.')}</p> : undefined}
+      souhrn={obdobi === 'mesic' && velikost !== 'S' ? t('Body získané tento měsíc (bez odečtů za odměny).') : undefined}>
+      <Sloupec mezera={2}>
       <ul className="list">
         {videt.map((s, i) => (
           <ListRow key={s.id}
-            lead={velikost === 'S' ? <span className="t-label w-5 text-right tabular-nums">{i + 1}.</span> : (
+            // v4 (P5): pořadí začíná na levé ose karty (zarovnané vlevo), ne odsazené o pár px doprava.
+            lead={velikost === 'S' ? <span className="t-label w-5 tabular-nums">{i + 1}.</span> : (
               <span className="flex items-center gap-2">
-                <span className="t-label w-5 text-right tabular-nums">{i + 1}.</span>
+                <span className="t-label w-5 tabular-nums">{i + 1}.</span>
                 <Avatar emoji={s.avatar} size="sm" />
               </span>
             )}
@@ -1101,7 +1129,8 @@ function Zebricek({ velikost, nastaveni }: WidgetProps<{ pocet?: string; obdobi?
             value={cislo(s.body)} valueMeta={velikost === 'S' ? undefined : bodTvar(t, s.body)} />
         ))}
       </ul>
-      {poradi.length > videt.length && velikost !== 'S' && <p className="t-meta mt-2">{aDalsich(t, poradi.length - videt.length)}</p>}
+      {poradi.length > videt.length && velikost !== 'S' && <p className="t-meta">{aDalsich(t, poradi.length - videt.length)}</p>}
+      </Sloupec>
     </Widget>
   );
 }
@@ -1202,26 +1231,29 @@ function Pochvaly({ velikost, nahled }: WidgetProps) {
   // Druhotné, ne limetka: na ploše Odměn je hlavní akce jedna (DP §3.1) a tohle je jedna z více.
   // Kolo 8: vedle Pochválit (body od vedení) i Poděkovat (body z vlastního měsíčního příspěvku — vedoucí je taky kolega).
   const [dekuji, setDekuji] = useState(false);
+  // v4 (V16, P12): Pochválit + Poděkovat jako pár ½ + ½ v patce widgetu (L→R × 44).
   const tlacitko = smiChvalit && <>
-    <Button variant="secondary" size="sm" icon="award" onClick={() => setOkno(true)}>{t('Pochválit')}</Button>
-    {!nahled && <Button variant="ghost" size="sm" onClick={() => setDekuji(true)}>{t('Poděkovat')}</Button>}
+    <Button variant="secondary" icon="award" onClick={() => setOkno(true)}>{t('Pochválit')}</Button>
+    {!nahled && <Button variant="ghost" className="justify-end !pr-2" onClick={() => setDekuji(true)}>{t('Poděkovat')}</Button>}
     {dekuji && <PodekovaniOkno onClose={() => setDekuji(false)} />}
   </>;
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={velikost === 'S' ? undefined : odkaz}
       prazdno={data.data && pochvaly.length === 0 ? (
-        <div className="space-y-3">
+        <Sloupec mezera={4}>
           <p className="t-meta text-pretty">{t('Zatím žádná pochvala. Body za dobře odvedenou práci potěší víc než hvězdy u směny.')}</p>
-          {tlacitko}
+          {tlacitko && <AkcePrazdna>{tlacitko}</AkcePrazdna>}
           {okno && <PochvalaOkno onClose={() => setOkno(false)} />}
-        </div>
-      ) : undefined}>
+        </Sloupec>
+      ) : undefined}
+      patka={tlacitko || undefined}>
+      <Sloupec mezera={3}>
       <StatRow podleKarty>
         <Stat label={t('Tento měsíc')} value={cislo(mesic.pocet)} note={bodu(t, mesic.body)} />
         <Stat label={t('Poslední')} value={pochvaly[0] ? pochvaly[0].jmeno : '—'} note={pochvaly[0] ? kdyKratce(pochvaly[0].kdy) : undefined} />
       </StatRow>
       {strop > 0 && (
-        <ul className="list mt-3">
+        <ul className="list">
           {pochvaly.slice(0, strop).map(p => (
             <ListRow key={p.id} lead={<Avatar emoji={p.avatar} size="sm" />} title={p.jmeno}
               meta={[p.duvod, kdyKratce(p.kdy), p.dal ? t('od {kdo}', { kdo: p.dal }) : null].filter(Boolean).join(' · ')}
@@ -1229,8 +1261,8 @@ function Pochvaly({ velikost, nahled }: WidgetProps) {
           ))}
         </ul>
       )}
-      {pochvaly.length > strop && strop > 0 && <p className="t-meta mt-2">{aDalsich(t, pochvaly.length - strop)}</p>}
-      {tlacitko && <div className="mt-3 flex flex-wrap items-center gap-2">{tlacitko}</div>}
+      {pochvaly.length > strop && strop > 0 && <p className="t-meta">{aDalsich(t, pochvaly.length - strop)}</p>}
+      </Sloupec>
       {okno && <PochvalaOkno onClose={() => setOkno(false)} />}
     </Widget>
   );
@@ -1348,7 +1380,7 @@ function ZedDiku({ velikost, nahled }: WidgetProps) {
   const smiDekovat = !nahled && !!prispevek;
   const strop = velikost === 'S' ? 2 : velikost === 'M' ? 4 : 12;
   const tlacitko = smiDekovat && (
-    <Button variant="secondary" size="sm" icon="award" onClick={() => setOkno(true)} data-podekovat>
+    <Button variant="secondary" icon="award" onClick={() => setOkno(true)} data-podekovat>
       {t('Poděkovat')}{prispevek && prispevek.zbyva > 0 ? ` · ${prispevek.zbyva} b` : ''}
     </Button>
   );
@@ -1359,12 +1391,15 @@ function ZedDiku({ velikost, nahled }: WidgetProps) {
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={velikost === 'S' ? undefined : odkaz}
       prazdno={data.data && diky.length === 0 ? (
-        <div className="space-y-3">
+        <Sloupec mezera={4}>
           <p className="t-meta text-pretty">{t('Zatím nikdo nikomu nepoděkoval. Záskok, pomoc s úklidem, hezké slovo hostovi — body od kolegů těší víc než hvězdy.')}</p>
-          {tlacitko}
+          {tlacitko && <AkcePrazdna>{tlacitko}</AkcePrazdna>}
           {okna}
-        </div>
-      ) : undefined}>
+        </Sloupec>
+      ) : undefined}
+      // v4 (V16): „Poděkovat" je akce widgetu — patka L→R × 44 na konci karty.
+      patka={tlacitko || undefined}>
+      <Sloupec mezera={2}>
       <ul className="list">
         {diky.slice(0, strop).map(d => (
           <ListRow key={d.id} lead={<Avatar emoji={d.avatar} size="sm" />} title={d.jmeno}
@@ -1374,8 +1409,8 @@ function ZedDiku({ velikost, nahled }: WidgetProps) {
             value={sZnamenkem(d.body)} valueMeta={bodTvar(t, d.body)} />
         ))}
       </ul>
-      {diky.length > strop && <p className="t-meta mt-2">{aDalsich(t, diky.length - strop)}</p>}
-      {tlacitko && <div className="mt-3">{tlacitko}</div>}
+      {diky.length > strop && <p className="t-meta">{aDalsich(t, diky.length - strop)}</p>}
+      </Sloupec>
       {okna}
     </Widget>
   );
@@ -1637,7 +1672,7 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
     pocetCeka > 0 ? t('{n, plural, one {# čeká} few {# čekají} other {# čeká}}', { n: pocetCeka }) : null,
   ].filter(Boolean);
   const tlacitko = smiUznat && (
-    <Button variant="secondary" size="sm" icon="star" onClick={() => setZapisuji(true)}>{t('Zapsat za člena')}</Button>
+    <Button variant="secondary" icon="star" onClick={() => setZapisuji(true)}>{t('Zapsat za člena')}</Button>
   );
   const okna = (
     <>
@@ -1656,11 +1691,11 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
     <Widget nacteni={ceka ? CEKA : [mesicni, cekajici]} odkaz={odkazNavic}
       doplnek={pocetCeka > 0 ? <Chip tone="wait" size="sm">{t('{n} čeká', { n: cislo(pocetCeka) })}</Chip> : undefined}
       prazdno={vse && vse.length === 0 ? (
-        <div className="space-y-3" data-navic-prazdno>
+        <Sloupec mezera={4} data-navic-prazdno>
           <p className="t-meta text-pretty">{t('Zatím nikdo nic navíc nezapsal. Lidé zapisují z Domů, z Moje směny, při uzávěrce i na tabletu; ty můžeš zapsat za člena.')}</p>
-          {tlacitko}
+          {tlacitko && <AkcePrazdna>{tlacitko}</AkcePrazdna>}
           {okna}
-        </div>
+        </Sloupec>
       ) : undefined}
       // v4 skladba (spec V2 — vzor pro fázi 2): filtr Měsíc (z katalogu) a Člověk v jedné řadě ½ + ½ × 36,
       // segment stavů L→R × 36, souhrn, seznam a „Zapsat za člena" L→R × 44 na konci (mimo zkrácení
@@ -1683,17 +1718,19 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
       ) : undefined}
       souhrn={<span data-navic-souhrn>{souhrnText.join(' · ')}</span>}
       patka={tlacitko || undefined}>
-      {videt.length === 0 ? (
-        <p className="t-meta">{filtr === 'ceka' ? t('Nic nečeká na uznání.') : t('Pro tenhle filtr tu nic není.')}</p>
-      ) : (
-        <ul className="list">
-          {videt.map(z => (
-            <NavicRadek key={z.id} z={z} smiUznat={smiUznat}
-              onUznat={x => setRozhoduji({ z: x, akce: 'uznat' })} onOdmitnout={x => setRozhoduji({ z: x, akce: 'odmitnout' })} />
-          ))}
-        </ul>
-      )}
-      {seznam.length > videt.length && <p className="t-meta mt-2">{aDalsich(t, seznam.length - videt.length)}</p>}
+      <Sloupec mezera={2} className={OSA_TEXTU}>
+        {videt.length === 0 ? (
+          <p className="t-meta">{filtr === 'ceka' ? t('Nic nečeká na uznání.') : t('Pro tenhle filtr tu nic není.')}</p>
+        ) : (
+          <ul className="list">
+            {videt.map(z => (
+              <NavicRadek key={z.id} z={z} smiUznat={smiUznat}
+                onUznat={x => setRozhoduji({ z: x, akce: 'uznat' })} onOdmitnout={x => setRozhoduji({ z: x, akce: 'odmitnout' })} />
+            ))}
+          </ul>
+        )}
+        {seznam.length > videt.length && <p className="t-meta">{aDalsich(t, seznam.length - videt.length)}</p>}
+      </Sloupec>
       {okna}
     </Widget>
   );
@@ -1757,12 +1794,12 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
     sporu > 0 ? t('{n} nesouhlasí', { n: cislo(sporu) }) : null,
   ].filter(Boolean);
   const vetaManko = manka > 0 && (!L || filtr === 'vse' || filtr === 'plati') ? (
-    <p className="t-meta mt-3 text-pretty" data-tresty-manko>
+    <p className="t-meta text-pretty" data-tresty-manko>
       {t('{n, plural, one {# uzávěrka s mankem.} few {# uzávěrky s mankem.} other {# uzávěrek s mankem.}}', { n: manka })} {t('Manko řeš dohodou o odpovědnosti, ne trestem.')}
     </p>
   ) : null;
   const tlacitko = smiUdelit && (
-    <Button variant="secondary" size="sm" icon="warning" onClick={() => setDavam({})}>{t('Dát trest')}</Button>
+    <Button variant="secondary" icon="warning" onClick={() => setDavam({})}>{t('Dát trest')}</Button>
   );
   const okna = !nahled && (
     <>
@@ -1779,12 +1816,12 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
     <Widget nacteni={ceka ? CEKA : [mesicni, platne]} odkaz={odkazTresty}
       doplnek={sporu > 0 ? <Chip tone="wait" size="sm">{t('{n} nesouhlasí', { n: cislo(sporu) })}</Chip> : undefined}
       prazdno={vse && vse.length === 0 && vsechnyNavrhy.length === 0 ? (
-        <div className="space-y-3" data-tresty-prazdno>
+        <Sloupec mezera={4} data-tresty-prazdno>
           <p className="t-meta text-pretty">{t('Tento měsíc bez trestů. Když něco nevyjde, dej trest nebo napomenutí odsud, z profilu člena, z uzávěrky nebo z docházky.')}</p>
           {vetaManko}
-          {tlacitko}
+          {tlacitko && <AkcePrazdna>{tlacitko}</AkcePrazdna>}
           {okna}
-        </div>
+        </Sloupec>
       ) : undefined}
       // v4 skladba (spec V2): Měsíc + Člověk ½ + ½ × 36, segment L→R × 36, souhrn, obsah, „Dát trest" L→R × 44 na konci.
       filtry={L && lide.length > 1 ? (
@@ -1804,29 +1841,33 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
       ) : undefined}
       souhrn={<span data-tresty-souhrn>{souhrnText.join(' · ')}</span>}
       patka={tlacitko || undefined}>
-      {sporne.length > 0 && (
-        <div className="mt-3" data-tresty-sporne>
-          <p className="t-label">{t('Nesouhlasí')}</p>
-          <ul className="list" data-tresty-seznam>{sporne.map(radek)}</ul>
-        </div>
-      )}
-      {navrhyVidet.length > 0 && (!L || filtr === 'vse' || filtr === 'plati') && (
-        <div className="mt-3" data-tresty-navrhy>
-          <p className="t-label">{t('Návrhy')}</p>
-          <NavrhyTrestu navrhy={navrhyVidet} onDat={zNavrhu} nahled={nahled || !smiUdelit} />
-          {vsechnyNavrhy.length > navrhyVidet.length && <p className="t-meta mt-1">{aDalsich(t, vsechnyNavrhy.length - navrhyVidet.length)}</p>}
-        </div>
-      )}
-      {vetaManko}
-      {videt.length > 0 ? (
-        <div className="mt-3">
-          {(sporne.length > 0 || navrhyVidet.length > 0) && <p className="t-label">{t('Tresty')}</p>}
-          <ul className="list" data-tresty-seznam>{videt.map(radek)}</ul>
-        </div>
-      ) : sporne.length === 0 && (
-        <p className="t-meta mt-3">{filtr === 'spor' && L ? t('Nikdo s trestem nenesouhlasí.') : vse && vse.length === 0 ? t('Tento měsíc bez trestů.') : t('Pro tenhle filtr tu nic není.')}</p>
-      )}
-      {zbytek.length > videt.length && <p className="t-meta mt-2">{aDalsich(t, zbytek.length - videt.length)}</p>}
+      {/* v4 (V14): skupiny seznamu (Nesouhlasí, Návrhy, Tresty) pod sebou viditelně 24 (gap 12 + spodní
+          odsazení řádku 12), uvnitř skupiny štítek → seznam 4 — dřív mt-3 / mt-1 / mt-2 (7 různých mezer). */}
+      <Sloupec mezera={3} className={OSA_TEXTU}>
+        {sporne.length > 0 && (
+          <Sloupec mezera={1} data-tresty-sporne>
+            <p className="t-label">{t('Nesouhlasí')}</p>
+            <ul className="list" data-tresty-seznam>{sporne.map(radek)}</ul>
+          </Sloupec>
+        )}
+        {navrhyVidet.length > 0 && (!L || filtr === 'vse' || filtr === 'plati') && (
+          <Sloupec mezera={1} data-tresty-navrhy>
+            <p className="t-label">{t('Návrhy')}</p>
+            <NavrhyTrestu navrhy={navrhyVidet} onDat={zNavrhu} nahled={nahled || !smiUdelit} />
+            {vsechnyNavrhy.length > navrhyVidet.length && <p className="t-meta">{aDalsich(t, vsechnyNavrhy.length - navrhyVidet.length)}</p>}
+          </Sloupec>
+        )}
+        {vetaManko}
+        {videt.length > 0 ? (
+          <Sloupec mezera={1}>
+            {(sporne.length > 0 || navrhyVidet.length > 0) && <p className="t-label">{t('Tresty')}</p>}
+            <ul className="list" data-tresty-seznam>{videt.map(radek)}</ul>
+            {zbytek.length > videt.length && <p className="t-meta">{aDalsich(t, zbytek.length - videt.length)}</p>}
+          </Sloupec>
+        ) : sporne.length === 0 && (
+          <p className="t-meta">{filtr === 'spor' && L ? t('Nikdo s trestem nenesouhlasí.') : vse && vse.length === 0 ? t('Tento měsíc bez trestů.') : t('Pro tenhle filtr tu nic není.')}</p>
+        )}
+      </Sloupec>
       {okna}
     </Widget>
   );
@@ -1857,7 +1898,7 @@ function ZaBodyTymu({ velikost, nahled }: WidgetProps) {
   const fronta = cekajiciZUkolu(cekajici.data?.items ?? []);
   const videt = L ? ukoly : ukoly.slice(0, ZA_BODY_M);
   const tlacitko = smiNovy && (
-    <Button variant="secondary" size="sm" icon="plus" className="tap-target" onClick={() => setNovy(true)}>{t('Nový úkol za body')}</Button>
+    <Button variant="secondary" icon="plus" onClick={() => setNovy(true)}>{t('Nový úkol za body')}</Button>
   );
   const okna = (
     <>
@@ -1872,32 +1913,29 @@ function ZaBodyTymu({ velikost, nahled }: WidgetProps) {
     <Widget nacteni={ceka ? CEKA : [dnes, cekajici]} odkaz={{ popisek: t('Spravovat'), pohled: 'tasks', arg: ARG_ZA_BODY }}
       doplnek={fronta.length > 0 ? <Chip tone="wait" size="sm">{t('{n} čeká', { n: cislo(fronta.length) })}</Chip> : undefined}
       prazdno={dnes.data && cekajici.data && ukoly.length === 0 && fronta.length === 0 ? (
-        <div className="space-y-3" data-za-body-prazdno>
+        <Sloupec mezera={4} data-za-body-prazdno>
           <p className="t-meta text-pretty">{t('Dnes tu žádný úkol za body není. Vypiš volitelný úkol — kdo chce, vezme si ho a dostane body. Opakování si nastavíš sám.')}</p>
-          {tlacitko}
+          {tlacitko && <AkcePrazdna>{tlacitko}</AkcePrazdna>}
           {okna}
-        </div>
-      ) : undefined}>
-      {/* Nový úkol nahoře vedle souhrnu: dole by ho u dlouhého seznamu schovalo zkrácení „Zobrazit vše". */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <p className="t-meta min-w-0" data-za-body-souhrn>{textSouhrnuZaBody(t, souhrnZaBody(ukoly))}</p>
-        {tlacitko}
-      </div>
-      {/* Dnešní úkoly první (hlavní údaj karty — na telefonu nesmí skončit pod „Zobrazit vše"), čekající pod nimi;
-          že něco čeká, říká už chip v hlavičce. */}
-      {ukoly.length > 0 ? (
-        <div className="mt-2">
-          <ul className="list" data-za-body-seznam>{videt.map(u => <RadekUkoluDnes key={u.nabidka.id} u={u} />)}</ul>
-          {ukoly.length > videt.length && <p className="t-meta mt-1">{aDalsich(t, ukoly.length - videt.length)}</p>}
-        </div>
-      ) : (
-        <p className="t-meta mt-3">{t('Dnes se žádný úkol za body nedá vzít.')}</p>
-      )}
-      {fronta.length > 0 && (
-        <div className="mt-3">
-          <FrontaZaBody items={fronta} smiUznat={smiUznat} strop={L ? undefined : 2} />
-        </div>
-      )}
+        </Sloupec>
+      ) : undefined}
+      // v4 (V2, V16): souhrn dne je slot nad seznamem a „Nový úkol za body" akce widgetu v patce (L→R × 44,
+      // mimo zkrácení „Zobrazit vše", takže ji dlouhý seznam neschová) — dřív obsahová pilulka vedle věty.
+      souhrn={<span data-za-body-souhrn>{textSouhrnuZaBody(t, souhrnZaBody(ukoly))}</span>}
+      patka={tlacitko || undefined}>
+      {/* Dnešní úkoly první (hlavní údaj karty — na telefonu nesmí skončit pod „Zobrazit vše"), čekající pod nimi
+          (skupina 24); že něco čeká, říká už chip v hlavičce. */}
+      <Sloupec mezera={3} className={OSA_TEXTU}>
+        {ukoly.length > 0 ? (
+          <Sloupec mezera={1} style={osaTextu(OSA_JAMKA)}>
+            <ul className="list" data-za-body-seznam>{videt.map(u => <RadekUkoluDnes key={u.nabidka.id} u={u} />)}</ul>
+            {ukoly.length > videt.length && <p className="t-meta">{aDalsich(t, ukoly.length - videt.length)}</p>}
+          </Sloupec>
+        ) : (
+          <p className="t-meta">{t('Dnes se žádný úkol za body nedá vzít.')}</p>
+        )}
+        {fronta.length > 0 && <FrontaZaBody items={fronta} smiUznat={smiUznat} strop={L ? undefined : 2} />}
+      </Sloupec>
       {okna}
     </Widget>
   );

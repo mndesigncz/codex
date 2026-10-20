@@ -47,11 +47,13 @@ import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
 import { useDraft } from '@/lib/useDraft';
 import { Icon } from '../../Icons';
 import {
-  Avatar, Button, Checklist, Chip, DraftNote, EmptyState, Field, ListRow, Menu, Modal, Skeleton, Stat, SwitchRow,
+  Avatar, Button, Checklist, Chip, DraftNote, Field, ListRow, Menu, Modal, Skeleton, Sloupec, Stat, SwitchRow,
   Textarea, Well, type ChecklistItem, type MenuItem,
 } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
+import { OSA_TEXTU } from '../osaTextu';
+import { PrazdnoWidgetu } from '../PrazdnoWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { navigaceCile, rozeberCil, useNavigace, useSmi, type CilOdkazu } from '../NavigaceKontext';
 
@@ -278,17 +280,23 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
           <span className="sr-only">{t('{n, plural, one {Celkem # položka čeká} few {Celkem # položky čekají} other {Celkem # položek čeká}}', { n: celkem })}</span>
         </Chip>
       ) : undefined}>
-      <div className="space-y-3">
+      <Sloupec mezera={3}>
+        {/* v4 (V08, V4): fronty jako ŘÁDKY SEZNAMU přes celou šířku (jamka s ikonou, věta s počtem, šipka
+            na R) — dřív pilulky podle délky textu pod sebou: šest tlačítek, šest pravých hran. */}
         {cekaji.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <ul className="list" data-ceka-fronty>
             {cekaji.map(({ f, s }) => {
               const text = f.text(t, s.data ?? 0);
-              // Proklik jen tam, kam divák smí; jinak číslo zůstane jako stav, bez odkazu.
-              return nav.smiPohled(f.pohled)
-                ? <Button key={f.id} variant="secondary" size="sm" icon={f.ikona} onClick={() => (f.otevri ? f.otevri(nav) : nav.onNavigate(f.pohled))}>{text}</Button>
-                : <Chip key={f.id} tone="wait" icon={f.ikona}>{text}</Chip>;
+              // Proklik jen tam, kam divák smí; jinak číslo zůstane jako stav, bez odkazu (a bez šipky).
+              const smi = nav.smiPohled(f.pohled);
+              return (
+                <li key={f.id}>
+                  <ListRow as="div" lead={<JamkaIkony ikona={f.ikona} />} title={text}
+                    onClick={smi ? () => (f.otevri ? f.otevri(nav) : nav.onNavigate(f.pohled)) : undefined} />
+                </li>
+              );
             })}
-          </div>
+          </ul>
         )}
         {selhane.length > 0 && !vsechnoSelhalo && (
           <p className="note note-wait text-[13px]">
@@ -297,7 +305,7 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
               className="tap-target-sm font-semibold underline underline-offset-2">{t('Zkusit znovu')}</button>
           </p>
         )}
-      </div>
+      </Sloupec>
     </Widget>
   );
 }
@@ -464,7 +472,7 @@ function QrNabidky({ adresa }: { adresa: string }) {
     return () => { platne = false; };
   }, [adresa]);
   return (
-    <Well className="mt-3 flex items-center gap-4">
+    <Well className="flex items-center gap-4">
       {obrazek
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={obrazek} alt={t('QR kód sdílené stránky')} width={128} height={128} className="h-32 w-32 shrink-0 rounded-xl" />
@@ -497,9 +505,10 @@ function PripnutaNabidka({ velikost }: WidgetProps) {
     prazdno = !spravuje ? null
       : S ? <p className="t-meta">{t('Nic není připnuté.')}</p>
       : (
-        <EmptyState compact icon="external" title={t('Nic není připnuté')}
-          hint={t('Připni sdílenou stránku a tým ji tu otevře jedním ťuknutím.')}
-          action={<Button variant="secondary" size="sm" onClick={() => nav.onNavigate('team-settings')}>{t('Nastavit sdílení')}</Button>} />
+        // v4 (V11, V16): prázdný stav na levé ose karty, akce přes celou šířku (L→R × 44).
+        <PrazdnoWidgetu titul={t('Nic není připnuté')}
+          text={t('Připni sdílenou stránku a tým ji tu otevře jedním ťuknutím.')}
+          akce={<Button variant="secondary" onClick={() => nav.onNavigate('team-settings')}>{t('Nastavit sdílení')}</Button>} />
       );
   }
 
@@ -512,7 +521,7 @@ function PripnutaNabidka({ velikost }: WidgetProps) {
           <Icon name="external" size={15} className="shrink-0 text-black/40" />
         </p>
       ) : (
-        <>
+        <Sloupec mezera={3}>
           <ul className="list">
             <ListRow lead={<JamkaIkony ikona={s.kind === 'guides' ? 'book' : 'box'} />}
               title={nazev} meta={t('Sdílená stránka pro zákazníky')}
@@ -525,7 +534,7 @@ function PripnutaNabidka({ velikost }: WidgetProps) {
               )} />
           </ul>
           {velikost === 'L' && <QrNabidky adresa={adresa} />}
-        </>
+        </Sloupec>
       ))}
     </Widget>
   );
@@ -681,16 +690,19 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
   };
 
   const pole = (
-    <div className="space-y-3">
+    <Sloupec mezera={3}>
       <DraftNote koncept={koncept} co="rozepsané oznámení" />
       <Field id={`${id}-text`} label={t('Nové oznámení')} hint={t('Připnuté oznámení uvidí celý tým a přijde mu upozornění.')}>
         <Textarea id={`${id}-text`} rows={okno ? 4 : 2} maxLength={MAX_OZNAMENI} value={text}
           onChange={e => setText(e.target.value)} />
       </Field>
-      <SwitchRow as="div" className="!py-1" title={t('Poslat i do týmového chatu')} checked={doChatu} onChange={setDoChatu} />
-      <SwitchRow as="div" className="!py-1" title={t('Vyžadovat potvrzení')} hint={t('Každý pod oznámením klepne na „Rozumím" a uvidíš, kdo ještě ne.')} checked={potvrzeni} onChange={setPotvrzeni} />
+      {/* v4 (V5): přepínače jako řádky seznamu (název vlevo, přepínač na R), ne volné ovládání pod polem. */}
+      <ul className="list">
+        <SwitchRow className="list-row" title={t('Poslat i do týmového chatu')} checked={doChatu} onChange={setDoChatu} />
+        <SwitchRow className="list-row" title={t('Vyžadovat potvrzení')} hint={t('Každý pod oznámením klepne na „Rozumím" a uvidíš, kdo ještě ne.')} checked={potvrzeni} onChange={setPotvrzeni} />
+      </ul>
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
-    </div>
+    </Sloupec>
   );
 
   if (okno) {
@@ -705,13 +717,17 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
     );
   }
   return (
-    <div className="space-y-3">
+    <Sloupec mezera={4}>
       {pole}
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <span className="t-meta tabular-nums">{cislo(text.length)}/{cislo(MAX_OZNAMENI)}</span>
-        <Button variant="primary" size="sm" block loading={ukladam} disabled={!text.trim()} onClick={pripnout}>{t('Připnout oznámení')}</Button>
-      </div>
-    </div>
+      {/* v4 (P2, P17): „Připnout" přes celou šířku L→R × 44 jako akce formuláře, počítadlo znaků nad ním
+          na pravé hraně (patří k poli) — dřív tlačítko obsahové šířky vpravo, na monitoru osamělé. */}
+      <Sloupec mezera={2}>
+        <p className="t-meta tabular-nums text-right">{cislo(text.length)}/{cislo(MAX_OZNAMENI)}</p>
+        <div className="rada rada-rovne rada-m">
+          <Button variant="primary" loading={ukladam} disabled={!text.trim()} onClick={pripnout}>{t('Připnout oznámení')}</Button>
+        </div>
+      </Sloupec>
+    </Sloupec>
   );
 }
 
@@ -872,7 +888,7 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
       meta={[a.authorName, dbTimeDayHM(a.createdAt)].filter(Boolean).join(' · ')}
       // „Rozumím" pod textem (44 px, tmavé primary — widget nikdy limetku): dokud člověk nepotvrdí.
       detail={a.requireAck && !a.acked && a.pinned ? (
-        <Button variant="primary" size="md" icon="check" className="mt-1.5" loading={potvrzuji === a.id} onClick={() => { void potvrdit(a); }}>{t('Rozumím')}</Button>
+        <Button variant="primary" size="md" icon="check" className="mt-2" loading={potvrzuji === a.id} onClick={() => { void potvrdit(a); }}>{t('Rozumím')}</Button>
       ) : undefined}
       right={!a.pinned ? <Chip tone="muted" size="sm">{t('Odepnuto')}</Chip> : stavPotvrzeni(a) ?? undefined}
       // Na telefonu se akce odlomí na vlastní řádek a jediné „···" by skončilo vlevo pod
@@ -887,8 +903,8 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
     prazdno = null;
   } else if (nicNevisi && M) {
     prazdno = (
-      <EmptyState compact icon="pin" title={t('Nástěnka je prázdná')} hint={t('Připni oznámení a celý tým ho uvidí.')}
-        action={<Button variant="secondary" size="sm" icon="plus" onClick={() => setPisu(true)}>{t('Nové oznámení')}</Button>} />
+      <PrazdnoWidgetu titul={t('Nástěnka je prázdná')} text={t('Připni oznámení a celý tým ho uvidí.')}
+        akce={<Button variant="secondary" icon="plus" onClick={() => setPisu(true)}>{t('Nové oznámení')}</Button>} />
     );
   }
 
@@ -899,33 +915,37 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
   return (
     <>
       <Widget nacteni={ceka ? CEKA : nacteniData} prazdno={prazdno}
+        // Velká nástěnka se nezkracuje pod „Zobrazit vše": formulář nahoře by jinak připnutá oznámení
+        // (to hlavní, co tým čte) odsunul pod odlesk. Zkracuje se jen střední karta s pěti řádky.
+        bezZkraceni={!M}
+        // v4 (V16): na střední nástěnce je „Nové oznámení" akce widgetu v patce (L→R × 44), ne pilulka pod seznamem.
+        patka={M && spravuje ? <Button variant="secondary" icon="plus" onClick={() => setPisu(true)}>{t('Nové oznámení')}</Button> : undefined}
         doplnek={kPotvrzeni > 0 ? <Chip tone="wait" size="sm" aria-label={t('{n, plural, one {# oznámení k potvrzení} few {# oznámení k potvrzení} other {# oznámení k potvrzení}}', { n: kPotvrzeni })}>{cislo(kPotvrzeni)}</Chip>
           : pripnuta.length > 0 ? <Chip tone="muted" size="sm">{cislo(pripnuta.length)}</Chip> : undefined}>
-        <div className="space-y-4">
+        <Sloupec mezera={6}>
           {spravuje && !M && <NoveOznameni nahled={nahled} />}
           {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
           {M ? (
-            <>
-              <ul className="list">{radkyM.slice(0, 5).map(radek)}</ul>
+            <Sloupec mezera={2}>
+              <ul className={`list ${OSA_TEXTU}`}>{radkyM.slice(0, 5).map(radek)}</ul>
               {radkyM.length > 5 && <p className="t-meta">{aDalsich(t, radkyM.length - 5)}</p>}
-              {/* Střední nástěnka nemá místo na formulář — jediné tlačítko těla otevře okno.
+              {/* Střední nástěnka nemá místo na formulář — „Nové oznámení" v patce otevře okno.
                   Jedna položka v nabídce „···" v hlavičce by vedle „···" řádků jen mátla. */}
-              {spravuje && <Button variant="secondary" size="sm" icon="plus" onClick={() => setPisu(true)}>{t('Nové oznámení')}</Button>}
-            </>
+            </Sloupec>
           ) : (
             <>
               {pripnuta.length > 0
-                ? <ul className="list">{pripnuta.map(radek)}</ul>
+                ? <ul className={`list ${OSA_TEXTU}`}>{pripnuta.map(radek)}</ul>
                 : <p className="t-meta">{t('Na nástěnce zatím nic nevisí.')}</p>}
               {odepnuta.length > 0 && (
-                <div>
+                <Sloupec mezera={1}>
                   <p className="t-label">{t('Odepnutá')}</p>
-                  <ul className="list mt-1">{odepnuta.map(radek)}</ul>
-                </div>
+                  <ul className={`list ${OSA_TEXTU}`}>{odepnuta.map(radek)}</ul>
+                </Sloupec>
               )}
             </>
           )}
-        </div>
+        </Sloupec>
       </Widget>
       {/* Okna mimo obal: když obal ukazuje prázdný stav, obsah se nekreslí —
           a „Nové oznámení" z prázdného stavu musí okno otevřít taky. */}

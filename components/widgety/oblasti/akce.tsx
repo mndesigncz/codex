@@ -32,7 +32,7 @@ import { apiMessage } from '@/lib/api';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { akceKPriprave, posledniProbehla, prepniBod, vyberAkceSouhrn, vysledekAkce } from '@/lib/klientPrehled';
 import { useMoney } from '../../CurrencyProvider';
-import { Chip, ListRow, PersonChip, Stat, StatRow } from '../../ui';
+import { Avatar, Chip, ListRow, Stat, StatRow } from '../../ui';
 import { Icon } from '../../Icons';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
@@ -158,13 +158,18 @@ function NejblizsiAkce({ velikost, nastaveni }: WidgetProps<{ pocet?: unknown }>
             {/* Chip nezalamuje — krátká věta, ať se na telefonu vejde. */}
             {jsem(a) && <Chip tone="ok" size="sm" icon="check">{t('Jsi v obsluze')}</Chip>}
             {a.crewPeople.length > 0 && (
-              <div>
+              // v4 (P2): obsluha jako řádky pod sebou (avatar + jméno přes šířku), ne pilulky podle délky
+              // jména zalomené za sebou (tři pravé hrany pod sebou).
+              <div className="sloupec sloupec-2">
                 <p className="t-label">{t('Obsluha')}</p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <ul className="sloupec sloupec-2">
                   {a.crewPeople.map(p => (
-                    <PersonChip key={p.id} name={p.name} avatar={p.avatar} size="sm" tone={meId === p.id ? 'ok' : 'muted'} />
+                    <li key={p.id} className="flex min-w-0 items-center gap-3">
+                      <Avatar emoji={p.avatar} name={p.name} size="xs" />
+                      <span className={`min-w-0 flex-1 truncate text-[15px] leading-snug ${meId === p.id ? 'font-semibold text-ok-ink' : 'text-[#16181A]'}`}>{p.name}</span>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
           </div>

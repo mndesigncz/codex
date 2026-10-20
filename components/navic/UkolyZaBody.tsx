@@ -17,7 +17,7 @@
 
 import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { Button, Chip, Toast } from '../ui';
+import { Button, Chip, Sloupec, Toast } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDenVTydnu } from '@/lib/i18n/format';
@@ -147,12 +147,17 @@ export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = 
           </div>
           <p className="t-meta mt-0.5 text-pretty" data-meta>{meta.join(' · ')}</p>
           {popisy && n.description && <p className="text-[13px] text-black/55 leading-snug mt-1 text-pretty">{n.description}</p>}
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <Chip tone={chip.tone} size="sm" icon={chip.icon}>{chip.text}</Chip>
-            {n.requirePhoto && <Chip tone="muted" size="sm" icon="camera">{t('s fotkou')}</Chip>}
-            {n.autoApprove && u.stav !== 'uznano' && <Chip tone="muted" size="sm" icon="check">{t('uzná se samo')}</Chip>}
-            {akce.length > 0 && <span className="ml-auto flex flex-wrap justify-end gap-2" data-akce-ukolu>{akce.map(a => tlacitko(u, a))}</span>}
+          {/* v4 (V4, P12): stavový řádek na ose textu; jediná akce stojí v něm na R, pár akcí
+              (Hotovo / Vrátit) je pod ním jako ½ + ½ přes šířku textu — ne dvě pilulky různé šířky. */}
+          <div className="flex items-center gap-2 mt-2">
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <Chip tone={chip.tone} size="sm" icon={chip.icon}>{chip.text}</Chip>
+              {n.requirePhoto && <Chip tone="muted" size="sm" icon="camera">{t('s fotkou')}</Chip>}
+              {n.autoApprove && u.stav !== 'uznano' && <Chip tone="muted" size="sm" icon="check">{t('uzná se samo')}</Chip>}
+            </span>
+            {akce.length === 1 && <span className="flex shrink-0" data-akce-ukolu>{tlacitko(u, akce[0])}</span>}
           </div>
+          {akce.length > 1 && <div className="rada rada-rovne mt-3" data-akce-ukolu>{akce.map(a => tlacitko(u, a))}</div>}
         </div>
       </li>
     );
@@ -161,11 +166,15 @@ export function UkolyZaBody({ ukoly, actingAs = null, jmeno = null, poOdchodu = 
   return (
     <>
       {jenAkce
-        ? <div className="flex flex-wrap gap-2" data-ukoly-za-body data-jen-akce>{videt.flatMap(u => (nahled ? [] : akceUkolu(u, poOdchodu)).map(a => tlacitko(u, a)))}</div>
-        : <ul className="list" data-ukoly-za-body>{videt.map(radek)}</ul>}
-      {max != null && ukoly.length > videt.length && (
-        <p className="t-meta mt-2">{t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n: ukoly.length - videt.length })}</p>
-      )}
+        ? <div className="rada rada-rovne" data-ukoly-za-body data-jen-akce>{videt.flatMap(u => (nahled ? [] : akceUkolu(u, poOdchodu)).map(a => tlacitko(u, a)))}</div>
+        : (
+          <Sloupec mezera={2}>
+            <ul className="list" data-ukoly-za-body>{videt.map(radek)}</ul>
+            {max != null && ukoly.length > videt.length && (
+              <p className="t-meta">{t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n: ukoly.length - videt.length })}</p>
+            )}
+          </Sloupec>
+        )}
       {!nahled && (
         <ZapsatNavic open={hotovo != null} onClose={() => setHotovo(null)} actingAs={actingAs} jmeno={jmeno}
           predvolby={hotovo ? { offerId: hotovo.nabidka.id, text: hotovo.nabidka.title, day: pragueToday(), nabidka: hotovo.nabidka } : null}
