@@ -1868,5 +1868,6 @@
   "Nový strop začne platit dnem uložení. Starší dny jsou beze změny, dokud body nepřepočítáš zpětně.": "The new cap applies from the day you save. Earlier days stay unchanged until you recalculate retroactively.",
   "Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop (když je zapnutý) začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Automatic points for procedures, tasks and closings will follow the method above and the cap (when on) will apply to past days too — as if it had always been so. Manual edits by management stay. You'll see the impact before saving.",
   "I starší ruční hodnocení směn považovat za nahrazující": "Treat older manual shift reviews as replacing too",
-  "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Shift reviews saved before this version were added to automatic points. Checked = they too replace the automatic points of their day (can be undone)."
+  "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Shift reviews saved before this version were added to automatic points. Checked = they too replace the automatic points of their day (can be undone).",
+  "Další možnosti": "More options"
 }

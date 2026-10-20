@@ -547,7 +547,7 @@ export default function EmployerLayout({ user }: Props) {
           <NotificationBell />
           {/* Všechno ostatní z lišty: Účtenky, přepnutí do Managero client a do TO GO.
               Položky jsou tytéž akce co dřív, jen bez pěti ikon vedle sebe. */}
-          <Menu items={[
+          <Menu label={t('Další možnosti')} items={[
             ...(ma(UCTENKY) ? [{ label: t('Účtenky'), icon: 'receipt', onClick: () => setReceiptsOpen(true) }] : []),
             ...(smiKlient ? [{ label: t('Přepnout do Managero client'), icon: 'gift', onClick: () => switchMode('client') }] : []),
             { label: t('Přepnout do TO GO režimu'), icon: 'cup', onClick: () => switchMode('togo') },

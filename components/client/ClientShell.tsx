@@ -66,7 +66,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
               <LogoMark size={32} />
               <span className={`hidden ${me ? 'min-[360px]:inline' : 'min-[440px]:inline'} font-bold tracking-tight leading-none`}>Managero <span className="hidden sm:inline text-black/45 font-semibold">client</span></span>
             </Link>
-            <nav className="ml-auto flex items-center gap-0.5 sm:gap-1 min-w-0" aria-label={t('Zákaznická navigace')}>
+            <nav className="ml-auto flex items-center gap-1 sm:gap-1.5 min-w-0" aria-label={t('Zákaznická navigace')}>
               {/* Na mobilu žijí záložky ve spodním docku jako ve zbytku
                   aplikace; nahoře zůstává jen značka a účet. Nepřihlášený
                   dock nemá, tak mu odkaz Podniky zůstává i na telefonu. */}

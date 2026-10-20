@@ -56,7 +56,9 @@ const pismo = (p) => p.evaluate(() => {
     const px = Math.round(parseFloat(cs.fontSize) * 10) / 10;
     vse.add(px);
     const inkoust = !!el.closest('section[class*="bg-[#16181A]"]');
-    const povolene = [11, 12, 13, 14, 15, 16, 18, 28];
+    // DESIGN v3 (redesign „na refero.design“): sekce 20 (dřív 18), číslo Stat 30 a titulek okna 22
+    // (dřív 28 obojí), nadpis stránky 32 (dřív 28). 18 a 28 zůstávají kvůli starším místům v obsahu.
+    const povolene = [11, 12, 13, 14, 15, 16, 18, 20, 22, 28, 30, 32];
     if (!povolene.includes(px) && !(inkoust && px >= 28 && px <= 40)) mimo.set(px, (mimo.get(px) ?? []).concat(t.slice(0, 24)));
   }
   return { vse: [...vse].sort((a, b) => a - b), mimo: Object.fromEntries([...mimo].map(([k, v]) => [k, v.slice(0, 3)])) };
@@ -140,7 +142,7 @@ for (const [nazev, cesta, stranka, fix, role, mineData, jmeno] of [
     tvrdi(`2: ${nazev} ${druh} — klikací karty jsou bílé (T5)`, karty.every(c => c === 'rgb(255, 255, 255)'), JSON.stringify(karty));
     tvrdi(`2: ${nazev} ${druh} — nic nepulzuje (animate-pulse/ping)`, await p.locator('[data-plocha] .animate-pulse, [data-plocha] .animate-ping').count() === 0);
     const f = await pismo(p);
-    tvrdi(`3: ${nazev} ${druh} — písmo drží řadu 11/12/13/14/15/16/18/28 (T13)`, Object.keys(f.mimo).length === 0, JSON.stringify(f));
+    tvrdi(`3: ${nazev} ${druh} — písmo drží řadu 11/12/13/14/15/16/18/20/22/28/30/32 (T13, v3)`, Object.keys(f.mimo).length === 0, JSON.stringify(f));
     const lim = await limetky(p, true);
     tvrdi(`4: ${nazev} ${druh} — v klidu žádná limetková plocha (T3)`, lim.length === 0, JSON.stringify(lim));
     // Názvy widgetů se nesmí usekávat (malá karta na telefonu má dva řádky).
