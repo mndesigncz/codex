@@ -101,11 +101,12 @@ export default function GuideItemLink({ itemId, items, onPick }: {
             </div>
           )}
           <button type="button" onClick={() => setOpen(false)}
-            className="btn btn-ghost btn-sm">{t('Zrušit')}</button>
+            className="btn btn-ghost w-full">{t('Zrušit')}</button>
         </div>
       ) : (
+        // v4 (P2, P8): akce formuláře v okně přes celou šířku, 44 jako ostatní tlačítka okna.
         <button type="button" onClick={() => setOpen(true)}
-          className="btn btn-secondary btn-sm">
+          className="btn btn-secondary btn-lg w-full">
           <Icon name="plus" size={15} />  {t('Připojit ke skladové položce')}
         </button>
       )}
