@@ -10,7 +10,8 @@ import { URL_NAVRHY_TRESTU, type NavrhTrestu } from '@/lib/tresty';
 import { apiMessage, okJson } from '@/lib/api';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
-import { Avatar, Button, ListRow, Toast } from '../ui';
+import { Avatar, Button, ListRow, Rada, Toast } from '../ui';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 import { useMoney } from '../CurrencyProvider';
 import { obnovTresty } from './data';
 
@@ -27,6 +28,7 @@ export function NavrhyTrestu({ navrhy, onDat, nahled = false }: {
   nahled?: boolean;
 }) {
   const t = useT('widgety');
+  const telefon = useJeTelefon();
   const money = useMoney();
   const [zahazuji, setZahazuji] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
@@ -42,6 +44,14 @@ export function NavrhyTrestu({ navrhy, onDat, nahled = false }: {
       setZahazuji(null);
     }
   };
+  const akce = (n: (typeof navrhy)[number]) => (
+    <>
+      <Button variant="secondary" size="sm" icon="warning" className="tap-target" disabled={zahazuji === n.klic}
+        aria-label={t('Dát trest: {jmeno}', { jmeno: n.userName })} onClick={() => onDat(n)}>{t('Dát trest')}</Button>
+      <Button variant="ghost" size="sm" className="tap-target" loading={zahazuji === n.klic}
+        aria-label={t('Zahodit návrh: {jmeno}', { jmeno: n.userName })} onClick={() => { void zahodit(n); }}>{t('Zahodit')}</Button>
+    </>
+  );
   return (
     <>
       <ul className="list" data-navrhy-trestu>
@@ -50,15 +60,12 @@ export function NavrhyTrestu({ navrhy, onDat, nahled = false }: {
             lead={<Avatar emoji={n.userAvatar} name={n.userName} size="sm" />}
             title={n.userName || t('Člen týmu')}
             meta={fmtDatum(n.day, { jazyk: t.jazyk, styl: 'denKratce' })}
-            detail={<span className="block text-[#16181A]">{popisNavrhu(t, n, money)}</span>}
-            actions={nahled ? undefined : (
-              <>
-                <Button variant="secondary" size="sm" icon="warning" className="tap-target" disabled={zahazuji === n.klic}
-                  aria-label={t('Dát trest: {jmeno}', { jmeno: n.userName })} onClick={() => onDat(n)}>{t('Dát trest')}</Button>
-                <Button variant="ghost" size="sm" className="tap-target" loading={zahazuji === n.klic}
-                  aria-label={t('Zahodit návrh: {jmeno}', { jmeno: n.userName })} onClick={() => { void zahodit(n); }}>{t('Zahodit')}</Button>
-              </>
-            )} />
+            detail={<>
+              <span className="block text-[#16181A]">{popisNavrhu(t, n, money)}</span>
+              {/* Telefon: pár akcí ½ + ½ na ose textu (P12) — v ocasu by stál pod avatarem na L. */}
+              {telefon && !nahled && <Rada vyska="s" className="mt-2">{akce(n)}</Rada>}
+            </>}
+            actions={nahled || telefon ? undefined : akce(n)} />
         ))}
       </ul>
       <Toast message={toast?.text ?? null} tone={toast?.tone} id={toast?.id} onClose={() => setToast(null)} />

@@ -13,7 +13,8 @@ import React from 'react';
 import { cekaSpor, jeNapomenuti, stavTrestu, type Trest } from '@/lib/tresty';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
-import { Avatar, Button, Chip, ListRow, Menu } from '../ui';
+import { Avatar, Button, Chip, ListRow, Menu, Rada } from '../ui';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 import { useMoney } from '../CurrencyProvider';
 
 /**
@@ -54,6 +55,8 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
 }) {
   const t = useT('widgety');
   const money = useMoney();
+  // Na telefonu je ocas řádku pod avatarem na L — stav a dopad proto jdou na osu textu (detail), v4.
+  const telefon = useJeTelefon();
   const stav = chipStavuTrestu(t, x);
   const zruseno = x.status === 'zruseno';
   const spor = cekaSpor(x);
@@ -84,19 +87,20 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
       {x.photoUrl && (
         <a href={x.photoUrl} target="_blank" rel="noreferrer" className="inline-block underline underline-offset-2 tap-target-sm">{t('Fotka')}</a>
       )}
-      {spor && <span className="mt-1.5 flex [&>span]:justify-start">{stavADopad}</span>}
+      {(spor || telefon) && <span className="mt-1.5 flex [&>span]:justify-start">{stavADopad}</span>}
       {rozhodnuti && (
-        <span className="mt-2 flex flex-wrap items-center gap-2">
+        // Pár akcí ½ + ½ (P12) na ose textu, stejná výška — dřív dvě obsahové šířky vlevo.
+        <Rada vyska="s" className="mt-2 sm:max-w-[24rem]">
           {/* Jméno v přístupném názvu: v seznamu je víc stejných tlačítek za sebou. `tap-target` = 44 px na telefonu. */}
           <Button variant="secondary" size="sm" icon="check" loading={pracuji} disabled={pracuji} className="tap-target"
             aria-label={t('Trest platí dál: {jmeno}', { jmeno: x.userName })} onClick={() => onPlatiDal(x)}>{t('Trest platí dál')}</Button>
           <Button variant="danger" size="sm" disabled={pracuji} className="tap-target"
             aria-label={t('Zrušit trest: {jmeno}', { jmeno: x.userName })} onClick={() => onZrusit(x)}>{t('Zrušit trest')}</Button>
-        </span>
+        </Rada>
       )}
     </>
   );
-  const maDetail = !bezJmena || !!vyjadreni || !!zruseni || !!x.photoUrl || spor;
+  const maDetail = !bezJmena || !!vyjadreni || !!zruseni || !!x.photoUrl || spor || telefon;
   const menu = !rozhodnuti && !zruseno && smiUdelit && onUpravit && onZrusit ? (
     // `!flex-none`: na telefonu by první prvek ocasu natáhlo přes řádek a „···" by stálo vlevo pod textem.
     <span className="!flex-none">
@@ -113,7 +117,7 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
       meta={meta}
       detail={maDetail ? detail : undefined}
       akceVRadku
-      right={spor ? undefined : stavADopad}
+      right={spor || telefon ? undefined : stavADopad}
       actions={menu} />
   );
 }

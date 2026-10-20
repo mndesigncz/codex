@@ -104,17 +104,16 @@ export function SpravaNabidky({ dnesni = false, onNovy }: {
 
   return (
     <Card aria-labelledby="nabidka-navic-titulek" data-sprava-nabidky>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="nabidka-navic-titulek" className="t-card flex items-center gap-2">
+      {/* Hlavička = titul + nejvýš proklik vpravo (V1); „Nový úkol za body" je akce karty na jejím konci
+          L→R × 44 (P17) — dřív se na telefonu zalomila pod titul jako osamělé tlačítko 165 px. */}
+      <div className="flex items-center justify-between gap-2 min-h-[var(--h-s)]">
+        <h2 id="nabidka-navic-titulek" className="t-card flex min-w-0 items-center gap-2">
           <Icon name="tag" size={17} className="shrink-0 text-black/40" />
-          {t('Úkoly za body')}
+          <span className="truncate">{t('Úkoly za body')}</span>
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          {vidiUkoly && (
-            <Button variant="ghost" size="sm" iconAfter="chevronRight" className="tap-target" onClick={() => nav.onNavigate('tasks', ARG_ZA_BODY)}>{t('Otevřít v Úkolech')}</Button>
-          )}
-          {smi && <Button variant="secondary" size="sm" icon="plus" className="tap-target" onClick={novy}>{t('Nový úkol za body')}</Button>}
-        </div>
+        {vidiUkoly && (
+          <Button variant="ghost" size="sm" iconAfter="chevronRight" className="tap-target shrink-0 !pr-0" onClick={() => nav.onNavigate('tasks', ARG_ZA_BODY)}>{t('Otevřít v Úkolech')}</Button>
+        )}
       </div>
       {/* V Úkolech totéž říká podtitulek hlavičky — na telefonu by tu byly čtyři řádky navíc nad seznamem. */}
       {!dnesni && <p className="t-meta mt-1 text-pretty">{t('Volitelné úkoly s body — kdo chce, vezme si úkol („Beru si"), splní ho a dostane body. Opakování nastavíš sám: jednou, každý den, vybrané dny, týdně, měsíčně nebo každých pár dní.')}</p>}
@@ -164,6 +163,9 @@ export function SpravaNabidky({ dnesni = false, onNovy }: {
         </>
       )}
       {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
+      {smi && polozky.length > 0 && !data.error && (
+        <Button variant="secondary" icon="plus" className="mt-4 w-full" onClick={novy}>{t('Nový úkol za body')}</Button>
+      )}
       {okno && (
         <NabidkaNavicOkno polozka={okno.polozka} onClose={() => setOkno(null)}
           onHotovo={(_o, nova) => setToast(nova ? t('Úkol za body je vypsaný.') : t('Úkol za body je upravený.'))} />

@@ -113,7 +113,6 @@
   "Tým teď vidí, kdo má kdy směnu.": "Zespół widzi teraz, kto kiedy ma zmianę.",
   "Tým vidí rozvrh ostatních": "Zespół widzi grafik innych",
   "Uložit": "Zapisz",
-  "Upravit": "Edytuj",
   "Upravit člena": "Edytuj członka",
   "Uzávěrka": "Zamknięcie kasy",
   "Uzávěrka je vázaná na směnu.": "Zamknięcie kasy jest powiązane ze zmianą.",
@@ -177,5 +176,6 @@
   "bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}": "bez stawki: {n, plural, one {# osoba} few {# osoby} many {# osób} other {# osoby}}",
   "dovolená {zbyva}/{dni}": "urlop {zbyva}/{dni}",
   "právě běží": "trwa teraz",
-  "Řadit lidi": "Sortuj osoby"
+  "Řadit lidi": "Sortuj osoby",
+  "Upravit…": "Edytuj…"
 }
