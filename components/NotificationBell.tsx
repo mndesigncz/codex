@@ -122,7 +122,7 @@ export default function NotificationBell() {
           if (!open) loadFeedback();
           setOpen(o => !o);
         }}
-        className="relative rounded-full bg-black/[0.04] border border-black/[0.08] w-10 h-10 flex items-center justify-center text-black/60 hover:text-black transition-colors"
+        className={`tap-target relative shrink-0 rounded-full w-10 h-10 flex items-center justify-center transition duration-200 ${open ? 'bg-black/10 text-[#16181A]' : 'bg-black/[0.05] text-black/70 hover:bg-black/[0.08] hover:text-[#16181A]'}`}
         title={t('Notifikace')} aria-label={t('Notifikace')}
       >
         {/* The bell only moves when there is actually something new. */}

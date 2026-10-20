@@ -8,7 +8,7 @@ import { predejPohledu } from '@/lib/predaniPohledu';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
-import { Avatar, Badge, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
+import { Avatar, Badge, ErrorBoundary, IconButton, MenuPanel, MenuItemButton } from '../ui';
 import { Dock } from '../ui/Dock';
 import { usePopover } from '@/lib/usePopover';
 import NotificationBell from '../NotificationBell';
@@ -282,29 +282,24 @@ export default function EmployeeLayout({ user }: Props) {
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Stejné odsazení jako u vedení — na 320px ho název stránky potřebuje. */}
-        <header className="px-4 sm:px-6 pt-5 pb-1 flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        {/* Horní lišta v3: značka a podnik vlevo, vpravo hledání a oznámení v šedých
+            kruzích. Název stránky stojí jednou — velkým h1 pod lištou; tady ho čte
+            jen odečítač. */}
+        <header className="px-5 sm:px-6 pt-4 pb-1 flex items-center gap-2 sm:gap-2.5 flex-shrink-0 min-h-[3.75rem]">
           {/* Ikonové tlačítko bez textu je pro odečítač obrazovky prostě
               „tlačítko". Tenhle přepínač je na každé obrazovce aplikace. */}
-          <button onClick={() => setSidebarOpen(v => !v)} type="button"
+          <IconButton icon="menu" onClick={() => setSidebarOpen(v => !v)}
             aria-label={sidebarOpen ? t('Zúžit boční pás') : t('Rozbalit boční pás')}
-            aria-expanded={sidebarOpen}
-            className="hidden md:flex rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
-            <Icon name="menu" size={20} />
-          </button>
-          <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>
+            aria-expanded={sidebarOpen} className="hidden md:inline-flex" />
+          <div className="md:hidden shrink-0"><LogoMark size={30} /></div>
           {/* Barista mezi pobočkami se přepíná hlavně z telefonu — boční pás tam není. */}
           <div className="md:hidden shrink-0"><PodnikSwitcher compact jenPrepinani /></div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
-          </div>
+          <p className="sr-only">{title}</p>
+          <div className="flex-1 min-w-0" />
           {/* Sekce skrytá v nastavení podniku, otevřená odkazem nebo widgetem: preference, ne zákaz. */}
           {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
-          {/* Lupa i na telefonu (kolo 6, Z9): hledání najde úkoly, položky skladu, návody i akce,
-              a jako řádek v listu Více o něm nikdo nevěděl. Titulek je truncate, místo tu je. */}
-          <button type="button" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog"
-            className="tap-target-sm inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
-            <Icon name="search" size={20} />
-          </button>
+          {/* Lupa i na telefonu (kolo 6, Z9): hledání najde úkoly, položky skladu, návody i akce. */}
+          <IconButton icon="search" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog" />
           <NotificationBell />
         </header>
 

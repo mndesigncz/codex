@@ -10,7 +10,7 @@ import { predejPohledu } from '@/lib/predaniPohledu';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher, { uklidKonceptu } from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
-import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton, type MenuItem } from '../ui';
+import { Avatar, ErrorBoundary, IconButton, Menu, MenuPanel, MenuItemButton, type MenuItem } from '../ui';
 import { Dock } from '../ui/Dock';
 import { usePopover } from '@/lib/usePopover';
 import NotificationBell from '../NotificationBell';
@@ -519,55 +519,39 @@ export default function EmployerLayout({ user }: Props) {
 
       {/* Main column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Na 320px byla tahle hlavička nejtěsnější místo v aplikaci: 48 px
-            odsazení, značka, dvě ikony a nápis TO GO se šálkem nechaly na název
-            obrazovky 29 pixelů, takže z „Nastavení týmu" zbyla jedna tečka.
-            Odsazení a mezery se na telefonu zmenšily a TO GO je tam jen
-            ikona — název stránky má přednost před vším ostatním. */}
-        <header className="px-4 sm:px-6 pt-5 pb-1 flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        {/* Horní lišta v3: vlevo značka a podnik, vpravo nejvýš dvě akce (hledat,
+            oznámení) v šedých kruzích a „···" se vším ostatním (účtenky, Managero
+            client, TO GO). Název stránky tu NENÍ — stojí jednou, velkým h1 pod
+            lištou (PageHeader). Dřív tu byl tentýž název podruhé a vedle něj pět
+            ikon a limetkové kolečko TO GO, takže lišta křičela víc než obsah. */}
+        <header className="px-5 sm:px-6 pt-4 pb-1 flex items-center gap-2 sm:gap-2.5 flex-shrink-0 min-h-[3.75rem]">
           {/* Ikonové tlačítko bez textu je pro odečítač obrazovky prostě
               „tlačítko". Tenhle přepínač je na každé obrazovce aplikace. */}
-          <button onClick={() => setSidebarOpen(v => !v)} type="button"
+          <IconButton icon="menu" onClick={() => setSidebarOpen(v => !v)}
             aria-label={sidebarOpen ? t('Zúžit boční pás') : t('Rozbalit boční pás')}
-            aria-expanded={sidebarOpen}
-            className="hidden md:flex rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
-            <Icon name="menu" size={20} />
-          </button>
-          <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>
+            aria-expanded={sidebarOpen} className="hidden md:inline-flex" />
+          <div className="md:hidden shrink-0"><LogoMark size={30} /></div>
           {/* Přepínač podniků byl jen v bočním pásu, který na telefonu není —
               majitel tří podniků se na mobilu nepřepnul a „Všechny podniky"
               nenašel. S jedním podnikem se nic nekreslí. */}
           <div className="md:hidden shrink-0"><PodnikSwitcher compact canCreate jenPrepinani onOverview={() => setCurrentView('org')} onNastaveniOrganizace={() => navigate('settings', 'organizace')} /></div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
-          </div>
+          {/* Název stránky jen pro odečítač: orientace „kde jsem" v landmarku lišty,
+              vidět je jednou — jako h1 obrazovky. */}
+          <p className="sr-only">{title}</p>
+          <div className="flex-1 min-w-0" />
           {/* Sekce skrytá v nastavení podniku, otevřená odkazem nebo widgetem: jedna
               informace, žádné okno. Skrytí je preference, ne zákaz. */}
           {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
-          {/* Hledání (paleta Ctrl K) i na telefonu (kolo 6): vedení kontroluje podnik hlavně z mobilu
-              a v listu Více bylo o dvě klepnutí dál. Dotyková plocha 44 px (tap-target). */}
-          <button type="button" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog"
-            className="tap-target inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
-            <Icon name="search" size={20} />
-          </button>
-          {ma(UCTENKY) && (
-          <button onClick={() => setReceiptsOpen(true)} title={t('Účtenky')} aria-label={t('Účtenky')}
-            className="tap-target-sm shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
-            <Icon name="receipt" size={20} />
-          </button>
-          )}
-          {/* Pod 380 px je přepínač do Managero client jen v listu Více — místo dostala lupa hledání, název stránky má přednost. */}
-          {smiKlient && (
-          <button onClick={() => switchMode('client')} title={t('Managero client: hosté, rezervace, věrnost')} aria-label={t('Přepnout do Managero client')}
-            className="tap-target shrink-0 hidden min-[380px]:inline-flex items-center gap-1.5 rounded-full bg-[#16181A]/[0.06] border border-black/10 text-[#16181A] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#16181A]/[0.1] transition whitespace-nowrap">
-            <Icon name="gift" size={15} className="shrink-0" /><span className="hidden sm:inline">{t('Client')}</span>
-          </button>
-          )}
-          <button onClick={() => switchMode('togo')} title={t('Přepnout do TO GO režimu')} aria-label={t('Přepnout do TO GO režimu')}
-            className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
-            <Icon name="cup" size={15} className="shrink-0" /><span className="hidden sm:inline">{t('TO GO')}</span>
-          </button>
+          {/* Hledání (paleta Ctrl K) i na telefonu (kolo 6): vedení kontroluje podnik hlavně z mobilu. */}
+          <IconButton icon="search" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog" />
           <NotificationBell />
+          {/* Všechno ostatní z lišty: Účtenky, přepnutí do Managero client a do TO GO.
+              Položky jsou tytéž akce co dřív, jen bez pěti ikon vedle sebe. */}
+          <Menu items={[
+            ...(ma(UCTENKY) ? [{ label: t('Účtenky'), icon: 'receipt', onClick: () => setReceiptsOpen(true) }] : []),
+            ...(smiKlient ? [{ label: t('Přepnout do Managero client'), icon: 'gift', onClick: () => switchMode('client') }] : []),
+            { label: t('Přepnout do TO GO režimu'), icon: 'cup', onClick: () => switchMode('togo') },
+          ]} />
         </header>
 
         {/* Bannery předplatného vedou rovnou na záložku Předplatné, ne na Účet.
