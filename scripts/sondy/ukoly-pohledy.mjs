@@ -70,8 +70,16 @@ for (const w of [1280, 390]) {
   await nastroj.getByRole('button', { name: /^Filtry/ }).click();
 
   // Hledání (na telefonu schované za lupou vedle rychlého přidání)
-  if (w < 600) await nastroj.getByRole('button', { name: 'Hledat v úkolech' }).click();
   const hledat = nastroj.getByRole('combobox', { name: 'Hledat v úkolech' }).or(nastroj.getByRole('textbox', { name: 'Hledat v úkolech' })).first();
+  if (w < 600) {
+    // Panel Filtry se právě zavírá: na pomalém runneru (CI) by klepnutí na lupu mohlo
+    // přijít během animace. Počkat na doběhnutí animací a pole případně otevřít znovu.
+    await p.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+    const lupa = nastroj.getByRole('button', { name: 'Hledat v úkolech' });
+    await lupa.click();
+    if (!(await dokud(() => hledat.isVisible().catch(() => false), 3000))) await lupa.click();
+  }
+  await hledat.waitFor({ timeout: 10000 });
   await hledat.fill('mleko');
   tvrdi(`${w}: hledání bez diakritiky najde „Objednat mléko" (2 výskyty)`, await dokud(async () => (await nastroj.getByRole('button', { name: 'Objednat mléko', exact: true }).count()) === 2, 3000));
   await hledat.fill('');
