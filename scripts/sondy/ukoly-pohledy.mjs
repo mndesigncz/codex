@@ -190,9 +190,10 @@ for (const w of [1280, 390]) {
   const karta = p.locator('[data-instance="po-terminu"]');
   await karta.waitFor({ timeout: 10000 });
   await karta.click({ position: { x: 40, y: 60 }, force: true });
-  const stavy = p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('group', { name: 'Stav úkolů' });
-  await stavy.waitFor({ timeout: 10000 });
-  tvrdi('widget → Úkoly: záložka „Po termínu" je rovnou zapnutá', await dokud(async () => (await stavy.getByRole('button', { name: /^Po termínu/ }).getAttribute('aria-pressed')) === 'true', 4000));
+  // Redesign v3: pás stavů je u vedení v panelu Filtry; zapnutý stav ukazuje štítek s křížkem.
+  const stitek = p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('button', { name: /^Zrušit filtr: Po termínu/ });
+  await stitek.waitFor({ timeout: 10000 });
+  tvrdi('widget → Úkoly: stav „Po termínu" je rovnou zapnutý (štítek nad seznamem)', await dokud(async () => /Po termínu · 2/.test(await stitek.innerText()), 4000));
   await ctx.close();
 }
 await konec();

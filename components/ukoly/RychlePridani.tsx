@@ -42,7 +42,7 @@ export function RychlePridani({ dnes, onPridat, className = '', kratce = false }
         <Icon name="plus" size={16} className="shrink-0 text-black/45" />
         <input value={text} onChange={e => setText(e.target.value)} maxLength={200} enterKeyHint="done"
           aria-label={t('Přidat úkol')} placeholder={kratce ? t('Přidat úkol…') : t('Přidat úkol… (např. Objednat mléko zítra)')} title={kratce ? t('Např. Objednat mléko zítra') : undefined}
-          className="min-w-0 flex-1 bg-transparent py-3 text-[15px] text-[#16181A] placeholder:text-black/40 focus:outline-none" />
+          className="min-w-0 flex-1 bg-transparent py-3 text-[15px] text-[#16181A] placeholder:text-black/45 dark:placeholder:text-white/40 focus:outline-none" />
         {rozbor && <Button type="submit" variant="secondary" size="sm" loading={ceka}>{t('Přidat')}</Button>}
       </div>
       {rozbor && <p className="t-meta mt-1.5 pl-4" aria-live="polite">{t('Termín: {den}', { den: denPopis(rozbor.dueDate) })}</p>}
