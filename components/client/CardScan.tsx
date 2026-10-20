@@ -178,17 +178,22 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
             </div>
           )}
           {cp.problem && <p role="alert" className="note note-danger">{cp.problem}</p>}
-          <div className="flex gap-2 flex-wrap">
+          {/* P12: pár akcí 2 × ½. */}
+          <div className="rada rada-rovne">
             <Button variant="primary" icon="check" disabled={!cp.usable} onClick={redeemPreview}>Uplatnit</Button>
             <Button variant="secondary" onClick={reset}>Zrušit</Button>
           </div>
         </div>
       ) : !hit ? (
-        <form onSubmit={e => { e.preventDefault(); void resolve(code); }} className="flex gap-2 flex-wrap">
+        // v4 (P10, V05): pole + Najít v jedné řadě 44 (pole pružné, Najít na pravé hraně); Skenovat pod nimi
+        // přes celou šířku. Dřív se Najít zalomilo pod pole na levý okraj.
+        <form onSubmit={e => { e.preventDefault(); void resolve(code); }} className="sloupec sloupec-2">
+          <div className="rada rada-pruzna rada-m">
           <Input aria-label="Kód kartičky nebo kuponu" value={code} onChange={e => setCode(/[^A-Za-z0-9 -]/.test(e.target.value) ? e.target.value.slice(0, 200) : fmt(e.target.value))} placeholder="ABCD-EFGH" autoCapitalize="characters" autoComplete="off" inputMode="text"
-            className="font-mono tracking-[0.2em] flex-1 basis-40 uppercase !w-auto" />
+            className="font-mono tracking-[0.2em] uppercase min-w-0" />
           <Button type="submit" variant="primary" icon="search" loading={busy === 'lookup'}>Najít</Button>
-          {canScan && <Button type="button" variant="secondary" icon="camera" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
+          </div>
+          {canScan && <Button type="button" variant="secondary" icon="camera" className="w-full" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
         </form>
       ) : (
         <div className="space-y-3">
@@ -216,8 +221,8 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
               onClick={() => act('stamp')}>
               {hit.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
             </Button>
-            <form onSubmit={e => { e.preventDefault(); act('points'); }} className="flex gap-2">
-              <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Útrata ${symbol}`} className="!w-32 text-center" />
+            <form onSubmit={e => { e.preventDefault(); act('points'); }} className="rada rada-pruzna rada-m">
+              <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Útrata ${symbol}`} className="text-center min-w-0" />
               <Button type="submit" variant="secondary" loading={busy === 'points'} disabled={!(hit.rules?.pointsPer100 || hit.campaigns?.some((cp: any) => cp.ruleType === 'min_value')) || !amount}>Body</Button>
             </form>
           </div>
@@ -229,12 +234,12 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="sc-pred" className="field-label">Z toho zaplaceno kreditem nebo poukazem ({symbol})</label>
-                  <Input id="sc-pred" type="number" inputMode="numeric" min={0} step={1} value={predplaceno} onChange={e => setPredplaceno(e.target.value)} placeholder="0" className="!w-32" />
+                  <Input id="sc-pred" type="number" inputMode="numeric" min={0} step={1} value={predplaceno} onChange={e => setPredplaceno(e.target.value)} placeholder="0" />
                   <p className="t-meta mt-1">{hit.rules?.bodyPravidla?.excludePrepaid === false ? 'Podnik počítá body z celého účtu, i z části zaplacené poukazem.' : 'Z téhle části se body a cashback nepočítají.'}</p>
                 </div>
                 <div>
                   <label htmlFor="sc-uct" className="field-label">Číslo účtenky (nepovinné)</label>
-                  <Input id="sc-uct" value={uctenka} maxLength={40} autoComplete="off" onChange={e => setUctenka(e.target.value)} placeholder="Třeba 2026/0412" className="!w-44" />
+                  <Input id="sc-uct" value={uctenka} maxLength={40} autoComplete="off" onChange={e => setUctenka(e.target.value)} placeholder="Třeba 2026/0412" />
                   <p className="t-meta mt-1">Bez pokladny: stejné číslo věrnost podruhé nepřipíše.</p>
                 </div>
               </div>
@@ -254,8 +259,8 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
                 ))}
               </div>
               {bill && (
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <Button size="sm" variant="primary" icon="check" loading={busy === 'bill'} onClick={() => act('bill')}>Připsat z účtenky</Button>
+                <div className="mt-2 sloupec sloupec-2">
+                  <Button size="sm" variant="primary" icon="check" className="w-full" loading={busy === 'bill'} onClick={() => act('bill')}>Připsat z účtenky</Button>
                   <p className="t-meta">Razítka podle položek účtu + body a kredit z částky. Jde to jen jednou na účtenku.</p>
                 </div>
               )}
@@ -407,11 +412,13 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
   return (
     <div className="space-y-3">
       {!p ? (
-        <form onSubmit={e => { e.preventDefault(); void najdi(kod); }} className="flex gap-2 flex-wrap">
+        <form onSubmit={e => { e.preventDefault(); void najdi(kod); }} className="sloupec sloupec-2">
+          <div className="rada rada-pruzna rada-m">
           <Input aria-label="Kód poukazu" value={kod} onChange={e => { setKod(formatujPriPsani(e.target.value)); setErr(''); }} placeholder="ABCD-2345" autoCapitalize="characters" autoComplete="off" inputMode="text"
-            className="font-mono tracking-[0.2em] flex-1 basis-40 uppercase !w-auto" />
+            className="font-mono tracking-[0.2em] uppercase min-w-0" />
           <Button type="submit" variant="primary" icon="search" loading={busy === 'najit'}>Najít</Button>
-          {canScan && <Button type="button" variant="secondary" icon="camera" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
+          </div>
+          {canScan && <Button type="button" variant="secondary" icon="camera" className="w-full" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
         </form>
       ) : (
         <div className="space-y-3">
@@ -421,23 +428,26 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
             <p className="t-meta tabular-nums">z {money(p.value_amount)} · {p.valid_until ? `platí do ${datumPoukazu(p.valid_until)}` : 'bez omezení platnosti'}{p.recipient_name ? ` · pro ${p.recipient_name}` : ''}</p>
           </div>
           {p.stav === 'active' ? (
-            <form onSubmit={e => { e.preventDefault(); if (castkaOk) void uplatni(cislo); }} className="flex flex-wrap items-center gap-2">
+            // v4 (P2, P10): výše účtu přes celou šířku, částka + Uplatnit v řadě 44, Celý zůstatek pod nimi přes šířku.
+            <form onSubmit={e => { e.preventDefault(); if (castkaOk) void uplatni(cislo); }} className="sloupec sloupec-2">
               {potrebaUcet && (
-                <div className="basis-full">
+                <div>
                   <Input aria-label={`Výše účtu v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={ucet} onChange={e => { setUcet(e.target.value); ref.current = null; setErr(''); }}
-                    placeholder={`Účet alespoň ${minUtrata}`} className="!w-44 text-center" />
+                    placeholder={`Účet alespoň ${minUtrata}`} className="text-center" />
                   <p className="t-meta mt-1">Poukaz jde uplatnit u účtu od {money(minUtrata)}. Zadej výši účtu.</p>
                 </div>
               )}
-              <Input aria-label={`Částka k uplatnění v ${symbol}`} type="number" inputMode="numeric" min={1} max={p.balance} step={1} value={castka}
-                onChange={e => { setCastka(e.target.value); ref.current = null; }} placeholder={`Max ${p.balance}`} className="!w-32 text-center" />
-              <Button type="submit" variant="primary" icon="check" loading={busy === 'uplatnit'} disabled={!castkaOk}>Uplatnit</Button>
-              <Button type="button" variant="secondary" disabled={busy === 'uplatnit' || !ucetOk} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatni(p.balance); }}>Celý zůstatek</Button>
+              <div className="rada rada-pruzna rada-m">
+                <Input aria-label={`Částka k uplatnění v ${symbol}`} type="number" inputMode="numeric" min={1} max={p.balance} step={1} value={castka}
+                  onChange={e => { setCastka(e.target.value); ref.current = null; }} placeholder={`Max ${p.balance}`} className="text-center min-w-0" />
+                <Button type="submit" variant="primary" icon="check" loading={busy === 'uplatnit'} disabled={!castkaOk}>Uplatnit</Button>
+              </div>
+              <Button type="button" variant="secondary" className="w-full" disabled={busy === 'uplatnit' || !ucetOk} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatni(p.balance); }}>Celý zůstatek</Button>
             </form>
           ) : (
             <p className="t-meta">{p.stav === 'expired' ? 'Platnost poukazu skončila, uplatnit ho nejde. Prodloužit ho může správce.' : p.stav === 'used' ? 'Poukaz je vyčerpaný.' : 'Poukaz je zrušený.'}</p>
           )}
-          <Button variant="ghost" size="sm" onClick={() => { setP(null); setKod(''); setCastka(''); setUcet(''); setMinUtrata(0); setErr(''); ref.current = null; }}>Jiný poukaz</Button>
+          <Button variant="ghost" size="sm" className="w-full" onClick={() => { setP(null); setKod(''); setCastka(''); setUcet(''); setMinUtrata(0); setErr(''); ref.current = null; }}>Jiný poukaz</Button>
         </div>
       )}
       {cam && !p && <Camera prijmi={prijmiPoukaz} onCode={c => { setCam(false); void najdi(c); }} onError={m => { setCam(false); setErr(m); }} />}

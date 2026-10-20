@@ -38,22 +38,24 @@ function Picker({ id, title, hint, value, onChange, tall, busy }: {
 }) {
   const ref = useRef<HTMLInputElement>(null);
   return (
-    <div>
+    // v4 (P2, V18): náhled přes celou šířku dílu (logo jamka 160 vysoká, na sm čtverec 160), pod ním
+    // vysvětlení a akce Nahrát / Odebrat jako řada rovných dílů — dřív čtyři různé pravé hrany pod sebou.
+    <div className={tall ? 'min-w-0' : 'min-w-0 sm:w-40'}>
       <p className="field-label">{title}</p>
-      <div className={`well relative overflow-hidden ${tall ? 'aspect-[16/7]' : 'aspect-square max-w-[10rem]'}`}>
+      <div className={`well relative overflow-hidden ${tall ? 'aspect-[16/7]' : 'h-40 w-full'}`}>
         {value ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={value} alt="" className={`h-full w-full ${tall ? 'object-cover' : 'object-contain p-3'}`} />
         ) : (
-          <span className="absolute inset-0 grid place-items-center text-black/30"><Icon name="camera" size={tall ? 28 : 22} /></span>
+          <span className="absolute inset-0 grid place-items-center text-black/30"><Icon name="camera" size={26} /></span>
         )}
       </div>
-      <div className="mt-2 flex items-center gap-2 flex-wrap">
-        <input ref={ref} id={id} type="file" accept="image/*" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) onChange(f as any); e.target.value = ''; }} />
+      <p className="t-meta mt-1.5">{hint}</p>
+      <input ref={ref} id={id} type="file" accept="image/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) onChange(f as any); e.target.value = ''; }} />
+      <div className="rada rada-rovne rada-s mt-3">
         <Button type="button" size="sm" variant="secondary" icon="upload" loading={busy} onClick={() => ref.current?.click()}>{value ? 'Změnit' : 'Nahrát'}</Button>
         {value && <Button type="button" size="sm" variant="danger" onClick={() => onChange('')}>Odebrat</Button>}
-        <span className="t-meta">{hint}</span>
       </div>
     </div>
   );
@@ -124,14 +126,15 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
       </Card>
 
       <Card className="space-y-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
+        {/* v4 (P2): „Přidat fotku" vpravo v řádku s titulem; na telefonu pod titulem přes celou šířku. */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
             <h2 className="t-card">Galerie</h2>
             <p className="t-meta mt-0.5">Až osm fotek z podniku. Host je uvidí na tvé stránce.</p>
           </div>
           <input ref={galerieRef} type="file" accept="image/*" className="hidden" aria-label="Fotka do galerie"
             onChange={e => { const f = e.target.files?.[0]; if (f) addPhoto(f); e.target.value = ''; }} />
-          <Button type="button" size="sm" variant="secondary" icon="plus" className="whitespace-nowrap" loading={busy === 'gallery'}
+          <Button type="button" size="sm" variant="secondary" icon="plus" className="whitespace-nowrap w-full sm:w-auto" loading={busy === 'gallery'}
             disabled={gallery.length >= 8} onClick={() => galerieRef.current?.click()}>Přidat fotku</Button>
         </div>
         {gallery.length === 0 ? (
@@ -157,16 +160,20 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
           <h2 className="t-card">Barva značky</h2>
           <p className="t-meta mt-0.5">Použije se na stránce pro hosty. Bez výběru zůstane limetková jako ve zbytku aplikace.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* v4 (P1, P2): vzorník je řada sedmi rovných dílů až k pravé hraně; vlastní barva a „Výchozí"
+            pod ním v jedné řadě (popisek vlevo, akce na R) — dřív „Vlastní" spadlo samo na další řádek. */}
+        <div className="grid grid-cols-7 gap-2 justify-items-center sm:flex sm:flex-wrap">
           {ACCENTS.map(c => (
             <button key={c} type="button" onClick={() => setP({ ...p, accent: c })} aria-label={`Barva ${c}`} aria-pressed={p.accent === c}
               className={`h-9 w-9 rounded-full border-2 transition ${p.accent === c ? 'border-[#16181A] scale-110' : 'border-black/10 hover:scale-105'}`}
               style={{ background: c }} />
           ))}
-          <label className="inline-flex items-center gap-2 text-[13px] text-black/55 ml-1">Vlastní
+        </div>
+        <div className="flex items-center gap-2 min-h-9">
+          <label className="flex flex-1 items-center justify-between gap-2 text-[13px] text-black/55">Vlastní
             <input type="color" aria-label="Vlastní barva značky" value={p.accent || '#C8F542'} onChange={e => setP({ ...p, accent: e.target.value.toUpperCase() })}
               className="h-9 w-12 rounded-xl border border-black/10 bg-transparent p-0.5" /></label>
-          {p.accent && <Button type="button" size="sm" variant="ghost" onClick={() => setP({ ...p, accent: '' })}>Výchozí</Button>}
+          {p.accent && <Button type="button" size="sm" variant="ghost" className="-mr-2" onClick={() => setP({ ...p, accent: '' })}>Výchozí</Button>}
         </div>
 
         {/* Ukázka i varování. Na některých barvách se čitelného textu prostě
