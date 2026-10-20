@@ -515,7 +515,10 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   const nastroj = (
     <div className="space-y-6">
-      {view === 'list' && !showForm && <RychlePridani dnes={today} onPridat={rychle} />}
+      {/* v3: rychlé přidání, hledání a „Filtry" v jedné řadě (dřív čtyři řady nad prvním úkolem:
+          segment, přidání, hledání s Filtry a pás stavů). Pás stavů je v panelu Filtry — seznam
+          je podle stavu rozdělený do sekcí s počty. Bez úkolů zůstává jen přidání. */}
+      {view === 'list' && !showForm && !(tasks.length > 0) && <RychlePridani dnes={today} onPridat={rychle} />}
 
       {/* Na telefonu je souhrn dne v podtitulku hlavičky (V11) — tady by byl další řádek nad prvním úkolem. */}
       {tasks.length > 0 && view !== 'prehled' && view !== 'zabody' && (
@@ -526,7 +529,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       )}
 
       {tasks.length > 0 && view !== 'prehled' && view !== 'zabody' && (
-        <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'} lide={lideFiltru} />
+        <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'} lide={lideFiltru}
+          kompaktniNaTelefonu stavVeFiltrech className="max-md:!mt-0"
+          vlevo={view === 'list' && !showForm ? <RychlePridani dnes={today} onPridat={rychle} kratce /> : undefined} />
       )}
 
       {showForm && (

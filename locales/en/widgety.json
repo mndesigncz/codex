@@ -2685,5 +2685,7 @@
   "Volitelné úkoly s body — kdo chce, vezme si úkol („Beru si\"), splní ho a dostane body. Opakování nastavíš sám: jednou, každý den, vybrané dny, týdně, měsíčně nebo každých pár dní.": "Optional tasks with points — whoever wants takes a task (\"I'll take it\"), does it and earns points. You set the repeat yourself: once, every day, selected days, weekly, monthly or every few days.",
   "Všechny úkoly za body": "All points tasks",
   "jen {komu}": "only {komu}",
-  "Bez ceny či balení": "No price or pack"
+  "Bez ceny či balení": "No price or pack",
+  "Přidat úkol…": "Add a task…",
+  "Např. Objednat mléko zítra": "E.g. Order milk tomorrow"
 }
