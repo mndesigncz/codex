@@ -1048,7 +1048,7 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
                   meta={[pred(o.vytvoreno, t), obsah].filter(Boolean).join(' · ')}
                   value={smiCenu && o.cena != null ? money(o.cena) : undefined}
                   actions={smiPrijmout ? (
-                    <Button variant="primary" size="sm" onClick={() => { if (!nahled) setPrijimam(o); }}>{t('Přijmout')}</Button>
+                    <Button variant="secondary" size="sm" icon="check" onClick={() => { if (!nahled) setPrijimam(o); }}>{t('Přijmout')}</Button>
                   ) : undefined}
                 />
               </li>
