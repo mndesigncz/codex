@@ -33,6 +33,16 @@ for (const w of [1280, 390]) {
   const karta = p.locator('[data-instance="po-dnech"]');
   await karta.waitFor({ timeout: 12000 });
   const tlacitko = karta.getByRole('button', { name: 'Zvětšit widget' });
+  if (w < 640) {
+    // v4 (spec-skladba V1): hlavička widgetu má na telefonu nejvýš DVĚ ikonová tlačítka (› a Sbalit) —
+    // Zvětšit by byl třetí a titul by se zalomil. Zvětšení je od sm; na telefonu karta už je přes celou šířku.
+    await dokud(async () => await karta.getByRole('button', { name: 'Sbalit widget' }).count() === 1, 8000);
+    tvrdi(`${w}: na telefonu hlavička nenabízí „Zvětšit widget" (nejvýš dvě ikony, V1)`, await tlacitko.count() === 0);
+    tvrdi(`${w}: … a „Sbalit widget" zůstává`, await karta.getByRole('button', { name: 'Sbalit widget' }).count() === 1);
+    tvrdi(`${w}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 2).join(' | '));
+    await ctx.close();
+    continue;
+  }
   tvrdi(`${w}: střední karta s velkou podobou nabízí „Zvětšit widget"`, await dokud(async () => await tlacitko.count() === 1, 8000));
   tvrdi(`${w}: „Zvětšit widget" je v hlavičce před „Sbalit widget" (Sbalit zůstává vpravo)`, await karta.locator('button[aria-label="Zvětšit widget"], button[aria-label="Sbalit widget"]').evaluateAll(b => b.map(x => x.getAttribute('aria-label')).join()) === 'Zvětšit widget,Sbalit widget');
   await tlacitko.click();
