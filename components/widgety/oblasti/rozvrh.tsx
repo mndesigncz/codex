@@ -988,7 +988,8 @@ function ZadostiVolna({ velikost, nahled }: WidgetProps) {
                   meta={meta(z)}
                   actions={smiRozhodnout && !sel.selecting ? (
                     <>
-                      <Button variant="primary" size="sm" loading={pracuji.has(z.id)} onClick={() => rozhodni(z, 'approved')}>{t('Schválit')}</Button>
+                      {/* v3: šedá pilulka v řádku fronty, ne inkoust (max jedno inkoustové v zorném poli). */}
+                      <Button variant="secondary" size="sm" icon="check" loading={pracuji.has(z.id)} onClick={() => rozhodni(z, 'approved')}>{t('Schválit')}</Button>
                       <Button variant="danger" size="sm" disabled={pracuji.has(z.id)} onClick={() => rozhodni(z, 'rejected')}>{t('Zamítnout')}</Button>
                       <Menu size="sm" label={t('Další akce se žádostí — {kdo}', { kdo: kdo(z) })} items={[
                         { label: t('Zamítnout s důvodem…'), icon: 'chat', danger: true, disabled: pracuji.has(z.id), hint: t('Důvod uvidí žadatel u žádosti i v oznámení.'), onClick: () => { setChyba(null); setSDuvodem({ z, duvod: '' }); } },
@@ -1186,7 +1187,7 @@ function Vymeny({ velikost, nahled }: WidgetProps) {
         lead: sel.selecting ? <SelectBox checked={sel.has(o.id)} onChange={() => sel.toggle(o.id)} label={t('Vybrat výměnu — {od}', { od })} /> : <Avatar emoji={o.claimedByAvatar} size="sm" />,
         meta: t('Předává {od}, bere {bere}', { od, bere }),
         actions: piseSe && !sel.selecting ? <>
-          <Button variant="primary" size="sm" loading={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'approve')}>{t('Schválit')}</Button>
+          <Button variant="secondary" size="sm" icon="check" loading={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'approve')}>{t('Schválit')}</Button>
           <Button variant="danger" size="sm" disabled={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'reject')}>{t('Zamítnout')}</Button>
         </> : undefined,
         right: !piseSe ? <Chip tone="wait" size="sm">{t('Ke schválení')}</Chip> : undefined,
