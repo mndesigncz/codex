@@ -305,11 +305,13 @@ function TrzbyVsMzdy({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
   else if (f && podil == null) prazdno = <p className="t-meta">{f.mesicu > 1 ? t('Za tohle období nejsou tržby z uzávěrek.') : t('Tenhle měsíc zatím nejsou tržby z uzávěrek.')}</p>;
 
   return (
-    <Widget nacteni={ceka ? CEKA : data} kostra={velikost === 'S' ? 'cislo' : 'seznam'} prazdno={prazdno}
-      doplnek={podil != null && cil != null ? <Chip tone={nad ? 'bad' : 'ok'} size="sm">{nad ? t('nad cílem') : t('v cíli')}</Chip> : undefined}>
+    // v3: stav proti cíli („v cíli" / „nad cílem") je v těle u čísla, ne v titulku — v titulku malé
+    // karty (171 px) lámal název na dva řádky a soupeřil s ním o pozornost.
+    <Widget nacteni={ceka ? CEKA : data} kostra={velikost === 'S' ? 'cislo' : 'seznam'} prazdno={prazdno}>
       {s && podil != null && (velikost === 'S' ? (
         <div>
           <Stat label={t('Mzdy z tržeb')} value={`${podil} %`} note={cil != null ? t('cíl {cil} %', { cil }) : t('cíl podniku není nastavený')} />
+          {cil != null && <div className="mt-2"><ChipCile nad={nad} /></div>}
           {radekKcH}
         </div>
       ) : (
@@ -317,7 +319,7 @@ function TrzbyVsMzdy({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
           <div>
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-[1.75rem] leading-none font-bold tracking-tight tabular-nums text-[#16181A]">{podil} %</p>
-              <p className="t-meta">{cil != null ? t('cíl {cil} %', { cil }) : t('cíl podniku není nastavený')}</p>
+              <p className="t-meta flex items-center gap-1.5">{cil != null && <ChipCile nad={nad} />}{cil != null ? t('cíl {cil} %', { cil }) : t('cíl podniku není nastavený')}</p>
             </div>
             {/* Pruh podílu s ryskou cíle; barva je stav (pod cílem ok, nad cílem bad). */}
             <div className="relative mt-3 h-2.5 rounded-full bg-black/[0.05]" role="img"
@@ -351,6 +353,12 @@ function TrzbyVsMzdy({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
       ))}
     </Widget>
   );
+}
+
+/** Stav podílu mezd proti cíli podniku — chip v těle widgetu u čísla. */
+function ChipCile({ nad }: { nad: boolean }) {
+  const t = useT('widgety');
+  return <Chip tone={nad ? 'bad' : 'ok'} size="sm">{nad ? t('nad cílem') : t('v cíli')}</Chip>;
 }
 
 // ---------------------------------------------------------------------------
@@ -401,16 +409,18 @@ function MzdyDnesWidget({ velikost, nahled }: WidgetProps) {
   return (
     <Widget nacteni={ceka ? CEKA : [doch, pokladna]} kostra="cislo"
       odkaz={velikost === 'S' ? undefined : { popisek: t('Docházka'), pohled: 'attendance' }}
-      doplnek={podil != null && cil != null ? <Chip tone={nad ? 'bad' : 'ok'} size="sm">{nad ? t('nad cílem') : t('v cíli')}</Chip> : undefined}
       prazdno={nic ? <p className="t-meta">{t('Dnes zatím nikdo nebyl na směně.')}</p> : undefined}>
+      {/* v3: „v cíli" pod číslem, ne v titulku (viz Mzdy za období). */}
       {m && !nic && (velikost === 'S' ? (
         // Malá karta: jedno číslo a krátká poznámka; odhad do konce plánu na vlastním řádku (poznámka Statu se zkracuje).
         <div>
           <Stat label={t('Náklad do teď')} value={money(m.naklad)} note={pozTrzby} />
           {pozKonec && <p className="t-meta mt-1 text-pretty">{pozKonec}</p>}
+          {podil != null && cil != null && <div className="mt-2"><ChipCile nad={nad} /></div>}
         </div>
       ) : (
         <div className="space-y-4">
+          {podil != null && cil != null && <ChipCile nad={nad} />}
           <StatRow podleKarty>
             <Stat label={t('Náklad do teď')} value={money(m.naklad)} note={pozTrzby} />
             <Stat label={t('Do konce plánu')} value={m.doKonce > 0 ? `~${money(m.doKonce)}` : '—'} note={m.doKonce > 0 ? t('zbytek směn podle rozvrhu') : t('nikdo už nemá přijít')} />
