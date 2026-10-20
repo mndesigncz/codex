@@ -3,26 +3,33 @@
 @tailwind utilities;
 
 /* =====================================================================
-   Managero 2 — jeden vizuální jazyk pro celou aplikaci.
-   Plochy jsou vrstvené a pevné: papír → bílá karta s vláskovou linkou →
-   tónovaná jamka uvnitř. Sklo (blur) zůstává jen plovoucímu chromu (rail,
-   dock, menu, modál), ne obsahu. Tři rádiusy, jedna typografická škála,
-   jedna sada stavových barev. Staré třídy (glass-card, glass, glass-strong)
-   míří na nové plochy, takže se překlopila celá aplikace naráz.
+   Managero 3 — jeden vizuální jazyk pro celou aplikaci (DESIGN.md v3).
+   Čisté světlé plátno s teplým zelenkavým nádechem, obsah na něm nebo
+   v bílé kartě s vláskovou linkou a stínem jen náznakem — jedna vrstva
+   hloubky. Uvnitř karty tónovaná jamka. Žádné dekorativní přechody, žádné
+   zrno. Sklo (blur) zůstává jen plovoucímu chromu (rail, dock, menu).
+   Tři rádiusy, jedna typografická škála, jedna sada stavových barev.
+   Staré třídy (glass-card, glass, glass-strong) míří na nové plochy.
    ===================================================================== */
 :root {
-  --bg: #F3F4F0;
-  --bg-gradient: radial-gradient(ellipse 70% 40% at 15% -10%, rgba(200,245,66,0.16), transparent 70%);
+  /* Plátno v3: o stupeň světlejší a čistší než #F3F4F0 z v2, nádech zůstal. */
+  --bg: #F6F7F3;
+  /* Barevné světlo v rohu plátna je pryč (v3): klid nese prázdno, ne přechod.
+     Proměnná zůstává kvůli místům, která si ji čtou. */
+  --bg-gradient: none;
   --ink: #16181A;
   --lime: #C8F542;
   --lime-ink: #4F6A07;
 
   /* Plochy */
   --surface: #FFFFFF;
-  --surface-line: rgba(22,24,26,0.07);
-  --well: rgba(22,24,26,0.035);
+  --surface-line: rgba(22,24,26,0.075);
+  /* Jamka v3 je o chlup sytější: nese pole, ikonová tlačítka v kruhu
+     a sekundární pilulky, které nemají rámeček. */
+  --well: rgba(22,24,26,0.045);
   --well-line: rgba(22,24,26,0.05);
-  --shadow-card: 0 1px 2px rgba(25,35,15,0.04), 0 10px 28px -14px rgba(25,35,15,0.12);
+  /* Stín karty jen náznakem — hranu nese linka. Jedna vrstva hloubky. */
+  --shadow-card: 0 1px 2px rgba(25,35,15,0.035);
   --shadow-float: 0 12px 36px -8px rgba(25,35,15,0.20), 0 2px 6px rgba(25,35,15,0.06);
   --shadow-modal: 0 30px 80px rgba(15,20,25,0.26);
 
@@ -93,23 +100,10 @@ p { text-wrap: pretty; }
 /* Kódy kartiček a kuponů drží v monospace, který patří k písmu, ne v Courieru. */
 .font-mono { font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-/* Zrno: pevný, průhledný šum přes celou stránku rozbije digitální plochost
-   skla i pozadí. Je pod hranicí vnímání — vidět není, chybět ano. Nesahá na
-   ukazatel a mizí, když si někdo vyžádá méně průhlednosti nebo tiskne. */
-body::after {
-  content: '';
-  position: fixed; inset: 0;
-  pointer-events: none;
-  z-index: 2147483000;
-  opacity: 0.035;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 160px 160px;
-}
-:root[data-theme="dark"] body::after { mix-blend-mode: screen; opacity: 0.05; }
-@media (prefers-reduced-transparency: reduce), print { body::after { display: none; } }
+/* Zrno přes celou stránku (v2, body::after) je ve v3 pryč: na čistém plátně
+   zbylo jen jako šum v textu a stálo kompozici celé stránky v každém snímku. */
 
-/* ---------- Plochy (Managero 2) ----------
+/* ---------- Plochy (Managero 3) ----------
    card   … bílá karta s vláskovou linkou — jediný kontejner obsahu
    well   … tónovaná jamka uvnitř karty pro vnořený obsah
    glass  … zpětné jméno: tónovaná plocha ovládacích prvků (bez blur)
@@ -129,18 +123,22 @@ body::after {
    přepínačů pohledu naráz a to je samostatný krok se snímky před a po. */
 button:where(.card, .glass-card) { background: var(--surface); }
 button:where(.well) { background: var(--well); }
-.card-accent { background: linear-gradient(180deg, rgba(200,245,66,0.16), rgba(200,245,66,0.06)), var(--surface); border-color: rgba(200,245,66,0.55); }
-.card-wait   { background: linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.04)), var(--surface); border-color: rgba(245,158,11,0.35); }
-.card-danger { background: linear-gradient(180deg, rgba(220,38,38,0.07), rgba(220,38,38,0.03)), var(--surface); border-color: rgba(220,38,38,0.25); }
-.card-info   { background: linear-gradient(180deg, rgba(10,132,255,0.08), rgba(10,132,255,0.03)), var(--surface); border-color: rgba(10,132,255,0.28); }
+/* Tónovaná karta v3 je plochý tón, ne přechod shora dolů: stav, ne dekorace.
+   (Dvě stejné zarážky = plná barva přes bílou kartu, bez míchání v CSS.) */
+.card-accent { background: linear-gradient(rgba(200,245,66,0.10), rgba(200,245,66,0.10)), var(--surface); border-color: rgba(143,184,17,0.35); }
+.card-wait   { background: linear-gradient(rgba(245,158,11,0.06), rgba(245,158,11,0.06)), var(--surface); border-color: rgba(245,158,11,0.30); }
+.card-danger { background: linear-gradient(rgba(220,38,38,0.045), rgba(220,38,38,0.045)), var(--surface); border-color: rgba(220,38,38,0.22); }
+.card-info   { background: linear-gradient(rgba(10,132,255,0.05), rgba(10,132,255,0.05)), var(--surface); border-color: rgba(10,132,255,0.24); }
 :where(.well) {
   background: var(--well);
   border: 1px solid var(--well-line);
   border-radius: var(--r-md);
 }
 :where(.glass) {
-  background: rgba(22,24,26,0.04);
-  border: 1px solid rgba(22,24,26,0.08);
+  /* v3: tónovaná plocha bez viditelného rámečku (rámeček je průhledný, aby
+     se rozměr ovládacích prvků nezměnil). */
+  background: rgba(22,24,26,0.05);
+  border: 1px solid transparent;
 }
 /* 96 %, ne 88 %: menu v postranní liště leží přímo na hustém textu navigace
    a při 88 % pod „Nastavení" prosvítalo „Plánování". Blur zůstává, ale
@@ -157,20 +155,24 @@ button:where(.well) { background: var(--well); }
    Jedna podoba pole pro celou aplikaci; dřív jich bylo osm kopií. */
 @layer components {
 .field {
+  /* v3: pole je jemně šedá jamka bez rámečku (rámeček průhledný, ať se
+     rozměr nemění) a při psaní zbělá s limetkovým prstencem. Výška 48 px. */
   width: 100%;
+  min-height: 3rem;
   border-radius: var(--r-md);
-  background: var(--surface);
-  border: 1px solid rgba(22,24,26,0.12);
-  padding: 0.625rem 0.875rem;
+  background: rgba(22,24,26,0.045);
+  border: 1px solid transparent;
+  padding: 0.6875rem 1rem;
   font-size: 0.9375rem;
   line-height: 1.4;
   color: var(--ink);
   transition: border-color var(--dur-2, .22s) ease, box-shadow var(--dur-2, .22s) ease, background-color var(--dur-2, .22s) ease;
 }
-.field::placeholder { color: rgba(22,24,26,0.38); }
-.field:hover { border-color: rgba(22,24,26,0.20); }
-.field:focus, .field:focus-visible { outline: none; border-color: #9FC22A !important; box-shadow: 0 0 0 3px rgba(200,245,66,0.30); }
-.field:disabled { background: var(--well); color: rgba(22,24,26,0.5); cursor: not-allowed; }
+textarea.field { min-height: 0; }
+.field::placeholder { color: rgba(22,24,26,0.42); }
+.field:hover { border-color: rgba(22,24,26,0.10); }
+.field:focus, .field:focus-visible { outline: none; background: var(--surface); border-color: #9FC22A !important; box-shadow: 0 0 0 3px rgba(200,245,66,0.30); }
+.field:disabled { color: rgba(22,24,26,0.5); cursor: not-allowed; }
 .field-label { display: block; font-size: 0.8125rem; font-weight: 500; color: rgba(22,24,26,0.70); margin-bottom: 0.375rem; }
 }
 /* Na dotykovém zařízení má pole aspoň 16 px: Safari na iPhonu každé pole
@@ -198,9 +200,10 @@ button:where(.well) { background: var(--well); }
 
 /* ---------- Chipy stavu ---------- */
 :where(.chip) {
-  display: inline-flex; align-items: center; gap: 0.3rem;
+  /* Stavová pilulka v3: ikona + věta, polotučně, bez verzálek. */
+  display: inline-flex; align-items: center; gap: 0.3125rem;
   border-radius: var(--r-chip);
-  padding: 0.25rem 0.625rem;
+  padding: 0.3125rem 0.6875rem;
   font-size: 0.75rem; font-weight: 600; line-height: 1.2;
   white-space: nowrap;
 }
@@ -237,17 +240,18 @@ button:where(.well) { background: var(--well); }
   transition: transform var(--dur-1, .12s) var(--ease-out, ease), background-color var(--dur-2, .22s) ease, color var(--dur-2, .22s) ease, box-shadow var(--dur-2, .22s) ease, filter var(--dur-2, .22s) ease;
 }
 .btn:active { transform: scale(0.97); }
-.btn-sm { height: 2.25rem; padding: 0 0.875rem; font-size: 0.75rem; }
+.btn-sm { height: 2.25rem; padding: 0 0.875rem; font-size: 0.8125rem; }
 /* Kulaté ikonové tlačítko — zavřít, upravit, smazat. Jedna velikost 36 px
-   (tap-target), sklo; dřív deset ručních opisů s w-7 až w-12. */
+   (tap-target), v3 v jemně šedém kruhu bez rámečku (jako zavírací kříž
+   spodních oken v inspiracích). Větší kruh 40 px pro lišty je <IconButton>. */
 .btn-icon {
   display: inline-flex; align-items: center; justify-content: center;
   flex-shrink: 0; width: 2.25rem; height: 2.25rem; padding: 0;
-  border-radius: var(--r-chip); background: rgba(255,255,255,0.55);
-  border: 1px solid var(--surface-line); color: rgba(22,24,26,0.55);
+  border-radius: var(--r-chip); background: rgba(22,24,26,0.055);
+  border: 0; color: rgba(22,24,26,0.70);
   transition: color var(--dur-2, .22s) ease, background-color var(--dur-2, .22s) ease, transform var(--dur-1, .12s) var(--ease-out, ease);
 }
-@media (hover: hover) { .btn-icon:hover { color: var(--ink); background: rgba(255,255,255,0.85); } }
+@media (hover: hover) { .btn-icon:hover { color: var(--ink); background: rgba(22,24,26,0.09); } }
 /* Stav přepínače pohledu psaného ručně (mimo <Segmented>): vybraný je vždy
    tmavá pilulka, nevybraný tlumený text; „glass" si přidá ten, kdo stojí
    volně mimo společný obal. Dřív deset různých zápisů téhož. */
@@ -256,6 +260,15 @@ button:where(.well) { background: var(--well); }
    Naměřeno sondou, ne odhadnuto; 0,62 vychází na 4,6 : 1. */
 .seg-off { color: rgba(22,24,26,0.62); }
 @media (hover: hover) { .seg-off:hover { color: var(--ink); background: rgba(22,24,26,0.05); } }
+/* Segment (v3, <Segmented>): šedá dráha bez rámečku, bílý jezdec se stínem
+   jen náznakem, vybraný text inkoustem. V tmavém režimu je jezdec
+   zvednutá šedá, o stupeň světlejší než dráha. */
+.seg-draha { background: rgba(22,24,26,0.055); }
+.seg-jezdec { background: #fff; box-shadow: 0 1px 2px rgba(22,24,26,0.10), 0 1px 1px rgba(22,24,26,0.04); }
+.seg-vybrano { color: var(--ink); }
+:root[data-theme="dark"] .seg-draha { background: rgba(255,255,255,0.07); }
+:root[data-theme="dark"] .seg-jezdec { background: #34373B; box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+:root[data-theme="dark"] .seg-vybrano { color: #EDF2E4; }
 /* Pilulka ve filtrovacím pásu (stav, měsíc, člověk). Tvar byl opsaný
    v každé obrazovce zvlášť jako `px-4 py-2 rounded-full text-xs …`; tady je
    jednou. Barvu stavu dodá `.seg-on` / `.seg-off glass`. */
@@ -276,20 +289,23 @@ button:where(.well) { background: var(--well); }
 }
 @keyframes spinner-turn { to { transform: rotate(360deg); } }
 .spinner-sm { width: 1.25rem; height: 1.25rem; }
-.btn-lg { height: 3rem; padding: 0 1.5rem; font-size: 0.9375rem; }
-.btn-accent { background: var(--lime); color: var(--ink); box-shadow: 0 6px 18px rgba(200,245,66,0.35); }
+/* Velké hlavní tlačítko v3: 52 px, pilulka, typicky přes šířku dole. */
+.btn-lg { height: 3.25rem; padding: 0 1.75rem; font-size: 1rem; }
+/* Limetka bez záře (v3): jedna na obrazovce, pozná se barvou, ne svitem. */
+.btn-accent { background: var(--lime); color: var(--ink); }
 .btn-primary { background: var(--ink); color: #fff; }
-.btn-secondary { background: rgba(22,24,26,0.04); border: 1px solid rgba(22,24,26,0.10); color: var(--ink); }
+/* Sekundární v3 = jemně šedá pilulka bez rámečku (rámeček průhledný kvůli rozměru). */
+.btn-secondary { background: rgba(22,24,26,0.055); border: 1px solid transparent; color: var(--ink); }
 .btn-ghost { background: transparent; color: rgba(22,24,26,0.62); }
 @media (hover: hover) {
   .btn-accent:hover { filter: brightness(1.05); }
   .btn-primary:hover { background: #000; }
-  .btn-secondary:hover { background: rgba(22,24,26,0.07); }
+  .btn-secondary:hover { background: rgba(22,24,26,0.085); }
   .btn-ghost:hover { background: rgba(22,24,26,0.05); color: var(--ink); }
 }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 :root[data-theme="dark"] .btn-primary { background: #EDF2E4; color: #16181A; }
-:root[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); color: #EDF2E4; }
+:root[data-theme="dark"] .btn-secondary { background: rgba(255,255,255,0.08); border-color: transparent; color: #EDF2E4; }
 :root[data-theme="dark"] .btn-ghost { color: rgba(237,242,228,0.66); }
 }
 
@@ -326,7 +342,8 @@ button:where(.well) { background: var(--well); }
 /* ---------- Seznamy ----------
    Řádky dělí linka, kterou kreslí seznam; řádek sám je jen obsah. */
 .list > * + * { border-top: 1px solid var(--surface-line); }
-:where(.list-row) { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; min-height: 3.25rem; }
+/* Řádek seznamu v3: 56 px, víc vzduchu, linka mezi řádky tenká (kreslí .list). */
+:where(.list-row) { display: flex; align-items: center; gap: 0.875rem; padding: 0.875rem 0; min-height: 3.5rem; }
 :where(.list-row-tap) { border-radius: var(--r-md); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; transition: background-color var(--dur-2, .22s) ease; }
 /* Klikací řádek bývá <button>. Preflight Tailwindu mu dává `padding: 0;
    margin: 0` se specifičností (0,0,1) a :where() výš má nulu — tatáž past
@@ -336,7 +353,7 @@ button:where(.well) { background: var(--well); }
    Tlačítko se navíc samo neroztáhne (i s display:flex má šířku podle obsahu),
    proto šířku dodává pravidlo: 100 % + oba přesahy. Utility (0,1,0) pořád
    přebijí, takže `w-full` na klikací řádek nepatří — posunul by ho doleva. */
-button:where(.list-row) { padding: 0.75rem 0; }
+button:where(.list-row) { padding: 0.875rem 0; }
 button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; width: calc(100% + 1rem); }
 @media (hover: hover) { .list-row-tap:hover { background: var(--well); } }
 .list-row-tap:active { background: rgba(22,24,26,0.06); }
@@ -377,18 +394,18 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
   .list-actions-radek { order: 0; }
 }
 
-/* ---------- Typografická škála ----------
-   Nadpis obrazovky 28, sekce 18, karta 15, meta 13, štítek 11. Jediné
-   povolené velikosti nadpisů — 10 velikostí h1 a 9 h2 bylo moc. */
+/* ---------- Typografická škála (v3) ----------
+   Nadpis obrazovky 32, sekce 20, karta 16, meta 13, štítek 13 větou.
+   Jediné povolené velikosti nadpisů — 10 velikostí h1 a 9 h2 bylo moc. */
 /* StatRow podleKarty: sloupce podle šířky karty. Do 34 rem dva sloupce, lichý poslední přes oba; od 34 rem jedna řada. */
 /* Číslo statistiky (Stat): 28 px, a když se do sloupce nevejde, o stupeň
    škály míň — stupeň měří Stat.tsx a píše ho jako `data-tesne` na obal
    (jeden Stat, nebo celá řada StatRow, ať jsou čísla v řadě stejně velká). */
-.stat-hodnota { font-size: 1.75rem; }
-.stat-jednotka { font-size: 1rem; }
-[data-tesne="1"] .stat-hodnota { font-size: 1.125rem; }
+.stat-hodnota { font-size: 1.875rem; letter-spacing: -0.025em; }
+.stat-jednotka { font-size: 1rem; letter-spacing: 0; }
+[data-tesne="1"] .stat-hodnota { font-size: 1.25rem; }
 [data-tesne="1"] .stat-jednotka { font-size: 0.8125rem; }
-[data-tesne="2"] .stat-hodnota { font-size: 0.875rem; }
+[data-tesne="2"] .stat-hodnota { font-size: 0.9375rem; }
 [data-tesne="2"] .stat-jednotka { font-size: 0.75rem; }
 
 .statrow-karta { container-type: inline-size; }
@@ -404,11 +421,14 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
 }
 
 @layer components {
-.t-page { font-size: 1.75rem; line-height: 1.1; font-weight: 700; letter-spacing: -0.022em; color: var(--ink); }
-.t-section { font-size: 1.125rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
-.t-card { font-size: 0.9375rem; line-height: 1.3; font-weight: 600; color: var(--ink); }
+.t-page { font-size: 2rem; line-height: 1.08; font-weight: 700; letter-spacing: -0.028em; color: var(--ink); }
+.t-section { font-size: 1.25rem; line-height: 1.2; font-weight: 600; letter-spacing: -0.018em; color: var(--ink); }
+.t-card { font-size: 1rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.008em; color: var(--ink); }
 .t-meta { font-size: 0.8125rem; line-height: 1.4; color: rgba(22,24,26,0.62); }
-.t-label { font-size: 0.6875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(22,24,26,0.62); }
+/* Štítek v3 je VĚTOU, ne verzálkami s prostrkáním: „Tržba", ne „TRŽBA".
+   Drobné verzálky po celé obrazovce dělaly neklid; hierarchii nese velikost
+   čísla pod štítkem. Výjimka zůstává jen kódům (Geist Mono). */
+.t-label { font-size: 0.8125rem; line-height: 1.3; font-weight: 500; letter-spacing: 0; text-transform: none; color: rgba(22,24,26,0.62); }
 }
 
 /* Everything tappable presses like a real surface. */
@@ -734,9 +754,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] { color-scheme: dark; }
 :root[data-theme="dark"] body{
   background:#0C0D0F;
-  background-image:
-    radial-gradient(ellipse 70% 45% at 20% -10%, rgba(200,245,66,0.10), transparent),
-    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(10,132,255,0.08), transparent);
+  background-image:none;
   color:#EDF2E4;
 }
 :root[data-theme="dark"] {
@@ -757,13 +775,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   --info-ink-rgb: 126 184 255;
   --muted-bg: rgba(255,255,255,0.08); --muted-ink: rgba(237,242,228,0.66);
 }
-:root[data-theme="dark"] .glass{ background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.10); }
+:root[data-theme="dark"] .glass{ background:rgba(255,255,255,0.07); border-color:transparent; }
 :root[data-theme="dark"] .glass-strong{ background:rgba(28,31,34,0.96); border-color:rgba(255,255,255,0.10); }
-:root[data-theme="dark"] .card-accent{ background:linear-gradient(180deg, rgba(200,245,66,0.12), rgba(200,245,66,0.04)), var(--surface); border-color:rgba(200,245,66,0.35); }
-:root[data-theme="dark"] .card-wait{ background:linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04)), var(--surface); }
-:root[data-theme="dark"] .card-danger{ background:linear-gradient(180deg, rgba(220,38,38,0.12), rgba(220,38,38,0.04)), var(--surface); }
-:root[data-theme="dark"] .card-info{ background:linear-gradient(180deg, rgba(10,132,255,0.12), rgba(10,132,255,0.04)), var(--surface); }
-:root[data-theme="dark"] .field{ background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.14); color:#EDF2E4; }
+:root[data-theme="dark"] .card-accent{ background:linear-gradient(rgba(200,245,66,0.08), rgba(200,245,66,0.08)), var(--surface); border-color:rgba(200,245,66,0.30); }
+:root[data-theme="dark"] .card-wait{ background:linear-gradient(rgba(245,158,11,0.08), rgba(245,158,11,0.08)), var(--surface); }
+:root[data-theme="dark"] .card-danger{ background:linear-gradient(rgba(220,38,38,0.08), rgba(220,38,38,0.08)), var(--surface); }
+:root[data-theme="dark"] .card-info{ background:linear-gradient(rgba(10,132,255,0.08), rgba(10,132,255,0.08)), var(--surface); }
+:root[data-theme="dark"] .field{ background:rgba(255,255,255,0.06); border-color:transparent; color:#EDF2E4; }
+:root[data-theme="dark"] .field:hover{ border-color:rgba(255,255,255,0.12); }
+:root[data-theme="dark"] .field:focus, :root[data-theme="dark"] .field:focus-visible{ background:rgba(255,255,255,0.08); }
 :root[data-theme="dark"] .field::placeholder{ color:rgba(237,242,228,0.35); }
 :root[data-theme="dark"] .field-label{ color:rgba(237,242,228,0.72); }
 :root[data-theme="dark"] .t-page, :root[data-theme="dark"] .t-section, :root[data-theme="dark"] .t-card{ color:#EDF2E4; }
@@ -792,7 +812,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .seg-on{ box-shadow: inset 0 0 0 1px rgba(255,255,255,0.30); }
 @media (hover: hover) { :root[data-theme="dark"] .seg-off:hover{ color:#EDF2E4; background:rgba(255,255,255,0.08); } }
 :root[data-theme="dark"] .btn-icon{
-  background:rgba(255,255,255,0.08); color:rgba(237,242,228,0.62);
+  background:rgba(255,255,255,0.08); color:rgba(237,242,228,0.72);
 }
 @media (hover: hover) { :root[data-theme="dark"] .btn-icon:hover{ color:#EDF2E4; background:rgba(255,255,255,0.14); } }
 /* Barevné štítky kategorií: na světlém pozadí je text tmavý odstín téže
@@ -995,9 +1015,10 @@ button:active:not(:disabled), .pressable:active { transition-duration: var(--dur
 
 /* Surfaces materialise: a real material arrives with blur + scale together,
    it doesn't just fade in. */
+/* v3: bez rozmazání — příchod plochy je krátký a tichý, ne efekt. */
 @keyframes surface-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(6px); }
-  to   { opacity: 1; transform: none; filter: blur(0); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 /* Lists and tile grids arrive in sequence — set --i on each child. */
 @media (prefers-reduced-motion: no-preference) {
@@ -1032,7 +1053,8 @@ button:active:not(:disabled), .pressable:active { transition-duration: var(--dur
 @media (prefers-reduced-motion: no-preference) {
   .i-draw > * { stroke-dasharray: 1; animation: icon-draw 0.55s var(--ease-out-soft) forwards; }
   .i-pop   { animation: icon-pop 0.32s var(--ease-spring); }
-  .i-ring  { animation: icon-ring 2.6s ease-in-out infinite; transform-origin: 50% 22%; }
+  /* Zvonek zazvoní dvakrát a ztichne (v3): trvalé kývání v liště tahalo oči od obsahu. */
+  .i-ring  { animation: icon-ring 2.6s ease-in-out 2; transform-origin: 50% 22%; }
   .i-pulse { animation: icon-pulse 1.6s ease-in-out infinite; }
   /* The icon leads the press: it reacts a touch before the surface settles. */
   button:active .i-lead, .pressable:active .i-lead { transform: scale(0.9); }
@@ -1040,7 +1062,7 @@ button:active:not(:disabled), .pressable:active { transition-duration: var(--dur
 .i-lead { transition: transform var(--dur-1) var(--ease-out-soft); }
 
 /* ---------- Typography: tracking is size-specific, never one value ------ */
-h1, .t-display { letter-spacing: -0.022em; line-height: 1.06; }
+h1, .t-display { letter-spacing: -0.028em; line-height: 1.08; }
 h2, .t-title   { letter-spacing: -0.015em; line-height: 1.15; }
 h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 .t-caption     { letter-spacing: 0.01em; }
@@ -1101,7 +1123,7 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 .chrome-edge::after {
   content: ''; position: absolute; left: 0; right: 0; bottom: -14px; height: 14px;
   pointer-events: none;
-  background: linear-gradient(to bottom, rgba(241,243,237,0.55), rgba(241,243,237,0));
+  background: linear-gradient(to bottom, rgba(246,247,243,0.55), rgba(246,247,243,0));
 }
 :root[data-theme="dark"] .chrome-edge::after {
   background: linear-gradient(to bottom, rgba(18,20,22,0.55), rgba(18,20,22,0));
@@ -1109,9 +1131,9 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 
 /* ===== Plocha s widgety (kolo 68): mřížka, režim úprav, vlnění, tah ===== */
 /* --sloupcu nastaví JS podle šířky plochy (ResizeObserver); do té doby náhradní počet podle okna. */
-.plocha-mrizka { --sloupcu-z: 1; display: grid; gap: .75rem; grid-template-columns: repeat(var(--sloupcu, var(--sloupcu-z)), minmax(0, 1fr)); }
+.plocha-mrizka { --sloupcu-z: 1; display: grid; gap: .875rem; grid-template-columns: repeat(var(--sloupcu, var(--sloupcu-z)), minmax(0, 1fr)); }
 @media (min-width: 332px) { .plocha-mrizka { --sloupcu-z: 2; } }
-@media (min-width: 640px) { .plocha-mrizka { gap: 1rem; } }
+@media (min-width: 640px) { .plocha-mrizka { gap: 1.25rem; } }
 @media (min-width: 1024px) { .plocha-mrizka { --sloupcu-z: 4; } }
 .plocha-mrizka > li { position: relative; min-width: 0; }
 /* Tři vrstvy, každá má svou transformaci:
@@ -1213,21 +1235,20 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 :root[data-theme="dark"] .spark-inkoust .spark-sloupek    { background: rgba(255,255,255,0.24); }
 :root[data-theme="dark"] .spark-inkoust .spark-sloupek-hl { background: #C8F542; }
 
-/* Limetkový dotek malých karet čísel (kolo 71): jemný gradient v pravém
-   horním rohu, aby domovské plochy nepůsobily jen bíle. Je to
-   background-image, ne barva — sonda k68-design měří backgroundColor
-   (plné limetkové plochy) a kontrast textu počítá jen z barev podkladu,
-   takže se ho dotek netýká. V tmavém režimu ztlumený, limetka na tmavé
-   jinak svítí. */
-.w-dotek {
-  position: absolute; inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  background: radial-gradient(140px 100px at 100% 0%, rgba(200,245,66,0.16), transparent 70%);
-}
-:root[data-theme="dark"] .w-dotek {
-  background: radial-gradient(140px 100px at 100% 0%, rgba(200,245,66,0.09), transparent 70%);
-}
+/* Limetkový dotek v rohu malých karet (kolo 71, .w-dotek) je ve v3 pryč:
+   dekorativní přechod v rohu každé karty dělal z plochy „polévku z karet". */
+
+/* Hlavička widgetu v3 (components/widgety/Widget.tsx): ikona bez podkladu
+   a tiché ovládání (odkaz, šipka, Zvětšit, Sbalit). Ikona i ovládání jsou
+   netextové prvky — 0,5 inkoustu drží na bílé kartě přes 3 : 1 (WCAG 1.4.11),
+   a přitom ustoupí titulku. Pod kurzorem a fokusem plný inkoust. */
+.w-ikona { color: rgba(22,24,26,0.45); }
+.w-ovladani { color: rgba(22,24,26,0.5); }
+@media (hover: hover) { .w-ovladani:hover { color: var(--ink); } }
+.w-ovladani:focus-visible { color: var(--ink); }
+:root[data-theme="dark"] .w-ikona { color: rgba(237,242,228,0.5); }
+:root[data-theme="dark"] .w-ovladani { color: rgba(237,242,228,0.58); }
+@media (hover: hover) { :root[data-theme="dark"] .w-ovladani:hover { color: #EDF2E4; } }
 
 /* České datum se píše větně: „úterý 18. srpna" → „Úterý 18. srpna".
    Tailwindí `capitalize` zvětší KAŽDÉ slovo a udělá z toho anglický
@@ -1244,7 +1265,7 @@ span.cz-sentence { display: inline-block; max-width: 100%; }
 .nav-fade {
   position: absolute; left: 0; right: 0; bottom: 0; height: 22px;
   pointer-events: none;
-  background: linear-gradient(to bottom, rgba(241,243,237,0), rgba(241,243,237,0.85));
+  background: linear-gradient(to bottom, rgba(246,247,243,0), rgba(246,247,243,0.85));
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .nav-fade { background: linear-gradient(to bottom, rgba(18,20,22,0), rgba(18,20,22,0.85)); }
@@ -1284,7 +1305,7 @@ input[type='search']::-webkit-search-decoration {
 /* Popisky polí v uzávěrce — podle nich se píšou peníze do kasy. */
 .kiosk-surface .t-meta { font-size: 14.5px; }
 .kiosk-surface .t-label,
-.kiosk-surface .field-label { font-size: 14px; letter-spacing: 0.06em; }
+.kiosk-surface .field-label { font-size: 14px; letter-spacing: 0; }
 
 /* Hustý seznam na kiosku neexistuje: 36px je pro myš, ne pro prst.
    ::before plochu jen rozšíří, rozměr prvku nemění. */

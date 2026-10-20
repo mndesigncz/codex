@@ -3,6 +3,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, type ButtonSize } from './Button';
+import { IconButton } from './IconButton';
 import { usePopover } from '@/lib/usePopover';
 import { useVejdiSe } from '@/lib/useVejdiSe';
 import { useT } from '@/lib/i18n/client';
@@ -128,14 +129,26 @@ export function Menu({ items, label, size = 'md', align = 'right', icon = 'more'
 
   return (
     <div ref={pop.ref} className={`relative shrink-0 ${className}`}>
-      <Button
-        ref={pop.triggerRef}
-        variant="secondary" size={size} iconOnly icon={icon} aria-label={label ?? t('Další akce')}
-        aria-haspopup="menu" aria-expanded={open}
-        onClick={() => setOpen(v => !v)}
-        onKeyDown={pop.onTriggerKeyDown}
-        className={open ? 'bg-black/[0.06]' : ''}
-      />
+      {/* v3: „···" je ikona v šedém kruhu 40 px — stejná jako hledání a oznámení
+          v liště. Malé (36 px) zůstává v řádku a v hlavičce widgetu. */}
+      {size === 'sm' ? (
+        <Button
+          ref={pop.triggerRef}
+          variant="secondary" size="sm" iconOnly icon={icon} aria-label={label ?? t('Další akce')}
+          aria-haspopup="menu" aria-expanded={open}
+          onClick={() => setOpen(v => !v)}
+          onKeyDown={pop.onTriggerKeyDown}
+          className={open ? 'bg-black/[0.08]' : ''}
+        />
+      ) : (
+        <IconButton
+          ref={pop.triggerRef}
+          icon={icon} aria-label={label ?? t('Další akce')}
+          aria-haspopup="menu" aria-expanded={open} active={open}
+          onClick={() => setOpen(v => !v)}
+          onKeyDown={pop.onTriggerKeyDown}
+        />
+      )}
       {open && (
         <MenuPanel
           ref={pop.panelRef}
