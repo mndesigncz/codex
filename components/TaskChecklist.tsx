@@ -61,7 +61,7 @@ export function TaskChecklist({ items, onToggle, onToggleAll, velky = false }: {
   const pct = Math.round((done / items.length) * 100);
   const allDone = done === items.length;
   return (
-    <div className="mt-2.5 space-y-1.5">
+    <div className="mt-3 sloupec sloupec-2">
       <div className="flex items-center gap-2">
         <div className="h-1.5 flex-1 rounded-full bg-black/[0.06] overflow-hidden">
           <div className="h-full rounded-full bg-[#C8F542] transition-[width]" style={{ width: `${pct}%` }} />
@@ -86,7 +86,7 @@ export function TaskChecklist({ items, onToggle, onToggleAll, velky = false }: {
             // Rádiusy ze systému (řádek i zaškrtávátko 10 px) a fajfka z Icons.tsx místo vlastního SVG (kolo 69).
             // Dotyková plocha je skutečná výška řádku (36 px, na tabletu 44 px), ne přesahující ::before:
             // kroky jsou naskládané těsně a přesah by sahal do sousedního kroku.
-            className={`${velky ? 'min-h-[44px]' : 'min-h-9'} flex w-full items-center gap-2 rounded-xl px-1.5 py-1 text-left text-sm transition-colors ${onToggle ? 'hover:bg-black/[0.03]' : ''}`}
+            className={`${velky ? 'min-h-[44px]' : 'min-h-9'} -mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-xl px-1.5 py-1 text-left text-sm transition-colors ${onToggle ? 'hover:bg-black/[0.03]' : ''}`}
           >
             <span aria-hidden className={`grid place-items-center h-[18px] w-[18px] shrink-0 rounded-xl border transition-colors ${
               it.done ? 'bg-[#C8F542] border-[#C8F542] on-accent' : 'border-black/25 text-transparent'

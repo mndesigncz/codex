@@ -7,7 +7,7 @@
 // jedním klepnutím zapsat jako „navíc" s názvem úkolu a vazbou taskId; vidí ho každý s navic.zapsat.
 
 import { useState, type ReactNode } from 'react';
-import { Button, Chip, Modal } from '../ui';
+import { Button, Chip, Modal, Rada } from '../ui';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { ZapsatNavic } from '../navic/ZapsatNavic';
 import { TaskChecklist, recurrenceLabel, type ChecklistItem } from '../TaskChecklist';
@@ -75,21 +75,25 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
   return (
     <Modal open onClose={onClose} size="lg" title={ukol.title}
       subtitle={hotovo ? t('Hotovo') : poTerminu ? t('Po termínu') : t('Čeká na splnění')}
-      footer={<>
-        {/* Vlevo tiché akce (mazání, navíc), vpravo hlavní — na 320 px se patička zalomí, skupina drží pohromadě. */}
-        {(onSmazat || smi('navic.zapsat')) && (
-          <span className="mr-auto flex flex-wrap items-center gap-2">
-            {onSmazat && <Button variant="ghost" icon="trash" className="hover:!text-[var(--bad-ink)]" onClick={onSmazat}>{t('Smazat')}</Button>}
-            {smi('navic.zapsat') && <Button variant="ghost" icon="sparkle" onClick={() => setNavic(true)} data-ukol-navic>{t('Zapsat jako navíc')}</Button>}
-          </span>
-        )}
-        {onUpravit && <Button variant="secondary" icon="pencil" onClick={onUpravit}>{t('Upravit')}</Button>}
-        {onOdlozit && !hotovo && <Button variant="secondary" icon="clock" onClick={() => onOdlozit(dayPlus(ukol.dueDate && ukol.dueDate > dnes ? ukol.dueDate : dnes, 1))}>{ukol.dueDate && ukol.dueDate > dnes ? t('Odložit o den') : t('Odložit na zítra')}</Button>}
-        {onStav && !zamceno && !hotovo && ukol.status !== 'in_progress' && <Button variant="secondary" icon="play" onClick={() => onStav('in_progress')}>{t('Začít')}</Button>}
-        {onSplnit && !zamceno && (hotovo
+      footer={(() => {
+        // v4 (V5, V6): vedlejší akce rovným dílem v jedné řadě 52, pod nimi hlavní L→R × 52.
+        // Dřív pět tlačítek různé šířky zalomených do tří řad (tiché vlevo, Upravit vpravo).
+        const vedlejsi = [
+          onUpravit && <Button key="upravit" variant="secondary" icon="pencil" onClick={onUpravit}>{t('Upravit')}</Button>,
+          onOdlozit && !hotovo && <Button key="odlozit" variant="secondary" icon="clock" onClick={() => onOdlozit(dayPlus(ukol.dueDate && ukol.dueDate > dnes ? ukol.dueDate : dnes, 1))}>{ukol.dueDate && ukol.dueDate > dnes ? t('Odložit o den') : t('Odložit na zítra')}</Button>,
+          onStav && !zamceno && !hotovo && ukol.status !== 'in_progress' && <Button variant="secondary" icon="play" key="zacit" onClick={() => onStav('in_progress')}>{t('Začít')}</Button>,
+        ].filter(Boolean);
+        const hlavni = onSplnit && !zamceno ? (hotovo
           ? <Button variant="secondary" icon="undo" onClick={() => onSplnit(false)}>{t('Vrátit mezi nehotové')}</Button>
-          : <Button variant="primary" icon="check" onClick={() => onSplnit(true)}>{t('Označit jako hotový')}</Button>)}
-      </>}>
+          : <Button variant="primary" icon="check" onClick={() => onSplnit(true)}>{t('Označit jako hotový')}</Button>) : null;
+        if (!vedlejsi.length && !hlavni) return undefined;
+        return (
+          <div className="sloupec sloupec-2 w-full">
+            {vedlejsi.length > 0 && <Rada vyska="l">{vedlejsi}</Rada>}
+            {hlavni && <Rada vyska="l">{hlavni}</Rada>}
+          </div>
+        );
+      })()}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <Chip tone={prioTon(ukol.priority)} size="sm">{priorita}</Chip>
@@ -135,6 +139,14 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
 
         {/* Co k úkolu řekli ostatní („dodavatel vozí až po 10:00") — vidí a píše každý, kdo úkol vidí. */}
         <Poznamky typ="task" id={ukol.id} className="pt-2" />
+
+        {/* Tiché akce na konci obsahu jako řádková tlačítka ½ + ½ (V5: destruktivní poslední, červený text). */}
+        {(onSmazat || smi('navic.zapsat')) && (
+          <Rada vyska="m" className="pt-2">
+            {smi('navic.zapsat') && <Button variant="ghost" icon="sparkle" onClick={() => setNavic(true)} data-ukol-navic>{t('Zapsat jako navíc')}</Button>}
+            {onSmazat && <Button variant="ghost" icon="trash" className="!text-[var(--bad-ink)]" onClick={onSmazat}>{t('Smazat')}</Button>}
+          </Rada>
+        )}
       </div>
       {/* Okno „navíc" nad detailem: název úkolu jako text, den splnění (nebo dnešek), vazba na úkol. */}
       <ZapsatNavic open={navic} onClose={() => setNavic(false)}

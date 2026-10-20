@@ -17,7 +17,7 @@
 // Objednávky, takže na stránce Sklad je to tatáž odpověď z mezipaměti.
 
 import { useMemo, useState } from 'react';
-import { Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, Well } from '../ui';
+import { Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, Well, Rada } from '../ui';
 import { useT } from '@/lib/i18n/client';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { dnuOd, polozekUDodavatelu, posledniObjednavkaDodavatelu, type PolozkaSkladu } from '@/lib/skladPrehled';
@@ -131,15 +131,16 @@ export default function DodavateleOkno({ suppliers, polozky, smiUpravit, smiObje
         {smiUpravit && (pridavam ? (
           <form className="well p-4 space-y-3" aria-label={t('Nový dodavatel')} onSubmit={e => { e.preventDefault(); void pridat(); }}>
             <PoleDodavatele f={novy} setF={setNovy} idZaklad="sklad-dod" autoFocus={suppliers.length > 0} />
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" variant="primary" icon="plus" loading={busy} disabled={!novy.name.trim()} className="w-full sm:w-auto justify-center">{t('Přidat dodavatele')}</Button>
+            {/* Pár akcí ½ + ½ ve výšce pole okna (P12) — dřív obsahové šířky vlevo (od sm) / pod sebou (telefon). */}
+            <Rada vyska="l">
               {suppliers.length > 0 && (
-                <Button type="button" variant="ghost" disabled={busy} className="w-full sm:w-auto justify-center" onClick={() => { setPridavam(false); setNovy(PRAZDNY); }}>{t('Zrušit', undefined, 'dialog')}</Button>
+                <Button type="button" variant="secondary" disabled={busy} onClick={() => { setPridavam(false); setNovy(PRAZDNY); }}>{t('Zrušit', undefined, 'dialog')}</Button>
               )}
-            </div>
+              <Button type="submit" variant="primary" icon="plus" loading={busy} disabled={!novy.name.trim()}>{t('Přidat dodavatele')}</Button>
+            </Rada>
           </form>
         ) : (
-          <Button variant="secondary" icon="plus" className="w-full sm:w-auto justify-center" onClick={() => setPridavam(true)}>{t('Nový dodavatel')}</Button>
+          <Button variant="secondary" size="lg" icon="plus" className="w-full" onClick={() => setPridavam(true)}>{t('Nový dodavatel')}</Button>
         ))}
 
         {suppliers.length === 0 ? (
@@ -154,10 +155,10 @@ export default function DodavateleOkno({ suppliers, polozky, smiUpravit, smiObje
                   <li key={sp.id} className="py-3">
                     <Well className="space-y-3">
                       <PoleDodavatele f={upravuji.f} setF={f => setUpravuji({ id: sp.id, f })} idZaklad={`sklad-dod-${sp.id}`} autoFocus />
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="primary" size="sm" loading={ukladam} disabled={!upravuji.f.name.trim()} onClick={ulozit}>{t('Uložit')}</Button>
-                        <Button variant="ghost" size="sm" disabled={ukladam} onClick={() => setUpravuji(null)}>{t('Zrušit', undefined, 'dialog')}</Button>
-                      </div>
+                      <Rada vyska="l">
+                        <Button variant="secondary" disabled={ukladam} onClick={() => setUpravuji(null)}>{t('Zrušit', undefined, 'dialog')}</Button>
+                        <Button variant="primary" loading={ukladam} disabled={!upravuji.f.name.trim()} onClick={ulozit}>{t('Uložit')}</Button>
+                      </Rada>
                     </Well>
                   </li>
                 );

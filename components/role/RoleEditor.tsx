@@ -223,7 +223,7 @@ export default function RoleEditor() {
       )}
 
       <section className="glass-card p-5 sm:p-6" aria-labelledby="role-vlastni">
-        <h4 id="role-vlastni" className="t-label mb-2">{t('Vlastní role ({n})', { n: data.vlastni.length })}</h4>
+        <h4 id="role-vlastni" className="t-label mb-1">{t('Vlastní role ({n})', { n: data.vlastni.length })}</h4>
         {data.vlastni.length === 0 ? (
           <EmptyState icon="lock" compact title={t('Zatím žádná vlastní role')}
             hint={t('Zkopíruj přednastavenou (třeba Barista bez uzávěrky) nebo slož novou od nuly.')} />
@@ -249,7 +249,7 @@ export default function RoleEditor() {
       </section>
 
       <section className="glass-card p-5 sm:p-6" aria-labelledby="role-system">
-        <h4 id="role-system" className="t-label mb-2">{t('Přednastavené role')}</h4>
+        <h4 id="role-system" className="t-label mb-1">{t('Přednastavené role')}</h4>
         <ul className="divide-y divide-black/[0.06]">
           {data.system.map(r => (
             <RadekRole key={r.klic} nazev={r.nazev} popis={r.popis} typ={r.typ} pocetOpravneni={r.opravneni.length} pocetLidi={r.pocet}
@@ -337,7 +337,9 @@ function RadekRole({ nazev, popis, typ, pocetOpravneni, pocetLidi, vychozi, moje
 }) {
   const t = useT('sprava');
   return (
-    <li className="py-3.5 flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4">
+    // v4: na telefonu akce pod textem L→R jedna pod druhou (dřív zalamované obsahové šířky — tři pravé hrany),
+    // od sm v řadě vpravo; rytmus 16 / 12 ze škály.
+    <li className="py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className="font-semibold text-[#16181A] min-w-0 break-words">{nazev}</p>
@@ -351,7 +353,7 @@ function RadekRole({ nazev, popis, typ, pocetOpravneni, pocetLidi, vychozi, moje
         {popis && <p className="text-xs text-black/50 mt-1 line-clamp-2 text-pretty">{popis}</p>}
         <p className="text-xs text-black/45 mt-1 tabular-nums">{t('{n} oprávnění', { n: pocetOpravneni })} · {lide(t, pocetLidi)}</p>
       </div>
-      <div className="flex items-center gap-1.5 flex-wrap shrink-0">{children}</div>
+      <div className="grid gap-2 sm:flex sm:items-center sm:gap-1.5 sm:flex-wrap shrink-0">{children}</div>
     </li>
   );
 }

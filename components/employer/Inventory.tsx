@@ -1677,8 +1677,10 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                   : <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-ok'}`} aria-hidden />}
                 title={i.name}
                 meta={meta || undefined}
+                // v4 (P15): stav pod meta na ose textu — v ocasu posouval množství o šířku chipu
+                // (sloupec čísel na 1030 / 1103 px) a na telefonu stál pod tečkou na L.
+                detail={st !== 'ok' ? <span className="mt-1 flex"><Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(t, st, i.madeInHouse)}</Chip></span> : undefined}
                 value={<span className="tabular-nums">{mnozstvi}</span>}
-                right={st !== 'ok' ? <Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(t, st, i.madeInHouse)}</Chip> : undefined}
                 onClick={selecting ? () => onToggle(i.id) : undefined}
                 actions={selecting ? undefined : <>
                   {/* Na telefonu se ocas „Odpis · − + · ···" (209 px) do řádku na 320 px nevešel a widget

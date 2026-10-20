@@ -184,7 +184,7 @@ export function PoleVolna({ f }: { f: FormularVolna }) {
   const typLabel = (id: TimeOffType) => (id === 'vacation' ? t('Dovolená') : id === 'sick' ? t('Nemoc') : t('Jiné'));
   const narok = useNarokDovolene();
   return (
-    <div className="space-y-3">
+    <div className="sloupec sloupec-4">
       <DraftNote koncept={f.koncept} co="rozepsanou žádost" />{/* i18n-ok: druh konceptu je identifikátor, větu překládá DraftNote */}
       <ZustatekDovolene narok={narok} od={f.fromDate} doDne={f.toDate} typ={f.type} />{/* kolo 8: zůstatek nad poli */}
       {/* Dvojice dat sdílí řádek i na telefonu (DESIGN: dvojice polí grid-cols-2). */}

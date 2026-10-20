@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Chip, EmptyState, ListRow, Menu, Modal, SearchField, Segmented } from '../ui';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 import { useMoney } from '../CurrencyProvider';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
@@ -58,6 +59,7 @@ export default function NakupniSeznamOkno({ polozky, kategorie, dodavatel: dodav
 }) {
   const loc = useLocale();
   const t = useT('sprava');
+  const telefon = useJeTelefon();
   const money = useMoney();
   const ctx = useMemo(() => sestavKontext(kategorie), [kategorie]);
   const dnes = useMemo(() => pragueToday(), []);
@@ -250,14 +252,16 @@ export default function NakupniSeznamOkno({ polozky, kategorie, dodavatel: dodav
 
   return (
     <Modal open onClose={onClose} size="lg" title={t('Nákupní seznam')} subtitle={podtitul}
-      footer={<div className="flex flex-wrap items-center justify-end gap-2 w-full">
+      // v4 (P7, P12): patička jedna řada 52 — „···" a dvě akce rovným dílem (dřív tři obsahové šířky
+      // zalomené na dvě řady s různými pravými hranami).
+      footer={<div className="grid w-full grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-2 [&>*]:h-[var(--h-l)] [&>.relative>button]:!h-[var(--h-l)] [&>.relative>button]:!w-[var(--h-l)] [&>button]:whitespace-normal [&>button]:leading-tight [&>button]:!px-3">
         <Menu label={t('Další možnosti seznamu')} items={[
           { label: t('Vytisknout'), icon: 'print', hint: t('S čtverečky k odškrtání v obchodě. Bez toho, co už je odškrtnuté.'), onClick: printList, disabled: pocetZbyva === 0 },
           { label: t('Poslat e-mailem'), icon: 'mail', hint: t('Otevře e-mail s předvyplněným seznamem.'), onClick: () => { window.location.href = mailto; }, disabled: pocetZbyva === 0 },
           ...(canShare ? [{ label: t('Sdílet'), icon: 'send', onClick: share, disabled: pocetZbyva === 0 }] : []),
           ...(odskrtnute.size > 0 ? [{ label: t('Zrušit odškrtnutí'), icon: 'undo', hint: t('Vrátí všechny položky mezi nekoupené.'), onClick: () => setOdskrtnute(new Set()) }] : []),
         ]} />
-        <Button variant="secondary" icon="copy" onClick={copy} disabled={pocetZbyva === 0}>{copied ? t('Zkopírováno') : t('Zkopírovat')}</Button>
+        <Button variant="secondary" icon="copy" onClick={copy} disabled={pocetZbyva === 0} className={smiObjednat ? '' : 'col-span-2'}>{copied ? t('Zkopírováno') : t('Zkopírovat')}</Button>
         {smiObjednat && (
           <Button variant="primary" loading={ordering} disabled={viditelne.length === 0} onClick={createOrders}>
             {viditelne.length > 0 ? t('Vytvořit objednávku ({n})', { n: viditelne.length }) : t('Vytvořit objednávku')}
@@ -288,18 +292,19 @@ export default function NakupniSeznamOkno({ polozky, kategorie, dodavatel: dodav
                     <Button variant="ghost" size="sm" onClick={() => zmenStav({ vynechane: moznosti.map(m => m.klic) })} disabled={stav.vynechane.length >= moznosti.length}>{t('Žádná')}</Button>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Kategorie na seznamu')}>
+                {/* Jeden posuvný pás mezi L a R (v4) — zalomené pilulky různé šířky dělaly zubatý sloupec. */}
+                <div className="flex gap-2 overflow-x-auto scrollbar-none scroll-fade-x py-0.5" role="group" aria-label={t('Kategorie na seznamu')}>
                   {zobrazenePilulky.map(m => {
                     const zapnuto = !stav.vynechane.includes(m.klic);
                     return (
                       <button key={m.klic} type="button" aria-pressed={zapnuto} onClick={() => prepniKategorii(m.klic)}
-                        className={`filter-pill tap-target-sm ${zapnuto ? 'seg-on' : 'seg-off glass'}`}>
+                        className={`filter-pill tap-target-sm shrink-0 ${zapnuto ? 'seg-on' : 'seg-off glass'}`}>
                         {popisKategorie(m.nazev)} <span className="tabular-nums opacity-70">{m.pocet}</span>
                       </button>
                     );
                   })}
                   {moznosti.length > MAX_PILULEK && (
-                    <button type="button" onClick={() => setVsechnyPilulky(v => !v)} className="filter-pill tap-target-sm seg-off glass">
+                    <button type="button" onClick={() => setVsechnyPilulky(v => !v)} className="filter-pill tap-target-sm shrink-0 seg-off glass">
                       {vsechnyPilulky ? t('Méně') : t('+{n} dalších', { n: moznosti.length - MAX_PILULEK })}
                     </button>
                   )}
@@ -307,8 +312,9 @@ export default function NakupniSeznamOkno({ polozky, kategorie, dodavatel: dodav
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="t-label shrink-0">{t('Seskupit')}</p>
+            {/* Štítek nad řadou, ať segment dostane celou šířku (dřív useknuté „Naléhavos…"). */}
+            <p className="t-label -mb-1">{t('Seskupit')}</p>
+            <div className="flex items-center gap-2">
               <Segmented size="sm" ariaLabel={t('Seskupit podle')} value={stav.seskupit} onChange={v => zmenStav({ seskupit: v })} options={seskupitMoznosti} className="min-w-0 flex-1" />
               <Menu label={t('Řazení')} icon="swap" size="sm" align="left" items={razeniMenu.map(r => ({ label: `${stav.razeni === r.id ? '✓ ' : ''}${r.label}`, onClick: () => zmenStav({ razeni: r.id }) }))} />
             </div>
@@ -406,8 +412,10 @@ export default function NakupniSeznamOkno({ polozky, kategorie, dodavatel: dodav
                         }
                         title={<span className={vKosiku ? 'line-through' : ''}>{i.name}</span>}
                         meta={meta}
+                        // Na telefonu chip stavu pod meta (osa textu), ne v ocasu pod zaškrtávátkem na L.
+                        detail={telefon ? <span className="mt-1 flex"><Chip tone={druh === 'critical' ? 'bad' : druh === 'low' ? 'wait' : 'info'} size="sm">{popisChipu(druh, t)}</Chip></span> : undefined}
                         value={<span className="tabular-nums">+{i.navrh} {i.unit}</span>}
-                        right={<Chip tone={druh === 'critical' ? 'bad' : druh === 'low' ? 'wait' : 'info'} size="sm">{popisChipu(druh, t)}</Chip>}
+                        right={telefon ? undefined : <Chip tone={druh === 'critical' ? 'bad' : druh === 'low' ? 'wait' : 'info'} size="sm">{popisChipu(druh, t)}</Chip>}
                         actions={i.supplierUrl ? (
                           <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn-icon" aria-label={t('Objednat {nazev} u dodavatele', { nazev: i.name })}>
                             <Icon name="external" size={15} />

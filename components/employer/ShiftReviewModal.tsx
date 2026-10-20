@@ -304,9 +304,10 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
             <label className="field-label">{t('Den směny')}</label>
             <input type="date" aria-label={t('Datum směny')} value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} appearance-none`} style={{ WebkitAppearance: 'none' }} />
             {shiftDates.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
+              // Rychlé dny jako jeden posuvný pás mezi L a R (v4) — zalomené pilulky dělaly zubatý sloupec.
+              <div className="flex gap-2 overflow-x-auto scrollbar-none scroll-fade-x py-0.5 mt-2">
                 {shiftDates.map(d => (
-                  <button key={d} type="button" aria-pressed={date === d} onClick={() => setDate(d)} className={`filter-pill tap-target-sm ${date === d ? 'seg-on' : 'seg-off glass'}`}>
+                  <button key={d} type="button" aria-pressed={date === d} onClick={() => setDate(d)} className={`filter-pill tap-target-sm shrink-0 ${date === d ? 'seg-on' : 'seg-off glass'}`}>
                     {fmtChip(d)}
                   </button>
                 ))}
