@@ -5,7 +5,8 @@
 // Každý widget se kreslí v tomhle obalu a jinak ne. Obal drží všechno, co
 // si dřív každý blok Přehledu psal po svém a co se proto rozjelo: titulek
 // z registru (nemůže ujet od názvu v galerii), jednu podobu hlavičky
-// (ikona 17 tlumeně, t-card, doplněk, odkaz dál jako ghost s chevronem),
+// (ikona 17 tlumeně bez podkladu, t-card, doplněk, odkaz dál jako tichý ghost
+// s chevronem, Sbalit vždy úplně vpravo),
 // všechny čtyři poctivé stavy (kostra, chyba se „Zkusit znovu", prázdno,
 // skrytí) a chování v režimu úprav (karta `inert`, jméno nese <li>).
 //
@@ -454,7 +455,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const filtrVHlavicce = filtr && !filtrPod ? filtr : null;
   const tlacitkoCile = sipkaCile ? (
     <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
-      className={`${sipkaDole ? 'shrink-0 -mb-1.5 -mr-2 self-end' : ''} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
+      className={`${sipkaDole ? 'shrink-0 -mb-1.5 -mr-2 self-end' : ''} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}`}
       onClick={otevriCil} />
   ) : null;
   return (
@@ -473,16 +474,12 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
         S ? `sm:p-5 relative ${prazdnyStav ? '' : 'min-h-[8.5rem]'}` : '',
         // Klepnutelná karta (natažený odkaz, nebo cíl z katalogu) se na hover jemně zvedne.
         otevrit || klepnutelna ? 'relative transition-shadow hover:shadow-[shadow:var(--shadow-float)]' : '',
-        // Jediná tmavá plocha v obsahu: hlavní číslo peněz se září v rohu (DP §2.10).
+        // Jediná tmavá plocha v obsahu: hlavní číslo peněz (DP §2.10), v3 bez záře v rohu.
         inkoust ? 'relative overflow-hidden bg-[#16181A] text-white border-transparent' : '',
       ].join(' ')}
     >
-      {inkoust && (
-        <span aria-hidden className="pointer-events-none absolute -top-14 -right-10 h-32 w-32 rounded-full bg-[#C8F542]/25 blur-2xl" />
-      )}
-      {/* Limetkový dotek karet čísel: gradient (background-image), žádná plná
-          plocha — sonda k68-design měří backgroundColor, gradientu se netýká. */}
-      {S && !inkoust && <span aria-hidden className="w-dotek" />}
+      {/* v3: žádná limetková záře v rohu inkoustové karty ani limetkový dotek
+          v rohu malých karet — dekorativní přechody dělaly z plochy „polévku z karet". */}
       <div className={`relative flex items-start justify-between gap-3 ${naCili && mozeSbalit ? 'cursor-pointer' : ''}`}
         // Okno rychlého filtru je portál do <body>, ale React jeho klepnutí bublá sem — pozadí okna kartu sbalit nesmí.
         onClick={naCili && mozeSbalit ? (e => { if (!(e.target as Element).closest('button, a, [role="menu"], [role="menuitem"], [role="dialog"], .modal-overlay')) k.prepniSbaleni(); }) : undefined}>
@@ -495,12 +492,10 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
             limit před/za). Rozlomení bez spojovníku (break-words) je až poslední
             záchrana proti přetečení (německá složená slova). */}
         <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${FOKUS_TITULKU} ${inkoust ? '!text-white' : ''}`}>
-          {/* Ikona v limetkové dlaždičce: jemný akcent hlavičky (kolo 71). Tónovaná
-              průhledností (bg-ok/15) — plná limetka je vyhrazená akci (DP T3)
-              a v tmavém režimu by svítila. Na inkoustové ploše bílá s průhledností. */}
-          <span aria-hidden className={`shrink-0 grid h-6 w-6 place-items-center rounded-xl ${S ? '-mt-0.5' : ''} ${inkoust ? 'bg-white/10 text-white/70' : 'bg-ok/15 text-ok-ink'}`}>
-            <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={14} />
-          </span>
+          {/* v3: ikona bez barevného čtverečku, jen tlumeně monochromní vedle titulku —
+              limetková dlaždička u každé karty (kolo 71) byla šum navíc. */}
+          <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={17}
+            className={`shrink-0 ${S ? 'mt-px' : ''} ${inkoust ? 'text-white/60' : 'w-ikona'}`} />
           <span className="line-clamp-2 break-words hyphens-auto [hyphenate-limit-chars:10_5_5] [-webkit-hyphenate-limit-before:5] [-webkit-hyphenate-limit-after:5]" title={nazev}>{nazev}</span>
           {doplnek}
         </h2>
@@ -512,7 +507,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
             {filtrVHlavicce && <span className={`flex min-w-0 ${mozeSbalit || mozeZvetsit || vidiOdkaz || (akce && akce.length > 0) || (sipkaCile && !sipkaDole) ? 'mr-1' : 'mr-2'}`}>{filtrVHlavicce}</span>}
             {vidiOdkaz && (
               <Button variant="ghost" size="sm" iconAfter="chevronRight"
-                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
+                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}
                 onClick={() => nav.onNavigate(odkaz!.pohled, odkaz!.arg)}>
                 {/* Vedle Zvětšit a Sbalit zbývá na telefonu málo místa na název: odkaz je tam jen šipka (text čte odečítač). */}
                 <span className={mozeZvetsit ? 'max-sm:sr-only' : ''}>{odkaz!.popisek}</span>
@@ -527,14 +522,14 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
             {!sipkaDole && tlacitkoCile}
             {mozeZvetsit && (
               <Button variant="ghost" size="sm" icon="expand" aria-haspopup="dialog" aria-describedby={idTitulku} aria-label={t('Zvětšit widget')}
-                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
+                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}
                 onClick={k.zvetsit!} />
             )}
             {mozeSbalit && (
               // Jméno widgetu v popisku by se pletlo s tlačítky hledanými podle názvu widgetu — nese ho nadpis (aria-describedby).
               <Button variant="ghost" size="sm" icon={k.sbaleno ? 'chevron' : 'chevronUp'} aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
                 aria-label={k.sbaleno ? t('Rozbalit widget') : t('Sbalit widget')}
-                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
+                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}
                 onClick={k.prepniSbaleni} />
             )}
           </div>
