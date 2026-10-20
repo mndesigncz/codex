@@ -23,7 +23,9 @@ boční pás), nikde jinde.
 **Měřítko „hotovo“ pro každou obrazovku na 390 px:** jeden nadpis, nejvýš
 jedna limetková akce, žádný VERZÁLKOVÝ štítek (výjimka: kód v Geist Mono),
 ikonová tlačítka v lištách ≤ 3, karty bez dekorativních přechodů, vzduch
-mezi sekcemi ≥ 20 px, nic nepřetéká, cíle ≥ 44 px, tmavý režim stejně čistý.
+mezi sekcemi ≥ 20 px, nic nepřetéká, cíle ≥ 44 px, tmavý režim stejně čistý
+(administrace, zaměstnanec, tablet; Managero client je vždy světlý — viz
+„Tmavý režim“).
 
 ## Tokeny (app/globals.css, `:root`)
 
@@ -43,7 +45,8 @@ mezi sekcemi ≥ 20 px, nic nepřetéká, cíle ≥ 44 px, tmavý režim stejně
 - Stavové barvy, jedna sada pro chipy, panely, hlášky i text:
   `--ok`, `--wait`, `--bad`, `--info`, `--muted`, vždy dvojice `-bg` / `-ink`.
 - Tmavý motiv: přemapování týchž tokenů pod `[data-theme="dark"]`, plátno
-  `#0C0D0F` bez barevných světel; hostovská část se připíná na světlý.
+  `#0C0D0F` bez barevných světel. Managero client (host i jeho správa) je
+  **vždy světlý** — viz „Tmavý režim“.
 
 ## Vrstvy ploch (CSS třídy)
 
@@ -1093,8 +1096,16 @@ obrazovky potřebuje — vědět, co ten prvek **je**.
 
 ## Tmavý režim
 
-Tmavý režim se v aplikaci nabízí a ukládá do prohlížeče. Hostovská část
-(Managero client) ho záměrně nemá — tam si vzhled určuje podnik.
+Tmavý režim se nabízí v administraci, u zaměstnance a na tabletu; volba se
+ukládá do prohlížeče (a na účet). **Managero client je vždy světlý** — hostovské
+stránky (`/client…`, stránka podniku, přihlášení hosta) i správa Managero client
+v administraci (`?mode=client`), stejně jako landing a ukázka. Skript
+v `app/layout.tsx` na těchto cestách `data-theme="dark"` vůbec nenastaví
+a `ThemeProvider.setForcedLight` drží světlý motiv, dokud je správa otevřená;
+volba člověka se jen odloží, nepřepíše. Podnik mění barvu značky (viz „Barva
+značky je podniku, čitelnost je naše“), ne motiv. Hostovské obrazovky se proto
+v tmavém režimu nefotí ani neměří a nová hostovská třída tmavou variantu
+nepotřebuje (PRODUCT.md: „Hostovská část je vždy světlá“).
 
 - **Třída, která si nastaví barvu textu, ji musí mít i pro tmavý režim.**
   Plošné pravidlo pro `.text-black/NN` na `.seg-off` ani `.cat-1` nedosáhne,
