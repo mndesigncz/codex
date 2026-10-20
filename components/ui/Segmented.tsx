@@ -73,6 +73,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
   const presahRef = useRef(0);
   presahRef.current = presah;
 
+  // Po každém vykreslení: soused se objevuje a mizí s rodičem (Uzávěrky: MonthNav až po „Měsíc").
   useLayoutEffect(() => {
     const obal = obalRef.current, rodic = obal?.parentElement;
     if (!obal || !rodic || sirka !== 'plna') return;
@@ -80,8 +81,8 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
     const radek = /flex/.test(cs.display) && !cs.flexDirection.startsWith('column');
     const soused = radek && Array.from(rodic.children).some(c => c !== obal && (c as HTMLElement).offsetParent !== null
       && getComputedStyle(c).position !== 'absolute');
-    setVRade(soused);
-  }, [sirka, options.length]);
+    setVRade(v => (v === soused ? v : soused));
+  });
 
   // Vejde se? Přirozená šířka položek (obsah + odsazení + mezery) proti šířce, kterou by
   // segment měl bez přesahu. Měří se z obsahu položek, ne ze scrollWidth: ten po přesahu
