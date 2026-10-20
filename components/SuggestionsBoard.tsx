@@ -262,8 +262,9 @@ export default function SuggestionsBoard() {
     <div className="space-y-4">
       {items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="sm:hidden">
-            <Button variant="secondary" size="sm" aria-expanded={ukazPas} aria-controls={`${id}-pas`} onClick={() => setFiltryTel(v => !v)}>
+          {/* v4 (P2, P10): na telefonu „Filtry" pružný díl řady (s řazením na pravé hraně), ne osamělé vlevo. */}
+          <div className="sm:hidden flex-1 min-w-0">
+            <Button variant="secondary" size="sm" className="w-full" aria-expanded={ukazPas} aria-controls={`${id}-pas`} onClick={() => setFiltryTel(v => !v)}>
               {pocetFiltru > 0 ? t('Filtry · {n}', { n: pocetFiltru }) : t('Filtry')}
             </Button>
           </div>
@@ -311,40 +312,41 @@ export default function SuggestionsBoard() {
               const poznamkyOtevrene = otevrenePoznamky.has(s.id);
               const pocetPoznamek = pocty.data?.[s.id] ?? 0;
               return (
-                <li key={s.id} className="list-row items-start flex-wrap">
+                <li key={s.id} className="list-row items-start">
                   <Hlas podnet={s} onClick={() => void toggleVote(s)} zamceno={!pridava} />
-                  <div className="min-w-0 flex-1">
+                  {/* v4 (V4): stav, posun stavu i poznámky na ose textu (ne pod hlasem), rozestup 8;
+                      „···" na pravé hraně. Dřív segment přes celý řádek od levého okraje pod hlasem. */}
+                  <div className="min-w-0 flex-1 sloupec sloupec-2">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="t-card min-w-0 break-words">{s.title}</h3>
                       <Chip tone={meta.tone} size="sm" className="shrink-0">{meta.label}</Chip>
                     </div>
-                    {s.content && <p className="text-sm text-black/60 mt-1 whitespace-pre-wrap break-words text-pretty">{s.content}</p>}
-                    <p className="flex items-center gap-1.5 mt-2 text-[13px] text-black/55 min-w-0">
+                    {s.content && <p className="text-sm text-black/60 -mt-1 whitespace-pre-wrap break-words text-pretty">{s.content}</p>}
+                    <p className="flex items-center gap-1.5 text-[13px] text-black/55 min-w-0">
                       <Avatar emoji={s.authorAvatar} size="xs" ring={false} />
                       <span className="truncate min-w-0">{s.authorName ?? t('Neznámý')}{mine ? ' (ty)' : ''}</span>
                       {relDate(s.createdAt, t, loc) && <><span aria-hidden className="text-black/40">·</span><span className="whitespace-nowrap">{relDate(s.createdAt, t, loc)}</span></>}
                     </p>
-                    {/* Vlákno pod podnětem (kolo 7): odpověď vedení, důvod zamítnutí, doplnění od autora. */}
-                    <Button variant="ghost" size="sm" icon="chat" className="-ml-3 mt-1"
-                      aria-expanded={poznamkyOtevrene} aria-controls={`${id}-pozn-${s.id}`} onClick={() => prepniPoznamky(s.id)}>
-                      {pocetPoznamek ? t('Poznámky ({n})', { n: pocetPoznamek }) : t('Poznámky')}
-                    </Button>
-                  </div>
-                  {polozky.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: s.title })} items={polozky} className="shrink-0 -my-1" />}
-                  {/* Posun podnětu — jen kdo podněty spravuje (server to tak pustí). Přes celou šířku
-                      řádku, ne v úzkém sloupci vedle hlasu: čtyři stavy se tam nevešly a „Hotovo" a
-                      „Zamítnout" byly za okrajem. */}
-                  {spravuje && (
-                    <div className="basis-full min-w-0">
+                    {/* Posun podnětu — jen kdo podněty spravuje (server to tak pustí). Čtyři stavy se
+                        na telefonu nevejdou celé: segment je pak posuvný pás mezi osou textu a R. */}
+                    {spravuje && (
                       <Segmented size="sm" ariaLabel={t('Stav podnětu {nazev}', { nazev: s.title })} value={(statusFlow(t).some(x => x.id === s.status) ? s.status : 'new') as IdStavu}
                         onChange={v => void setStatus(s, v)} options={statusFlow(t).map(x => ({ id: x.id, label: x.label }))} />
+                    )}
+                    {/* Vlákno pod podnětem (kolo 7): odpověď vedení, důvod zamítnutí, doplnění od autora. */}
+                    <div className="-mt-3 -mb-1 flex">
+                      <Button variant="ghost" size="sm" icon="chat" className="-ml-3"
+                        aria-expanded={poznamkyOtevrene} aria-controls={`${id}-pozn-${s.id}`} onClick={() => prepniPoznamky(s.id)}>
+                        {pocetPoznamek ? t('Poznámky ({n})', { n: pocetPoznamek }) : t('Poznámky')}
+                      </Button>
                     </div>
-                  )}
-                  {poznamkyOtevrene && (
-                    <div id={`${id}-pozn-${s.id}`} className="basis-full min-w-0 pb-1">
-                      <Poznamky typ="suggestion" id={s.id} />
-                    </div>
-                  )}
+                    {poznamkyOtevrene && (
+                      <div id={`${id}-pozn-${s.id}`} className="min-w-0 pb-1">
+                        <Poznamky typ="suggestion" id={s.id} />
+                      </div>
+                    )}
+                  </div>
+                  {polozky.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: s.title })} items={polozky} className="shrink-0 -my-1" />}
                 </li>
               );
             })}
