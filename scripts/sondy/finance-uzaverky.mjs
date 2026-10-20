@@ -103,6 +103,9 @@ const text = async (p, w) => (await p.locator(`[data-plocha] li[data-widget="${w
     await nastroj(p).getByRole('button', { name: 'Zrušit filtry' }).last().click();
     await dokud(async () => (await radky(p).count()) === 5, 3000);
 
+    // Redesign v3: stav je v panelu „Filtry" (nad seznamem jen hledání a Filtry v jedné řadě).
+    tvrdi(`B4b ${w}: nad seznamem jen hledání a „Filtry" — segment stavu je až v panelu`, await nastroj(p).getByRole('tablist', { name: 'Stav uzávěrky' }).count() === 0);
+    await nastroj(p).getByRole('button', { name: /^Filtry/ }).click();
     const stavTab = (jmeno) => nastroj(p).getByRole('tablist', { name: 'Stav uzávěrky' }).getByRole('tab', { name: jmeno });
     await stavTab(/^Ke schválení/).click();
     tvrdi(`B5 ${w}: stav „Ke schválení" nechá jen jednu (Petr Novák)`, await dokud(async () => (await radky(p).count()) === 1, 3000) && /Čeká na schválení/.test(await radky(p).first().innerText()));
@@ -111,7 +114,6 @@ const text = async (p, w) => (await p.locator(`[data-plocha] li[data-widget="${w
     await stavTab('Vše').click();
     await dokud(async () => (await radky(p).count()) === 5, 3000);
 
-    await nastroj(p).getByRole('button', { name: /^Filtry/ }).click();
     const kasaTab = (jmeno) => nastroj(p).getByRole('tablist', { name: 'Rozdíl v kase' }).getByRole('tab', { name: jmeno });
     await kasaTab('Sedí').click();
     const sedi = await dokud(async () => { const n = await radky(p).count(); return n >= 1 && n < 5; }, 3000);

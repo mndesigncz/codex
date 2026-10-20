@@ -284,28 +284,33 @@ export default function ClosingsOverview() {
         ) : null}
         {allClosings.length > 0 && (
           <div className="space-y-2" role="search" aria-label={t('Filtry uzávěrek')}>
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            {/* v3: nad seznamem jedna řada — hledání a „Filtry". Stav (Vše / Ke schválení / Schválené)
+                je v panelu: dřív tu vedle hledání stál ještě segment stavu a pod titulkem segment období,
+                tři přepínače nad sebou. Frontu ke schválení drží widget „Uzávěrky ke schválení"
+                a zapnutý stav prozradí řádek „Zobrazeno N z M" se Zrušit filtry. */}
+            <div className="flex gap-2 items-center">
               <SearchField className="flex-1 min-w-0" value={filtr.hledej} onChange={v => nastav({ hledej: v })}
                 placeholder={t('Hledat podle dne, směny, jména nebo poznámky…')} ariaLabel={t('Hledat v uzávěrkách')} storageKey="uzaverky"
                 suggestions={[
                   ...jmena.map(j => ({ label: j, hint: t('na směně') })),
                   ...stitky.map(x => ({ label: x, hint: t('směna') })),
                 ]} />
-              <div className="flex items-center gap-2 min-w-0">
-                <Segmented size="sm" ariaLabel={t('Stav uzávěrky')} value={filtr.stav} onChange={v => nastav({ stav: v })}
-                  options={[
-                    { id: 'vse', label: t('Vše') },
-                    { id: 'ceka', label: t('Ke schválení'), count: kCekani || undefined },
-                    { id: 'schvaleno', label: t('Schválené') },
-                  ]} />
-                <Button variant="secondary" size="sm" aria-expanded={dalsiFiltry} onClick={() => setDalsiFiltry(v => !v)}
-                  className="shrink-0">
-                  {t('Filtry')}{nFiltru > 0 ? ` · ${nFiltru}` : ''}
-                </Button>
-              </div>
+              <Button variant="secondary" size="sm" aria-expanded={dalsiFiltry} onClick={() => setDalsiFiltry(v => !v)}
+                className="shrink-0">
+                {t('Filtry')}{nFiltru > 0 ? ` · ${nFiltru}` : ''}
+              </Button>
             </div>
             {dalsiFiltry && (
               <div className="well px-4 py-3 space-y-3">
+                <div className="space-y-1.5">
+                  <p className="t-label">{t('Stav')}</p>
+                  <Segmented size="sm" ariaLabel={t('Stav uzávěrky')} value={filtr.stav} onChange={v => nastav({ stav: v })}
+                    options={[
+                      { id: 'vse', label: t('Vše') },
+                      { id: 'ceka', label: t('Ke schválení'), count: kCekani || undefined },
+                      { id: 'schvaleno', label: t('Schválené') },
+                    ]} />
+                </div>
                 <div className="space-y-1.5">
                   <p className="t-label">{t('Kasa')}</p>
                   <Segmented size="sm" ariaLabel={t('Rozdíl v kase')} value={filtr.kasa} onChange={v => nastav({ kasa: v })}
