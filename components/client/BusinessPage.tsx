@@ -439,7 +439,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
           </div>
         </div>
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-        <button type="submit" disabled={busy || !slots.length} className={btnPrimary}>
+        <button type="submit" disabled={busy || !slots.length} className={`${btnPrimary} btn-lg w-full`}>
           <Icon name="calendarCheck" size={16} /> {busy ? t('Odesílám…') : signedIn ? t('Odeslat rezervaci') : t('Přihlásit se a rezervovat')}
         </button>
       </form>
