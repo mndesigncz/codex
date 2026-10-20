@@ -524,7 +524,7 @@ export default function EmployerLayout({ user }: Props) {
             client, TO GO). Název stránky tu NENÍ — stojí jednou, velkým h1 pod
             lištou (PageHeader). Dřív tu byl tentýž název podruhé a vedle něj pět
             ikon a limetkové kolečko TO GO, takže lišta křičela víc než obsah. */}
-        <header className="px-5 sm:px-6 pt-4 pb-1 flex items-center gap-2 sm:gap-2.5 flex-shrink-0 min-h-[3.75rem]">
+        <header className="px-4 min-[360px]:px-5 sm:px-6 pt-3 pb-1 flex items-center gap-1.5 sm:gap-2 flex-shrink-0 min-h-[3.75rem]">
           {/* Ikonové tlačítko bez textu je pro odečítač obrazovky prostě
               „tlačítko". Tenhle přepínač je na každé obrazovce aplikace. */}
           <IconButton icon="menu" onClick={() => setSidebarOpen(v => !v)}

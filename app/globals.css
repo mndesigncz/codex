@@ -924,6 +924,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .hover\:bg-black\/\[0\.12\]:hover{ background-color:rgba(255,255,255,0.15) !important; }
 :root[data-theme="dark"] .hover\:bg-black\/\[0\.14\]:hover{ background-color:rgba(255,255,255,0.17) !important; }
 :root[data-theme="dark"] .hover\:bg-black\/10:hover{ background-color:rgba(255,255,255,0.12) !important; }
+/* Šedý kruh IconButton / zvonku pod kurzorem (group-hover na vnitřním kruhu). */
+:root[data-theme="dark"] .group:hover .group-hover\:bg-black\/\[0\.08\]{ background-color:rgba(255,255,255,0.10) !important; }
 
 /* borders / rings / dividers */
 :root[data-theme="dark"] .border-black\/\[0\.06\]{ border-color:rgba(255,255,255,0.08) !important; }

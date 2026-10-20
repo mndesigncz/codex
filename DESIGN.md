@@ -66,7 +66,7 @@ Písmo **Geist** (balíček `geist`, `--font-geist-sans`), kódy kartiček a kup
 **Geist Mono**. Pět velikostí a dost:
 
 - `.t-page` 32 px bold, proklad 1,08, prostrkání −0,028 em (jediný h1 na
-  obrazovce; kreslí ho `PageHeader`); podtitulek pod ním 15 px šedě
+  obrazovce; kreslí ho `PageHeader`); podtitulek pod ním 14 px šedě
 - `.t-section` 20 px semibold (h2 sekce; kreslí `Section`; titulek okna
   `Modal` je táž třída zvětšená na 22 px bold)
 - `.t-card` 16 px semibold (titulek karty, widgetu, dlaždice)
@@ -204,12 +204,12 @@ Klient navíc: StatCard, SectionTitle, TableMap.
   jako h1 pod lištou. Hostovská lišta (`ClientShell`): značka, záložky od
   md, hledání/kód v šedém kruhu, jazyk, účet; „Přihlásit“ je inkoustová
   pilulka — limetka patří hlavní akci obrazovky.
-- Každá obrazovka: `PageHeader` (h1 32 px + podtitulek 15 px; vpravo „···“
+- Každá obrazovka: `PageHeader` (h1 32 px + podtitulek 14 px; vpravo „···“
   a vedlejší akce v šedých kruzích, jedna limetková akce — na telefonu pod
-  nadpisem přes šířku), pak obsah. Okraj obsahu na telefonu 20 px (plocha
+  nadpisem přes šířku), pak obsah. Okraj obsahu na telefonu 20 px (pod 360 px 16 px; plocha
   widgetů), od `sm` 24 px. Šířka obsahu: seznamové obrazovky `max-w-4xl`,
   datové (finance, docházka, sklad) plná šířka `max-w-7xl`.
-- Mezi sekcemi aspoň 20 px vzduchu (`space-y-6` stránky, mřížka plochy
+- Mezi sekcemi aspoň 20 px vzduchu (plocha `space-y-5`, od `sm` `space-y-6`; mřížka plochy
   14 px na telefonu / 20 px od `sm`).
 - Seznam = jedna karta s `.list`; ne jedna karta na položku (Úkoly, Nápady,
   Průběhy). Řádek 56–64 px: ikona/avatar 36–40 px, titulek 15 px medium,

@@ -75,15 +75,15 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
   // Dřív stálo na telefonu „···" osamocené vlevo pod nadpisem vedle limetky.
   // Jeden DOM, žádné zdvojené tlačítko: sondy počítají limetky na stránce.
   return (
-    <div className={`space-y-5 ${className}`}>
+    <div className={`space-y-4 ${className}`}>
       {/* Akce se zalamují (iPad 768 px s postranní lištou má na obsah 448 px
           a tři tlačítka s menu přes 480) a drží se vpravo; název (`flex-1`)
           se nikdy nesmrskne na nulu — má minimální šířku a akce jdou pod něj. */}
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-4">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-3.5">
         <div className="min-w-0 flex-1 basis-[12rem]">
           <Nadpis className="t-page text-balance">{title}</Nadpis>
           {showSubtitle && (
-            <p className="mt-2 max-w-[70ch] text-[15px] leading-snug text-black/60 text-pretty group">
+            <p className="mt-1.5 max-w-[70ch] text-sm leading-snug text-black/60 text-pretty group">
               {subtitle}
               {hintId && (
                 <button type="button"

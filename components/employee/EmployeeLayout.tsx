@@ -285,7 +285,7 @@ export default function EmployeeLayout({ user }: Props) {
         {/* Horní lišta v3: značka a podnik vlevo, vpravo hledání a oznámení v šedých
             kruzích. Název stránky stojí jednou — velkým h1 pod lištou; tady ho čte
             jen odečítač. */}
-        <header className="px-5 sm:px-6 pt-4 pb-1 flex items-center gap-2 sm:gap-2.5 flex-shrink-0 min-h-[3.75rem]">
+        <header className="px-4 min-[360px]:px-5 sm:px-6 pt-3 pb-1 flex items-center gap-1.5 sm:gap-2 flex-shrink-0 min-h-[3.75rem]">
           {/* Ikonové tlačítko bez textu je pro odečítač obrazovky prostě
               „tlačítko". Tenhle přepínač je na každé obrazovce aplikace. */}
           <IconButton icon="menu" onClick={() => setSidebarOpen(v => !v)}

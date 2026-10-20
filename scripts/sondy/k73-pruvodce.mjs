@@ -148,7 +148,8 @@ const pismo = p => p.evaluate(() => {
     const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
     if (r.width < 1 || r.height < 1 || cs.visibility === 'hidden') continue;
     const px = Math.round(parseFloat(cs.fontSize) * 10) / 10;
-    if (![11, 12, 13, 14, 15, 16, 18, 28].includes(px)) mimo.set(px, (mimo.get(px) ?? []).concat(el.textContent.trim().slice(0, 22)));
+    // DESIGN v3: nadpis kroku je .t-page 32 px (dřív 28), sekce 20, okno 22, Stat 30.
+    if (![11, 12, 13, 14, 15, 16, 18, 20, 22, 28, 30, 32].includes(px)) mimo.set(px, (mimo.get(px) ?? []).concat(el.textContent.trim().slice(0, 22)));
   }
   return Object.fromEntries([...mimo].map(([k, v]) => [k, v.slice(0, 3)]));
 });
@@ -496,7 +497,7 @@ for (const [nazev, vp, mobil] of [['1280', { width: 1280, height: 900 }, false],
     const k = await kontrast(p);
     tvrdi(`P9 ${nazev} ${nazevKroku}: text v tmavém režimu ≥ 4,5 : 1`, k.length === 0, k.slice(0, 6).join(' | '));
     const f = await pismo(p);
-    tvrdi(`P11 ${nazev} ${nazevKroku}: písmo drží řadu 11/12/13/14/15/16/18/28`, Object.keys(f).length === 0, JSON.stringify(f));
+    tvrdi(`P11 ${nazev} ${nazevKroku}: písmo drží řadu 11/12/13/14/15/16/18/20/22/28/30/32 (v3)`, Object.keys(f).length === 0, JSON.stringify(f));
     const foto = await p.evaluate(() => { const f = document.querySelector('.foto-ramec'); if (!f) return 0; const r = f.getBoundingClientRect(); return (r.width * r.height) / (innerWidth * innerHeight); });
     tvrdi(`P9 ${nazev} ${nazevKroku}: fotka nezaplňuje celou obrazovku`, foto < 0.6, foto.toFixed(2));
     await p.screenshot({ path: `${OUT}k73-tmavy-${nazevKroku}-${nazev}.png` });

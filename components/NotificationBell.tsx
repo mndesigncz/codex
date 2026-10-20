@@ -122,11 +122,13 @@ export default function NotificationBell() {
           if (!open) loadFeedback();
           setOpen(o => !o);
         }}
-        className={`tap-target relative shrink-0 rounded-full w-10 h-10 flex items-center justify-center transition duration-200 ${open ? 'bg-black/10 text-[#16181A]' : 'bg-black/[0.05] text-black/70 hover:bg-black/[0.08] hover:text-[#16181A]'}`}
+        className={`group relative shrink-0 rounded-full w-11 h-11 flex items-center justify-center transition duration-200 ${open ? 'text-[#16181A]' : 'text-black/70 hover:text-[#16181A]'}`}
         title={t('Notifikace')} aria-label={t('Notifikace')}
       >
         {/* The bell only moves when there is actually something new. */}
-        <Icon name="bell" size={19} className="i-lead" motion={badge > 0 ? 'ring' : undefined} />
+        {/* Šedý kruh 40 px v dotykové ploše 44 px — stejně jako IconButton v liště. */}
+        <span aria-hidden className={`pointer-events-none absolute inset-0.5 rounded-full transition-colors duration-200 ${open ? 'bg-black/10' : 'bg-black/[0.05] group-hover:bg-black/[0.08]'}`} />
+        <Icon name="bell" size={19} className="relative i-lead" motion={badge > 0 ? 'ring' : undefined} />
         {/* Stejný odznak jako v doku. Limetkový podklad tu dřív soupeřil
             s hlavní akcí obrazovky o jedinou limetku; červený zůstává pro
             vlajku (nízké hodnocení čeká na potvrzení). */}
