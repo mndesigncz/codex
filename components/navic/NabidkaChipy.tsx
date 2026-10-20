@@ -64,7 +64,7 @@ export function VolbaRadek({ vybrano, onClick, titul, hodnota, ikona, disabled, 
 } & { [k: `data-${string}`]: string | number | undefined }) {
   return (
     <button type="button" aria-pressed={vybrano} disabled={disabled} title={title} onClick={onClick} {...data}
-      className={`flex w-full min-w-0 items-center gap-3 rounded-[var(--r-md)] px-4 py-2.5 ${vyska === 'l' ? 'min-h-[var(--h-l)]' : 'min-h-[var(--h-m)]'} text-left text-[0.9375rem] font-medium leading-snug select-none transition-colors disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] ${vybrano ? 'seg-on' : 'btn-secondary'} ${className}`}>
+      className={`tap-target flex w-full min-w-0 items-center gap-3 rounded-[var(--r-md)] px-4 py-2.5 ${vyska === 'l' ? 'min-h-[var(--h-l)]' : 'min-h-[var(--h-m)]'} text-left text-[0.9375rem] font-medium leading-snug select-none transition-colors disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] ${vybrano ? 'seg-on' : 'btn-secondary'} ${className}`}>
       {ikona && <Icon name={ikona} size={18} className="shrink-0" />}
       <span className="min-w-0 flex-1 text-pretty">{titul}</span>
       {hodnota != null && hodnota !== '' && <><span className="sr-only"> · </span><span className="shrink-0 text-right tabular-nums">{hodnota}</span></>}
@@ -83,7 +83,7 @@ export function VolbaDil({ vybrano, onClick, children, role, disabled, title, cl
   const stav = role === 'tab' ? { role, 'aria-selected': vybrano } : { 'aria-pressed': vybrano };
   return (
     <button type="button" {...stav} disabled={disabled} title={title} onClick={onClick} {...data}
-      className={`flex min-w-0 items-center justify-center rounded-[var(--r-md)] px-2 min-h-[var(--h-l)] text-center text-sm font-medium leading-tight select-none transition-colors disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] ${vybrano ? 'seg-on' : 'btn-secondary'} ${className}`}>
+      className={`tap-target flex min-w-0 items-center justify-center rounded-[var(--r-md)] px-2 min-h-[var(--h-l)] text-center text-sm font-medium leading-tight select-none transition-colors disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] ${vybrano ? 'seg-on' : 'btn-secondary'} ${className}`}>
       <span className="min-w-0 text-pretty [overflow-wrap:anywhere]">{children}</span>
     </button>
   );

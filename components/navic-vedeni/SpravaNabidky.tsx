@@ -164,7 +164,7 @@ export function SpravaNabidky({ dnesni = false, onNovy }: {
       )}
       {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
       {smi && polozky.length > 0 && !data.error && (
-        <Button variant="secondary" icon="plus" className="mt-4 w-full" onClick={novy}>{t('Nový úkol za body')}</Button>
+        <Button variant="secondary" icon="plus" className="tap-target mt-4 w-full" onClick={novy}>{t('Nový úkol za body')}</Button>
       )}
       {okno && (
         <NabidkaNavicOkno polozka={okno.polozka} onClose={() => setOkno(null)}

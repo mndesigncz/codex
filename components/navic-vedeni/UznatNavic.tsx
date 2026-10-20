@@ -88,11 +88,11 @@ export function UznatNavic({ zapis, akce, onClose, onHotovo, nadOkny = false }: 
                 <Field id="navic-body" label={t('Body')}
                   hint={zapis.pointsProposed != null && zapis.pointsProposed > 0 ? t('Z nabídky: {n} b. Nula = uznáno bez bodů.', { n: zapis.pointsProposed }) : t('0–{max}; nula = uznáno bez bodů.', { max: MAX_BODU })}>
                   <Rada vyska="l" className="[&>input]:!px-1">
-                    <Button variant="secondary" size="lg" iconOnly icon="minus" aria-label={t('Méně bodů')} disabled={bodyCislo <= 0} className="!w-auto"
+                    <Button variant="secondary" size="lg" iconOnly icon="minus" aria-label={t('Méně bodů')} disabled={bodyCislo <= 0} className="tap-target !w-auto"
                       onClick={() => setBody(String(krokBodu(body, -1)))} />
                     <Input id="navic-body" type="number" inputMode="numeric" min={0} max={MAX_BODU} step={1} value={body}
                       onChange={e => setBody(e.target.value.replace(/\D/g, ''))} className="text-center tabular-nums" autoFocus />
-                    <Button variant="secondary" size="lg" iconOnly icon="plus" aria-label={t('Víc bodů')} disabled={bodyCislo >= MAX_BODU} className="!w-auto"
+                    <Button variant="secondary" size="lg" iconOnly icon="plus" aria-label={t('Víc bodů')} disabled={bodyCislo >= MAX_BODU} className="tap-target !w-auto"
                       onClick={() => setBody(String(krokBodu(body, 1)))} />
                   </Rada>
                 </Field>

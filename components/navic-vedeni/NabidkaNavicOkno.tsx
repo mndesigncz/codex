@@ -122,11 +122,11 @@ export function NabidkaNavicOkno({ polozka, predvyplneno, onClose, onHotovo, nad
             <Field id="nabidka-body" label={t('Body')} hint={t('0–{max}', { max: MAX_BODU })}>
               {/* Krokovač = řada 52 jako pole vedle (V6): − | číslo | + rovným dílem. */}
               <Rada vyska="l" className="[&>input]:!px-1">
-                <Button variant="secondary" size="lg" iconOnly icon="minus" className="!w-auto" aria-label={t('Méně bodů')} disabled={bodyCislo <= 0}
+                <Button variant="secondary" size="lg" iconOnly icon="minus" className="tap-target !w-auto" aria-label={t('Méně bodů')} disabled={bodyCislo <= 0}
                   onClick={() => zmen({ body: String(krokBoduUkolu(f.body, -1, MAX_BODU)) })} />
                 <Input id="nabidka-body" type="number" inputMode="numeric" min={0} max={MAX_BODU} step={1} value={f.body}
                   onChange={e => zmen({ body: e.target.value.replace(/\D/g, '') })} className="text-center tabular-nums" />
-                <Button variant="secondary" size="lg" iconOnly icon="plus" className="!w-auto" aria-label={t('Víc bodů')} disabled={bodyCislo >= MAX_BODU}
+                <Button variant="secondary" size="lg" iconOnly icon="plus" className="tap-target !w-auto" aria-label={t('Víc bodů')} disabled={bodyCislo >= MAX_BODU}
                   onClick={() => zmen({ body: String(krokBoduUkolu(f.body, 1, MAX_BODU)) })} />
               </Rada>
             </Field>
