@@ -97,7 +97,8 @@ const naPlose = (p, w) => p.locator(`[data-plocha] li[data-widget="${w}"]:not([h
 const widgetLi = (p, w) => p.locator(`[data-plocha] li[data-widget="${w}"]`);
 const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 // Limetka se září = akce (DP §0): Button accent i třída btn-accent. Limetkové kolečko splněného úkolu záři nemá.
-const LIMETKA = '[data-plocha] button[class*="0_6px_18px"]:visible, [data-plocha] .btn-accent:visible';
+// DESIGN v3: limetka je bez záře, takže se nepozná podle stínu 0_6px_18px, ale podle výplně Button accent (bg-[#C8F542] on-accent); samotné .on-accent nosí i hotová kolečka úkolů.
+const LIMETKA = '[data-plocha] button[class*="bg-[#C8F542] on-accent hover:brightness-105"]:visible, [data-plocha] .btn-accent:visible';
 const limetek = (p) => p.locator(LIMETKA).count();
 const h1 = (p) => p.evaluate(() => {
   const vid = [...document.querySelectorAll('h1')].filter(h => h.offsetParent !== null);

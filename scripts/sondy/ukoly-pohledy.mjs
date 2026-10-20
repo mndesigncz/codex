@@ -31,7 +31,20 @@ for (const w of [1280, 390]) {
   const { ctx, p, stav, chyby } = await kontext({ viewport: { width: w, height: 900 }, mobil: w < 600, fix: nacti('k69-b6a-rozlozeni-ukoly'), dalsi: podvrh });
   await otevri(p, '/employer/overview?view=tasks', 'vedeni.ukoly');
   const nastroj = p.locator('[data-plocha] li[data-widget="nastroj"]');
-  await nastroj.getByRole('group', { name: 'Stav úkolů' }).waitFor({ timeout: 10000 });
+  // Redesign v3: nad seznamem vedení je jedna řada (rychlé přidání · hledání · Filtry); pás stavů
+  // je v panelu „Filtry" — seznam pod ním je podle stavu rozdělený do sekcí s počty.
+  await nastroj.getByRole('group', { name: 'Filtry úkolů' }).waitFor({ timeout: 10000 });
+  {
+    const radek = await nastroj.evaluate(el => {
+      const r = (sel) => el.querySelector(sel)?.getBoundingClientRect();
+      const a = r('input[aria-label="Přidat úkol"]'), f = [...el.querySelectorAll('button')].find(b => /^Filtry/.test(b.textContent ?? ''))?.getBoundingClientRect();
+      return a && f ? Math.abs((a.top + a.height / 2) - (f.top + f.height / 2)) : null;
+    });
+    tvrdi(`${w}: rychlé přidání a „Filtry" stojí v jedné řadě`, radek != null && radek <= 8, String(radek));
+    tvrdi(`${w}: pás stavů není nad seznamem (je v panelu Filtry)`, await nastroj.getByRole('group', { name: 'Stav úkolů' }).count() === 0);
+  }
+  await nastroj.getByRole('button', { name: /^Filtry/ }).click();
+  await nastroj.getByRole('group', { name: 'Stav úkolů' }).waitFor({ timeout: 5000 });
 
   // Karty a záložky stavu
   const txt = async () => (await nastroj.innerText()).replace(/\s+/g, ' ');
@@ -54,9 +67,19 @@ for (const w of [1280, 390]) {
   const seznam = nastroj.locator('ul[aria-label="Úkoly"] > li');
   tvrdi(`${w}: záložka Po termínu ukáže jen dva úkoly`, await dokud(async () => await seznam.count() === 2, 3000), String(await seznam.count()));
   await stavy.getByRole('button', { name: /^Vše/ }).click();
+  await nastroj.getByRole('button', { name: /^Filtry/ }).click();
 
-  // Hledání
+  // Hledání (na telefonu schované za lupou vedle rychlého přidání)
   const hledat = nastroj.getByRole('combobox', { name: 'Hledat v úkolech' }).or(nastroj.getByRole('textbox', { name: 'Hledat v úkolech' })).first();
+  if (w < 600) {
+    // Panel Filtry se právě zavírá: na pomalém runneru (CI) by klepnutí na lupu mohlo
+    // přijít během animace. Počkat na doběhnutí animací a pole případně otevřít znovu.
+    await p.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+    const lupa = nastroj.getByRole('button', { name: 'Hledat v úkolech' });
+    await lupa.click();
+    if (!(await dokud(() => hledat.isVisible().catch(() => false), 3000))) await lupa.click();
+  }
+  await hledat.waitFor({ timeout: 10000 });
   await hledat.fill('mleko');
   tvrdi(`${w}: hledání bez diakritiky najde „Objednat mléko" (2 výskyty)`, await dokud(async () => (await nastroj.getByRole('button', { name: 'Objednat mléko', exact: true }).count()) === 2, 3000));
   await hledat.fill('');
@@ -175,9 +198,10 @@ for (const w of [1280, 390]) {
   const karta = p.locator('[data-instance="po-terminu"]');
   await karta.waitFor({ timeout: 10000 });
   await karta.click({ position: { x: 40, y: 60 }, force: true });
-  const stavy = p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('group', { name: 'Stav úkolů' });
-  await stavy.waitFor({ timeout: 10000 });
-  tvrdi('widget → Úkoly: záložka „Po termínu" je rovnou zapnutá', await dokud(async () => (await stavy.getByRole('button', { name: /^Po termínu/ }).getAttribute('aria-pressed')) === 'true', 4000));
+  // Redesign v3: pás stavů je u vedení v panelu Filtry; zapnutý stav ukazuje štítek s křížkem.
+  const stitek = p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('button', { name: /^Zrušit filtr: Po termínu/ });
+  await stitek.waitFor({ timeout: 10000 });
+  tvrdi('widget → Úkoly: stav „Po termínu" je rovnou zapnutý (štítek nad seznamem)', await dokud(async () => /Po termínu · 2/.test(await stitek.innerText()), 4000));
   await ctx.close();
 }
 await konec();

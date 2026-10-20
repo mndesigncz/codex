@@ -43,16 +43,19 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
   const Tile = (item: MoreItem) => {
     const active = item.id === activeId;
     return (
-      <button key={item.id} onClick={() => { onSelect(item.id); onClose(); }}
+      // v3: dlaždice bez tmavé plochy — vybraná se pozná inkoustovým kruhem ikony,
+      // ostatní mají ikonu v jemně šedém kruhu. Celý list tak zůstane klidný.
+      <button key={item.id} type="button" onClick={() => { onSelect(item.id); onClose(); }}
+        aria-current={active ? 'page' : undefined}
         className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl py-2.5 px-1 transition active:scale-[0.96] ${
-          active ? 'seg-on' : 'seg-off'
+          active ? 'text-[#16181A]' : 'seg-off'
         }`}>
-        <span className={`relative flex h-10 w-10 items-center justify-center rounded-full ${active ? 'bg-white/15' : 'bg-black/[0.05]'}`}>
-          <Icon name={item.icon} size={20} className={active ? 'text-[#C8F542]' : 'text-[#16181A]'} />
+        <span className={`relative flex h-11 w-11 items-center justify-center rounded-full ${active ? 'chip-ink' : 'bg-black/[0.05]'}`}>
+          <Icon name={item.icon} size={20} className={active ? '' : 'text-[#16181A]'} />
           {/* Odznak jako v doku: chat vyřazený z doku (kolo 6, Z16) by jinak o nepřečtených mlčel. */}
           {!!item.badge && !active && <Badge count={item.badge} label={item.badgeLabel} className="absolute -top-1 -right-1" />}
         </span>
-        <span className="text-[11px] font-medium text-center leading-tight truncate w-full">{item.label}</span>
+        <span className={`text-xs text-center leading-tight truncate w-full ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
       </button>
     );
   };
@@ -63,13 +66,13 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
 
       <div
         ref={m.ref} {...m.dialogProps}
-        className="absolute inset-x-0 bottom-0 modal-sheet rounded-t-[24px] px-3.5 pt-2.5 pb-[max(env(safe-area-inset-bottom),16px)] shadow-[0_-14px_40px_rgba(15,20,25,0.2)] animate-[sheetUp_0.26s_cubic-bezier(0.16,1,0.3,1)]"
+        className="absolute inset-x-0 bottom-0 modal-sheet rounded-t-3xl px-4 pt-2.5 pb-[max(env(safe-area-inset-bottom),16px)] shadow-[0_-14px_40px_rgba(15,20,25,0.2)] animate-[sheetUp_0.26s_cubic-bezier(0.16,1,0.3,1)]"
       >
         {/* Grabber */}
         <div className="mx-auto mb-2 h-1.5 w-9 rounded-full bg-black/15" />
 
         {/* Category groups — compact 4-across tiles under a small label */}
-        <div className="max-h-[62vh] overflow-y-auto scrollbar-thin space-y-2.5">
+        <div className="max-h-[62vh] overflow-y-auto scrollbar-thin space-y-4">
           {renderGroups.map((g, gi) => (
             <div key={g.title ?? gi}>
               {g.title && (

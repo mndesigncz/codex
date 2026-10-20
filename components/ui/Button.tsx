@@ -9,7 +9,7 @@ import { Icon } from '../Icons';
 // vedle sebe, k tomu osm variant výplně a písma. Tady platí jediné pravidlo:
 //   accent   = limetka, JEDNA hlavní akce na obrazovce („Uložit", „Přidat")
 //   primary  = tmavá, silná vedlejší akce nebo potvrzení v modálu
-//   secondary= sklo, běžná akce
+//   secondary= jemně šedá pilulka, běžná akce
 //   ghost    = jen text, akce v řádku seznamu
 //   danger   = červená, mazání — výplň až po potvrzení
 // Vybraný stav (záložka, položka menu) je tmavá, ale to není tlačítko.
@@ -17,25 +17,29 @@ import { Icon } from '../Icons';
 export type ButtonVariant = 'accent' | 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-solid';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
+// v3: limetka bez záře (pozná se barvou, ne svitem), sekundární = jemně
+// šedá pilulka bez rámečku (rámeček průhledný, ať se rozměr nemění).
 const VARIANT: Record<ButtonVariant, string> = {
-  accent: 'bg-[#C8F542] on-accent hover:brightness-105 shadow-[0_6px_18px_rgba(200,245,66,0.35)]',
+  accent: 'bg-[#C8F542] on-accent hover:brightness-105',
   primary: 'bg-[#16181A] text-white hover:bg-black',
-  secondary: 'glass border border-black/10 text-[#16181A] hover:bg-black/[0.05]',
+  // Explicitní výplň, ne `glass`: preflight dává <button> průhledné pozadí s vyšší specifičností než :where(.glass).
+  secondary: 'bg-black/[0.05] border border-transparent text-[#16181A] hover:bg-black/[0.08]',
   ghost: 'text-black/60 hover:text-[#16181A] hover:bg-black/[0.05]',
   danger: 'text-bad-ink hover:bg-bad/[0.08]',
   'danger-solid': 'bg-bad text-white hover:brightness-110',
 };
 
+// Tři výšky: 36 (v řádku), 44 (běžná), 52 (hlavní akce dole přes šířku).
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3.5 text-xs gap-1.5',
+  sm: 'h-9 px-3.5 text-[13px] gap-1.5',
   md: 'h-11 px-5 text-sm gap-2',
-  lg: 'h-12 px-6 text-[15px] gap-2',
+  lg: 'h-[3.25rem] px-7 text-base gap-2',
 };
 
 // Kulaté tlačítko jen s ikonou má stejné výšky, ale je čtvercové. `shrink-0`: vedle pole (`w-full`)
 // v řádku by se jinak smrštilo — na 320 px z 36 na 25 px široký „Vložit bod" a „Odebrat bod" v úkolu,
 // tedy ne čtverec a hůř trefitelné.
-const ICON_ONLY: Record<ButtonSize, string> = { sm: 'h-9 w-9 px-0 shrink-0', md: 'h-11 w-11 px-0 shrink-0', lg: 'h-12 w-12 px-0 shrink-0' };
+const ICON_ONLY: Record<ButtonSize, string> = { sm: 'h-9 w-9 px-0 shrink-0', md: 'h-11 w-11 px-0 shrink-0', lg: 'h-[3.25rem] w-[3.25rem] px-0 shrink-0' };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;

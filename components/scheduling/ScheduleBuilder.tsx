@@ -1480,6 +1480,13 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
 
   // Stav publikování pro Chip a texty Publikovat (jen plánovač — náhled publikaci nezná).
   const stavPub = planovac ? stavChipu(publikace, shifts.length) : null;
+  const chipPublikace = stavPub && !loading && !loadError
+    ? (stavPub === 'publikovano' && publikace
+      ? <Chip tone="ok" size="sm" icon="check">{t('Publikováno {datum}', { datum: fmtDatum(pragueDaySafe(publikace.publishedAt), { jazyk, styl: 'kratce' }) })}</Chip>
+      : stavPub === 'zmeneno'
+        ? <Chip tone="wait" size="sm">{t('Změněno od publikování')}</Chip>
+        : <Chip tone="muted" size="sm">{t('Nepublikováno')}</Chip>)
+    : null;
   const menu: MenuItem[] = [];
   // Import, kopírování týdne a úprava podle požadavků zapisují rovnou do
   // uložených směn. S otevřeným návrhem by je jeho uložení (výchozí
@@ -1513,7 +1520,10 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   }
   const hlavicka = {
     title: t('Rozvrh'),
-    subtitle: t('Sestav měsíční rozvrh podle dostupnosti týmu.'),
+    // Telefon (v3): místo návodné věty stav publikování měsíce — v nástroji by byl další řádek nad mřížkou.
+    subtitle: chipPublikace && naRozvrhu
+      ? <><span className="sm:hidden inline-flex" data-publikace={stavPub}>{chipPublikace}</span><span className="max-sm:hidden">{t('Sestav měsíční rozvrh podle dostupnosti týmu.')}</span></>
+      : t('Sestav měsíční rozvrh podle dostupnosti týmu.'),
     hintId: 'schedulebuilder',
     aside,
     // S otevřeným návrhem je hlavní akcí jeho uložení, ne nové generování:
@@ -1625,32 +1635,31 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   ) : null;
   const nastroj = (
     <Card as="section" aria-labelledby="planovac-nadpis" className="space-y-4">
+      {/* v3 (redesign „na refero.design"): jedna řada nad mřížkou. Na telefonu stály pod
+          hlavní limetkou a segmentem ještě tři řady — přepínač měsíce, pilulky „Tento /
+          Příští měsíc" s chipem publikování a „Filtry" — a mřížka začínala pod ohybem.
+          Teď: ‹ měsíc › přes šířku a vedle „Filtry". Plánovač se sám otevře na měsíci, který
+          je na řadě (tento, nebo po 25. příští), takže „Tento" a „Příští" jsou na telefonu jedno
+          klepnutí šipkou — pilulky by na 390 px zkrátily název měsíce na „Listopad 2…". Stav publikování
+          je na telefonu v podtitulku hlavičky. Od `sm` je místa dost a zůstává vše v řádku. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Na telefonu měsíc ukazuje už MonthNav pod ním; nadpis tam jen opakuje totéž (zůstává pro odečítač). */}
         <h2 id="planovac-nadpis" className="t-card cz-sentence max-sm:sr-only">{monthLabel(month, jazyk)}</h2>
         {/* Šipky pro libovolný měsíc, pilulky pro dva obvyklé (tento slouží i jako „zpět na dnešek"). */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <MonthNav value={month} onChange={(m) => { zmenMesic(m); }} />
-          <div className="flex gap-1.5" role="group" aria-label={t('Rychlý výběr měsíce')}>
+        <div className="flex max-sm:flex-nowrap flex-wrap items-center gap-2 w-full sm:w-auto min-w-0">
+          <MonthNav value={month} onChange={(m) => { zmenMesic(m); }} className="max-sm:flex-1 max-sm:w-auto" />
+          <div className="flex gap-1.5 shrink-0 max-sm:hidden" role="group" aria-label={t('Rychlý výběr měsíce')}>
             {rychleMesice.map(m => (
               <button key={m.id} type="button" aria-pressed={month === m.id} onClick={() => zmenMesic(m.id)}
                 className={`filter-pill tap-target-sm ${month === m.id ? 'seg-on' : 'seg-off glass'}`}>{m.label}</button>
             ))}
           </div>
-          {/* Stav publikování měsíce (kolo 7) — vejde se vedle měsíce, nebo se zalomí pod něj. */}
-          {stavPub && !loading && !loadError && (
-            <span data-publikace={stavPub} className="min-w-0 max-w-full">
-              {stavPub === 'publikovano' && publikace
-                ? <Chip tone="ok" size="sm" icon="check">{t('Publikováno {datum}', { datum: fmtDatum(pragueDaySafe(publikace.publishedAt), { jazyk, styl: 'kratce' }) })}</Chip>
-                : stavPub === 'zmeneno'
-                  ? <Chip tone="wait" size="sm">{t('Změněno od publikování')}</Chip>
-                  : <Chip tone="muted" size="sm">{t('Nepublikováno')}</Chip>}
-            </span>
-          )}
-          {/* Telefon: „Filtry" ve stejném řádku jako měsíce — vlastní řádek nad mřížkou
+          {/* Stav publikování měsíce (kolo 7) — od `sm` vedle měsíce; na telefonu v podtitulku hlavičky. */}
+          {chipPublikace && <span data-publikace={stavPub} className="min-w-0 max-w-full max-sm:hidden">{chipPublikace}</span>}
+          {/* Telefon: „Filtry" ve stejném řádku jako měsíc — vlastní řádek nad mřížkou
               by ji spolu s dostupností odsunul pod ohyb (kolo 6 UX). */}
           {maPasy && !loading && !loadError && (
-            <div className="sm:hidden">
+            <div className="sm:hidden shrink-0">
               <Button variant="secondary" size="sm" aria-expanded={filtryTel || filtrAktivni} aria-controls="rozvrh-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
                 {t('Filtry')}{pocetAktivnich > 0 ? ` · ${pocetAktivnich}` : ''}
               </Button>

@@ -9,6 +9,12 @@
 // a „Filtry · n". Pole hledání se rozbalí pod řádek až po klepnutí na lupu (nebo když je co hledat)
 // a záložky stavu se kreslí jen u delšího seznamu nebo se zapnutým stavem. První úkol tak začíná
 // na první obrazovce, ne pod čtyřmi řádky ovládání. Od md beze změny.
+//
+// Redesign v3 (Úkoly vedení): `vlevo` dá na začátek řádku obsah na všech šířkách (rychlé přidání)
+// a `stavVeFiltrech` přesune záložky stavu do panelu „Filtry" — seznam pod nimi je podle stavu
+// rozdělený do sekcí s počty („Po termínu (1)", „Dnes (3)"), takže pás nad ním říkal totéž
+// podruhé. Zapnutý stav je vidět jako štítek s křížkem, stejně jako vybraný člověk. Vedení tak
+// má nad seznamem jednu řadu (přidat · hledat · Filtry) místo tří.
 
 import { useRef, useState } from 'react';
 import { Button, Segmented, SearchField } from '../ui';
@@ -21,7 +27,7 @@ import {
 
 export interface ClovekFiltru { id: number | 'volne'; label: string; n: number }
 
-export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = [], className = '', kompaktniNaTelefonu = false, pilulkyNaTelefonu = true, vlevoNaTelefonu }: {
+export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = [], className = '', kompaktniNaTelefonu = false, pilulkyNaTelefonu = true, vlevoNaTelefonu, vlevo, stavVeFiltrech = false }: {
   filtr: FiltrUkolu;
   onChange: (f: FiltrUkolu) => void;
   pocty: PoctyStavu;
@@ -36,6 +42,10 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
   pilulkyNaTelefonu?: boolean;
   /** Kompaktně: obsah na začátek řádku, jen na telefonu (od md ho volající kreslí jinde). */
   vlevoNaTelefonu?: React.ReactNode;
+  /** Obsah na začátek řádku na všech šířkách (rychlé přidání úkolu); hledání se pak vejde vedle. */
+  vlevo?: React.ReactNode;
+  /** Záložky stavu v panelu „Filtry" místo vlastního pásu nad seznamem; zapnutý stav je štítek s křížkem. */
+  stavVeFiltrech?: boolean;
 }) {
   const t = useT('widgety');
   const loc = aktualniJazyk();
@@ -48,7 +58,7 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
   const hledaniSbalene = kompaktniNaTelefonu && !hledaniOtevreno && !filtr.hledat;
   const pilulkyJenOdMd = kompaktniNaTelefonu && !pilulkyNaTelefonu && filtr.stav === 'vse';
   const kdoZapnuto = lide.length > 0 && filtr.kdo !== 'all';
-  const n = pocetFiltru(filtr) + (kdoZapnuto ? 1 : 0);
+  const n = pocetFiltru(filtr) + (kdoZapnuto ? 1 : 0) + (!skrytStav && stavVeFiltrech && filtr.stav !== 'vse' ? 1 : 0);
   const kdoJmeno = lide.find(l => l.id === filtr.kdo)?.label ?? '';
   const nastav = (cast: Partial<FiltrUkolu>) => onChange({ ...filtr, ...cast });
   const jmenoDne = (i: number) => new Date(`2024-01-0${i + 1}T12:00:00`).toLocaleDateString(loc, { weekday: 'short' });
@@ -64,6 +74,15 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
   ];
   // Prázdné záložky se neukazují (kromě „Zbývá" a zvolené), ať lišta nemá sedm čísel s nulou.
   const viditelne = stavy.filter(s => s.id === 'vse' || s.id === filtr.stav || pocty[s.id] > 0);
+  const pilulkyStavu = viditelne.map(s => (
+    <button key={s.id} type="button" aria-pressed={filtr.stav === s.id} onClick={() => nastav({ stav: s.id })}
+      className={`filter-pill tap-target-sm shrink-0 ${filtr.stav === s.id ? 'seg-on' : 'seg-off glass'}`}>
+      {s.label} · {pocty[s.id]}
+    </button>
+  ));
+  // Stav schovaný v panelu: zapnutý (jiný než Vše) se ukáže štítkem s křížkem nad seznamem.
+  const stavZapnuty = !skrytStav && stavVeFiltrech && filtr.stav !== 'vse';
+  const stavJmeno = stavy.find(s => s.id === filtr.stav)?.label ?? '';
 
   const prio: { id: PrioritaUkolu; label: string }[] = [{ id: 'high', label: t('Vysoká') }, { id: 'medium', label: t('Střední') }, { id: 'low', label: t('Nízká') }];
   const prepniPrioritu = (p: PrioritaUkolu) => nastav({ priorita: filtr.priorita.includes(p) ? filtr.priorita.filter(x => x !== p) : [...filtr.priorita, p] });
@@ -78,38 +97,50 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
           if (!filtr.hledat && !kam?.closest('[role=combobox], [role=listbox]')) setHledaniOtevreno(false);
         }) : undefined}>
         {kompaktniNaTelefonu && vlevoNaTelefonu && <div className="md:hidden min-w-0 shrink">{vlevoNaTelefonu}</div>}
+        {vlevo && <div className="min-w-0 flex-1">{vlevo}</div>}
         {/* Na telefonu v kompaktní podobě jde pole na vlastní řádek pod ovládání (order-last + celá šířka). */}
         <SearchField value={filtr.hledat} onChange={v => nastav({ hledat: v })} placeholder={t('Hledat v úkolech…')} ariaLabel={t('Hledat v úkolech')}
           storageKey="ukoly"
-          className={`min-w-0 flex-1 ${kompaktniNaTelefonu ? 'max-md:order-last max-md:basis-full' : ''} ${hledaniSbalene ? 'max-md:hidden' : ''}`} />
+          className={`min-w-0 flex-1 ${vlevo ? 'md:flex-none md:w-60' : ''} ${kompaktniNaTelefonu ? 'max-md:order-last max-md:basis-full' : ''} ${hledaniSbalene ? 'max-md:hidden' : ''}`} />
         {hledaniSbalene && (
           <Button variant="secondary" size="sm" iconOnly icon="search" aria-label={t('Hledat v úkolech')} aria-expanded={false}
-            className="md:hidden ml-auto shrink-0" onClick={otevriHledani} />
+            className={`md:hidden shrink-0 ${vlevo ? '' : 'ml-auto'}`} onClick={otevriHledani} />
         )}
         <Button variant="secondary" size="sm" aria-expanded={otevreno} onClick={() => setOtevreno(o => !o)}
-          className={`shrink-0 ${kompaktniNaTelefonu && !hledaniSbalene ? 'max-md:ml-auto' : ''}`}>
+          className={`shrink-0 ${kompaktniNaTelefonu && !hledaniSbalene && !vlevo ? 'max-md:ml-auto' : ''}`}>
           {t('Filtry')}{n > 0 ? ` · ${n}` : ''}
         </Button>
       </div>
 
-      {!skrytStav && <div className={`flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5 ${pilulkyJenOdMd ? 'max-md:hidden' : ''}`} role="group" aria-label={t('Stav úkolů')}>
-        {viditelne.map(s => (
-          <button key={s.id} type="button" aria-pressed={filtr.stav === s.id} onClick={() => nastav({ stav: s.id })}
-            className={`filter-pill tap-target-sm shrink-0 ${filtr.stav === s.id ? 'seg-on' : 'seg-off glass'}`}>
-            {s.label} · {pocty[s.id]}
-          </button>
-        ))}
+      {!skrytStav && !stavVeFiltrech && <div className={`flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5 ${pilulkyJenOdMd ? 'max-md:hidden' : ''}`} role="group" aria-label={t('Stav úkolů')}>
+        {pilulkyStavu}
       </div>}
 
-      {kdoZapnuto && (
-        <button type="button" onClick={() => nastav({ kdo: 'all' })} aria-label={t('Zrušit filtr: {kdo}', { kdo: kdoJmeno })}
-          className="filter-pill tap-target-sm seg-on inline-flex items-center gap-1.5 self-start">
-          {kdoJmeno}<Icon name="close" size={12} />
-        </button>
+      {(kdoZapnuto || stavZapnuty) && (
+        <div className="flex flex-wrap gap-1.5">
+          {stavZapnuty && (
+            <button type="button" onClick={() => nastav({ stav: 'vse' })} aria-label={t('Zrušit filtr: {kdo}', { kdo: stavJmeno })}
+              className="filter-pill tap-target-sm seg-on inline-flex items-center gap-1.5">
+              {stavJmeno} · {pocty[filtr.stav]}<Icon name="close" size={12} />
+            </button>
+          )}
+          {kdoZapnuto && (
+            <button type="button" onClick={() => nastav({ kdo: 'all' })} aria-label={t('Zrušit filtr: {kdo}', { kdo: kdoJmeno })}
+              className="filter-pill tap-target-sm seg-on inline-flex items-center gap-1.5">
+              {kdoJmeno}<Icon name="close" size={12} />
+            </button>
+          )}
+        </div>
       )}
 
       {otevreno && (
         <div className="well px-4 py-3 space-y-3">
+          {!skrytStav && stavVeFiltrech && (
+            <div className="space-y-1.5">
+              <p className="t-label">{t('Stav')}</p>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Stav úkolů')}>{pilulkyStavu}</div>
+            </div>
+          )}
           {lide.length > 1 && (
             <div className="space-y-1.5">
               <p className="t-label">{t('Komu úkol patří')}</p>

@@ -4,8 +4,9 @@
 //
 // Dřív se o povinných postupech dozvěděl člověk až po spočítání kasy, z
 // červené hlášky pod formulářem, a nevedlo z ní nic dál. Teď je zámek nad
-// formulářem hned od začátku: klidná oranžová karta, co přesně chybí, kolik
-// je hotovo a z každé věci cesta tam, kde se udělá. Kasa se mezitím dá
+// formulářem hned od začátku: bílá karta se stavovou pilulkou „Zamčeno" (v3),
+// co přesně chybí (čistý seznam), kolik je hotovo a z každé věci cesta tam,
+// kde se udělá. Kasa se mezitím dá
 // počítat dál — zamčené je jen odeslání.
 //
 // Pravidla (co zamyká, pro koho, za který den) počítá server
@@ -258,109 +259,106 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
   const pct = stav.celkem > 0 ? Math.round((stav.hotovo / stav.celkem) * 100) : 0;
   const zbyva = chybi.length;
 
+  // Čistý seznam (v3): nejdřív to, co chybí, pak tiše hotové — bez nadpisů skupin; druh
+  // věci (postup, úkol, návod) nese ikona v řádku a cestu tam nápověda pod názvem.
+  // Druh věci pro odečítač (vizuálně ho nese ikona): nadpisy skupin z řádků zmizely.
+  const druh = (p: PovinnaPolozka) => <span className="sr-only">{p.typ === 'postup' ? t('Postupy') : p.typ === 'ukol' ? t('Úkoly') : t('Návody')} — </span>;
+  const poradi = [...SKUPINY.flatMap(typ => stav.vsechny.filter(p => p.typ === typ && !p.hotovo)),
+    ...SKUPINY.flatMap(typ => stav.vsechny.filter(p => p.typ === typ && p.hotovo))];
+
   return (
     <div ref={kartaRef} className="scroll-mt-4">
-    <Card tone="wait" pad="md" className="rise-in space-y-4" aria-labelledby="zamek-uzaverky-titulek">
-      <div className="flex items-start gap-4">
-        <span aria-hidden className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-wait/20 text-wait-ink">
-          {/* Nový klíč = animace znovu: zámek „zazvoní" při každém pokusu o odeslání. */}
-          <Icon key={pulz} name="lock" size={24} motion="ring" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 id="zamek-uzaverky-titulek" className="t-card">{t('Uzávěrka je zamčená')}</h2>
-          <p className="t-meta mt-0.5 text-pretty">
-            {mojeChybi.length > 0
-              ? <>{t('Nejdřív dokonči {n, plural, one {# věc} few {# věci} other {# věcí}}. Pak se odemkne sama.', { n: zbyva })}</>
-              : <>{t('Zbývá {n, plural, one {# věc} few {# věci} other {# věcí}} — odsud to nesplníš: čeká na kolegy ze směny nebo na toho, za koho zavíráš. Až to dokončí, odemkne se sama.', { n: zbyva })}</>}
-          </p>
+    {/* v3: bílá karta se stavovou pilulkou, ne tónovaná plocha s dlaždicí zámku — ta na
+        telefonu zabrala půl obrazovky a soupeřila s jedinou hlavní akcí. Tón nese pilulka. */}
+    <Card pad="md" className="rise-in space-y-4" aria-labelledby="zamek-uzaverky-titulek">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="chip chip-wait">
+            {/* Nový klíč = animace znovu: zámek „zazvoní" při každém pokusu o odeslání. */}
+            <Icon key={pulz} name="lock" size={13} motion="ring" className="shrink-0" />
+            {t('Zamčeno')}
+          </span>
+          {stav.celkem > 1 && <p className="t-meta tabular-nums">{t('Hotovo {hotovo} z {celkem}', { hotovo: stav.hotovo, celkem: stav.celkem })}</p>}
         </div>
-      </div>
-
-      {stav.celkem > 1 && (
-        <div className="space-y-1.5">
-          <p className="t-meta tabular-nums">{t('Hotovo {hotovo} z {celkem}', { hotovo: stav.hotovo, celkem: stav.celkem })}</p>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]" role="progressbar"
+        <h2 id="zamek-uzaverky-titulek" className="t-card">{t('Uzávěrka je zamčená')}</h2>
+        <p className="t-meta text-pretty">
+          {mojeChybi.length > 0
+            ? <>{t('Nejdřív dokonči {n, plural, one {# věc} few {# věci} other {# věcí}}. Pak se odemkne sama.', { n: zbyva })}</>
+            : <>{t('Zbývá {n, plural, one {# věc} few {# věci} other {# věcí}} — odsud to nesplníš: čeká na kolegy ze směny nebo na toho, za koho zavíráš. Až to dokončí, odemkne se sama.', { n: zbyva })}</>}
+        </p>
+        {stav.celkem > 1 && (
+          <div className="h-1 w-full overflow-hidden rounded-full bg-black/[0.06]" role="progressbar"
             aria-valuenow={stav.hotovo} aria-valuemin={0} aria-valuemax={stav.celkem} aria-label={t('Hotové povinné věci')}>
             <div className="h-full rounded-full bg-ok transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {SKUPINY.map(typ => {
-        const nadpis = typ === 'postup' ? t('Postupy') : typ === 'ukol' ? t('Úkoly') : t('Návody');
-        const vSkupine = stav.vsechny.filter(p => p.typ === typ);
-        if (vSkupine.length === 0) return null;
-        return (
-          <div key={typ}>
-            <p className="t-label" id={`zamek-${typ}`}>{nadpis}</p>
-            <ul className="list mt-1" aria-labelledby={`zamek-${typ}`}>
-              {vSkupine.map(p => {
-                const kruh = (
-                  <span aria-hidden className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${
-                    p.hotovo ? 'bg-ok on-accent' : 'border-2 border-wait-ink/40'}`}>
-                    {p.hotovo && <Icon name="check" size={12} strokeWidth={2.6} />}
-                  </span>
-                );
-                if (p.hotovo) {
-                  // Hotové tiše: jen fajfka a tlumený název, žádná akce.
-                  return (
-                    <li key={`${p.typ}:${p.id}`} className="list-row !min-h-0 !py-2">
-                      {kruh}
-                      <span className="t-meta min-w-0 flex-1 truncate"><span className="sr-only">{t('Hotovo')}: </span>{p.nazev}</span>
-                    </li>
-                  );
-                }
-                const hint = napoveda(p);
-                if (cizi(p)) {
-                  // Jen informace: žádná šipka ani tlačítko, nic k otevření.
-                  return (
-                    <li key={`${p.typ}:${p.id}`} className="list-row !py-2 gap-3">
-                      {kruh}
-                      <Icon name="users" size={17} className="shrink-0 text-black/45" />
-                      <span className="min-w-0 flex-1">
-                        <span className="t-card block text-pretty">{p.nazev}</span>
-                        {hint && <span className="t-meta block text-pretty">{hint}</span>}
-                      </span>
-                    </li>
-                  );
-                }
-                const obsah = (
-                  <>
-                    {kruh}
-                    <Icon name={ikonaPolozky(p)} size={17} className="shrink-0 text-black/45" />
-                    <span className="min-w-0 flex-1">
-                      <span className="t-card block text-pretty">{p.nazev}</span>
-                      {hint && <span className="t-meta block text-pretty">{hint}</span>}
-                    </span>
-                    {bezi(p)
-                      ? <Icon name="play" size={14} motion="pulse" className="shrink-0 text-wait-ink" />
-                      : <Icon name="chevronRight" size={16} className="shrink-0 text-black/30" />}
-                  </>
-                );
-                const tridaRadku = 'flex min-w-0 flex-1 items-center gap-3 rounded-[var(--r-md)] -mx-2 px-2 py-2 text-left transition-colors hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime';
-                // Bez navigace (formulář vložený mimo layout) a bez spuštění na
-                // místě vede řádek obyčejným odkazem.
-                const jenOdkaz = !odkazJde(p) && !(spustitelny(p) && !jinyBezi(p));
-                return (
-                  <li key={`${p.typ}:${p.id}`} className="list-row !py-1 gap-2">
-                    {jenOdkaz ? (
-                      <a href={p.odkaz.href} onClick={predOdchodem} className={tridaRadku}>{obsah}</a>
-                    ) : (
-                      <button type="button" onClick={() => otevri(p)} disabled={bezi(p)} className={`${tridaRadku} disabled:cursor-default`}>{obsah}</button>
-                    )}
-                    {odskrtnutelny(p) && (
-                      <Button size="sm" variant="secondary" icon="check" loading={odskrtavam === p.id}
-                        onClick={() => hotovo(p)} aria-label={t('Hotovo: {nazev}', { nazev: p.nazev })}>
-                        {t('Hotovo')}
-                      </Button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        );
-      })}
+      <ul className="list">
+        {poradi.map(p => {
+          const kruh = (
+            <span aria-hidden className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+              p.hotovo ? 'bg-ok on-accent' : 'border-2 border-black/20'}`}>
+              {p.hotovo && <Icon name="check" size={12} strokeWidth={2.6} />}
+            </span>
+          );
+          if (p.hotovo) {
+            // Hotové tiše: jen fajfka a tlumený název, žádná akce.
+            return (
+              <li key={`${p.typ}:${p.id}`} className="list-row !min-h-0 !py-2.5 gap-3">
+                {kruh}
+                <span className="t-meta min-w-0 flex-1 truncate"><span className="sr-only">{t('Hotovo')}: </span>{druh(p)}{p.nazev}</span>
+              </li>
+            );
+          }
+          const hint = napoveda(p);
+          if (cizi(p)) {
+            // Jen informace: žádná šipka ani tlačítko, nic k otevření.
+            return (
+              <li key={`${p.typ}:${p.id}`} className="list-row !py-2 gap-3">
+                {kruh}
+                <Icon name="users" size={17} className="shrink-0 text-black/45" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-medium leading-snug text-[#16181A] text-pretty">{druh(p)}{p.nazev}</span>
+                  {hint && <span className="t-meta block text-pretty">{hint}</span>}
+                </span>
+              </li>
+            );
+          }
+          const obsah = (
+            <>
+              {kruh}
+              <Icon name={ikonaPolozky(p)} size={17} className="shrink-0 text-black/45" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium leading-snug text-[#16181A] text-pretty">{druh(p)}{p.nazev}</span>
+                {hint && <span className="t-meta block text-pretty">{hint}</span>}
+              </span>
+              {bezi(p)
+                ? <Icon name="play" size={14} motion="pulse" className="shrink-0 text-wait-ink" />
+                : <Icon name="chevronRight" size={16} className="shrink-0 text-black/30" />}
+            </>
+          );
+          const tridaRadku = 'flex min-w-0 flex-1 items-center gap-3 rounded-[var(--r-md)] -mx-2 px-2 py-2 min-h-[48px] text-left transition-colors hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime';
+          // Bez navigace (formulář vložený mimo layout) a bez spuštění na
+          // místě vede řádek obyčejným odkazem.
+          const jenOdkaz = !odkazJde(p) && !(spustitelny(p) && !jinyBezi(p));
+          return (
+            <li key={`${p.typ}:${p.id}`} className="list-row !py-1 gap-2">
+              {jenOdkaz ? (
+                <a href={p.odkaz.href} onClick={predOdchodem} className={tridaRadku}>{obsah}</a>
+              ) : (
+                <button type="button" onClick={() => otevri(p)} disabled={bezi(p)} className={`${tridaRadku} disabled:cursor-default`}>{obsah}</button>
+              )}
+              {odskrtnutelny(p) && (
+                <Button size="sm" variant="secondary" icon="check" loading={odskrtavam === p.id}
+                  onClick={() => hotovo(p)} aria-label={t('Hotovo: {nazev}', { nazev: p.nazev })}>
+                  {t('Hotovo')}
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
 
       {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
 

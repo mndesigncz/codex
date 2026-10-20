@@ -7,9 +7,10 @@ import { useT } from '@/lib/i18n/client';
 
 // Hlavička obrazovky — jedna pro všechny.
 //
-// Vlevo název a jeden řádek kontextu („190 položek · hodnota zásob 365 897 Kč").
-// Vpravo nejvýš: dvě vedlejší akce (jen na monitoru), menu „···" a jedna
-// hlavní akce. Na telefonu jdou vedlejší akce do menu a hlavní zůstane.
+// Vlevo název (jediný h1, 32 px) a jeden řádek kontextu („190 položek ·
+// hodnota zásob 365 897 Kč"). Vpravo nejvýš: dvě vedlejší akce (jen na
+// monitoru), menu „···" a jedna hlavní akce. Na telefonu jdou vedlejší akce
+// do menu, „···" zůstane vedle nadpisu a hlavní akce pod ním přes šířku.
 // Dřív měla každá obrazovka svůj nadpis (osm variant) a svou řadu tlačítek.
 
 export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, menuMobile, aside, className = '', as: Nadpis = 'h1' }: {
@@ -65,21 +66,24 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
   const showSubtitle = subtitle && !(hintId && subtitleHidden);
   const maMenu = !!menu && menu.length > 0;
   const maMenuMobil = !!menuMobile && menuMobile.length > 0;
-  // Bez limetky na telefonu nemá smysl dávat akcím vlastní řádek: samotné
-  // „···" pod nadpisem by stálo osiřelé a ubralo první obrazovce 68 px.
-  const vRadku = !primary;
+  const maAkce = !!(secondary || maMenu || maMenuMobil);
 
+  // v3: jeden velký nadpis vlevo a vedle něj tiché akce v šedých kruzích
+  // („···", vedlejší akce od md). Hlavní (limetková) akce stojí na monitoru
+  // v téže řadě úplně vpravo; na telefonu se přes `order` odlomí pod nadpis
+  // na celou šířku — palec ji najde a „···" zůstane u nadpisu, kam patří.
+  // Dřív stálo na telefonu „···" osamocené vlevo pod nadpisem vedle limetky.
+  // Jeden DOM, žádné zdvojené tlačítko: sondy počítají limetky na stránce.
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Od `sm` stojí akce vedle názvu; když se vedle něj nevejdou (iPad 768 px
-          s postranní lištou má na obsah 448 px a tři tlačítka s menu mají přes
-          480), zalomí se pod něj a drží se vpravo. Bez zalomení se název
-          (`flex-1`) smrštil na nulu a akce vyčuhovaly z obrazovky. */}
-      <div className={`flex gap-3 flex-wrap ${vRadku ? 'flex-row items-start justify-between' : 'flex-col sm:flex-row sm:items-start sm:justify-between'}`}>
-        <div className={`min-w-0 ${vRadku ? 'flex-1 min-w-[12rem]' : 'sm:flex-1 sm:min-w-[14rem]'}`}>
+      {/* Akce se zalamují (iPad 768 px s postranní lištou má na obsah 448 px
+          a tři tlačítka s menu přes 480) a drží se vpravo; název (`flex-1`)
+          se nikdy nesmrskne na nulu — má minimální šířku a akce jdou pod něj. */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-3.5">
+        <div className="min-w-0 flex-1 basis-[12rem]">
           <Nadpis className="t-page text-balance">{title}</Nadpis>
           {showSubtitle && (
-            <p className="t-meta mt-1.5 max-w-[70ch] text-pretty group">
+            <p className="mt-1.5 max-w-[70ch] text-sm leading-snug text-black/60 text-pretty group">
               {subtitle}
               {hintId && (
                 <button type="button"
@@ -93,19 +97,20 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
             </p>
           )}
         </div>
-        {(primary || secondary || maMenu || maMenuMobil) && (
-          // Akce se zalamují i mezi sebou (vedlejší + „···" + hlavní mají v němčině
-          // přes 500 px) a drží se vpravo — `shrink-0` by je nechalo vyčuhovat.
-          <div className={`flex flex-wrap items-center justify-end gap-2 min-w-0 max-w-full ${vRadku ? '' : 'sm:ml-auto'}`}>
-            {secondary && <div className="hidden md:flex items-center gap-2">{secondary}</div>}
+        {maAkce && (
+          // Vedlejší akce + „···" mají v němčině přes 300 px — zalamují se mezi sebou a drží se vpravo.
+          <div className="flex flex-wrap items-center justify-end gap-2 min-w-0 max-w-full ml-auto">
+            {secondary && <div className="hidden md:flex flex-wrap items-center justify-end gap-2">{secondary}</div>}
             {maMenuMobil ? (
               <>
                 <div className="md:hidden"><Menu items={[...(menu ?? []), ...menuMobile!]} /></div>
                 {maMenu && <div className="hidden md:block"><Menu items={menu!} /></div>}
               </>
             ) : maMenu && <Menu items={menu!} />}
-            {primary && <div className="flex-1 sm:flex-none flex flex-col sm:flex-row gap-2 [&>*]:w-full sm:[&>*]:w-auto">{primary}</div>}
           </div>
+        )}
+        {primary && (
+          <div className="max-sm:order-last max-sm:basis-full sm:ml-auto sm:flex-none flex flex-col sm:flex-row gap-2 [&>*]:w-full sm:[&>*]:w-auto">{primary}</div>
         )}
       </div>
       {aside}

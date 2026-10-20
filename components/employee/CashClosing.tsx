@@ -493,8 +493,9 @@ function Step({
         : <Chip tone="muted" size="sm">{t('Doplnit')}</Chip>
   );
   const ikona = (
-    <span aria-hidden className="well grid h-11 w-11 shrink-0 place-items-center !p-0">
-      <Icon name={icon} size={20} className="text-black/55" />
+    // v3: ikona kroku v jemně šedém kruhu (jako ikonová tlačítka a řádky seznamu), ne v jamce s linkou.
+    <span aria-hidden className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/[0.05]">
+      <Icon name={icon} size={19} className="text-black/55" />
     </span>
   );
   const navod = guide && (guide.href || guide.onOpen) && (
@@ -1261,7 +1262,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       {navicPoUzaverce && (
         <Card as="section" aria-labelledby="navic-po-uzaverce" data-navic-po-uzaverce className="space-y-3">
           <div className="flex items-start gap-3">
-            <span aria-hidden className="shrink-0 grid h-6 w-6 place-items-center rounded-xl bg-ok/15 text-ok-ink"><Icon name="sparkle" size={14} /></span>
+            <Icon name="sparkle" size={17} className="mt-0.5 shrink-0 text-black/45" />
             <div className="min-w-0 flex-1">
               <h2 id="navic-po-uzaverce" className="t-card">{t('Udělal(a) jsi dnes něco navíc?')}</h2>
               <p className="t-meta mt-0.5 text-pretty">{t('Zapiš to k téhle uzávěrce — vedení to uvidí a může to ocenit.')}</p>
@@ -1337,26 +1338,23 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             field they fill visibly moves the number they'll be checking against. */}
         {(form.openingCash !== '' || form.cashRevenue !== '') && (
           <button type="button" onClick={() => otevriKrok(3)}
-            // Jediná inkoustová plocha formuláře (souhrn peněz, DP §4 D) — bez
-            // rozmazání: blur v obsahu je zákaz a plná barva čte stejně.
-            className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl bg-[#16181A] px-4 py-2.5 text-white shadow-[shadow:var(--shadow-float)] active:scale-[0.99] transition-transform">
+            // v3: světlý pás s linkou místo inkoustové plochy — inkoust patří nanejvýš
+            // jednomu prvku v zorném poli a na telefonu je jím lišta kroků dole. Pás jde
+            // s člověkem formulářem (sticky), proto plná plocha a stín zvednutí, ne sklo.
+            className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl border border-[var(--surface-line)] bg-[var(--surface)] px-4 py-2.5 text-[#16181A] shadow-[shadow:var(--shadow-float)] active:scale-[0.99] transition-transform">
             {/* Na 390 px se vedle zámku a rozdílu nevejde celý popisek — zkrátí se, čísla ne. */}
-            <span className="min-w-0 truncate text-left text-xs font-medium text-white/70">{t('Očekáváno')}<span className="hidden sm:inline"> {t('v kase')}</span></span>
+            <span className="min-w-0 truncate text-left text-[13px] font-medium text-black/60">{t('Očekáváno')}<span className="hidden sm:inline"> {t('v kase')}</span></span>
             <span className="flex shrink-0 items-center gap-2.5">
-              {/* Zámek slovem a ikonou, ne tónovaným chipem — ten je na
-                  inkoustovém pásu nečitelný (viz rozdíl níž). */}
               {zamceno && (
-                <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-white/85">
-                  <Icon name="lock" size={12} className="shrink-0" /><span className="hidden sm:inline">{t('Zamčeno ·')}</span> {chybiPovinne.length}
+                <span className="chip chip-wait chip-sm shrink-0 tabular-nums">
+                  <Icon name="lock" size={11} className="shrink-0" /><span className="hidden sm:inline">{t('Zamčeno ·')}</span> {chybiPovinne.length}
                   <span className="sr-only"> — {t('{n, plural, one {# věc} few {# věci} other {# věcí}} chybí', { n: chybiPovinne.length })}</span>
                 </span>
               )}
               <span className="text-base font-bold tabular-nums">{money(expected)}</span>
-              {/* Rozdíl slovem, ne ručním štítkem: tónované chipy (průsvitná výplň
-                  + tmavý inkoust) jsou na inkoustovém pásu nečitelné a plná limetka
-                  vedle hlavní akce je zákaz. Stav nese slovo (sedí / přebytek / manko). */}
+              {/* Rozdíl slovem v barvě stavu (sedí / přebytek / manko). */}
               {diff !== null && (
-                <span className="shrink-0 text-xs font-semibold tabular-nums text-white/85">
+                <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${diff === 0 ? 'text-ok-ink' : diff > 0 ? 'text-info-ink' : 'text-bad-ink'}`}>
                   {diff === 0 ? t('Sedí') : diff > 0 ? t('Přebytek +{castka}', { castka: money(diff) }) : t('Manko {castka}', { castka: money(diff) })}
                 </span>
               )}
@@ -1927,7 +1925,8 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       {jeTelefon && !schovany && (
         <PlovouciLista label={t('Kroky uzávěrky')}>
           <button type="button" onClick={() => otevriKrok(aktivniKrok - 1)} disabled={aktivniKrok === 0}
-            className="tap-target rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap disabled:opacity-40">
+            // v3: Zpět tiše jako text, pilulku má jen krok dopředu — v liště je jedna akce.
+            className="tap-target rounded-full px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 transition whitespace-nowrap disabled:opacity-40">
             <Icon name="chevronLeft" size={14} className="inline -mt-0.5 mr-1" />{t('Zpět')}
           </button>
           <span className="text-sm font-semibold whitespace-nowrap px-1 tabular-nums" aria-live="polite">

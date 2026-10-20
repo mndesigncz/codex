@@ -10,7 +10,7 @@
 // a `?view=recipes` dál platí. Inventura je okno nad Skladem: tady se otevře
 // rovnou (`onInventura`), z Receptur přes `navigate('inventory', 'akce:inventura')`.
 
-import { Button, Segmented } from '../ui';
+import { Segmented } from '../ui';
 import { useT } from '@/lib/i18n/client';
 import { AKCE_INVENTURA } from '@/lib/skladPredani';
 
@@ -27,23 +27,24 @@ export default function SkladZalozky({ aktivni, onNavigate, smiReceptury, smiInv
   const t = useT('sklad');
   // Bez navigace (stránka vložená jinam) nemá přepínač kam vést.
   if (!onNavigate && !onInventura) return null;
+  // v3: jeden segment „Položky · Receptury z kasy · Inventura". Dřív stál vedle segmentu
+  // ještě samostatný knoflík Inventura — dva různé tvary pro tři sourozence a na telefonu
+  // dvě řady pod hlavičkou. Inventura je okno nad Skladem: klepnutí ho otevře a vybraná
+  // část zůstává, kde byla (segment je pohled, okno se nad ním jen otevře).
   const options = [
     { id: 'polozky' as const, label: t('Položky'), icon: 'archive' },
-    ...(smiReceptury ? [{ id: 'receptury' as const, label: t('Receptury z kasy'), icon: 'receipt' }] : []),
+    ...(smiReceptury && onNavigate ? [{ id: 'receptury' as const, label: t('Receptury z kasy'), icon: 'receipt' }] : []),
+    ...(smiInventura ? [{ id: 'inventura' as const, label: t('Inventura'), icon: 'clipboard' }] : []),
   ];
+  if (options.length < 2) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2" data-sklad-zalozky>
-      {options.length > 1 && onNavigate && (
-        <Segmented ariaLabel={t('Části skladu')} size="sm" value={aktivni}
-          options={options}
-          onChange={id => { if (id !== aktivni) onNavigate(id === 'receptury' ? 'recipes' : 'inventory'); }} />
-      )}
-      {smiInventura && (
-        <Button variant="secondary" size="sm" icon="clipboard"
-          onClick={() => { if (onInventura) onInventura(); else onNavigate?.('inventory', AKCE_INVENTURA); }}>
-          {t('Inventura')}
-        </Button>
-      )}
+    <div className="flex min-w-0" data-sklad-zalozky>
+      <Segmented ariaLabel={t('Části skladu')} size="sm" value={aktivni}
+        options={options}
+        onChange={id => {
+          if (id === 'inventura') { if (onInventura) onInventura(); else onNavigate?.('inventory', AKCE_INVENTURA); return; }
+          if (id !== aktivni) onNavigate?.(id === 'receptury' ? 'recipes' : 'inventory');
+        }} />
     </div>
   );
 }

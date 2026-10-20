@@ -1691,7 +1691,7 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                     <span className="hidden sm:block"><ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} /></span>
                   )}
                   {i.archived && setArchived
-                    ? <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>{t('Naskladnit')}</Button>
+                    ? <Button variant="secondary" size="sm" onClick={() => setArchived(i, false)}>{t('Naskladnit')}</Button>
                     : step ? <Krokovac i={i} step={step} /> : null}
                   {menu.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: i.name })} items={menu} />}
                 </>}
@@ -1762,7 +1762,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
               </div>
               <div className="flex items-center gap-1">
                 {i.archived && setArchived ? (
-                  <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>{t('Naskladnit')}</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setArchived(i, false)}>{t('Naskladnit')}</Button>
                 ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
                     <Icon name="external" size={15} />  {t('Objednat')}

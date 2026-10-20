@@ -76,7 +76,6 @@
   "Chybí uzávěrka": "Fehlender Kassenabschluss",
   "Chybí-li překlad, hostovi se ukáže výchozí text. Cena a „vyprodáno“ jsou pro všechny jazyky stejné.": "Fehlt eine Übersetzung, sieht der Gast den Standardtext. Preis und „Ausverkauft“ sind für alle Sprachen gleich.",
   "Citlivé": "Sensibel",
-  "Client": "Client",
   "Co bylo super, co příště zlepšit…": "Was super war, was man nächstes Mal verbessern kann…",
   "Co hosty čeká — program, vstupné, na co se těšit.": "Was die Gäste erwartet — Programm, Eintritt, worauf sie sich freuen können.",
   "Co je potřeba napravit": "Was zu beheben ist",
@@ -297,7 +296,6 @@
   "Makro, večerka…": "Makro, Kiosk…",
   "Managero": "Managero",
   "Managero client (hosté, rezervace, věrnost)": "Managero client (Gäste, Reservierungen, Treue)",
-  "Managero client: hosté, rezervace, věrnost": "Managero client: Gäste, Reservierungen, Treue",
   "Manko": "Fehlbetrag",
   "Max. množství": "Max. Menge",
   "Menu": "Karte",
@@ -948,7 +946,6 @@
   "Systém je spočítá sám z toho, co se za směnu udělalo (a co ne). Záporné číslo body strhne.": "Das System berechnet sie selbst aus dem, was in der Schicht erledigt wurde (und was nicht). Eine negative Zahl zieht Punkte ab.",
   "Sám tohle oprávnění nemáš, takže ho do role dát nemůžeš.": "Du hast diese Berechtigung selbst nicht, also kannst du sie der Rolle nicht geben.",
   "Síla prvků: {n} %": "Stärke der Elemente: {n} %",
-  "TO GO": "TO GO",
   "Tablet": "Tablet",
   "Tablet tohle mít nesmí — kdo zná heslo tabletu, dostal by to taky.": "Ein Tablet darf das nicht haben — wer das Tablet-Passwort kennt, bekäme es ebenfalls.",
   "Tabule je zatím prázdná": "Das Board ist noch leer",
@@ -1871,5 +1868,6 @@
   "Nový strop začne platit dnem uložení. Starší dny jsou beze změny, dokud body nepřepočítáš zpětně.": "Das neue Limit gilt ab dem Tag des Speicherns. Frühere Tage bleiben unverändert, bis du rückwirkend neu berechnest.",
   "Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop (když je zapnutý) začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Automatische Punkte für Abläufe, Aufgaben und Abschlüsse folgen der Zählweise oben und das Limit (wenn an) gilt auch für vergangene Tage — als wäre es immer so gewesen. Manuelle Änderungen der Leitung bleiben. Vor dem Speichern siehst du die Auswirkung.",
   "I starší ruční hodnocení směn považovat za nahrazující": "Auch ältere manuelle Schichtbewertungen als ersetzend behandeln",
-  "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Vor dieser Version gespeicherte Schichtbewertungen kamen zu den automatischen Punkten dazu. Angehakt = auch sie ersetzen die automatischen Punkte ihres Tages (rückgängig machbar)."
+  "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Vor dieser Version gespeicherte Schichtbewertungen kamen zu den automatischen Punkten dazu. Angehakt = auch sie ersetzen die automatischen Punkte ihres Tages (rückgängig machbar).",
+  "Další možnosti": "Weitere Optionen"
 }

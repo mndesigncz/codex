@@ -89,7 +89,16 @@ async function vygeneruj(p) {
 async function otevriRozvrh(p) {
   await otevri(p, ROZVRH, 'vedeni.rozvrh');
   const pristi = p.getByRole('button', { name: 'Příští měsíc' });
-  await dokud(() => pristi.isVisible(), 6000);
+  // Redesign v3: na telefonu pilulky Tento/Příští měsíc nejsou (nad mřížkou je jen ‹ měsíc › a Filtry),
+  // na příští měsíc se jde šipkou „Další měsíc" — podle nadpisu plánovače (pro odečítač).
+  if (!(await dokud(() => pristi.isVisible(), 6000))) {
+    const ted = new Date(); const prvni = new Date(Date.UTC(ted.getUTCFullYear(), ted.getUTCMonth() + 1, 15));
+    const cil = new Intl.DateTimeFormat('cs-CZ', { month: 'long', year: 'numeric', timeZone: 'Europe/Prague' }).format(prvni).toLowerCase();
+    const nadpis = p.locator('#planovac-nadpis');
+    if ((await nadpis.innerText()).trim().toLowerCase() !== cil) await p.getByRole('button', { name: 'Další měsíc' }).first().click();
+    await dokud(async () => (await nadpis.innerText()).trim().toLowerCase() === cil, 3000);
+    return;
+  }
   if ((await pristi.getAttribute('aria-pressed')) !== 'true') await pristi.click();
   await dokud(async () => (await pristi.getAttribute('aria-pressed')) === 'true', 3000);
 }

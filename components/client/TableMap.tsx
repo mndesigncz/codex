@@ -36,7 +36,7 @@ export function PlanCanvasContent({ plan }: { plan?: FloorPlan | null }) {
         ) : null)}
       </svg>
       {plan.shapes.map(s => s.type === 'room' && s.label ? (
-        <span key={s.id} className="absolute text-[11px] font-semibold uppercase tracking-wider text-black/45 pointer-events-none"
+        <span key={s.id} className="absolute text-xs font-semibold text-black/50 pointer-events-none whitespace-nowrap"
           style={{ left: `${s.x + s.w / 2}%`, top: `${s.y + 1}%`, transform: 'translateX(-50%)' }}>{s.label}</span>
       ) : s.type === 'label' ? (
         <span key={s.id} className="absolute text-[11px] font-medium text-black/55 pointer-events-none whitespace-nowrap"

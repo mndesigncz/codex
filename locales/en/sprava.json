@@ -76,7 +76,6 @@
   "Chybí uzávěrka": "Missing closing",
   "Chybí-li překlad, hostovi se ukáže výchozí text. Cena a „vyprodáno“ jsou pro všechny jazyky stejné.": "If a translation is missing, the guest sees the default text. The price and “sold out” are the same for all languages.",
   "Citlivé": "Sensitive",
-  "Client": "Client",
   "Co bylo super, co příště zlepšit…": "What was great, what to improve next time…",
   "Co hosty čeká — program, vstupné, na co se těšit.": "What awaits guests — program, admission, what to look forward to.",
   "Co je potřeba napravit": "What needs fixing",
@@ -297,7 +296,6 @@
   "Makro, večerka…": "Makro, corner shop…",
   "Managero": "Managero",
   "Managero client (hosté, rezervace, věrnost)": "Managero client (guests, reservations, loyalty)",
-  "Managero client: hosté, rezervace, věrnost": "Managero client: guests, reservations, loyalty",
   "Manko": "Shortfall",
   "Max. množství": "Max. quantity",
   "Menu": "Menu",
@@ -948,7 +946,6 @@
   "Systém je spočítá sám z toho, co se za směnu udělalo (a co ne). Záporné číslo body strhne.": "The system calculates them itself from what was done during the shift (and what was not). A negative number deducts points.",
   "Sám tohle oprávnění nemáš, takže ho do role dát nemůžeš.": "You don't have this permission yourself, so you can't put it in the role.",
   "Síla prvků: {n} %": "Element strength: {n} %",
-  "TO GO": "TO GO",
   "Tablet": "Tablet",
   "Tablet tohle mít nesmí — kdo zná heslo tabletu, dostal by to taky.": "A tablet must not have this — whoever knows the tablet password would get it too.",
   "Tabule je zatím prázdná": "The board is empty for now",
@@ -1871,5 +1868,6 @@
   "Nový strop začne platit dnem uložení. Starší dny jsou beze změny, dokud body nepřepočítáš zpětně.": "The new cap applies from the day you save. Earlier days stay unchanged until you recalculate retroactively.",
   "Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop (když je zapnutý) začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Automatic points for procedures, tasks and closings will follow the method above and the cap (when on) will apply to past days too — as if it had always been so. Manual edits by management stay. You'll see the impact before saving.",
   "I starší ruční hodnocení směn považovat za nahrazující": "Treat older manual shift reviews as replacing too",
-  "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Shift reviews saved before this version were added to automatic points. Checked = they too replace the automatic points of their day (can be undone)."
+  "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Shift reviews saved before this version were added to automatic points. Checked = they too replace the automatic points of their day (can be undone).",
+  "Další možnosti": "More options"
 }

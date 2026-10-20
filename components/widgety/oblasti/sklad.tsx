@@ -640,16 +640,17 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
                   p.category || t('bez kategorie'),
                   p.submittedByName ? t('zapsal/a {jmeno}', { jmeno: p.submittedByName }) : t('zapsal někdo z týmu'),
                 ].join(' · ')}
-                actions={vyber.selecting ? undefined : <>
+                actions={vyber.selecting ? undefined : <span className="flex items-center justify-end gap-1">
+                  {/* v3: v řádku fronty šedá pilulka, ne inkoust — pět inkoustových „Schválit“ pod sebou tahalo oko víc než hlavní akce (DESIGN „max jedno inkoustové v zorném poli“). Obal drží akce u pravého okraje, .list-actions by první natáhl přes šířku. */}
                   {smiSchvalit && (
-                    <Button variant="primary" size="sm" loading={pracuji === p.id} disabled={pracuji != null}
+                    <Button variant="secondary" size="sm" icon="check" loading={pracuji === p.id} disabled={pracuji != null}
                       onClick={() => { if (!nahled) void schval([p.id]); }}>{t('Schválit')}</Button>
                   )}
                   {smiZamitnout && (
                     <Button variant="danger" size="sm" disabled={pracuji != null}
                       onClick={() => { if (!nahled) setZamitam([p]); }}>{t('Zamítnout')}</Button>
                   )}
-                </>}
+                </span>}
               />
             </li>
           ))}
@@ -1047,7 +1048,7 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
                   meta={[pred(o.vytvoreno, t), obsah].filter(Boolean).join(' · ')}
                   value={smiCenu && o.cena != null ? money(o.cena) : undefined}
                   actions={smiPrijmout ? (
-                    <Button variant="primary" size="sm" onClick={() => { if (!nahled) setPrijimam(o); }}>{t('Přijmout')}</Button>
+                    <Button variant="secondary" size="sm" icon="check" onClick={() => { if (!nahled) setPrijimam(o); }}>{t('Přijmout')}</Button>
                   ) : undefined}
                 />
               </li>
@@ -1153,7 +1154,10 @@ function ChybiUdaje({ velikost, nahled }: WidgetProps) {
 
   if (velikost === 'S') {
     return (
-      <Widget nacteni={ceka ? CEKA : [sklad, usage]} kostra="cislo" prazdno={hotovo && radky.length === 0 ? null : undefined}
+      // Malá karta má na název ~107 px: katalogové „Suroviny bez ceny nebo balení" končilo jako
+      // „Suroviny bez ceny nebo…". Krátký titulek se vejde na dva řádky celý; plný název zůstává
+      // v galerii a ve střední velikosti.
+      <Widget titulek={t('Bez ceny či balení')} nacteni={ceka ? CEKA : [sklad, usage]} kostra="cislo" prazdno={hotovo && radky.length === 0 ? null : undefined}
         otevrit={nav.smiPohled('inventory') && !nahled ? () => nav.onNavigate('inventory') : undefined}>
         <Stat label={t('K doplnění')} value={cislo(radky.length)} note={t('{n, plural, one {surovina} few {suroviny} other {surovin}}', { n: radky.length })} />
       </Widget>
@@ -1314,8 +1318,10 @@ function ZapsatNovou({ velikost, nahled }: WidgetProps) {
             <p className="t-meta">{t('Přišlo zboží? Vyfoť ho a napiš kolik.')}{navrh ? ` ${t('Vedení zápis jen potvrdí.')}` : ''}</p>
           )}
           <Button variant="secondary" size="sm" icon="plus" className={velikost === 'S' ? 'w-full justify-center' : ''}
+            aria-label={velikost === 'S' ? t('Zapsat novou věc') : undefined}
             onClick={() => { if (!nahled) setOkno(true); }}>
-            {t('Zapsat novou věc')}
+            {/* Malá karta už název nese v titulku — tlačítko řekne jen sloveso (celé jméno čte odečítač). */}
+            {velikost === 'S' ? t('Zapsat') : t('Zapsat novou věc')}
           </Button>
         </div>
       </Widget>
@@ -1437,8 +1443,9 @@ function Nahlasit({ velikost, nahled }: WidgetProps) {
             </p>
           )}
           <Button variant="secondary" size="sm" icon="send" className={velikost === 'S' ? 'w-full justify-center' : ''}
+            aria-label={velikost === 'S' ? t('Nahlásit chybějící') : undefined}
             onClick={() => { if (!nahled) setOkno(true); }}>
-            {t('Nahlásit chybějící')}
+            {velikost === 'S' ? t('Nahlásit') : t('Nahlásit chybějící')}
           </Button>
         </div>
       </Widget>

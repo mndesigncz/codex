@@ -18,7 +18,9 @@
 //    serveru (N2: tržba jen s finance.trzby, dřív stačilo uzaverky.zobrazit_vse);
 //  - hlavička je PageHeader s pozdravem z lib/greeting (pražský čas, stejná slova
 //    jako Přehled); přepínač podniku a „Administrace" jsou v liště nad ní jako
-//    chrom aplikace (na telefonu se vedlejší akce PageHeader schovávají do „···");
+//    chrom aplikace (na telefonu se vedlejší akce PageHeader schovávají do „···").
+//    Redesign v3: lišta má tvar lišty administrace (značka, zvonek v šedém kruhu,
+//    „Administrace" šedá pilulka, žádný nápis vedle loga);
 //  - pozadí a tmavý režim dává body — vynucený světlý motiv byl jen záplata na
 //    natvrdo světlé barvy, které tu už nejsou.
 //
@@ -64,15 +66,17 @@ export default function ToGoMode({ user, onExit, onOpenView, dok }: {
   return (
     // Pod dokem zůstává místo (pb-36 jako v administraci), ať dok nepřekryje poslední widget.
     <div className={`min-h-[100dvh] ${dok ? 'pb-36 md:pb-[env(safe-area-inset-bottom)]' : 'pb-[env(safe-area-inset-bottom)]'}`}>
-      {/* Chrom aplikace: značka, přepínač podniku (jen s víc podniky), zvonek a cesta do administrace. */}
-      <div className="max-w-lg mx-auto w-full px-4 pt-[max(env(safe-area-inset-top),12px)] flex items-center gap-3">
-        <LogoMark size={34} />
-        {/* Pod 380 px by se název s přepínačem, zvonkem a „Administrace" smrštil na jedno písmeno — zůstane jen značka. */}
-        <span className="t-card flex-1 min-w-0 truncate"><span className="hidden min-[380px]:inline">{t('Managero')}</span></span>
+      {/* Chrom aplikace jako lišta v3 administrace: vlevo značka a přepínač podniku (jen s víc
+          podniky), vpravo zvonek v šedém kruhu a cesta do administrace jako šedá pilulka — nejvýš
+          tři akce. Dřív tu vedle značky stál ještě nápis „Managero", který se na telefonu
+          smrskl na „Manag…", a lišta měla jiný okraj i výšku než všude jinde. */}
+      <header className="max-w-lg mx-auto w-full px-4 min-[360px]:px-5 pt-[max(env(safe-area-inset-top),12px)] pb-1 flex items-center gap-1.5 min-h-[3.75rem]">
+        <LogoMark size={30} />
         <PodnikSwitcher compact jenPrepinani onOverview={() => onOpenView('org')} />
+        <div className="flex-1 min-w-0" />
         <NotificationBell />
-        <Button variant="secondary" size="sm" icon="swap" onClick={onExit} className="shrink-0">{t('Administrace')}</Button>
-      </div>
+        <Button variant="secondary" size="sm" icon="swap" onClick={onExit} className="shrink-0 ml-1">{t('Administrace')}</Button>
+      </header>
       <div className="max-w-lg mx-auto w-full">
         <PlochaWidgetu stranka="vedeni.togo" hlavicka={{ title, subtitle: `TO GO · ${subtitle}` }} />
       </div>

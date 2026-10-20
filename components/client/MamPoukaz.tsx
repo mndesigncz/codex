@@ -66,20 +66,20 @@ export default function MamPoukaz({ slug, podniky, prihlasen = false, onPridano 
       <div className="flex gap-2">
         <input id={`poukaz-${slug ?? 'moje'}`} value={kod} onChange={e => { setKod(formatujPriPsani(e.target.value)); setNalez(null); setErr(''); }}
           placeholder={t('Kód z poukazu')} autoComplete="off" autoCapitalize="characters" spellCheck={false}
-          className="field text-sm font-mono tracking-widest flex-1 min-w-0 uppercase" />
-        <button type="submit" disabled={busy || !kod.trim()} className="tap-target shrink-0 inline-flex items-center btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : t('Zkontrolovat')}</button>
+          className="field text-sm font-mono tracking-widest flex-1 min-w-0 uppercase placeholder:font-sans placeholder:tracking-normal placeholder:normal-case" />
+        <button type="submit" disabled={busy || !kod.trim()} className="tap-target shrink-0 btn btn-secondary disabled:opacity-50">{busy ? '…' : t('Zkontrolovat')}</button>
       </div>
       {err && <p role="alert" className="text-sm text-bad-ink">{err}</p>}
       {nalez && (
-        <div role="status" className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-4 py-3">
-          <p className="text-lg font-bold tabular-nums leading-tight">{t('Zůstatek {castka}', { castka: formatMoney(nalez.balance, nalez.currency) })}</p>
+        <div role="status" className="well px-4 py-3.5">
+          <p className="text-[1.75rem] font-bold tracking-[-0.02em] tabular-nums leading-tight">{t('Zůstatek {castka}', { castka: formatMoney(nalez.balance, nalez.currency) })}</p>
           <p className="text-sm text-black/60 mt-0.5">
             {nalez.balance !== nalez.value ? `${t('z {castka}', { castka: formatMoney(nalez.value, nalez.currency) })} · ` : ''}
             {nalez.validUntil ? t('platí do {datum}', { datum: fmtDatum(nalez.validUntil, { jazyk, styl: 'cislo' }) }) : t('bez omezení platnosti')}
           </p>
           <p className="text-xs text-black/55 mt-1.5">{t('Poukaz uplatní obsluha u kasy: ukaž jí kód.')}</p>
           {prihlasen && !pridano && (
-            <button type="button" onClick={pridej} disabled={pridavam} className="tap-target-sm mt-2 btn btn-secondary text-sm disabled:opacity-50">{pridavam ? '…' : t('Přidat do mé aplikace')}</button>
+            <button type="button" onClick={pridej} disabled={pridavam} className="tap-target mt-3 btn btn-primary btn-sm disabled:opacity-50">{pridavam ? '…' : t('Přidat do mé aplikace')}</button>
           )}
           {pridano && <p role="status" className="text-sm font-semibold mt-2">{t('Poukaz je v tvé aplikaci, najdeš ho v Moje.')}</p>}
         </div>

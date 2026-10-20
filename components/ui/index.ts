@@ -1,7 +1,8 @@
-// Společné stavební kameny rozhraní (Managero 2). Obrazovky si je berou
+// Společné stavební kameny rozhraní (Managero 3). Obrazovky si je berou
 // odsud a ne každá svoje — proto vypadá „Uložit" ve Skladu stejně jako
 // v Rozvrhu, a řádek seznamu stejně u směn, rezervací i kuponů.
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './Button';
+export { IconButton, type IconButtonProps } from './IconButton';
 export { Menu, MenuPanel, MenuItemButton, type MenuItem } from './Menu';
 export { PageHeader } from './PageHeader';
 export { Segmented, type SegmentedOption } from './Segmented';

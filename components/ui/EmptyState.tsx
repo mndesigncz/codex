@@ -35,12 +35,13 @@ export function EmptyState({ illustration, icon, title, hint, action, compact = 
           draggable={false}
         />
       ) : icon ? (
-        <div className={`${compact ? 'h-12 w-12' : 'h-16 w-16'} rounded-2xl bg-[#C8F542]/15 text-[#5B7A08] flex items-center justify-center mb-4`}>
-          <Icon name={icon} size={compact ? 22 : 28} />
+        // v3: velký klidný symbol v šedém kruhu, ne limetková dlaždice — prázdno není akce.
+        <div className={`${compact ? 'h-14 w-14' : 'h-[4.5rem] w-[4.5rem]'} rounded-full bg-black/[0.05] text-black/50 flex items-center justify-center mb-4`}>
+          <Icon name={icon} size={compact ? 24 : 30} strokeWidth={1.6} />
         </div>
       ) : null}
-      <p className={`font-bold tracking-tight text-[#16181A] text-balance ${compact ? 'text-base' : 'text-lg'}`}>{title}</p>
-      {hint && <p className={`text-black/55 mt-1.5 max-w-sm text-pretty ${compact ? 'text-sm' : 'text-sm'}`}>{hint}</p>}
+      <p className={`font-semibold tracking-tight text-[#16181A] text-balance ${compact ? 'text-base' : 'text-[17px]'}`}>{title}</p>
+      {hint && <p className="text-black/55 mt-1.5 max-w-sm text-pretty text-sm">{hint}</p>}
       {/* Akce se zalamují a dlouhý text tlačítka (německé „Karte aus dem heutigen Angebot anlegen" na 288 px)
           se zalomí dovnitř, místo aby vyčuhoval z karty (sondy preteceni-*). */}
       {action && <div className="mt-5 flex flex-wrap justify-center gap-2 max-w-full [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:h-auto [&_button]:min-h-11 [&_button]:py-2 [&_button]:text-center [&_a]:max-w-full [&_a]:whitespace-normal">{action}</div>}

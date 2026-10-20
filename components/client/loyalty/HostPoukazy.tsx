@@ -57,12 +57,12 @@ function Karta({ p, onOdebrano }: { p: Poukaz; onOdebrano: (id: number) => void 
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-black/55 truncate">{p.business}</p>
-          <p className="text-lg font-bold tabular-nums leading-tight">{t('Zůstatek {castka}', { castka: formatMoney(p.balance, p.currency) })}</p>
+          <p className="text-[1.375rem] font-bold tracking-[-0.02em] tabular-nums leading-tight">{t('Zůstatek {castka}', { castka: formatMoney(p.balance, p.currency) })}</p>
           <p className="text-xs text-black/55">
             {p.balance !== p.value ? `${t('z {castka}', { castka: formatMoney(p.value, p.currency) })} · ` : ''}
             {p.validUntil ? t('platí do {datum}', { datum: fmtDatum(p.validUntil, { jazyk, styl: 'cislo' }) }) : t('bez omezení platnosti')}
           </p>
-          {stav && <p role="status" className="mt-1 inline-block rounded-full bg-black/[0.07] px-2 py-0.5 text-[11px] font-semibold text-black/60">{stav}</p>}
+          {stav && <p role="status" className="mt-1.5 chip chip-sm chip-muted">{stav}</p>}
         </div>
         <p className="font-mono font-bold tracking-widest text-base shrink-0 break-all text-right max-w-[9rem]">{p.code}</p>
       </div>
@@ -100,7 +100,7 @@ export default function HostPoukazy({ poukazy }: { poukazy: Poukaz[] }) {
   if (seznam.length === 0) return null;
   return (
     <section aria-labelledby="h-poukazy" className="max-w-md">
-      <h2 id="h-poukazy" className="text-lg font-bold tracking-tight">{t('Moje poukazy')}</h2>
+      <h2 id="h-poukazy" className="t-section">{t('Moje poukazy')}</h2>
       <p className="text-sm text-black/55 mt-1 mb-3">{t('Kód ukaž obsluze u kasy.')}</p>
       <ul className="space-y-2">{seznam.map(p => <Karta key={p.id} p={p} onOdebrano={id => setSeznam(s => s.filter(x => x.id !== id))} />)}</ul>
     </section>

@@ -416,7 +416,8 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
                   actions={(smiSchvalit || smiMazat) ? (
                     <>
                       {smiSchvalit && (
-                        <Button variant="primary" size="sm" icon="check" loading={pracuji === c.id && !mazat}
+                        // v3: v řádku fronty šedá pilulka, ne inkoust (max jedno inkoustové v zorném poli).
+                        <Button variant="secondary" size="sm" icon="check" loading={pracuji === c.id && !mazat}
                           onClick={() => zapis(c, 'PATCH')}>{t('Schválit')}</Button>
                       )}
                       {smiMazat && (

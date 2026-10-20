@@ -77,6 +77,15 @@ const orezane = (p) => p.evaluate(() => {
     if (el.closest('.sr-only, [hidden], [aria-hidden="true"]')) continue;
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
+    // Tlačítko, jehož text je celý jen pro odečítač (odkaz widgetu je na telefonu šipka, `max-sm:sr-only`),
+    // nemá co oříznout: scrollWidth tam měří neviditelné ::before dotykové plochy tabletu (44 px kolem 36px kruhu).
+    const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let viditelny = false;
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      const rr = n.parentElement.getBoundingClientRect(); // sr-only = rámeček 1 × 1 px
+      if (n.textContent.trim() && !(rr.width <= 1 && rr.height <= 1)) { viditelny = true; break; }
+    }
+    if (!viditelny) continue;
     const st = getComputedStyle(el);
     if (st.overflowX === 'visible') {
       // text přesahuje vnitřní obsah tlačítka (nowrap) — přesah o víc než vnitřní odsazení

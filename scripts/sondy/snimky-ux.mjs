@@ -47,7 +47,8 @@ for (const w of SIRKY) {
     const { ctx, p } = await kontext({ viewport: { width: w, height: 900 }, mobil: w < 600, tmavy: TMAVY, fix: nacti('k69-b6a-rozlozeni-ukoly'), dalsi: ukolyPodvrh });
     await otevri(p, '/employer/overview?view=tasks', 'vedeni.ukoly');
     const nastroj = p.locator('[data-plocha] li[data-widget="nastroj"]');
-    await nastroj.getByRole('group', { name: 'Stav úkolů' }).waitFor({ timeout: 10000 });
+    // Redesign v3: pás stavů je v panelu „Filtry"; nad seznamem zůstává skupina „Filtry úkolů".
+    await nastroj.getByRole('group', { name: 'Filtry úkolů' }).waitFor({ timeout: 10000 });
     await p.waitForTimeout(500); await foto(p, `ukoly-seznam-${w}${PRIPONA}`);
     const pohledy = p.locator('[aria-label="Zobrazení"]').first();
     await pohledy.getByRole('tab', { name: 'Měsíc', exact: true }).click(); await p.waitForTimeout(500); await foto(p, `ukoly-mesic-${w}${PRIPONA}`);

@@ -301,6 +301,10 @@ function RadekFronty({ o, kasa, vyridi, pracuje, onZmena, onOdmitnout }: {
 }) {
   const t = useT('widgety');
   const money = useMoney();
+  // v3: mimo tablet je akce řádku šedá pilulka — na Přehledu stojí fronta vedle Píchaček
+  // a inkoustové tlačítko smí být v zorném poli jen jedno. Na tabletu za barem je fronta hlavní práce.
+  const { role } = useOpravneni();
+  const varianta = role?.typ === 'kiosk' ? 'primary' : 'secondary';
   const polozky = o.polozky.map(p => `${p.count}× ${p.name}`).join(', ');
   const meta = [polozky || t('Bez položek'), kdy(o.vytvoreno, t), kasa && !o.vKase ? t('není v kase') : null].filter(Boolean).join(' · ');
   // Nejvýš dvě akce v řádku: hlavní vidět, zbytek (a nebezpečné na konci) v nabídce (DP §3.6).
@@ -319,9 +323,9 @@ function RadekFronty({ o, kasa, vyridi, pracuje, onZmena, onOdmitnout }: {
         <>
           {/* Stůl v přístupném názvu — tři „Přijmout" za sebou by odečítač nerozlišil. */}
           {o.stav === 'new'
-            ? <Button variant="primary" size="sm" icon="check" loading={pracuje} onClick={() => onZmena({ status: 'confirmed' })}
+            ? <Button variant={varianta} size="sm" icon="check" loading={pracuje} onClick={() => onZmena({ status: 'confirmed' })}
                 aria-label={t('Přijmout: {stul}, {host}', { stul: o.stul ?? t('bez stolu'), host: o.host })}>{t('Přijmout')}</Button>
-            : <Button variant="primary" size="sm" loading={pracuje} onClick={() => onZmena({ status: 'done' })}
+            : <Button variant={varianta} size="sm" loading={pracuje} onClick={() => onZmena({ status: 'done' })}
                 aria-label={t('Hotovo: {stul}, {host}', { stul: o.stul ?? t('bez stolu'), host: o.host })}>{t('Hotovo')}</Button>}
           {dalsi.length > 0 && <Menu size="sm" label={t('Další akce s objednávkou {nazev}', { nazev: o.stul ?? o.host })} items={dalsi} />}
         </>

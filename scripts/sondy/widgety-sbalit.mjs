@@ -60,7 +60,9 @@ for (const w of [1280, 390]) {
 
   // klepnutí do těla nesbalí a nikam nevede
   const url0 = p.url();
-  await li(p, 'souhrn').locator('p, span').first().click({ position: { x: 20, y: 6 } }).catch(() => {});
+  // Tělo karty (pod hlavičkou). Dřív první span karty byl limetkový „dotek" přes celou kartu; ve v3 je pryč
+  // a první span je titulek v hlavičce — ten kartu sbalit má. Proto výslovně obsah pod hlavičkou.
+  await li(p, 'souhrn').locator('section > div.mt-3').locator('p, span').first().click({ position: { x: 20, y: 6 } }).catch(() => {});
   await p.waitForTimeout(400);
   tvrdi(`1 ${w}: klepnutí do těla karty nic nesbalí a nenaviguje`, p.url() === url0 && await li(p, 'souhrn').getByRole('button', { name: /^Sbalit/ }).count() === 1);
 

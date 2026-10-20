@@ -55,7 +55,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
   return (
     <div className="min-h-[100dvh] flex flex-col" style={{ background: 'var(--bg)', color: '#16181A' }}>
       <header className="sticky top-0 z-30 chrome-edge">
-        <div className="glass-strong border-b border-black/[0.06]">
+        <div className="glass-strong !border-x-0 !border-t-0 !shadow-none border-b border-black/[0.06]">
           <div className="mx-auto max-w-5xl px-3 sm:px-6 h-16 flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Na 320 px se značka, dvě záložky a účet do řádku nevešly a stránka
                 se dala odrolovat do strany. Slovo „client" jde na telefonu pryč,
@@ -66,19 +66,19 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
               <LogoMark size={32} />
               <span className={`hidden ${me ? 'min-[360px]:inline' : 'min-[440px]:inline'} font-bold tracking-tight leading-none`}>Managero <span className="hidden sm:inline text-black/45 font-semibold">client</span></span>
             </Link>
-            <nav className="ml-auto flex items-center gap-0.5 sm:gap-1 min-w-0" aria-label={t('Zákaznická navigace')}>
+            <nav className="ml-auto flex items-center gap-0.5 sm:gap-1.5 min-w-0" aria-label={t('Zákaznická navigace')}>
               {/* Na mobilu žijí záložky ve spodním docku jako ve zbytku
                   aplikace; nahoře zůstává jen značka a účet. Nepřihlášený
                   dock nemá, tak mu odkaz Podniky zůstává i na telefonu. */}
               <Link href="/client" aria-current={active('/client') && path === '/client' ? 'page' : undefined}
-                className={`${me ? 'hidden md:inline-block' : ''} tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'seg-on' : 'seg-off'}`}>{t('Podniky')}</Link>
+                className={`${me ? 'hidden md:inline-block' : ''} tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'bg-black/[0.06] text-[#16181A]' : 'seg-off'}`}>{t('Podniky')}</Link>
               {me && (
                 <Link href="/client/me" aria-current={active('/client/me') ? 'page' : undefined}
-                  className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'seg-on' : 'seg-off'}`}>{t('Moje')}</Link>
+                  className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'bg-black/[0.06] text-[#16181A]' : 'seg-off'}`}>{t('Moje')}</Link>
               )}
               {/* Sken QR a kód podniku. Přihlášený má na telefonu tlačítko uprostřed spodního doku, tady jen od md. */}
               <button type="button" onClick={otevriNajit} aria-label={sken.umi ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}
-                className={`${me ? 'hidden md:inline-flex' : 'inline-flex'} tap-target items-center justify-center gap-1.5 rounded-full px-2.5 sm:px-3.5 py-2 text-sm font-medium seg-off transition`}>
+                className={`${me ? 'hidden md:inline-flex' : 'inline-flex'} tap-target items-center justify-center gap-1.5 rounded-full h-10 min-w-10 px-2.5 sm:px-3.5 text-sm font-medium bg-black/[0.05] text-black/70 hover:bg-black/[0.08] hover:text-[#16181A] transition`}>
                 <Icon name={ikonaNajit} size={17} aria-hidden />
                 <span className="hidden sm:inline">{popisNajit}</span>
               </button>
@@ -112,14 +112,17 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                   )}
                 </div>
               ) : (
-                <Link href="/client/login" className="tap-target-sm ml-0.5 sm:ml-1 rounded-full bg-[#C8F542] on-accent px-3.5 sm:px-4 py-2 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition whitespace-nowrap">{t('Přihlásit')}</Link>
+                // v3: v liště inkoustová pilulka, ne limetka — jediná limetka patří hlavní akci obrazovky
+                // („Založit účet", „Přihlásit se" ve formuláři).
+                <Link href="/client/login" className="tap-target-sm ml-0.5 sm:ml-1 btn btn-primary btn-sm !px-3 sm:!px-4 text-sm">{t('Přihlásit')}</Link>
               )}
             </nav>
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-10">{children}</main>
-      <footer className={`mx-auto max-w-5xl w-full px-4 sm:px-6 pt-8 ${me ? 'pb-28 md:pb-8' : 'pb-8'} text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1`}>
+      {/* v3: okraj obsahu na telefonu 20 px (pod 360 px 16 px), od sm 24 px — stejně jako administrace. */}
+      <main className="flex-1 w-full mx-auto max-w-5xl px-4 min-[360px]:px-5 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-10">{children}</main>
+      <footer className={`mx-auto max-w-5xl w-full px-4 min-[360px]:px-5 sm:px-6 pt-8 ${me ? 'pb-28 md:pb-8' : 'pb-8'} text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1`}>
         <span>Managero client</span>
         <span>{t('Rezervace, věrnost a objednávky pro podniky, kam chodíš.')}</span>
         {jeObal

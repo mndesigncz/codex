@@ -180,7 +180,9 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened, p
               />
             </Card>
           ) : (
-            <Button variant="primary" size="lg" icon="plus" block className="w-full" onClick={() => setAdding(true)}>
+            // Při inventuře je hlavní akcí limetkové „spočítat sklad" — zápis nové věci pak
+            // ustoupí do šedé pilulky, ať pod sebou nesvítí inkoust i limetka (v3).
+            <Button variant={stocktakeOpen ? 'secondary' : 'primary'} size="lg" icon="plus" block className="w-full" onClick={() => setAdding(true)}>
               {t('Zapsat novou věc do skladu')}
             </Button>
           )}

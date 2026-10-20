@@ -92,9 +92,11 @@ const otevriMenuPolozky = async (p, nazev) => {
   await otevri(p, VEDENI, 'vedeni.sklad');
   // Záložky pod hlavičkou.
   const zalozky = p.locator('[data-sklad-zalozky]').first();
-  tvrdi('S1: pod hlavičkou Skladu jsou záložky Položky / Receptury z kasy a tlačítko Inventura',
+  // Redesign v3: Inventura je třetí položka téhož segmentu (dřív samostatné tlačítko vedle něj —
+  // dva tvary pro tři sourozence a na telefonu druhá řada pod hlavičkou). Klepnutí otevře okno.
+  tvrdi('S1: pod hlavičkou Skladu je jeden segment Položky / Receptury z kasy / Inventura',
     await zalozky.getByRole('tab', { name: 'Položky' }).isVisible() && await zalozky.getByRole('tab', { name: 'Receptury z kasy' }).isVisible()
-    && await zalozky.getByRole('button', { name: 'Inventura' }).isVisible());
+    && await zalozky.getByRole('tab', { name: 'Inventura' }).isVisible() && await zalozky.getByRole('button', { name: 'Inventura' }).count() === 0);
   tvrdi('S1: aktivní je Položky', await zalozky.getByRole('tab', { name: 'Položky' }).getAttribute('aria-selected') === 'true');
 
   await otevriMenuPolozky(p, 'Gin');
@@ -155,7 +157,7 @@ const otevriMenuPolozky = async (p, nazev) => {
 {
   const { ctx, p, stav } = await kontext({ fix: FIX_VEDENI, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await otevri(p, VEDENI, 'vedeni.sklad');
-  await p.locator('[data-sklad-zalozky]').first().getByRole('button', { name: 'Inventura' }).click();
+  await p.locator('[data-sklad-zalozky]').first().getByRole('tab', { name: 'Inventura' }).click();
   const okno = p.getByRole('dialog', { name: 'Inventura skladu' });
   tvrdi('I1: tlačítko Inventura v záložkách otevře okno', await dokud(() => okno.isVisible(), 3000));
   // Okno se otevře dřív, než dorazí položky (v CI i o pár set ms) — na data počkat, ne je číst hned.
@@ -239,7 +241,7 @@ const otevriMenuPolozky = async (p, nazev) => {
   await p.waitForTimeout(300);
   await p.locator('[data-sklad-zalozky]').first().getByRole('tab', { name: 'Receptury z kasy' }).click();
   tvrdi('R2: záložka Receptury z kasy vede zpět na Receptury', await dokud(() => p.getByRole('heading', { level: 1, name: 'Receptury' }).isVisible(), 5000));
-  await p.locator('[data-sklad-zalozky]').first().getByRole('button', { name: 'Inventura' }).click();
+  await p.locator('[data-sklad-zalozky]').first().getByRole('tab', { name: 'Inventura' }).click();
   tvrdi('R2: Inventura z Receptur otevře Sklad s oknem inventury', await dokud(() => p.getByRole('dialog', { name: 'Inventura skladu' }).isVisible(), 5000));
   await ctx.close();
 }
@@ -259,7 +261,7 @@ for (const w of [320, 390]) {
   if (w === 320) await p.screenshot({ path: OUT + 'k82-polozka-320.png' });
   await p.keyboard.press('Escape');
   await p.waitForTimeout(300);
-  await p.locator('[data-sklad-zalozky]').first().getByRole('button', { name: 'Inventura' }).click();
+  await p.locator('[data-sklad-zalozky]').first().getByRole('tab', { name: 'Inventura' }).click();
   await dokud(() => p.getByRole('dialog', { name: 'Inventura skladu' }).isVisible(), 3000);
   tvrdi(`P${w}: okno inventury bez přetečení`, (await preteceni(p)).length === 0, (await preteceni(p)).join(' | '));
   if (w === 320) await p.screenshot({ path: OUT + 'k82-inventura-320.png' });

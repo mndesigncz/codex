@@ -27,8 +27,8 @@ export default async function ZalozitPodnikPage() {
           <p className="t-meta text-pretty">{t('Máte od vedení kód týmu nebo pozvánku? Připojte se rovnou v aplikaci.')}</p>
         </div>
         <div className="flex flex-col gap-2">
-          <Link href="/login" className="btn btn-accent w-full justify-center">{t('Přihlásit se')}</Link>
-          <Link href="/join" className="btn btn-secondary w-full justify-center">{t('Připojit se kódem týmu')}</Link>
+          <Link href="/login" className="btn btn-accent btn-lg w-full justify-center">{t('Přihlásit se')}</Link>
+          <Link href="/join" className="btn btn-secondary btn-lg w-full justify-center">{t('Připojit se kódem týmu')}</Link>
           {!vObalu && <Link href="/register" className="btn btn-ghost w-full justify-center">{t('Založit podnik')}</Link>}
         </div>
       </main>

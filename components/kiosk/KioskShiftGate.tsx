@@ -539,7 +539,9 @@ function LockScreen() {
           />
         ) : !picking ? (
           <>
-            <div className="mx-auto h-20 w-20 rounded-3xl bg-[#16181A] text-[#C8F542] grid place-items-center">
+            {/* v3: klidný symbol v šedém kruhu (jako EmptyState), ne inkoustová dlaždice
+                s limetkou — limetka patří jediné akci pod textem. */}
+            <div className="mx-auto h-20 w-20 rounded-full bg-black/[0.05] text-black/50 grid place-items-center">
               <Icon name="clock" size={38} />
             </div>
             <h2 className="t-page mt-6 text-balance">{t('Tablet čeká na směnu')}</h2>
@@ -759,7 +761,7 @@ export function ActivePersonChip() {
     if (onShift.length === 0) return null;
     return (
       <button type="button" onClick={() => { void requireActive(); }}
-        className="flex items-center gap-2.5 rounded-full glass border border-wait/50 bg-wait/[0.14] pl-3.5 pr-4 py-2 min-h-[44px] hover:bg-wait/20 transition">
+        className="flex items-center gap-2.5 rounded-full border border-transparent bg-wait/[0.14] pl-3.5 pr-4 py-2 min-h-[44px] hover:bg-wait/20 transition">
         <Icon name="warning" size={17} className="text-wait-ink shrink-0" />
         <span className="text-left leading-tight">
           <span className="hidden sm:block t-label">{t('Zapisuje se jako')}</span>
@@ -796,8 +798,10 @@ function PrepinacOsoby({ active, onShift, canSwitch, selectPerson }: {
         onKeyDown={canSwitch ? pop.onTriggerKeyDown : undefined}
         aria-haspopup={canSwitch ? 'menu' : undefined}
         aria-expanded={canSwitch ? open : undefined}
-        className={`flex items-center gap-2.5 rounded-full glass border border-[#C8F542]/45 bg-[#C8F542]/[0.14] pl-2.5 pr-4 py-2 min-h-[44px] transition ${
-          canSwitch ? 'hover:bg-[#C8F542]/20' : 'cursor-default'
+        // v3: šedá pilulka (jako sekundární tlačítko), ne limetkový nádech — limetka
+        // na obrazovce patří jen hlavní akci; kdo se zapisuje, nese avatar a jméno.
+        className={`btn-secondary flex items-center gap-2.5 rounded-full pl-2.5 pr-4 py-2 min-h-[44px] transition ${
+          canSwitch ? '' : 'cursor-default'
         }`}
       >
         <Avatar emoji={active.avatar} size="sm" ring={false} />

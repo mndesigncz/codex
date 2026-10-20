@@ -130,7 +130,9 @@ const bezPretecni = (p) => p.evaluate(() => document.documentElement.scrollWidth
   tvrdi('D1 světlý motiv vynucený i při uloženém tmavém a tmavém systému', await p.evaluate(() => document.documentElement.getAttribute('data-theme') === 'light'));
   tvrdi('D1 žádné cookies', (await ctx.cookies()).length === 0 && (await p.evaluate(() => document.cookie)) === '');
   tvrdi('D1 žádný service worker', (await p.evaluate(() => navigator.serviceWorker.getRegistrations().then(r => r.length))) === 0);
-  await p.getByRole('button', { name: 'Přepnout do TO GO režimu' }).click();
+  // DESIGN v3: přepnutí do TO GO je v liště v „···" (Další možnosti), ne samostatné tlačítko.
+  await p.getByRole('button', { name: 'Další možnosti' }).click();
+  await p.getByRole('menuitem', { name: 'Přepnout do TO GO režimu' }).click();
   await p.waitForTimeout(500);
   await p.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
   const uloz = await p.evaluate(() => ({ rezim: localStorage.getItem('managero-app-mode'), motiv: localStorage.getItem('managero-theme') }));

@@ -268,7 +268,7 @@ function NavrhyReceptur({ navrhy, schvaluje, produkty, onClose }: {
                 ) : (
                   <div className="flex flex-wrap gap-2 justify-end">
                     <Button variant="secondary" size="sm" disabled={busy != null} onClick={() => { setVracim(n.id); setPoznamka(''); }}>{t('Vrátit')}</Button>
-                    <Button variant="primary" size="sm" icon="check" loading={busy === n.id} disabled={busy != null && busy !== n.id} onClick={() => { void rozhodni(n, 'schvalit'); }}>{t('Schválit')}</Button>
+                    <Button variant="secondary" size="sm" icon="check" loading={busy === n.id} disabled={busy != null && busy !== n.id} onClick={() => { void rozhodni(n, 'schvalit'); }}>{t('Schválit')}</Button>
                   </div>
                 ))}
               </Well>

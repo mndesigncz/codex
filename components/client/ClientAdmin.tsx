@@ -281,9 +281,10 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
             <Button variant="ghost" size="sm" iconOnly icon="arrowLeft" className="md:hidden shrink-0"
               aria-label="Zpět do administrace" title="Zpět do administrace" onClick={onExit} />
             <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{aktivni.label}</h2>
-            </div>
+            {/* Název části jen pro odečítač (jako lišta administrace): vidět je
+                jednou, jako h1 obrazovky. Dřív tu stál podruhé („Kartičky / Kartičky"). */}
+            <p className="sr-only">{aktivni.label}</p>
+            <div className="flex-1 min-w-0" />
             {souhrn?.zapnuto === false && <Chip tone="wait" size="sm" icon="warning">Pro hosty vypnuto</Chip>}
             {kVyrizeni > 0 && <Chip tone="wait" size="sm" className="hidden sm:inline-flex">{kVyrizeni} k vyřízení</Chip>}
           </header>

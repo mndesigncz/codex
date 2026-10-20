@@ -4,10 +4,14 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 
 // Přepínač pohledů (Seznam / Týden, Rozvrh / Kalendář / Typy směn…).
-// Vybraná položka je tmavá — stejně jako v postranní liště a doku, takže
-// „vybráno" vypadá v celé aplikaci stejně a nikdy jako tlačítko akce.
+// v3: jemný segment — šedá dráha bez rámečku a v ní bílý jezdec se stínem
+// jen náznakem (jako segmentované ovládání iOS). Dřív byl vybraný pohled
+// tmavá pilulka, a protože na obrazovce bývá i tmavé tlačítko a tmavý
+// filtr, četly se tři inkoustové skvrny jako tři akce. Inkoustová pilulka
+// zůstala filtrovacím čipům (`.filter-pill.seg-on`) — segment je pohled,
+// čip je výběr.
 //
-// Tmavá pilulka je jeden prvek, který PŘEJÍŽDÍ mezi položkami, ne barva,
+// Jezdec je jeden prvek, který PŘEJÍŽDÍ mezi položkami, ne barva,
 // která se na jedné položce vypne a na druhé zapne. Přechod pak čte oko jako
 // pohyb jedné věci — stejný trik, jakým iOS animuje segmentované ovládání.
 //
@@ -89,7 +93,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
     : undefined;
 
   return (
-    <div className={`inline-flex max-w-full min-w-0 rounded-full glass border border-black/[0.07] ${className}`}>
+    <div className={`inline-flex max-w-full min-w-0 rounded-full seg-draha ${className}`}>
       <div ref={listRef} role="tablist" aria-label={ariaLabel} onScroll={zmerOkraje}
         style={maska ? { WebkitMaskImage: maska, maskImage: maska } : undefined}
         // snap-x: po švihnutí prstem se pás zastaví na hraně položky, ne
@@ -98,7 +102,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
         className="relative flex gap-1 p-1 min-w-0 overflow-x-auto overscroll-x-contain snap-x snap-proximity scrollbar-none rounded-full">
         {pill && (
           <span aria-hidden
-            className="absolute left-0 top-0 rounded-full bg-[#16181A] shadow-sm pointer-events-none motion-safe:transition-[transform,width,height] motion-safe:duration-[240ms] motion-safe:ease-out"
+            className="absolute left-0 top-0 rounded-full seg-jezdec pointer-events-none motion-safe:transition-[transform,width,height] motion-safe:duration-[240ms] motion-safe:ease-out"
             style={{ transform: `translate(${pill.x}px, ${pill.y}px)`, width: pill.w, height: pill.h }} />
         )}
         {options.map(o => {
@@ -112,14 +116,14 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
               data-on={on ? 'true' : undefined}
               onClick={() => onChange(o.id)}
               className={`tap-target-sm relative z-[1] shrink-0 snap-start inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap transition-colors duration-200 ${pad} ${
-                on ? `text-white ${pill ? '' : 'bg-[#16181A] shadow-sm'}` : 'text-black/60 hover:text-[#16181A]'
+                on ? `seg-vybrano ${pill ? '' : 'seg-jezdec'}` : 'text-black/60 hover:text-[#16181A]'
               }`}
             >
               {o.icon && <Icon name={o.icon} size={size === 'sm' ? 14 : 16} className="shrink-0" />}
               {o.label}
               {o.count != null && o.count > 0 && (
                 <span className={`ml-0.5 rounded-full px-1.5 min-w-[1.25rem] text-center text-[11px] font-semibold tabular-nums transition-colors duration-200 ${
-                  on ? 'bg-white/20 text-white' : 'bg-black/[0.08] text-[#16181A]'}`}>{o.count}</span>
+                  'bg-black/[0.08] text-[#16181A]'}`}>{o.count}</span>
               )}
             </button>
           );

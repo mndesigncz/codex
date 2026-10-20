@@ -13,7 +13,8 @@
 // Výjimky jsou plochy, které zůstávají světlé i v tmavém režimu — tam je
 // tmavý text správně a přebarvit ho by byla chyba opačným směrem.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 const css = readFileSync('app/globals.css', 'utf8');
 
@@ -43,6 +44,31 @@ const tmave = new Set(
 );
 
 const chybi = [...svetle.entries()].filter(([name]) => !tmave.has(name));
+
+// Zástupný text psaný utilitou (`placeholder:text-black/40`) plošné pravidlo
+// nepřebarví — v tmavém režimu byl ve globálním hledání nečitelný. Kdo ho píše
+// utilitou, dopíše vedle i `dark:placeholder:…` (`placeholder-black/NN` má
+// tmavou variantu v globals.css).
+function* tsx(dir) {
+  for (const f of readdirSync(dir)) {
+    const p = join(dir, f);
+    if (statSync(p).isDirectory()) yield* tsx(p);
+    else if (p.endsWith('.tsx')) yield p;
+  }
+}
+const zastupne = [];
+for (const dir of ['app', 'components']) {
+  for (const p of tsx(dir)) {
+    readFileSync(p, 'utf8').split('\n').forEach((radek, i) => {
+      if (/(^|[\s"'`])placeholder:text-black\//.test(radek) && !/dark:placeholder:/.test(radek)) zastupne.push(`${p}:${i + 1}`);
+    });
+  }
+}
+if (zastupne.length) {
+  console.error(`\n${zastupne.length}× \`placeholder:text-black/…\` bez \`dark:placeholder:…\` (v tmavém režimu nečitelné):`);
+  for (const z of zastupne) console.error(`  ${z}`);
+  process.exit(1);
+}
 
 if (chybi.length) {
   console.error(`\n${chybi.length} tříd nastavuje inkoustový text a nemá tmavou variantu:`);

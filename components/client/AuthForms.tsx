@@ -22,7 +22,7 @@ function Field({ id, label: l, hint, error, children }: { id: string; label: str
     <div className="grid gap-2">
       <label htmlFor={id} className={label}>{l}</label>
       {children}
-      {error ? <p className="text-xs text-bad-ink">{error}</p> : hint ? <p className="text-xs text-black/45">{hint}</p> : null}
+      {error ? <p className="text-xs text-bad-ink">{error}</p> : hint ? <p className="t-meta text-pretty">{hint}</p> : null}
     </div>
   );
 }
@@ -63,7 +63,7 @@ export function RegisterForm() {
         <Field id="r-name" label={t('Jméno')}><input id="r-name" className={input} value={name} onChange={e => setName(e.target.value)} autoComplete="name" required /></Field>
         <Field id="r-email" label={t('E-mail')}><input id="r-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
         <Field id="r-pw" label={t('Heslo')} hint={t('Aspoň 8 znaků.')}><input id="r-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" required /></Field>
-        <Field id="r-ref" label={t('Kód od kamaráda')} hint={t('Nepovinné. Až se přidáš do podniku, kde je členem, dostanete oba body.')}><input id="r-ref" className={`${input} font-mono tracking-widest`} value={ref} onChange={e => setRef(e.target.value.toUpperCase())} placeholder="ABCD-EFGH" autoComplete="off" /></Field>
+        <Field id="r-ref" label={t('Kód od kamaráda')} hint={t('Nepovinné. Až se přidáš do podniku, kde je členem, dostanete oba body.')}><input id="r-ref" className={`${input} font-mono tracking-widest placeholder:font-sans placeholder:tracking-normal`} value={ref} onChange={e => setRef(e.target.value.toUpperCase())} placeholder="ABCD-EFGH" autoComplete="off" /></Field>
         <label className="flex items-start gap-3 text-sm text-black/70 cursor-pointer">
           <input type="checkbox" checked={novinky} onChange={e => setNovinky(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-[#16181A]" />
           <span>{t('Chci dostávat novinky a akce od podniků, kde jsem členem. Nepovinné, půjde to kdykoli vypnout v profilu.')}</span>
@@ -72,7 +72,7 @@ export function RegisterForm() {
           onChange={v => { setSouhlas(v); if (v && vek) setChybaSouhlasu(null); }}
           vek={{ checked: vek, onChange: v => { setVek(v); if (v && souhlas) setChybaSouhlasu(null); } }} />
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-        <button type="submit" disabled={busy} className="tap-target btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
+        <button type="submit" disabled={busy} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">
           {busy ? t('Zakládám…') : <><Icon name="plus" size={16} /> {t('Založit účet')}</>}
         </button>
         <p className="text-sm text-black/55 text-center">{t('Už účet máš?')} <Link href={`/client/login?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Přihlas se')}</Link></p>
@@ -116,7 +116,7 @@ export function LoginForm() {
         <Field id="l-pw" label={t('Heslo')}><input id="l-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" required /></Field>
         <p className="-mt-2 text-sm"><Link href="/client/zapomenute-heslo" className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Zapomenuté heslo')}</Link></p>
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-        <button type="submit" disabled={busy} className="tap-target btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition">
+        <button type="submit" disabled={busy} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">
           {busy ? t('Přihlašuji…') : t('Přihlásit se')}
         </button>
         <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
@@ -128,12 +128,14 @@ export function LoginForm() {
 
 export function AuthCard({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-8 md:gap-14 items-start">
+    // v3 (jako přihlášení ve World App / [untitled]): na telefonu formulář leží přímo na plátně —
+    // velký nadpis, jedna věta, pole a hlavní tlačítko přes šířku. Karta s linkou až od md, vedle nadpisu.
+    <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-7 md:gap-14 items-start">
       <div className="md:pt-8">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter leading-[1.05] text-balance">{title}</h1>
-        <p className="mt-3 text-black/60 leading-relaxed max-w-[40ch] text-pretty">{lead}</p>
+        <h1 className="t-page sm:text-[2.5rem] sm:leading-[1.05] text-balance">{title}</h1>
+        <p className="mt-2 text-[15px] sm:text-base text-black/60 leading-relaxed max-w-[40ch] text-pretty">{lead}</p>
       </div>
-      <div className="glass-card p-6 sm:p-8 max-w-md w-full">{children}</div>
+      <div className="w-full max-w-md karta-od-md md:p-8">{children}</div>
     </div>
   );
 }

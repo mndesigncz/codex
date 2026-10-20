@@ -82,6 +82,9 @@ async function kartaJakoPng(karta: Karta, jmeno: string, popisek: string): Promi
   return new Promise(res => canvas.toBlob(res, 'image/png'));
 }
 
+/** Dlaždice akce pod kartičkou: ikona nad popiskem, šedá jamka, text se smí zalomit. */
+const DLAZDICE = '!h-auto min-h-[4.5rem] !rounded-[14px] !whitespace-normal flex-col !px-2 !py-3 text-center leading-tight [text-wrap:balance]';
+
 export default function KartaNastroje({ karta, podniky }: { karta: Karta; podniky: Podnik[] }) {
   const t = useT('klient-host');
   // V aplikaci z obchodu (obal) je „Přidat na plochu“ k ničemu — aplikace na ploše už je.
@@ -147,10 +150,12 @@ export default function KartaNastroje({ karta, podniky }: { karta: Karta; podnik
 
   return (
     <section aria-label={t('Nástroje karty')} className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="primary" icon="card" onClick={() => setVelky(true)} disabled={!karta.svg}>{t('Zvětšit QR')}</Button>
-        <Button size="sm" variant="secondary" icon="download" onClick={ulozObrazek} disabled={!karta.svg}>{t('Uložit kartu jako obrázek')}</Button>
-        {!nainstalovana && !jeObal && <Button size="sm" variant="secondary" icon="plus" onClick={naPlochu} aria-expanded={pomocPlocha}>{t('Přidat na plochu')}</Button>}
+      {/* v3: akce s kartou jako tiché dlaždice pod sebou (ikona nad popiskem, šedá jamka) — žádná
+          tmavá plná tlačítka vedle kartičky, ta je na obrazovce hlavní. */}
+      <div className={`grid gap-2 ${!nainstalovana && !jeObal ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <Button size="sm" variant="secondary" icon="card" className={DLAZDICE} onClick={() => setVelky(true)} disabled={!karta.svg}>{t('Zvětšit QR')}</Button>
+        <Button size="sm" variant="secondary" icon="download" className={DLAZDICE} onClick={ulozObrazek} disabled={!karta.svg}>{t('Uložit kartu jako obrázek')}</Button>
+        {!nainstalovana && !jeObal && <Button size="sm" variant="secondary" icon="plus" className={DLAZDICE} onClick={naPlochu} aria-expanded={pomocPlocha}>{t('Přidat na plochu')}</Button>}
       </div>
 
       {(jdeApple || jdeGoogle) && (
@@ -173,10 +178,10 @@ export default function KartaNastroje({ karta, podniky }: { karta: Karta; podnik
       {zprava && <p role="status" className="text-sm text-black/60">{zprava}</p>}
 
       <Modal open={velky} onClose={() => setVelky(false)} title={t('Kartička')} size="sm">
-        <div className="rounded-2xl bg-white border border-black/10 p-4 w-full aspect-square grid place-items-center [&_svg]:w-full [&_svg]:h-full">
+        <div className="rounded-[22px] bg-white border border-black/[0.08] p-4 w-full aspect-square grid place-items-center [&_svg]:w-full [&_svg]:h-full">
           {karta.svg && <span dangerouslySetInnerHTML={{ __html: karta.svg }} className="block w-full h-full" aria-hidden />}
         </div>
-        <p className="mt-3 text-center font-mono text-2xl font-bold tracking-[0.2em]">{karta.code}</p>
+        <p className="mt-4 text-center font-mono text-2xl font-bold tracking-[0.14em]">{karta.code}</p>
         <p className="mt-3 text-sm text-black/60 text-center text-pretty">
           {umiDrzet
             ? t('Displej zůstane svítit. Pro rychlé načtení zvyš jas displeje na maximum.')

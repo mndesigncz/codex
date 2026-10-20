@@ -532,6 +532,7 @@
   "Nadcházející, naplánované hodiny a celkem.": "Nadchádzajúce, naplánované hodiny a celkom.",
   "Nafotit": "Odfotiť",
   "Nafotit účtenku jedním ťuknutím; poslední účtenky a součet za měsíc.": "Odfotiť účtenku jedným ťuknutím; posledné účtenky a súčet za mesiac.",
+  "Nahlásit": "Nahlásiť",
   "Nahlásit chybějící": "Nahlásiť chýbajúce",
   "Nahlásit {nazev}": "Nahlásiť {nazev}",
   "Nahlášeno: {n, plural, one {# položka} few {# položky} other {# položek}}. Vedení dostalo upozornění.": "Nahlásené: {n, plural, one {# položka} few {# položky} many {# položky} other {# položiek}}. Vedenie dostalo upozornenie.",
@@ -2687,5 +2688,8 @@
   "Volitelné úkoly s body na dnešek — kdo si co vzal, kdo co splnil, kolik míst zbývá a co čeká na uznání.": "Voliteľné úlohy s bodmi na dnes — kto si čo vzal, kto čo splnil, koľko miest zostáva a čo čaká na uznanie.",
   "Volitelné úkoly s body — kdo chce, vezme si úkol („Beru si\"), splní ho a dostane body. Opakování nastavíš sám: jednou, každý den, vybrané dny, týdně, měsíčně nebo každých pár dní.": "Voliteľné úlohy s bodmi — kto chce, vezme si úlohu („Beriem si\"), splní ju a dostane body. Opakovanie nastavíš sám: raz, každý deň, vybrané dni, týždenne, mesačne alebo každých pár dní.",
   "Všechny úkoly za body": "Všetky úlohy za body",
-  "jen {komu}": "len {komu}"
+  "jen {komu}": "len {komu}",
+  "Bez ceny či balení": "Bez ceny či balenia",
+  "Přidat úkol…": "Pridať úlohu…",
+  "Např. Objednat mléko zítra": "Napr. Objednať mlieko zajtra"
 }

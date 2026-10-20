@@ -301,8 +301,11 @@ export default function InventoryReport({ initialCategory, predani = 0 }: Props)
               className="!w-44 max-w-full"
             />
             {/* Uložit je `primary` jen s rozepsanou změnou — limetka na obrazovce
-                je jedna a v řádku nikdy (DP §3.1). */}
+                je jedna a v řádku nikdy (DP §3.1). v3: bez změny je neviditelné (místo
+                drží, ať „···" neuskakuje) — šedé „Uložit" u každé z šestnácti položek
+                bylo nejhlasitější šum seznamu a nic nedělalo. */}
             <Button variant={dirty ? 'primary' : 'secondary'} size="sm" disabled={!dirty} loading={savingId === item.id}
+              className={dirty || savingId === item.id ? undefined : 'invisible'}
               onClick={() => save(item)}>{t('Uložit')}</Button>
             <Menu size="sm" label={t('Další akce: {nazev}', { nazev: item.name })} items={menu} />
           </> : (<>

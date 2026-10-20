@@ -20,6 +20,7 @@ import { TaskChecklist, recurrenceLabel, type ChecklistItem } from '../TaskCheck
 import { useCurrency } from '../CurrencyProvider';
 import TaskWeekBoard from '../TaskWeekBoard';
 import { pragueToday } from '@/lib/pragueTime';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 import { Button, Card, Chip, EmptyState, ErrorState, Menu, Modal, Segmented, Skeleton, Toast } from '../ui';
 import { Icon } from '../Icons';
 import { apiMessage, okJson } from '@/lib/api';
@@ -63,6 +64,7 @@ export default function Tasks({ user }: Props) {
   const denKratce = (d: string) => fmtDatum(d, { jazyk, styl: 'denKratce' });
   const ja = parseInt(user.id ?? '0') || null;
   const smi = useSmi();
+  const naTelefonu = useJeTelefon();
   const data = useDataWidgetu<Ukol[]>(ja ? URL_UKOLY : null, vyberUkoly);
   // Server vrací moje a pro kohokoli; kdo má ukoly.zobrazit_tym, dostane celý tým —
   // tahle stránka je ale „moje úkoly", tak cizí nechává seznamu vedení.
@@ -110,7 +112,7 @@ export default function Tasks({ user }: Props) {
     el.querySelector<HTMLElement>('[data-za-body-nadpis]')?.focus({ preventScroll: true });
     const k = setTimeout(() => setZvyraznitZaBody(0), 2600);
     return () => clearTimeout(k);
-  }, [zvyraznitZaBody, zaBodyNacteno]);
+  }, [zvyraznitZaBody, zaBodyNacteno, naTelefonu]);
 
   const [showLater, setShowLater] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -309,7 +311,7 @@ export default function Tasks({ user }: Props) {
 
   const nastroj = (
     <div className="space-y-6">
-      {sekceZaBodyEl}
+      {!naTelefonu && sekceZaBodyEl}
       {/* Telefon začíná úkolem, ne ovládáním (audit kola 6, Z3): dřív Segmented, souhrn dne,
           hledání s Filtry a pás záložek — první úkol na y=427 z 844. Teď jeden řádek
           Seznam/Týden/Měsíc · lupa · Filtry · n; souhrn dne je až od md (po termínu je hned
@@ -325,6 +327,11 @@ export default function Tasks({ user }: Props) {
             kompaktniNaTelefonu pilulkyNaTelefonu={tasks.length > 8} vlevoNaTelefonu={prepinac} />
         : <div className="md:hidden">{prepinac}</div>}
       {saveErr && <p className="note note-danger text-sm" role="alert">{saveErr}</p>}
+      {/* Telefon (v3): „Za body navíc" až pod jedinou řadou ovládání — přepínač pohledu
+          s lupou a Filtry stojí hned pod nadpisem, ne v půlce obrazovky pod kartou nabídky,
+          kde působil jako druhá lišta. Od md je přepínač pohledu v hlavičce a řádek nad
+          seznamem jsou jen jeho filtry — tam nabídka zůstává nad nimi, filtry u seznamu. */}
+      {naTelefonu && sekceZaBodyEl}
       {data.error && !data.data ? (
         <Card><ErrorState title={t('Úkoly se nenačetly')} onRetry={data.reload} detail={data.error} /></Card>
       ) : data.loading ? (

@@ -77,14 +77,18 @@ if (await prepinac.count() > 0) {
   tvrdi('„Otevřít" přepne přes server na teamId=2', !!sw && /"teamId":\s*2/.test(sw.body ?? ''), JSON.stringify(sw));
 }
 
-await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'networkidle' });
+// networkidle v CI občas nedoběhne do 30 s (pomalý runner) — stačí načtená stránka a pak čekat na obsah.
+await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.locator('main').getByText(/moje kavárny/i).first().waitFor({ timeout: 30000 }).catch(() => {});
 await p.waitForTimeout(1500);
 const m3 = norm(await p.locator('main').innerText());
 tvrdi('hluboký odkaz ?view=org otevře přehled', m3.includes('tržby celkem') && m3.includes('moje kavárny'), m3.slice(0, 160));
 
 // Vypnuto v nastavení → přehled to přizná, nevymýšlí čísla
 await ctx.route('**/api/organization/overview**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ available: false, reason: 'vypnuto', message: 'Přehled za všechny podniky je v nastavení organizace vypnutý.' }) }));
-await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'networkidle' });
+// networkidle v CI občas nedoběhne do 30 s (pomalý runner) — stačí načtená stránka a pak čekat na obsah.
+await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.locator('main').getByText(/moje kavárny/i).first().waitFor({ timeout: 30000 }).catch(() => {});
 await p.waitForTimeout(1500);
 const m4 = norm(await p.locator('main').innerText());
 tvrdi('vypnutý přehled řekne proč a kde se zapíná', m4.includes('vypnutý') && m4.includes('nastavení › organizace'), m4.slice(0, 200));
