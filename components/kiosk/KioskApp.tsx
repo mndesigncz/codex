@@ -69,7 +69,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center p-6">
         <div className="glass-card p-10 max-w-md text-center space-y-3">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="lock" size={28} /></div>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-black/[0.05] text-black/50"><Icon name="lock" size={28} /></div>
           <div className="flex items-center justify-center gap-2">
             <h1 className="text-xl font-bold tracking-tight text-[#16181A]">{t('Kiosk režim')}</h1>
             <ProBadge />
@@ -264,7 +264,10 @@ function KioskShell({ user }: { user: KioskUser }) {
         </div>
       </header>
 
-      {/* Tabs — big touch targets for a shared tablet */}
+      {/* Tabs — big touch targets for a shared tablet. v3: nevybraná záložka je šedá
+          pilulka (btn-secondary — `.glass` na <button> přebíjí preflight a záložky pak
+          vypadaly jako holý text), vybraná inkoustová jako výběr v navigaci; limetka
+          zůstává hlavní akci obrazovky. Velikost 48 px pro prst u baru beze změny. */}
       {/* Na tabletu se záložky zalomí místo scrollování: 882 px pásu se do
           712 px nevešlo a poslední („Uzávěrka") byla uříznutá bez jakéhokoli
           náznaku, že tam ještě něco je. U baru se nehledá posuvník. */}
@@ -275,7 +278,7 @@ function KioskShell({ user }: { user: KioskUser }) {
           <button key={t.id} type="button" onClick={() => setTab(t.id)}
             aria-current={tab === t.id ? 'page' : undefined}
             className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
-              tab === t.id ? 'seg-on' : 'seg-off glass'
+              tab === t.id ? 'seg-on' : 'btn-secondary'
             }`}>
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {nazevZalozky(t.id)}
@@ -489,7 +492,7 @@ function WhoFirst({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-1 flex items-start justify-center pt-10 pb-10">
       <div className="card w-full max-w-lg p-8 text-center">
-        <div className="mx-auto h-16 w-16 rounded-3xl bg-wait/20 text-wait-ink grid place-items-center">
+        <div className="mx-auto h-16 w-16 rounded-full bg-black/[0.05] text-black/50 grid place-items-center">
           <Icon name="user" size={30} />
         </div>
         <h2 className="t-page mt-5">{t('Kdo teď u tabletu stojí?')}</h2>
