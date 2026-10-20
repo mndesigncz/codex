@@ -67,7 +67,7 @@ export default function KartickyHosta() {
       {karty.length === 0 && <h2 id="h-plastove" className="sr-only">{t('Plastové karty')}</h2>}
 
       {!otevreno ? (
-        <Button size="sm" variant="secondary" icon="card" aria-expanded={false} onClick={() => { setOtevreno(true); setErr(''); }}>{t('Mám plastovou kartu')}</Button>
+        <Button variant="secondary" icon="card" className="w-full" aria-expanded={false} onClick={() => { setOtevreno(true); setErr(''); }}>{t('Mám plastovou kartu')}</Button>
       ) : (
         <form onSubmit={pripoj} className="card p-4 sm:p-5 space-y-3 max-w-xl" noValidate>
           <div>

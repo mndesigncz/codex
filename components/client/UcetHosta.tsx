@@ -133,7 +133,7 @@ export default function UcetHosta({ novinky, novinkyEmail = true, onFlash }: { n
 
   return (
     <section id="ucet" aria-labelledby="h-ucet-hosta" className="card p-4 sm:p-5 scroll-mt-24">
-      <h2 id="h-ucet-hosta" className="text-lg font-bold tracking-tight">{t('Oznámení a soukromí')}</h2>
+      <h2 id="h-ucet-hosta" className="t-section">{t('Oznámení a soukromí')}</h2>
       {nativni && (
         <ul className="list mt-2">
           <SwitchRow title={t('Upozornění v telefonu')} checked={pushZapnut} onChange={zmenPush}

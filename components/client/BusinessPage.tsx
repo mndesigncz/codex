@@ -108,30 +108,21 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <section className={`relative overflow-hidden rounded-3xl border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'glass-card'} min-h-[13rem] sm:min-h-[16rem] flex flex-col justify-end p-5 sm:p-7`}>
-        {b.coverUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        )}
-        {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/90 via-[#16181A]/35 to-[#16181A]/5" />}
-        {!b.coverUrl && (
-          <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none" aria-hidden>
-            <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full blur-3xl" style={{ background: accent, opacity: 0.22 }} />
-            <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-[#0A84FF]/10 blur-3xl" />
-          </div>
-        )}
-        <div className={`relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end ${b.coverUrl ? 'text-white' : ''}`}>
-          <div className="min-w-0 flex items-start gap-4">
+      {/* v3: hlavička podniku. S fotkou zůstává fotka přes šířku (ztmavení je kvůli čitelnosti, ne ozdoba);
+          bez fotky leží název přímo na plátně — žádná karta s barevnými světly v rozích. */}
+      {(() => {
+        const nazev = (
+          <div className={`min-w-0 flex items-start gap-4 ${b.coverUrl ? 'text-white' : ''}`}>
             {b.logoUrl ? (
-              <span className="hidden sm:grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white shadow-lg overflow-hidden mt-1">
+              <span className={`grid h-14 w-14 sm:h-20 sm:w-20 shrink-0 place-items-center rounded-2xl bg-white overflow-hidden ${b.coverUrl ? '' : 'border border-black/[0.07]'}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={b.logoUrl} alt="" className="h-full w-full object-contain p-2" />
               </span>
-            ) : !b.coverUrl ? <span className="hidden sm:block mt-1"><Initials name={b.name} size={64} /></span> : null}
+            ) : !b.coverUrl ? <span className="shrink-0 mt-0.5"><Initials name={b.name} size={56} /></span> : null}
             <div className="min-w-0">
-              <h1 className="text-3xl sm:text-[2.6rem] font-bold tracking-tighter leading-[1.02] text-balance">{b.name}</h1>
-              {b.tagline && <p className={`mt-1.5 text-base sm:text-lg leading-snug text-pretty max-w-[40ch] ${b.coverUrl ? 'text-white/85' : 'text-black/65'}`}>{b.tagline}</p>}
-              <p className={`mt-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1 ${b.coverUrl ? 'text-white/75' : 'text-black/55'}`}>
+              <h1 className={`t-page sm:text-[2.6rem] sm:leading-[1.02] text-balance break-words ${b.coverUrl ? '!text-white' : ''}`}>{b.name}</h1>
+              {b.tagline && <p className={`mt-1.5 text-[15px] sm:text-lg leading-snug text-pretty max-w-[40ch] ${b.coverUrl ? 'text-white/85' : 'text-black/60'}`}>{b.tagline}</p>}
+              <p className={`mt-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1 ${b.coverUrl ? 'text-white/80' : 'text-black/55'}`}>
                 <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={15} />{t('Dnes {hodiny}', { hodiny: hoursLabel(b.hours, today, cs => t(cs)) })}</span>
                 {/* Adresu píše podnik: dlouhé slovo bez mezer jinak přeteče přes okraj (rodič má overflow-hidden a text uřízne). */}
                 {b.address && <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full"><Icon name="location" size={15} className="shrink-0" /><span className="min-w-0 break-words">{b.address}</span></span>}
@@ -144,32 +135,45 @@ export default function BusinessPage({ slug }: { slug: string }) {
                   různé věci. Zůstává jedna nabídka a jedna hlavní akce. */}
             </div>
           </div>
-          <div className="shrink-0">
-            {me?.member ? (
-              <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : ''}`}
-                style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
-                <p className="text-[11px] uppercase tracking-wider opacity-70">{t(me.levelLabel ?? 'Člen')}{me.discount > 0 ? ` · ${me.discountSource === 'skupina' && me.discountName ? t('sleva {n} % ({skupina})', { n: me.discount, skupina: me.discountName }) : t('sleva {n} %', { n: me.discount })}` : ''}</p>
-                <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} {b.stampTarget > 0 && !(me.campaigns?.length) && <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget })}</span>}</p>
-                {me.expiring && <p className="text-[11px] font-semibold leading-snug">{t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: me.expiring.points, kdy: denKratce(me.expiring.till) })}</p>}
-                {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</p>}
-                {me.creditExpiring && <p className="text-[11px] font-semibold leading-snug">{t('Kredit {castka} propadne do {kdy}', { castka: formatMoney(me.creditExpiring.amount, b.currency), kdy: denKratce(me.creditExpiring.till) })}</p>}
-                {me.levelDegraded && <p className="text-[11px] opacity-70 leading-snug">{t('Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.')}</p>}
-                {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{me.nextTierUnit === 'spend' ? t('do „{level}“ ještě {castka}', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) }) : t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
-              </div>
-            ) : (
-              <div className="grid gap-1.5" data-vstup-clenstvi>
-                <button type="button" onClick={join} disabled={joining} className="tap-target w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-60 transition"
-                  style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> {t('Stát se členem')}</button>
-                {/* Souhlas s novinkami je dobrovolný a po podnicích: výchozí NE, jde změnit v profilu. */}
-                <label className={`min-h-[44px] inline-flex items-center gap-2.5 text-sm cursor-pointer select-none ${b.coverUrl ? 'text-white/90' : 'text-black/70'}`}>
-                  <input type="checkbox" checked={chciNovinky} onChange={e => setChciNovinky(e.target.checked)} className="h-5 w-5 shrink-0 accent-[#16181A]" />
-                  <span className="min-w-0 break-words">{t('Chci novinky od {podnik}', { podnik: b.name })}</span>
-                </label>
-              </div>
-            )}
+        );
+        return b.coverUrl ? (
+          <section className="relative overflow-hidden rounded-3xl bg-[#16181A] min-h-[14rem] sm:min-h-[18rem] flex flex-col justify-end p-5 sm:p-7">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/90 via-[#16181A]/35 to-[#16181A]/5" />
+            <div className="relative">{nazev}</div>
+          </section>
+        ) : <section>{nazev}</section>;
+      })()}
+
+      {/* Členství: body jsou hlavní číslo stránky (velké, tabulkové), úroveň a sleva štítkem větou.
+          Nečlen tu má jedinou hlavní akci obrazovky — v barvě podniku. */}
+      {me?.member ? (
+        <section className="card p-5 sm:p-6 md:max-w-md flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <p className="t-label">{t(me.levelLabel ?? 'Člen')}{me.discount > 0 ? ` · ${me.discountSource === 'skupina' && me.discountName ? t('sleva {n} % ({skupina})', { n: me.discount, skupina: me.discountName }) : t('sleva {n} %', { n: me.discount })}` : ''}</p>
+            <p className="mt-1 text-[2.5rem] font-bold tracking-[-0.03em] tabular-nums leading-none">{me.points}<span className="stat-jednotka ml-1 font-semibold text-black/50">{t('b.')}</span></p>
+            {me.expiring && <p className="mt-2 text-xs font-semibold text-wait-ink leading-snug">{t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: me.expiring.points, kdy: denKratce(me.expiring.till) })}</p>}
+            {me.levelDegraded && <p className="mt-1 t-meta">{t('Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.')}</p>}
+            {me.nextTierAt && <p className="mt-1 t-meta">{me.nextTierUnit === 'spend' ? t('do „{level}“ ještě {castka}', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) }) : t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
           </div>
+          <div className="text-right space-y-0.5">
+            {b.stampTarget > 0 && !(me.campaigns?.length) && <p className="text-sm font-semibold tabular-nums">{t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget })}</p>}
+            {me.credit > 0 && <p className="text-sm font-semibold tabular-nums">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</p>}
+            {me.creditExpiring && <p className="text-xs font-semibold text-wait-ink leading-snug">{t('Kredit {castka} propadne do {kdy}', { castka: formatMoney(me.creditExpiring.amount, b.currency), kdy: denKratce(me.creditExpiring.till) })}</p>}
+          </div>
+        </section>
+      ) : (
+        <div className="grid gap-1.5 sm:max-w-sm" data-vstup-clenstvi>
+          <button type="button" onClick={join} disabled={joining} className="tap-target btn btn-lg w-full sm:w-auto disabled:opacity-60"
+            style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> {t('Stát se členem')}</button>
+          {/* Souhlas s novinkami je dobrovolný a po podnicích: výchozí NE, jde změnit v profilu. */}
+          <label className="min-h-[44px] inline-flex items-center gap-2.5 text-sm cursor-pointer select-none text-black/70">
+            <input type="checkbox" checked={chciNovinky} onChange={e => setChciNovinky(e.target.checked)} className="h-5 w-5 shrink-0 accent-[#16181A]" />
+            <span className="min-w-0 break-words">{t('Chci novinky od {podnik}', { podnik: b.name })}</span>
+          </label>
         </div>
-      </section>
+      )}
 
       {/* Promo bannery podniku: akce a oznámení (data podniku, nepřekládají se). */}
       {(d.banners?.length ?? 0) > 0 && <PromoBanners banners={d.banners} accent={accent} loyaltyOn={!!b.loyaltyOn} onGoTab={setTab} slug={slug} />}
@@ -177,7 +181,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
       {/* Běžící bonusová akce („Dnes dvojnásobné body do 18:00"): název akce je data podniku, věta jde přes t(). */}
       {d.bonus && b.loyaltyOn && <BonusPruh bonus={d.bonus} accent={accent} />}
 
-      {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
+      {flash && <p role="status" className="toast-in note note-ok">{flash}</p>}
 
       {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} ariaLabel={t('Části stránky podniku')} />}
 
@@ -202,10 +206,10 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
   return (
     <div className="space-y-8">
       {(gallery?.length ?? 0) > 0 && (
-        <section aria-label={t('Fotky z podniku')} className="-mx-4 sm:mx-0">
+        <section aria-label={t('Fotky z podniku')} className="-mx-4 min-[360px]:-mx-5 sm:mx-0">
           {/* Pás fotek: na telefonu se posouvá prstem, na monitoru se zarovná
               do mřížky. První fotka je větší — podnik má čím začít. */}
-          <ul className="flex gap-2.5 overflow-x-auto px-4 sm:px-0 sm:grid sm:grid-cols-4 scrollbar-thin snap-x">
+          <ul className="flex gap-2.5 overflow-x-auto px-4 min-[360px]:px-5 sm:px-0 sm:grid sm:grid-cols-4 scrollbar-thin snap-x">
             {gallery!.slice(0, 8).map((g, i) => (
               <li key={g} className={`shrink-0 snap-start rounded-2xl overflow-hidden border border-black/[0.06] ${i === 0 ? 'w-64 sm:w-auto sm:col-span-2 sm:row-span-2 aspect-[4/3]' : 'w-40 sm:w-auto aspect-square'}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -218,19 +222,19 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
 
       {(events?.length ?? 0) > 0 && (
         <section aria-labelledby="h-events">
-          <h2 id="h-events" className="text-lg font-bold tracking-tight mb-3">{t('Co se u nás chystá')}</h2>
+          <h2 id="h-events" className="t-section mb-3">{t('Co se u nás chystá')}</h2>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {events!.map((e: any) => (
               <li key={e.id}>
                 <button type="button" onClick={() => setEvDetail(e)}
-                  className="w-full text-left card p-4 flex gap-3.5 hover:bg-white/80 active:scale-[0.99] transition">
+                  className="w-full text-left card p-4 flex gap-3.5 active:scale-[0.99] transition">
                   {e.photos?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={e.photos[0]} alt="" className="shrink-0 h-14 w-14 rounded-2xl object-cover" />
                   ) : (
-                    <span className="shrink-0 grid place-items-center rounded-2xl h-14 w-14 text-center leading-none" style={{ background: `${ac}26` }}>
+                    <span className="shrink-0 grid place-items-center content-center rounded-2xl h-14 w-14 text-center leading-none bg-black/[0.05]">
                       <span className="block text-lg font-bold tabular-nums">{Number(String(e.date).slice(8, 10))}</span>
-                      <span className="block text-[11px] uppercase tracking-wider text-black/50 mt-0.5">{fmtMesic(Number(String(e.date).slice(5, 7)), { jazyk, styl: 'kratky' })}</span>
+                      <span className="block text-[11px] font-medium text-black/55 mt-0.5">{fmtMesic(Number(String(e.date).slice(5, 7)), { jazyk, styl: 'kratky' })}</span>
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
@@ -238,7 +242,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
                     <p className="text-xs text-black/55 mt-0.5 cz-sentence">{fmtDatum(e.date, { jazyk, styl: 'denDlouze' })}{e.start_time ? ` · ${e.start_time}` : ''}{e.location ? ` · ${e.location}` : ''}</p>
                     {e.description && <p className="text-sm text-black/65 mt-1 line-clamp-2 text-pretty">{e.description}</p>}
                     {(e.going > 0 || e.capacity) && (
-                      <p className="text-[11px] text-black/45 mt-1">{e.going > 0 ? t('✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}', { n: e.going }) : ''}{e.going > 0 && e.capacity ? ' · ' : ''}{e.capacity ? t('kapacita {n}', { n: e.capacity }) : ''}</p>
+                      <p className="text-xs text-black/50 mt-1">{e.going > 0 ? t('✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}', { n: e.going }) : ''}{e.going > 0 && e.capacity ? ' · ' : ''}{e.capacity ? t('kapacita {n}', { n: e.capacity }) : ''}</p>
                     )}
                   </div>
                   <Icon name="chevron" size={16} className="shrink-0 self-center -rotate-90 text-black/30" />
@@ -257,9 +261,9 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
             <h2 className="t-section mb-2">{s.title}</h2>
             <ul className="divide-y divide-black/[0.06]">
               {s.items.map((it: any) => (
-                <li key={it.id} className={`py-2.5 flex items-baseline gap-3 ${it.soldOut ? 'opacity-50' : ''}`}>
+                <li key={it.id} className={`py-3 flex items-baseline gap-3 ${it.soldOut ? 'opacity-50' : ''}`}>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium leading-tight">{it.name}{it.soldOut && <span className="ml-2 text-[11px] uppercase tracking-wider text-black/50">{t('vyprodáno')}</span>}</p>
+                    <p className="text-[15px] font-medium leading-tight">{it.name}{it.soldOut && <span className="ml-2 chip chip-sm chip-muted align-middle">{t('vyprodáno')}</span>}</p>
                     {it.description && <p className="text-sm text-black/55 mt-0.5 text-pretty">{it.description}</p>}
                     {/* Alergeny jen u položek, kde je podnik vyplnil: prázdné neznamená „bez alergenů“. */}
                     {Array.isArray(it.alergeny) && it.alergeny.length > 0 && <p className="text-xs text-black/55 mt-0.5"><span className="font-semibold">{t('Alergeny')}:</span> {it.alergeny.join(', ')}</p>}
@@ -280,13 +284,13 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
         )}
       </div>
       <aside className="space-y-5 md:sticky md:top-24">
-        {tagline && <p className="text-base font-semibold tracking-tight text-pretty">{tagline}</p>}
+        {tagline && <p className="t-card text-pretty">{tagline}</p>}
         {description && <p className="text-sm text-black/65 leading-relaxed text-pretty">{description}</p>}
         {address && <p className="text-sm text-black/65 inline-flex items-center gap-1.5 max-w-full"><Icon name="location" size={15} className="text-black/45 shrink-0" /><span className="min-w-0 break-words">{address}</span></p>}
         <div>
           {(news?.length ?? 0) > 0 && (
             <div className="mb-5">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Novinky')}</p>
+              <h2 className="t-card mb-2">{t('Novinky')}</h2>
               <ul className="space-y-3">
                 {news!.map((n: any) => (
                   <li key={n.id}>
@@ -298,7 +302,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
               </ul>
             </div>
           )}
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Otevírací doba')}</p>
+          <h2 className="t-card mb-1">{t('Otevírací doba')}</h2>
           <ul className="text-sm divide-y divide-black/[0.06]">
             {[0, 1, 2, 3, 4, 5, 6].map(i => {
               const n = fmtDenVTydnu(i, { jazyk, styl: 'dlouhy' });
@@ -423,9 +427,9 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
           <div className="grid gap-2">
             <label htmlFor="r-party" className={label}>{t('Kolik vás bude')}</label>
             <div className="flex items-center gap-2">
-              <button type="button" aria-label={t('Méně')} onClick={() => setParty(p => Math.max(1, p - 1))} className="tap-target h-11 w-11 rounded-full glass border border-black/10 grid place-items-center hover:bg-black/[0.05] active:scale-95 transition"><span className="text-lg leading-none">−</span></button>
+              <button type="button" aria-label={t('Méně')} onClick={() => setParty(p => Math.max(1, p - 1))} className="btn-icon !h-11 !w-11"><Icon name="minus" size={18} /></button>
               <input id="r-party" type="number" min={1} max={b.maxParty} value={party} onChange={e => setParty(Math.max(1, Math.min(b.maxParty, parseInt(e.target.value || '1', 10))))} className={`${input} text-center tabular-nums !w-20`} />
-              <button type="button" aria-label={t('Více')} onClick={() => setParty(p => Math.min(b.maxParty, p + 1))} className="tap-target h-11 w-11 rounded-full glass border border-black/10 grid place-items-center hover:bg-black/[0.05] active:scale-95 transition"><span className="text-lg leading-none">+</span></button>
+              <button type="button" aria-label={t('Více')} onClick={() => setParty(p => Math.min(b.maxParty, p + 1))} className="btn-icon !h-11 !w-11"><Icon name="plus" size={18} /></button>
             </div>
             <p className="text-xs text-black/45">{t('Nejvíc {n} u jedné rezervace.', { n: b.maxParty })}</p>
           </div>
@@ -435,36 +439,36 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
           </div>
         </div>
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-        <button type="submit" disabled={busy || !slots.length} className={btnPrimary}>
+        <button type="submit" disabled={busy || !slots.length} className={`${btnPrimary} btn-lg w-full`}>
           <Icon name="calendarCheck" size={16} /> {busy ? t('Odesílám…') : signedIn ? t('Odeslat rezervaci') : t('Přihlásit se a rezervovat')}
         </button>
       </form>
       <aside>
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Moje rezervace tady')}</h3>
+        <h3 className="t-card mb-1">{t('Moje rezervace tady')}</h3>
         {me?.reservations?.length ? (
-          <ul className="divide-y divide-black/[0.06]">
+          <ul className="list">
             {me.reservations.map((r: any) => {
               const st = RES_STATUS[r.status] ?? RES_STATUS.requested;
               const potvrzeno = !!r.guest_confirmed_at || !!potvrzene[r.id];
               const zvyraznit = zPripominky === r.id;
               return (
-                <li key={r.id} id={`rezervace-${r.id}`} className={`py-3 flex items-start gap-3 flex-wrap ${zvyraznit ? '-mx-2 px-2 rounded-2xl bg-[#C8F542]/15' : ''}`}>
+                <li key={r.id} id={`rezervace-${r.id}`} className={`py-3.5 flex items-start gap-3 flex-wrap ${zvyraznit ? '-mx-3 px-3 rounded-2xl bg-black/[0.045]' : ''}`}>
                   <div className="min-w-0 flex-1 basis-40">
                     <p className="font-semibold cz-sentence">{fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} <span className="text-black/50 font-medium">· {r.time}</span></p>
                     <p className="text-sm text-black/55">{t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: r.party })}{r.note ? ` · ${r.note}` : ''}</p>
-                    <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{t(st.label)}</span>
+                    <span className={`chip chip-sm mt-1.5 ${st.tone === 'ok' ? 'chip-ok' : st.tone === 'wait' ? 'chip-wait' : 'chip-muted'}`}>{st.tone === 'ok' && <Icon name="check" size={11} />}{t(st.label)}</span>
                     {zvyraznit && !potvrzeno && r.status === 'confirmed' && <p className="text-xs text-black/60 mt-1">{t('Dorazíš? Potvrď, nebo rezervaci zruš — uvolníš místo jiným.')}</p>}
                   </div>
                   {['requested', 'confirmed'].includes(r.status) && (
                     <div className="flex items-center gap-2 shrink-0 ml-auto">
                       {r.status === 'confirmed' && (potvrzeno
-                        ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#3E5406]"><Icon name="check" size={14} />{t('Potvrzeno tebou')}</span>
+                        ? <span className="chip chip-ok"><Icon name="check" size={13} />{t('Potvrzeno tebou')}</span>
                         : <button type="button" onClick={() => { void potvrdit(r.id); }} disabled={potvrzuji === r.id}
                             className="tap-target inline-flex items-center gap-1.5 btn btn-primary btn-sm active:scale-[0.98] disabled:opacity-50 transition"
                             aria-label={t('Potvrdit rezervaci {kdy}', { kdy: `${fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} ${r.time}` })}>
                             <Icon name="check" size={14} />{potvrzuji === r.id ? '…' : t('Potvrdit', undefined, 'rezervace')}
                           </button>)}
-                      <button onClick={() => setZrusitId(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">{t('Zrušit', undefined, 'rezervace')}</button>
+                      <button type="button" onClick={() => setZrusitId(r.id)} className="tap-target btn btn-secondary btn-sm shrink-0">{t('Zrušit', undefined, 'rezervace')}</button>
                     </div>
                   )}
                 </li>
@@ -473,12 +477,14 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
           </ul>
         ) : <p className="text-sm text-black/55">{t('Zatím žádná. První je hned vlevo.')}</p>}
       </aside>
+      {/* v3: velký titulek, jedna věta pod ním, dvě pilulky přes šířku; nevratný krok plně červený. */}
       <Modal open={zrusitId !== null} onClose={() => setZrusitId(null)} size="sm" title={t('Zrušit rezervaci?')}
+        subtitle={t('Podnik se o zrušení dozví a termín se uvolní.')}
         footer={<>
           <Button variant="secondary" onClick={() => setZrusitId(null)}>{t('Ponechat')}</Button>
-          <Button variant="danger" onClick={() => { if (zrusitId !== null) void cancel(zrusitId); }}>{t('Zrušit rezervaci')}</Button>
+          <Button variant="danger-solid" onClick={() => { if (zrusitId !== null) void cancel(zrusitId); }}>{t('Zrušit rezervaci')}</Button>
         </>}>
-        <p className="text-sm text-black/65">{t('Podnik se o zrušení dozví a termín se uvolní.')}</p>
+        {null}
       </Modal>
     </div>
   );
@@ -508,10 +514,10 @@ function BonusPruh({ bonus, accent }: { bonus: { name: string; multiplier: numbe
   }
   if (!radky.length) return null;
   return (
-    <section aria-label={bonus.name} className="rounded-2xl px-4 py-3 flex items-start gap-3 min-w-0" style={{ background: `${accent}22`, border: `1px solid ${accent}66` }}>
-      <Icon name="gift" size={18} className="shrink-0 mt-0.5" />
+    <section aria-label={bonus.name} className="card px-4 py-3.5 flex items-start gap-3 min-w-0">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.05] text-black/70" aria-hidden><Icon name="gift" size={17} /></span>
       <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wider opacity-70 break-words">{bonus.name}</p>
+        <p className="t-label break-words">{bonus.name}</p>
         {radky.map(r => <p key={r} className="text-sm font-semibold leading-snug text-pretty">{r}</p>)}
       </div>
     </section>
@@ -579,7 +585,7 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
                 </div>
                 <div className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(target, 10)}, minmax(0, 1fr))` }} aria-hidden>
                   {Array.from({ length: target }).map((_, i) => (
-                    <span key={i} className={`h-8 rounded-lg border ${i < me.stamps ? 'bg-[#C8F542] border-[#C8F542]' : 'bg-white/60 border-black/[0.08]'}`} />
+                    <span key={i} className={`h-8 rounded-[10px] ${i < me.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.06]'}`} />
                   ))}
                 </div>
                 <p className="mt-2 text-xs text-black/55">{t('Za {n, plural, one {# návštěvu} few {# návštěvy} other {# návštěv}}:', { n: target })} <strong className="text-black/80">{b.stampReward || t('odměna')}</strong>. {t('Razítko přibude, když podnik uzavře tvoji rezervaci nebo objednávku.')}</p>
@@ -588,7 +594,7 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
             <SkonceneKarticky list={me.endedCampaigns ?? []} />
             <div className="mt-5 flex items-baseline justify-between gap-3 border-t border-black/[0.06] pt-4">
               <p className="text-sm text-black/60">{t('Body')}</p>
-              <p className="text-2xl font-bold tabular-nums">{me.points}</p>
+              <p className="text-[1.75rem] font-bold tracking-[-0.02em] tabular-nums leading-none">{me.points}</p>
             </div>
             <p className="text-xs text-black/55 mt-1">{t('{body} bodů za každých {castka} útraty od stolu. Body jsou na kupony vpravo.', { body: b.pointsPer100, castka: formatMoney(100, b.currency) })}</p>
             {b.cashbackPct > 0 && (
@@ -597,11 +603,11 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
                   <p className="text-sm text-black/60">{t('Kredit')}</p>
                   <p className="text-xs text-black/55 mt-0.5">{t('{n} % z každé útraty se vrací jako kredit. Obsluha ho odečte u kasy.', { n: b.cashbackPct })}</p>
                 </div>
-                <p className="text-2xl font-bold tabular-nums shrink-0">{formatMoney(me.credit ?? 0, b.currency)}</p>
+                <p className="text-[1.75rem] font-bold tracking-[-0.02em] tabular-nums leading-none shrink-0">{formatMoney(me.credit ?? 0, b.currency)}</p>
               </div>
             )}
             {me.discount > 0 && (
-              <p className="mt-4 rounded-2xl bg-[#16181A] text-[#C8F542] px-3.5 py-2.5 text-sm font-semibold">
+              <p className="mt-4 well px-4 py-3 text-sm font-medium text-pretty">
                 {me.discountSource === 'skupina' && me.discountName
                   ? t('Jako člen skupiny „{skupina}“ máš u nás slevu {n} %.', { skupina: me.discountName, n: me.discount })
                   : t('Jako „{level}“ máš u nás slevu {n} %.', { level: t(me.levelLabel), n: me.discount })}
@@ -612,19 +618,19 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
             )}
             {me.claims?.length > 0 && (
               <div className="mt-5 border-t border-black/[0.06] pt-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Kupony k uplatnění')}</p>
-                <ul className="space-y-2">
+                <h3 className="t-card">{t('Kupony k uplatnění')}</h3>
+                <p className="t-meta mt-0.5">{t('Kód ukaž obsluze u kasy.')}</p>
+                <ul className="list mt-1">
                   {me.claims.map((c: any) => (
-                    <li key={c.id} className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-3.5 py-2.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-medium min-w-0 truncate">{c.title}</span>
-                        <span className="font-mono font-bold tracking-widest text-sm shrink-0">{c.code}</span>
+                    <li key={c.id} className="list-row">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[15px] font-medium leading-tight truncate">{c.title}</p>
+                        <PlatnostKuponu validUntil={c.valid_until} today={today} className="block t-meta mt-0.5" />
                       </div>
-                      <PlatnostKuponu validUntil={c.valid_until} today={today} className="block text-xs mt-0.5" />
+                      <span className="font-mono font-bold tracking-[0.14em] text-[15px] shrink-0 rounded-[10px] bg-black/[0.05] px-3 py-1.5">{c.code}</span>
                     </li>
                   ))}
                 </ul>
-                <p className="text-xs text-black/50 mt-2">{t('Kód ukaž obsluze u kasy.')}</p>
               </div>
             )}
             {signedIn && <HostHistorie slug={slug} className="mt-5 border-t border-black/[0.06] pt-4" />}
@@ -635,7 +641,7 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
             {campaigns.length > 0 && (
               <ul className="mt-4 space-y-3">
                 {campaigns.map((cp: any) => (
-                  <li key={cp.id} className="well bg-white px-4 py-3"><KartaRazitek karta={cp} clen={false} /></li>
+                  <li key={cp.id} className="well px-4 py-3"><KartaRazitek karta={cp} clen={false} /></li>
                 ))}
               </ul>
             )}
@@ -645,8 +651,8 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
         <form onSubmit={usePromo} className="mt-5 border-t border-black/[0.06] pt-4">
           <label htmlFor="promo-code" className={label}>{t('Máš promo kód?')}</label>
           <div className="flex gap-2">
-            <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder={t('Z letáku nebo účtenky')} autoComplete="off" className={`${input} font-mono tracking-widest flex-1 min-w-0`} />
-            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : t('Uplatnit')}</button>
+            <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder={t('Z letáku nebo účtenky')} autoComplete="off" className={`${input} font-mono tracking-widest placeholder:font-sans placeholder:tracking-normal flex-1 min-w-0`} />
+            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 btn btn-secondary disabled:opacity-50">{promoBusy ? '…' : t('Uplatnit')}</button>
           </div>
           {promoErr && <p role="alert" className="mt-2 text-sm text-bad-ink">{promoErr}</p>}
         </form>
@@ -656,15 +662,15 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
         <h2 className="t-section mb-3">{t('Kupony za body')}</h2>
         {err && <p role="alert" className="mb-3 note note-danger text-sm px-3 py-2">{err}</p>}
         {coupons?.length ? (
-          <ul className="divide-y divide-black/[0.06]">
+          <ul className="card list px-4 sm:px-5">
             {coupons.map((c: any) => {
               const can = me?.member && me.points >= Number(c.cost_points) && !c.blocked;
               return (
-                <li key={c.id} id={`kupon-${c.id}`} className={`py-3.5 flex items-center gap-4 ${c.blocked ? 'opacity-60' : ''}`}>
+                <li key={c.id} id={`kupon-${c.id}`} className={`list-row !py-4 !gap-4 ${c.blocked ? 'opacity-60' : ''}`}>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold">
+                    <p className="text-[15px] font-semibold leading-snug">
                       {c.title}
-                      {c.benefit && <span className="ml-2 rounded-full bg-[#C8F542]/25 text-[#3E5406] px-2 py-0.5 text-[11px] font-bold align-middle whitespace-nowrap">{c.benefit}</span>}
+                      {c.benefit && <span className="ml-2 chip chip-sm chip-ok align-middle">{c.benefit}</span>}
                     </p>
                     {c.description && <p className="text-sm text-black/55 text-pretty">{c.description}</p>}
                     {(c.badges?.length > 0 || c.valid_until) && (
@@ -676,9 +682,9 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
                     {c.blocked && <p className="text-xs text-wait-ink mt-0.5">{c.blocked}</p>}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold tabular-nums">{Number(c.cost_points) === 0 ? t('zdarma') : t('{n} b.', { n: c.cost_points })}</p>
-                    <button onClick={() => claim(c.id)} disabled={busy === c.id || (signedIn && me?.member && !can)}
-                      className="tap-target-sm mt-1 btn btn-primary btn-sm active:scale-[0.97] disabled:opacity-40 transition">
+                    <p className="text-[15px] font-bold tabular-nums">{Number(c.cost_points) === 0 ? t('zdarma') : t('{n} b.', { n: c.cost_points })}</p>
+                    <button type="button" onClick={() => claim(c.id)} disabled={busy === c.id || (signedIn && me?.member && !can)}
+                      className="tap-target mt-1.5 btn btn-secondary btn-sm disabled:opacity-40">
                       {busy === c.id ? '…' : t('Vzít')}
                     </button>
                   </div>
@@ -771,7 +777,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
           {qrTable ? (
             <>
               <p className={label}>{t('Kde sedíš')}</p>
-              <p className="text-lg font-bold tracking-tight flex items-center gap-2"><span className="rounded-lg bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-sm">{qrTable.name}</span><span className="text-sm font-medium text-black/50">{t('podle QR na stole')}</span></p>
+              <p className="flex items-center gap-2 flex-wrap"><span className="chip chip-ink">{qrTable.name}</span><span className="t-meta">{t('podle QR na stole')}</span></p>
               <TableMap tables={tables} plan={plan} selectedId={qrTable.id} caption={t('Tvůj stůl na plánku podniku.')} />
             </>
           ) : qrOnly ? (
@@ -795,7 +801,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
             </>
           )}
           {geoMode !== 'off' && (!qrOnly || token) && (
-            <p className={`text-xs flex items-center gap-1.5 ${geo.status === 'ok' ? 'text-[#3E5406]' : geo.status === 'denied' ? (geoMode === 'block' ? 'text-bad-ink' : 'text-wait-ink') : 'text-black/50'}`}>
+            <p className={`text-xs flex items-center gap-1.5 ${geo.status === 'ok' ? 'text-ok-ink' : geo.status === 'denied' ? (geoMode === 'block' ? 'text-bad-ink' : 'text-wait-ink') : 'text-black/50'}`}>
               <Icon name="location" size={13} />
               {geo.status === 'ok' ? t('Poloha ověřena.') : geo.status === 'asking' || geo.status === 'idle' ? t('Ověřujeme, že sedíš u stolu…')
                 : geoMode === 'block' ? t('Bez polohy objednat nejde. Povol ji v prohlížeči.') : t('Bez polohy objednávku nejdřív potvrdí obsluha.')}
@@ -810,23 +816,23 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
               if (!list.length) return null;
               return (
                 <section key={s.id}>
-                  <h2 className="text-base font-bold tracking-tight mb-1">{s.title}</h2>
-                  <ul className="divide-y divide-black/[0.06]">
+                  <h2 className="t-section mb-1">{s.title}</h2>
+                  <ul className="list">
                     {list.map((it: any) => {
                       const n = cart[it.id] ?? 0;
                       return (
-                        <li key={it.id} className="py-2.5 flex items-center gap-3">
+                        <li key={it.id} className="list-row">
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium leading-tight">{it.name}</p>
+                            <p className="text-[15px] font-medium leading-tight">{it.name}</p>
                             <p className="text-sm text-black/55">{money(it.price)}{it.description ? ` · ${it.description}` : ''}</p>
                           </div>
                           {n === 0 ? (
-                            <button onClick={() => setCount(it.id, 1)} aria-label={t('Přidat {name}', { name: it.name })} className="tap-target-sm rounded-full bg-[#16181A] text-white h-9 w-9 grid place-items-center hover:bg-black active:scale-95 transition"><Icon name="plus" size={16} /></button>
+                            <button type="button" onClick={() => setCount(it.id, 1)} aria-label={t('Přidat {name}', { name: it.name })} className="tap-target btn-icon !h-10 !w-10 !text-[#16181A]"><Icon name="plus" size={18} /></button>
                           ) : (
                             <div className="flex items-center gap-1.5">
-                              <button onClick={() => setCount(it.id, n - 1)} aria-label={t('Méně')} className="tap-target-sm h-9 w-9 rounded-full glass border border-black/10 grid place-items-center active:scale-95 transition"><span className="text-lg leading-none">−</span></button>
-                              <span className="w-6 text-center font-semibold tabular-nums" aria-live="polite">{n}</span>
-                              <button onClick={() => setCount(it.id, n + 1)} aria-label={t('Více')} className="tap-target-sm h-9 w-9 rounded-full bg-[#16181A] text-white grid place-items-center active:scale-95 transition"><Icon name="plus" size={16} /></button>
+                              <button type="button" onClick={() => setCount(it.id, n - 1)} aria-label={t('Méně')} className="tap-target btn-icon !h-10 !w-10"><Icon name="minus" size={18} /></button>
+                              <span className="w-6 text-center text-[15px] font-bold tabular-nums" aria-live="polite">{n}</span>
+                              <button type="button" onClick={() => setCount(it.id, n + 1)} aria-label={t('Více')} className="tap-target btn-icon !h-10 !w-10 !text-[#16181A]"><Icon name="plus" size={18} /></button>
                             </div>
                           )}
                         </li>
@@ -849,27 +855,27 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
           )}
           <div className="flex items-baseline justify-between border-t border-black/[0.06] pt-3">
             <span className="text-sm text-black/60">{t('Celkem')}</span>
-            <span className="text-xl font-bold tabular-nums">{money(total)}</span>
+            <span className="text-[1.75rem] font-bold tracking-[-0.02em] tabular-nums leading-none">{money(total)}</span>
           </div>
           <div className="grid gap-2">
             <label htmlFor="o-note" className={label}>{t('Poznámka pro obsluhu')}</label>
             <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder={t('Bez cukru, mléko zvlášť…')} className={input} maxLength={300} />
           </div>
           {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-          <button onClick={submit} disabled={busy} className={`${btnPrimary} w-full`}><Icon name="cup" size={16} /> {busy ? t('Odesílám…') : signedIn ? t('Objednat') : t('Přihlásit se a objednat')}</button>
+          <button type="button" onClick={submit} disabled={busy} className={`${btnPrimary} btn-lg w-full`}><Icon name="cup" size={16} /> {busy ? t('Odesílám…') : signedIn ? t('Objednat') : t('Přihlásit se a objednat')}</button>
           <p className="text-xs text-black/45">{t('Platí se u obsluhy jako obvykle. Za každých 100 {mena} dostaneš {body} bodů.', { mena: cur, body: b.pointsPer100 })}</p>
         </div>
         {orders && orders.length > 0 && (
           <section>
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Dnešní objednávky')}</h3>
-            <ul className="space-y-2">
+            <h3 className="t-card mb-1">{t('Dnešní objednávky')}</h3>
+            <ul className="card list px-4">
               {orders.map(o => (
-                <li key={o.id} className={`rounded-2xl border px-3.5 py-2.5 ${o.status === 'new' ? 'bg-wait/[0.08] border-wait/30' : o.status === 'confirmed' ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/60 border-black/[0.06]'}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-sm">{ORDER_LABEL[o.status] ? t(ORDER_LABEL[o.status]) : o.status}</span>
-                    <span className="text-sm tabular-nums">{money(o.total)}{o.table_name ? ` · ${o.table_name}` : ''}</span>
+                <li key={o.id} className="list-row">
+                  <div className="min-w-0 flex-1">
+                    <span className={`chip chip-sm ${o.status === 'new' ? 'chip-wait' : o.status === 'confirmed' ? 'chip-info' : o.status === 'done' ? 'chip-ok' : 'chip-muted'}`}>{ORDER_LABEL[o.status] ? t(ORDER_LABEL[o.status]) : o.status}</span>
+                    <p className="t-meta truncate mt-1">{(o.items ?? []).map((l: any) => `${l.count}× ${l.name}`).join(', ')}</p>
                   </div>
-                  <p className="text-xs text-black/55 truncate">{(o.items ?? []).map((l: any) => `${l.count}× ${l.name}`).join(', ')}</p>
+                  <span className="text-sm font-semibold tabular-nums shrink-0">{money(o.total)}{o.table_name ? ` · ${o.table_name}` : ''}</span>
                 </li>
               ))}
             </ul>
@@ -940,12 +946,12 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
         <div className="p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="text-xl font-bold tracking-tight text-[#16181A]">{e.title}</h3>
+              <h3 className="t-section text-[1.375rem] leading-tight font-bold tracking-[-0.02em] text-balance">{e.title}</h3>
               <p className="text-sm text-black/55 cz-sentence mt-0.5">
                 {fmtDatum(e.date, { jazyk, styl: 'denDlouze' })}{e.start_time ? ` · ${e.start_time}${e.end_time ? `–${e.end_time}` : ''}` : ''}
               </p>
             </div>
-            <button onClick={m.guard.attemptClose} className="tap-target-sm shrink-0 btn-icon" aria-label={t('Zavřít')}><Icon name="close" size={15} /></button>
+            <button type="button" onClick={m.guard.attemptClose} className="tap-target shrink-0 btn-icon -mt-1 -mr-1" aria-label={t('Zavřít')}><Icon name="close" size={16} /></button>
           </div>
 
           {place && (
@@ -973,8 +979,8 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
           )}
 
           {menu.length > 0 && (
-            <div className="mt-4 well bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Co se bude podávat')}</p>
+            <div className="mt-4 well p-4">
+              <p className="t-label mb-1.5">{t('Co se bude podávat')}</p>
               <ul className="divide-y divide-black/[0.06]">
                 {menu.map((l: any, i: number) => (
                   <li key={i} className="py-1.5 flex items-baseline gap-3">
@@ -990,9 +996,8 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
           <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button disabled={busy} onClick={() => setState(going ? { follow, going: false } : { follow: true, going: true })}
               className={going
-                ? 'tap-target inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition text-[#16181A]'
-                : btnPrimary}
-              style={going ? { background: `${ac}40` } : undefined}>
+                ? `${btnQuiet} !text-[#16181A]`
+                : btnPrimary}>
               {going ? t('✋ Jdu — zrušit účast') : t('✋ Přijdu')}
             </button>
             <button disabled={busy} onClick={() => (follow ? setState({ follow: false, going: false }) : setState({ follow: true, going }))}
@@ -1004,7 +1009,7 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
             <Icon name="calendarCheck" size={15} className="shrink-0" />{t('Přidat do kalendáře (.ics)')}
           </button>
           {!signedIn && <p className="text-xs text-black/45 mt-2 text-center">{t('Na „Přijdu“ a hlídání se přihlas — připomínku pošleme den předem.')}</p>}
-          {msg && <p role="status" className="toast-in text-xs text-[#3E5406] bg-[#C8F542]/15 border border-[#C8F542]/35 rounded-xl px-3 py-2 mt-2 text-center">{msg}</p>}
+          {msg && <p role="status" className="toast-in note note-ok mt-2 text-center">{msg}</p>}
         </div>
       </div>
     </div>

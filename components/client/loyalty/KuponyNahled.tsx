@@ -33,12 +33,12 @@ export default function KuponyNahled({ f, className = '' }: { f: FormKupon; clas
   return (
     <Well className={className} aria-label="Náhled kuponu pro hosta">
       <p className="field-label">Takto ho uvidí host</p>
-      <div className={`rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3.5 ${f.draft ? 'opacity-70' : ''}`}>
+      <div className={`rounded-2xl bg-white border border-black/[0.07] px-4 py-3.5 ${f.draft ? 'opacity-70' : ''}`}>
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-pretty">
               {c.title || <span className="text-black/40">Název kuponu</span>}
-              {vyhoda && <span className="ml-2 rounded-full bg-[#C8F542]/25 text-[#3E5406] px-2 py-0.5 text-[11px] font-bold align-middle whitespace-nowrap">{vyhoda}</span>}
+              {vyhoda && <span className="ml-2 chip chip-sm chip-ok align-middle">{vyhoda}</span>}
             </p>
             {c.description && <p className="text-sm text-black/55 text-pretty">{c.description}</p>}
             {(stitky.length > 0 || c.valid_until) && (

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Initials } from './ClientShell';
 import Link from 'next/link';
-import { Icon } from '../Icons';
+import { Icon, LogoMark } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
 import { RES_STATUS, tierForMember } from '@/lib/clientSlots';
 import { efektivniSleva } from '@/lib/slevy';
@@ -73,17 +73,22 @@ export default function MyPage() {
   const orders: any[] = d.orders ?? [];
 
   return (
-    <div className="space-y-8 sm:space-y-10">
-      <MemberCard name={d.me?.name} card={card} />
-      {card?.code && <KartaNastroje karta={card} podniky={(d.memberships ?? []).map((m: any) => ({ slug: m.slug, name: m.name }))} />}
-      {/* Plastové karty od podniků (spuštění, balík C): připojené karty a „Mám plastovou kartu“. */}
-      <KartickyHosta />
+    // v3: kartička je hrdina obrazovky (jako karta v peněžence). Na monitoru stojí vlevo a drží se
+    // při posouvání, všechno ostatní je ve sloupci vedle; na telefonu jde první a přes šířku.
+    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] gap-8 md:gap-10 items-start">
+      <div className="space-y-5 md:sticky md:top-24">
+        <MemberCard name={d.me?.name} card={card} />
+        {card?.code && <KartaNastroje karta={card} podniky={(d.memberships ?? []).map((m: any) => ({ slug: m.slug, name: m.name }))} />}
+        {/* Plastové karty od podniků (spuštění, balík C): připojené karty a „Mám plastovou kartu“. */}
+        <KartickyHosta />
+      </div>
 
-      {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
+      <div className="space-y-8 sm:space-y-10 min-w-0">
+      {flash && <p role="status" className="toast-in note note-ok">{flash}</p>}
 
       {pending.length > 0 && (
         <section aria-labelledby="h-review">
-          <h2 id="h-review" className="text-lg font-bold tracking-tight mb-3">{t('Jak to bylo?')}</h2>
+          <h2 id="h-review" className="t-section mb-3">{t('Jak to bylo?')}</h2>
           <ul className="space-y-3">
             {pending.map((p: any) => <ReviewPrompt key={p.ref} p={p} onDone={() => { setPending(x => x.filter(y => y.ref !== p.ref)); setFlash(t('Díky za hodnocení.')); }} />)}
           </ul>
@@ -92,13 +97,13 @@ export default function MyPage() {
 
       {odpovedi.length > 0 && (
         <section aria-labelledby="h-odpovedi">
-          <h2 id="h-odpovedi" className="text-lg font-bold tracking-tight mb-3">{t('Odpovědi na tvoje hodnocení')}</h2>
+          <h2 id="h-odpovedi" className="t-section mb-3">{t('Odpovědi na tvoje hodnocení')}</h2>
           <ul className="space-y-3">
             {odpovedi.map(o => (
               <li key={`${o.slug}-${o.id}`} className="card p-4 sm:p-5">
                 <p className="font-semibold leading-tight">{o.business} <span className="text-black/50 font-medium tabular-nums">· {t('{n} z 5', { n: o.rating })}</span></p>
                 {o.note && <p className="text-sm text-black/55 mt-1">„{o.note}“</p>}
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mt-3">{t('Odpověď podniku')}{o.repliedAt ? ` · ${denCesky(o.repliedAt, jazyk)}` : ''}</p>
+                <p className="t-label mt-3">{t('Odpověď podniku')}{o.repliedAt ? ` · ${denCesky(o.repliedAt, jazyk)}` : ''}</p>
                 <p className="text-sm mt-1 whitespace-pre-line text-pretty">{o.reply}</p>
               </li>
             ))}
@@ -107,28 +112,28 @@ export default function MyPage() {
       )}
 
       <section aria-labelledby="h-biz">
-        <h2 id="h-biz" className="text-lg font-bold tracking-tight mb-3">{t('Moje podniky')}</h2>
+        <h2 id="h-biz" className="t-section mb-3">{t('Moje podniky')}</h2>
         {d.memberships?.length ? (
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <ul className="grid grid-cols-1 gap-3">
             {d.memberships.map((m: any) => (
               <li key={m.slug}>
                 <Link href={`/client/${m.slug}`} className="block card active:scale-[0.99] transition p-5">
                   <div className="flex items-start gap-3">
                     <Initials name={m.name} size={40} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-lg font-bold tracking-tight leading-tight truncate">{m.name}</p>
+                      <p className="t-card text-[17px] leading-tight truncate">{m.name}</p>
                       {(() => { const lv = tierForMember({ visits: Number(m.visits), spend: Number(m.spend), lastVisitAt: m.lastVisitAt }, m.tiers); const sl = efektivniSleva({ uroven: lv, skupiny: m.groupDiscounts }); return (
                         <p className="text-sm text-black/55 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                          {lv.id !== 'bronze' && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${lv.id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{t(lv.label)}</span>}
-                          {sl.pct > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-[11px] font-bold">{sl.zdroj === 'skupina' && sl.nazev ? t('sleva {n} % ({skupina})', { n: sl.pct, skupina: sl.nazev }) : t('sleva {n} %', { n: sl.pct })}</span>}
+                          {lv.id !== 'bronze' && <span className={`chip chip-sm ${lv.id === 'gold' ? 'chip-ok' : 'chip-muted'}`}>{t(lv.label)}</span>}
+                          {sl.pct > 0 && <span className="chip chip-sm chip-ink">{sl.zdroj === 'skupina' && sl.nazev ? t('sleva {n} % ({skupina})', { n: sl.pct, skupina: sl.nazev }) : t('sleva {n} %', { n: sl.pct })}</span>}
                           <span>{t('{n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { n: m.visits })}{m.lastVisitAt ? ` · ${t('naposledy {datum}', { datum: denCesky(m.lastVisitAt, jazyk) })}` : ''}</span>
                         </p>
                       ); })()}
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-xl font-bold tabular-nums leading-tight">{m.points} <span className="text-sm font-medium text-black/50">{t('b.')}</span></p>
-                      {m.expiring && <p className="text-[11px] font-semibold leading-snug text-wait-ink">{t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: m.expiring.points, kdy: denCesky(m.expiring.till, jazyk) })}</p>}
-                      {m.credit > 0 && <p className="text-sm font-semibold tabular-nums text-[#5B7A08] leading-tight">{t('{castka} kreditu', { castka: formatMoney(m.credit, m.currency) })}</p>}
+                      <p className="text-[1.75rem] font-bold tracking-[-0.02em] tabular-nums leading-none">{m.points}<span className="stat-jednotka ml-0.5 font-semibold text-black/50">{t('b.')}</span></p>
+                      {m.expiring && <p className="mt-1 text-xs font-semibold leading-snug text-wait-ink">{t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: m.expiring.points, kdy: denCesky(m.expiring.till, jazyk) })}</p>}
+                      {m.credit > 0 && <p className="mt-1 text-sm font-semibold tabular-nums text-ok-ink leading-tight">{t('{castka} kreditu', { castka: formatMoney(m.credit, m.currency) })}</p>}
                     </div>
                   </div>
                   {(m.campaigns ?? []).length > 0 ? (
@@ -171,11 +176,11 @@ export default function MyPage() {
       )}
 
       {(upcoming.length > 0 || open.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 items-start">
+        <div className="grid grid-cols-1 gap-8 sm:gap-10 items-start">
           {upcoming.length > 0 && (
             <section aria-labelledby="h-res">
-              <h2 id="h-res" className="text-lg font-bold tracking-tight mb-3">{t('Nadcházející rezervace')}</h2>
-              <ul className="divide-y divide-black/[0.06]">{upcoming.map((r: any) => <ResRow key={r.id} r={r} akce />)}</ul>
+              <h2 id="h-res" className="t-section mb-3">{t('Nadcházející rezervace')}</h2>
+              <ul className="card list px-4 sm:px-5">{upcoming.map((r: any) => <ResRow key={r.id} r={r} akce />)}</ul>
             </section>
           )}
           {open.length > 0 && (
@@ -183,25 +188,25 @@ export default function MyPage() {
               {/* Vysvětlení patří pod nadpis, ne pod seznam: zbytek aplikace
                   má všude nadpis + jednu větu, co se tu dělá. Pod seznamem
                   to vypadalo jako osiřelý popisek. */}
-              <h2 id="h-coup" className="text-lg font-bold tracking-tight">{t('Kupony k uplatnění')}</h2>
-              <p className="text-sm text-black/55 mt-1 mb-3">{t('Kód ukaž obsluze u kasy.')}</p>
-              <ul className="space-y-2">
+              <h2 id="h-coup" className="t-section">{t('Kupony k uplatnění')}</h2>
+              <p className="t-meta mt-1 mb-3">{t('Kód ukaž obsluze u kasy.')}</p>
+              <ul className="card list px-4 sm:px-5">
                 {open.map((c: any) => (
-                  <li key={c.id} className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-4 py-3">
+                  <li key={c.id} className="py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold leading-tight truncate">{c.title}</p>
-                        <p className="text-xs text-black/55 truncate">{c.business}</p>
+                        <p className="text-[15px] font-semibold leading-tight truncate">{c.title}</p>
+                        <p className="t-meta truncate mt-0.5">{c.business}</p>
                         <PlatnostKuponu validUntil={c.valid_until} today={d.today} className="block text-xs" />
                       </div>
-                      <p className="font-mono font-bold tracking-widest text-lg shrink-0">{c.code}</p>
+                      <p className="font-mono font-bold tracking-[0.14em] text-lg shrink-0 rounded-[10px] bg-black/[0.05] px-3 py-1.5">{c.code}</p>
                     </div>
                     {/* QR „managero:coupon:<kód>“: obsluha ho načte skenerem místo opisování. Obrázek se stáhne až po rozbalení. */}
                     <details className="mt-2 group/qr">
                       <summary className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
                         <Icon name="chevron" size={15} className="transition-transform group-open/qr:rotate-180" />{t('Ukázat QR kód')}
                       </summary>
-                      <div className="mt-2 rounded-2xl bg-white p-3 w-40 h-40 mx-auto">
+                      <div className="mt-2 rounded-2xl bg-white border border-black/[0.07] p-3 w-44 h-44 mx-auto">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={`/api/client/coupons/${c.id}/qr`} alt={t('QR kód kuponu {kod}', { kod: c.code })} loading="lazy" className="w-full h-full" />
                       </div>
@@ -223,17 +228,17 @@ export default function MyPage() {
           <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
             <Icon name="chevron" size={16} className="transition-transform group-open:rotate-180" />{t('Historie ({n})', { n: past.length + orders.length })}
           </summary>
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+          <div className="mt-3 grid grid-cols-1 gap-8 items-start">
             {past.length > 0 && (
               <section>
-                <h3 className="text-sm font-bold tracking-tight mb-2">{t('Dřívější rezervace')}</h3>
-                <ul className="divide-y divide-black/[0.06]">{past.slice(0, 20).map((r: any) => <ResRow key={r.id} r={r} />)}</ul>
+                <h3 className="t-card mb-1">{t('Dřívější rezervace')}</h3>
+                <ul className="list">{past.slice(0, 20).map((r: any) => <ResRow key={r.id} r={r} />)}</ul>
               </section>
             )}
             {orders.length > 0 && (
               <section>
-                <h3 className="text-sm font-bold tracking-tight mb-2">{t('Objednávky od stolu')}</h3>
-                <ul className="divide-y divide-black/[0.06]">
+                <h3 className="t-card mb-1">{t('Objednávky od stolu')}</h3>
+                <ul className="list">
                   {orders.slice(0, 20).map((o: any) => (
                     <li key={o.id} className="py-3 flex items-center gap-3">
                       <div className="min-w-0 flex-1">
@@ -255,6 +260,7 @@ export default function MyPage() {
 
       <ProfileForm me={d.me} onSaved={(me: any) => { setD({ ...d, me }); setFlash(t('Uloženo.')); }} />
       <UcetHosta novinky={d.me?.novinky === true} novinkyEmail={d.me?.novinkyEmail !== false} onFlash={setFlash} />
+      </div>
     </div>
   );
 }
@@ -274,45 +280,55 @@ function InviteCard({ code, onFlash }: { code: string; onFlash: (m: string) => v
   };
   return (
     <section aria-labelledby="h-invite" className="card p-4 sm:p-5">
-      <h2 id="h-invite" className="text-lg font-bold tracking-tight">{t('Pozvi kamaráda')}</h2>
+      <h2 id="h-invite" className="t-section">{t('Pozvi kamaráda')}</h2>
       <p className="mt-1 text-sm text-black/60 max-w-[52ch] text-pretty">{t('Pošli mu odkaz. Když se přidá do podniku, kde jsi členem, dostanete oba body — pokud to podnik ve věrnosti zapnul.')}</p>
       <div className="mt-3 flex items-center gap-2 flex-wrap">
-        <span className="font-mono tracking-[0.2em] font-bold text-sm rounded-xl bg-black/[0.05] px-3 py-2">{code}</span>
-        <button type="button" onClick={copy} className="tap-target-sm inline-flex items-center gap-1.5 btn btn-secondary btn-sm hover:bg-black/[0.05] active:scale-[0.98] transition"><Icon name="copy" size={15} /> {t('Kopírovat odkaz')}</button>
-        <button type="button" onClick={share} className="tap-target-sm w-full sm:w-auto justify-center inline-flex items-center gap-1.5 btn btn-primary active:scale-[0.98] transition"><Icon name="send" size={15} /> {t('Sdílet')}</button>
+        <span className="font-mono tracking-[0.14em] font-bold text-sm rounded-[10px] bg-black/[0.05] px-3 py-2">{code}</span>
+        <button type="button" onClick={copy} className="tap-target btn btn-secondary btn-sm"><Icon name="copy" size={15} /> {t('Kopírovat odkaz')}</button>
+        <button type="button" onClick={share} className="tap-target w-full sm:w-auto btn btn-primary"><Icon name="send" size={15} /> {t('Sdílet')}</button>
       </div>
     </section>
   );
 }
 
-/** Kartička: tmavá, s QR. Kód i textem, kdyby čtečka selhala. */
+/**
+ * Kartička: hrdina stránky Moje, podoba karty v peněžence. Tmavá plocha, značka nahoře,
+ * velký QR na bílém poli uprostřed, pod ním jméno a kód (kód i textem, kdyby čtečka selhala).
+ * Popisek „Managero client" větou — verzálky s prostrkáním v3 nepoužívá.
+ */
 function MemberCard({ name, card }: { name: string; card: any | null }) {
   const t = useT('klient-host');
   return (
-    <section aria-label={t('Kartička')} className="rounded-3xl bg-[#16181A] text-white p-5 sm:p-7 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-6 items-center">
-      <div className="min-w-0 order-2 sm:order-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C8F542] mb-2">Managero client</p>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter leading-[1.05] break-words">{name}</h1>
-        {card ? (
-          <p className="mt-3 font-mono text-lg sm:text-xl font-bold tracking-[0.2em] text-white/90">{card.code}</p>
-        ) : card === null ? <p className="mt-3 text-sm text-white/60">{t('Kartička se nenačetla.')}</p> : <Skeleton className="mt-3 h-7 w-40 rounded-lg bg-white/10" />}
-        <p className="mt-3 text-sm text-white/60 max-w-[34ch] text-pretty">{t('Ukaž u kasy. Obsluha načte kód a přidá razítko za návštěvu nebo body za útratu. Jedna kartička pro všechny podniky.')}</p>
-      </div>
-      <div className="order-1 sm:order-2 justify-self-center sm:justify-self-end">
+    <div>
+      <section aria-label={t('Kartička')} className="rounded-[28px] bg-[#16181A] text-white p-5 sm:p-6 shadow-[shadow:var(--shadow-float)]">
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 min-w-0">
+            <LogoMark size={26} />
+            <span className="text-[15px] font-semibold tracking-[-0.01em] truncate">Managero <span className="text-white/55 font-medium">client</span></span>
+          </span>
+          <span className="text-[13px] font-medium text-white/55 shrink-0">{t('Kartička')}</span>
+        </div>
         {/* Když QR nedorazí, nesmí tu zůstat šedý obdélník donekonečna —
             host stojí u kasy a potřebuje ukázat aspoň něco. Kód funguje
             i bez čtečky, tak ho v tom případě ukážeme velký místo QR. */}
-        <div className="rounded-2xl bg-white p-3 w-40 h-40 sm:w-44 sm:h-44 grid place-items-center [&_svg]:w-full [&_svg]:h-full">
+        <div className="mt-5 mx-auto w-full max-w-[17rem] aspect-square rounded-[22px] bg-white p-4 grid place-items-center [&_svg]:w-full [&_svg]:h-full">
           {card?.svg
             ? <span dangerouslySetInnerHTML={{ __html: card.svg }} className="block w-full h-full" aria-hidden />
             : card?.code
-            ? <p className="font-mono text-base font-bold tracking-[0.12em] text-[#16181A] text-center break-all px-1">{card.code}</p>
+            ? <p className="font-mono text-xl font-bold tracking-[0.12em] text-[#16181A] text-center break-all px-1">{card.code}</p>
             : card === null
-            ? <p className="text-xs text-black/45 text-center px-2">{t('QR se nenačetlo.')}<br />{t('Řekni obsluze kód nahoře.')}</p>
-            : <Skeleton className="w-full h-full rounded-lg" />}
+            ? <p className="text-sm text-black/55 text-center px-2">{t('QR se nenačetlo.')}<br />{t('Řekni obsluze kód nahoře.')}</p>
+            : <Skeleton className="w-full h-full rounded-xl" />}
         </div>
-      </div>
-    </section>
+        <div className="mt-5">
+          <h1 className="text-[1.5rem] font-bold tracking-[-0.025em] leading-tight break-words">{name}</h1>
+          {card ? (
+            <p className="mt-1 font-mono text-[15px] font-semibold tracking-[0.14em] text-white/75">{card.code}</p>
+          ) : card === null ? <p className="mt-1 text-sm text-white/60">{t('Kartička se nenačetla.')}</p> : <Skeleton className="mt-1.5 h-5 w-36 rounded-md bg-white/10" />}
+        </div>
+      </section>
+      <p className="mt-3 t-meta text-center text-pretty px-2">{t('Ukaž u kasy. Obsluha načte kód a přidá razítko za návštěvu nebo body za útratu. Jedna kartička pro všechny podniky.')}</p>
+    </div>
   );
 }
 
@@ -389,15 +405,15 @@ function ResRow({ r, akce = false }: { r: any; akce?: boolean }) {
   const st = RES_STATUS[r.status] ?? RES_STATUS.requested;
   const ziva = akce && r.slug && ['requested', 'confirmed'].includes(String(r.status));
   return (
-    <li className="py-3 flex items-start gap-3 flex-wrap">
+    <li className="py-3.5 flex items-start gap-3 flex-wrap">
       <div className="min-w-0 flex-1 basis-40">
         <p className="font-semibold cz-sentence">{fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} <span className="text-black/50 font-medium">· {r.time}</span></p>
         <p className="text-sm text-black/55 truncate">{r.business} · {t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: r.party })}</p>
       </div>
       <div className="flex items-center gap-2 shrink-0 ml-auto">
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{t(st.label)}</span>
+        <span className={`chip chip-sm shrink-0 ${st.tone === 'ok' ? 'chip-ok' : st.tone === 'wait' ? 'chip-wait' : 'chip-muted'}`}>{st.tone === 'ok' && <Icon name="check" size={11} />}{t(st.label)}</span>
         {ziva && (
-          <Link href={`/client/${encodeURIComponent(String(r.slug))}?tab=reserve&rezervace=${r.id}`} className="tap-target-sm inline-flex items-center gap-1 text-xs font-semibold text-black/60 hover:text-black transition">
+          <Link href={`/client/${encodeURIComponent(String(r.slug))}?tab=reserve&rezervace=${r.id}`} className="tap-target inline-flex items-center gap-1 text-[13px] font-semibold text-black/65 hover:text-black transition">
             {t('Potvrdit nebo zrušit')}<Icon name="chevronRight" size={14} />
           </Link>
         )}

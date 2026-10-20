@@ -10,13 +10,18 @@ import { LogoMark } from '../Icons';
 import { useT } from '@/lib/i18n/client';
 import { tg } from '@/lib/i18n/stav';
 
-// V hostovské části už limetku drží tlačítko Přihlásit v hlavičce (ClientShell): jediná plná
-// limetka na obrazovku, takže hlavní akce formuláře je tam tmavá.
-const hlavniTlacitko = (klient: boolean) => (klient ? 'btn btn-primary' : 'btn btn-accent');
+// v3: „Přihlásit" v hlavičce hosta (ClientShell) je inkoustová pilulka, limetka patří hlavní
+// akci obrazovky — tady tlačítku formuláře, vysokému a přes šířku (jako v inspiracích).
+const hlavniTlacitko = (_klient: boolean) => 'btn btn-accent btn-lg w-full';
 
 function Obal({ klient, children }: { klient: boolean; children: React.ReactNode }) {
   const karta = <div className="card p-6 sm:p-8 max-w-md w-full">{children}</div>;
-  if (klient) return <div className="grid place-items-start md:place-items-center pt-2">{karta}</div>;
+  // Host: na telefonu formulář leží přímo na plátně (nadpis, věta, pole, tlačítko), karta až od md.
+  if (klient) return (
+    <div className="grid place-items-start md:place-items-center pt-2">
+      <div className="max-w-md w-full md:bg-[var(--surface)] md:border md:border-[var(--surface-line)] md:rounded-3xl md:p-8 md:shadow-[shadow:var(--shadow-card)]">{children}</div>
+    </div>
+  );
   return (
     <main className="min-h-[100dvh] flex flex-col items-center justify-center gap-6 p-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       <div className="flex items-center gap-2.5"><LogoMark size={34} /><span className="font-bold tracking-tight">Managero</span></div>

@@ -42,10 +42,10 @@ export default function HostPravidla({ b, campaigns }: {
   };
   return (
     <section aria-labelledby="h-pravidla" className="mt-5 border-t border-black/[0.06] pt-4">
-      <h3 id="h-pravidla" className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Jak získat body a odměny')}</h3>
+      <h3 id="h-pravidla" className="t-card mb-1.5">{t('Jak získat body a odměny')}</h3>
       <ul className="space-y-1.5 text-sm text-black/70">
         {pravidla.map((r, i) => (
-          <li key={i} className="flex gap-2"><span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#C8F542]" /><span className="min-w-0 text-pretty break-words">{veta(r)}</span></li>
+          <li key={i} className="flex gap-2"><span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-black/30" /><span className="min-w-0 text-pretty break-words">{veta(r)}</span></li>
         ))}
       </ul>
     </section>
