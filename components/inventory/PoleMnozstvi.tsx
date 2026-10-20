@@ -55,7 +55,9 @@ export default function PoleMnozstvi({
   // Odsazení textu podle délky jednotky, ať číslo nepodjíždí pod sufix.
   const odsazeni = !j ? '' : j.length <= 2 ? '!pr-9' : j.length <= 4 ? '!pr-12' : j.length <= 7 ? '!pr-16' : '!pr-20';
   const align = zarovnat ?? (krok ? 'center' : 'right');
-  const vyska = velikost === 'lg' ? '!py-3 text-[17px] font-semibold' : '';
+  // Krokovač = jedna řada jedné výšky (P7): pole i ± mají 52 (lg) nebo 44 (md) — dřív pole 52/48
+  // a tlačítka 44/36 vedle sebe. Bez kroku pole drží výšku z kontextu (.field 44, v okně 52).
+  const vyska = [velikost === 'lg' ? 'text-[17px] font-semibold' : '', krok ? (velikost === 'lg' ? '!h-[var(--h-l)] !min-h-0 !py-0' : '!h-[var(--h-m)] !min-h-0 !py-0') : velikost === 'lg' ? '!py-3' : ''].join(' ');
   const pole = (
     <div className={`relative min-w-0 ${krok ? 'flex-1' : 'w-full'}`}>
       <input
@@ -80,9 +82,9 @@ export default function PoleMnozstvi({
     </div>
   );
   if (!krok) return <div className={`min-w-0 ${className}`}>{pole}</div>;
-  const velikostTlacitka = velikost === 'lg' ? 'md' : 'sm';
+  const velikostTlacitka = velikost === 'lg' ? 'lg' : 'md';
   return (
-    <div className={`flex items-center gap-1.5 min-w-0 ${className}`}>
+    <div className={`flex items-center gap-2 min-w-0 ${className}`}>
       <Button type="button" variant="secondary" size={velikostTlacitka} iconOnly icon="minus" disabled={disabled}
         aria-label={nazev ? t('Ubrat — {nazev}', { nazev }) : t('Ubrat')}
         onClick={() => onChange(pocetDoPole(krokMnozstvi(value, -krok, min)))} />

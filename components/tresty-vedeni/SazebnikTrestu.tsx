@@ -73,12 +73,12 @@ export function DruhTrestuOkno({ polozka, onClose, onHotovo }: {
         <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
         <Button type="submit" form="druh-trestu" variant="primary" icon="check" loading={ukladam} disabled={!nazev.trim()}>{nova ? t('Přidat do sazebníku') : t('Uložit')}</Button>
       </>}>
-      <form id="druh-trestu" className="space-y-3" data-druh-trestu-okno onSubmit={e => { e.preventDefault(); void uloz(); }}>
+      <form id="druh-trestu" className="sloupec sloupec-4" data-druh-trestu-okno onSubmit={e => { e.preventDefault(); void uloz(); }}>
         <Field id="druh-nazev" label={t('Prohřešek')}>
           <Input id="druh-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={MAX_DELKA_NAZVU} placeholder={t('Např. pozdní příchod')} autoFocus />
         </Field>
         <Field id="druh-popis" label={t('Popis (nepovinný)')} hint={t('Kdy se položka použije — třeba „víc než 10 minut po začátku směny".')}>
-          <Textarea id="druh-popis" rows={2} value={popis} onChange={e => setPopis(e.target.value)} maxLength={MAX_DELKA_POZNAMKY} />
+          <Textarea id="druh-popis" rows={3} value={popis} onChange={e => setPopis(e.target.value)} maxLength={MAX_DELKA_POZNAMKY} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field id="druh-body" label={t('Body dolů')} hint={t('0–{max}', { max: MAX_BODU })}>

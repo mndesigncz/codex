@@ -30,7 +30,8 @@ import {
 import { apiMessage, okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 import { pragueToday } from '@/lib/pragueTime';
-import { Button, Field, Input, Modal, Select, Textarea, Toast } from '../ui';
+import { Button, Field, Input, Modal, Rada, Select, Textarea, Toast } from '../ui';
+import { VolbaRadek, VolbyRadky } from '../navic/NabidkaChipy';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
@@ -234,7 +235,9 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
           <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
           <Button variant="primary" icon="check" loading={ukladam} disabled={nahravam || (!upravit && !userId)} onClick={() => void uloz()}>{textTlacitka}</Button>
         </>}>
-        <div className="space-y-4" data-dat-trest={upravit ? 'uprava' : 'novy'}>
+        {/* Formulář okna podle V6: pole ↔ pole 16 (Sloupec), pole i krokovač 52, dvojice polí ½ + ½,
+            volby sazebníku jako řádky L→R (dřív zalamované pilulky různé šířky — audit V03/V04). */}
+        <div className="sloupec sloupec-4" data-dat-trest={upravit ? 'uprava' : 'novy'}>
           {!pevnyId && (
             <Field id="trest-kdo" label={t('Komu')}>
               <Select id="trest-kdo" value={kdo} onChange={e => { setKdo(e.target.value); setChybaKraceni(null); setStropServeru(null); }} autoFocus>
@@ -244,19 +247,15 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
             </Field>
           )}
           {druhy.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="t-label">{t('Sazebník')}</p>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Sazebník')}>
+            <div className="min-w-0">
+              <VolbyRadky label={t('Sazebník')} ariaLabel={t('Sazebník')}>
                 {druhy.map(d => (
-                  <button key={d.id} type="button" aria-pressed={typeId === d.id} onClick={() => vyberDruh(d.id)}
-                    className={`filter-pill tap-target-sm max-w-full ${typeId === d.id ? 'seg-on' : 'seg-off glass'}`}>
-                    <span className="truncate">{d.title}</span>
-                    <span className="shrink-0 tabular-nums">· {dopadTrestu(t, { points: d.points, bonusCut: d.bonusCut ?? 0 }, money)}</span>
-                  </button>
+                  <VolbaRadek key={d.id} vybrano={typeId === d.id} onClick={() => vyberDruh(d.id)}
+                    titul={d.title} hodnota={dopadTrestu(t, { points: d.points, bonusCut: d.bonusCut ?? 0 }, money)} />
                 ))}
-              </div>
+              </VolbyRadky>
               {opakovani != null && opakovani >= 2 && (
-                <p className="t-meta" data-trest-opakovani>
+                <p className="t-meta mt-1.5" data-trest-opakovani>
                   {den.slice(0, 7) === dnes.slice(0, 7) ? t('{n}. tento měsíc', { n: opakovani }) : t('{n}. v tom měsíci', { n: opakovani })}
                 </p>
               )}
@@ -268,24 +267,26 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
               onChange={e => { setText(e.target.value); if (chyba) setChyba(null); }}
               placeholder={t('Např. příchod o 20 minut později bez omluvy')} />
           </Field>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Field id="trest-den" label={t('Den')} hint={t('Nejvýš {n} dní zpětně.', { n: DNI_ZPETNE })}>
               <Input id="trest-den" type="date" value={den} min={minDen} max={dnes} className="appearance-none min-w-0"
                 onChange={e => { setDen(e.target.value); setChybaKraceni(null); setStropServeru(null); if (chyba) setChyba(null); }} />
             </Field>
             <Field id="trest-body" label={t('Body dolů')} hint={t('0–{max}; nula = bez bodů.', { max: MAX_BODU })}>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Méně bodů')} disabled={bodyCislo <= 0} className="tap-target"
+              {/* Krokovač = řada 52 jako pole vedle (V6): − | číslo | + rovným dílem. */}
+              <Rada vyska="l" className="[&>input]:!px-1">
+                <Button variant="secondary" size="lg" iconOnly icon="minus" aria-label={t('Méně bodů')} disabled={bodyCislo <= 0} className="!w-auto"
                   onClick={() => setBody(String(krokBodu(body, -1)))} />
                 <Input id="trest-body" type="number" inputMode="numeric" min={0} max={MAX_BODU} step={1} value={body}
-                  onChange={e => setBody(e.target.value.replace(/\D/g, ''))} className="!w-20 text-center tabular-nums" />
-                <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Víc bodů')} disabled={bodyCislo >= MAX_BODU} className="tap-target"
+                  onChange={e => setBody(e.target.value.replace(/\D/g, ''))} className="text-center tabular-nums" />
+                <Button variant="secondary" size="lg" iconOnly icon="plus" aria-label={t('Víc bodů')} disabled={bodyCislo >= MAX_BODU} className="!w-auto"
                   onClick={() => setBody(String(krokBodu(body, 1)))} />
-              </div>
+              </Rada>
             </Field>
           </div>
           <Field id="trest-kraceni" label={t('Krácení prémie')} error={chybaKraceni ?? (nadStrop && kraceniCislo > 0 ? (stropKc ? t('Krátit jde nejvýš {castka}.', { castka: money(stropKc) }) : null) : null)}
-            hint={<span className="block text-pretty" data-trest-strop>{hintKraceni}</span>}>
+            hint={<><span className="block text-pretty" data-trest-strop>{hintKraceni}</span>
+              <span className="block text-pretty mt-1">{t('Krátí se jen nenároková prémie za ten měsíc, ne mzda — peněžní postihy zákoník práce zakazuje (§ 346b).')}</span></>}>
             <div className="relative">
               <Input id="trest-kraceni" type="number" inputMode="numeric" min={0} max={Math.min(MAX_KRACENI, stropKc ?? MAX_KRACENI)} step={1} value={kraceni}
                 disabled={bezPremii && kraceniCislo === 0}
@@ -293,7 +294,6 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
               <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{symbol}</span>
             </div>
           </Field>
-          <p className="t-meta -mt-2 text-pretty">{t('Krátí se jen nenároková prémie za ten měsíc, ne mzda — peněžní postihy zákoník práce zakazuje (§ 346b).')}</p>
           <div className="min-w-0">
             <p className="field-label">{t('Fotka (nepovinná)')}</p>
             <input ref={vstup} type="file" accept="image/*" capture="environment" className="hidden" aria-hidden tabIndex={-1}
@@ -301,12 +301,12 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
             {fotka ? (
               <div className="flex items-center gap-2 min-w-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={fotka} alt={t('Náhled fotky')} className="block h-11 w-11 shrink-0 rounded-xl object-cover" />
-                <Button variant="ghost" size="sm" icon="camera" loading={nahravam} onClick={() => vstup.current?.click()}>{t('Jinou')}</Button>
-                <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat fotku')} onClick={() => setFotka(null)} />
+                <img src={fotka} alt={t('Náhled fotky')} className="block h-[3.25rem] w-[3.25rem] shrink-0 rounded-[var(--r-md)] object-cover" />
+                <Button variant="secondary" size="lg" icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="flex-1 min-w-0 !px-4">{t('Jinou')}</Button>
+                <Button variant="secondary" size="lg" iconOnly icon="close" aria-label={t('Odebrat fotku')} onClick={() => setFotka(null)} />
               </div>
             ) : (
-              <Button variant="secondary" icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="w-full sm:w-auto">
+              <Button variant="secondary" size="lg" icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="w-full">
                 {t('Vyfotit / nahrát')}
               </Button>
             )}

@@ -35,6 +35,7 @@ import {
 } from '@/lib/packaging';
 import ConsumeControl from '../inventory/ConsumeControl';
 import PoleMnozstvi from '../inventory/PoleMnozstvi';
+import { VolbaDil, VolbaRadek } from '../navic/NabidkaChipy';
 import SkladZalozky from '../inventory/SkladZalozky';
 import { vyznamCeny, jednotkaSnesDesetiny } from '@/lib/jednotky';
 import { NABIDKA_JEDNOTEK, jeZNabidky, vedeniPolozky, celkemObsahu } from '@/lib/mnozstvi';
@@ -1074,43 +1075,41 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
             <div>
               <p className="field-label" id="sklad-f-kat">{t('Kategorie')}</p>
               {(flatCats.length > 0 || orphanNames.length > 0) && (
-                <div role="group" aria-labelledby="sklad-f-kat" className="space-y-1.5 mb-2.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
+                // Kategorie jako řádky L→R (strom odsazením zleva, pravá hrana všech na R) — dřív pilulky
+                // každá jiné šířky pod sebou (audit V03).
+                <div role="group" aria-labelledby="sklad-f-kat" className="sloupec sloupec-2 mb-3 max-h-64 overflow-y-auto scrollbar-thin">
                   {flatCats.map(({ cat: c, depth }) => (
-                    <div key={c.id} style={{ paddingLeft: depth * 14 }}
-                      className={depth > 0 ? 'border-l border-black/[0.08] ml-1' : ''}>
-                      <CatChip name={c.zOrganizace ? `${c.name} · ${t('z organizace')}` : c.name} active={form.categoryId === c.id} small={depth > 0}
-                        onPick={() => pickCategory(c.id)} />
+                    <div key={c.id} style={depth ? { paddingLeft: depth * 16 } : undefined} className="min-w-0">
+                      <VolbaRadek vybrano={form.categoryId === c.id} onClick={() => pickCategory(c.id)} ikona={form.categoryId === c.id ? 'check' : undefined}
+                        titul={c.zOrganizace ? `${c.name} · ${t('z organizace')}` : c.name} />
                     </div>
                   ))}
-                  {orphanNames.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {orphanNames.map(c => (
-                        <CatChip key={c} name={c} active={false} onPick={async () => {
-                          if (await createCategory(c)) {
-                            const created = lastCats.current.find((x: any) => x.name === c);
-                            if (created) pickCategory(created.id);
-                          }
-                        }} />
-                      ))}
-                    </div>
-                  )}
+                  {orphanNames.map(c => (
+                    <VolbaRadek key={c} vybrano={false} titul={c} ikona="plus" onClick={async () => {
+                      if (await createCategory(c)) {
+                        const created = lastCats.current.find((x: any) => x.name === c);
+                        if (created) pickCategory(created.id);
+                      }
+                    }} />
+                  ))}
                 </div>
               )}
               {smiKategorie && (
-                <div className="flex flex-col sm:flex-row gap-2">
+                // Nová kategorie: na telefonu pole L→R a pod ním výběr + Přidat ½ + ½; od sm jedna řada 52.
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]">
                   <input value={newCatInline} onChange={e => setNewCatInline(e.target.value)} placeholder={t('Nová kategorie')}
                     aria-label={t('Nová kategorie')}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInlineCategory(); } }}
-                    className={`${inputClass} flex-1 min-w-0`} />
+                    className={`${inputClass} col-span-2 sm:col-span-1 min-w-0`} />
                   <select value={inlineParent} onChange={e => setInlineParent(e.target.value)}
                     aria-label={t('Kam novou kategorii zařadit')}
-                    className={`${inputClass} !w-full sm:!w-40 shrink-0`}>
+                    className={`${inputClass} min-w-0`}>
                     <option value="">{t('Hlavní')}</option>
                     {flatOwnCats.map(({ cat: c, depth }) => (
                       <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{t('pod {nazev}', { nazev: c.name })}</option>
                     ))}
                   </select>
-                  <Button type="button" variant="secondary" icon="plus" onClick={addInlineCategory} loading={addingCat} disabled={!newCatInline.trim()}>{t('Přidat')}</Button>
+                  <Button type="button" variant="secondary" size="lg" icon="plus" onClick={addInlineCategory} loading={addingCat} disabled={!newCatInline.trim()} className="!px-5">{t('Přidat')}</Button>
                 </div>
               )}
             </div>
@@ -1119,13 +1118,15 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
           {/* 2. V čem to počítáš — jednotka stavu, a když se bere po částech, co jedno balení obsahuje. */}
           <section className="space-y-3" aria-labelledby="sklad-f-jednotka-l">
             <p id="sklad-f-jednotka-l" className="t-label">{t('V čem to počítáš')}</p>
-            <div role="group" aria-labelledby="sklad-f-jednotka-l" className="flex flex-wrap gap-1.5">
+            {/* Jednotky mřížkou stejných dílů (4 + „Jiná…" přes dva na telefonu, 7 v řadě od sm). */}
+            <div role="group" aria-labelledby="sklad-f-jednotka-l" className="grid grid-cols-4 gap-2 sm:grid-cols-7">
               {NABIDKA_JEDNOTEK.map(u => (
-                <CatChip key={u} name={u === 'balení' ? t('balení') : u} active={!vlastniJednotka && form.unit === u} // i18n-ok: „balení" je hodnota jednotky v datech; text kreslí t()
-                  onPick={() => { setJinaJednotka(false); setForm(f => ({ ...f, unit: u })); }} />
+                <VolbaDil key={u} vybrano={!vlastniJednotka && form.unit === u} onClick={() => { setJinaJednotka(false); setForm(f => ({ ...f, unit: u })); }}>
+                  {u === 'balení' ? t('balení') : u /* i18n-ok: „balení" je hodnota jednotky v datech; text kreslí t() */}
+                </VolbaDil>
               ))}
-              <CatChip name={t('Jiná…')} active={vlastniJednotka}
-                onPick={() => { setJinaJednotka(true); setForm(f => ({ ...f, unit: jeZNabidky(f.unit) ? '' : f.unit })); }} />
+              <VolbaDil vybrano={vlastniJednotka} className="col-span-2 sm:col-span-1"
+                onClick={() => { setJinaJednotka(true); setForm(f => ({ ...f, unit: jeZNabidky(f.unit) ? '' : f.unit })); }}>{t('Jiná…')}</VolbaDil>
             </div>
             {vlastniJednotka && (
               <Field id="sklad-f-jednotka" label={t('Vlastní jednotka')} hint={t('Např. lahev, krabička, pytel — tak se bude psát u každého čísla.')}>
@@ -1135,11 +1136,11 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
             )}
             <div className="well p-4 space-y-2">
               <label htmlFor="sklad-f-baleni" className="field-label !text-[#16181A]">{t('1 {j} obsahuje', { j: jednotka })}</label>
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <PoleMnozstvi id="sklad-f-baleni" value={form.packageSize} onChange={v => setForm(f => ({ ...f, packageSize: v }))} desetinne
-                  placeholder={balKat?.defaultPackageSize ? pocetDoPole(balKat.defaultPackageSize) : '0,7'} className="!w-32" />
+                  placeholder={balKat?.defaultPackageSize ? pocetDoPole(balKat.defaultPackageSize) : '0,7'} />
                 <select aria-label={t('Jednotka obsahu')} value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
-                  className={`${inputClass} !w-24 shrink-0 px-2`}>
+                  className={`${inputClass} min-w-0`}>
                   <option value="">{balKat?.contentUnit ?? '—'}</option>
                   {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
@@ -1614,17 +1615,6 @@ function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }:
 
 /* ---------- One category chip in the item form ---------- */
 // Vybraná kategorie je inkoustová pilulka (DP §3.8) — dřív limetková, jako by šlo o akci.
-function CatChip({ name, active, small, onPick }: {
-  name: string; active: boolean; small?: boolean; onPick: () => void;
-}) {
-  return (
-    <button type="button" onClick={onPick} aria-pressed={active}
-      className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 max-w-full !shrink !whitespace-normal text-left ${small ? '!text-[12px]' : ''} ${active ? 'seg-on' : 'seg-off glass'}`}>
-      {active && <Icon name="check" size={small ? 12 : 13} className="shrink-0" />}{name}
-    </button>
-  );
-}
-
 /** Akce řádku položky: nejvýš dvě tlačítka, zbytek v „···" (DP §3.6). */
 function akcePolozky(t: PrekladFn, i: Item, h: { openEdit?: (i: Item) => void; remove?: (i: Item) => void; setArchived?: (i: Item, a: boolean) => void; objednat?: boolean }): MenuItem[] {
   return [
