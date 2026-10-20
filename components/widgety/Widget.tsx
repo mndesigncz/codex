@@ -249,7 +249,8 @@ function RychlyFiltr({ pole, hodnota, onZmena, inkoust, idTitulku, uzky }: {
     <div ref={pop.ref} className={`relative min-w-0 ${uzky ? 'max-w-full' : 'shrink-0'}`} data-rychly-filtr={pole.klic}>
       <button ref={pop.triggerRef} type="button" onClick={() => setOpen(v => !v)} onKeyDown={pop.onTriggerKeyDown}
         aria-haspopup={telefon ? 'dialog' : 'menu'} aria-expanded={open} aria-label={popisek} aria-describedby={idTitulku} title={popisek}
-        className={`chip chip-sm tap-target-sm transition-colors ${uzky ? 'max-w-full' : 'max-w-[11rem]'} ${inkoust ? 'bg-white/10 text-white/80 hover:bg-white/15' : 'chip-muted hover:bg-black/10'} ${open ? 'ring-2 ring-[#C8F542]' : ''}`}>
+        // 28 px vysoký chip, dotyková plocha 44 px (tap-target): dřív 17 px s cílem 36 — na telefonu hádanka.
+        className={`chip chip-sm min-h-7 !px-2.5 tap-target transition-colors ${uzky ? 'max-w-full' : 'max-w-[11rem]'} ${inkoust ? 'bg-white/10 text-white/80 hover:bg-white/15' : 'chip-muted hover:bg-black/10'} ${open ? 'ring-2 ring-[#C8F542]' : ''}`}>
         <span className="truncate">{text}</span>
         <Icon name="chevron" size={11} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -507,10 +508,11 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
             {filtrVHlavicce && <span className={`flex min-w-0 ${mozeSbalit || mozeZvetsit || vidiOdkaz || (akce && akce.length > 0) || (sipkaCile && !sipkaDole) ? 'mr-1' : 'mr-2'}`}>{filtrVHlavicce}</span>}
             {vidiOdkaz && (
               <Button variant="ghost" size="sm" iconAfter="chevronRight"
-                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}
+                className={`max-sm:w-9 max-sm:!px-0 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : 'w-ovladani'}`}
                 onClick={() => nav.onNavigate(odkaz!.pohled, odkaz!.arg)}>
-                {/* Vedle Zvětšit a Sbalit zbývá na telefonu málo místa na název: odkaz je tam jen šipka (text čte odečítač). */}
-                <span className={mozeZvetsit ? 'max-sm:sr-only' : ''}>{odkaz!.popisek}</span>
+                {/* Na telefonu je odkaz jen šipka (text čte odečítač): „Sklad ›" vedle Sbalit
+                    bral názvu místo a titulky se lámaly na dva řádky. */}
+                <span className="max-sm:sr-only">{odkaz!.popisek}</span>
               </Button>
             )}
             {!odkaz && akce && akce.length > 0 && (
