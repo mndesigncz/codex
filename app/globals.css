@@ -1867,8 +1867,10 @@ html[data-obal] .jen-web { display: none !important; }
 /* ---------- Řady (components/ui/Rada.tsx) ---------- */
 .rada { display: flex; align-items: stretch; gap: var(--m-2); width: 100%; min-width: 0; }
 .rada-mezera-3 { gap: var(--m-3); }
-/* Rovné díly: 2 × ½, 3 × ⅓ — každý přímý potomek stejně široký, nikdy přes R. */
-.rada-rovne > * { flex: 1 1 0; min-width: 0; }
+/* Rovné díly: 2 × ½, 3 × ⅓ — každý přímý potomek stejně široký, nikdy přes R. Mřížka, ne flex:
+   u `flex: 1 1 0` by díl s velkým odsazením (select se šipkou, 50 px) dostal o to víc. */
+.rada-rovne { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.rada-rovne > * { min-width: 0; }
 /* Pružný + pevný: první díl (pole, titul, segment) bere zbytek, ostatní obsahová šířka na R. */
 .rada-pruzna > :first-child { flex: 1 1 auto; min-width: 0; }
 .rada-pruzna > :not(:first-child) { flex: 0 0 auto; }
