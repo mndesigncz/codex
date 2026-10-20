@@ -57,7 +57,7 @@ export function ListRow({
       {lead && <span className="shrink-0 flex items-center">{lead}</span>}
       <span className="min-w-0 flex-1">
         {/* v4 (V4): titul smí na dva řádky — s hodnotou v témže řádku by se jinak useknul („Po 19. října · 07:"). */}
-        <span className="block font-medium text-[15px] leading-snug text-[#16181A] line-clamp-2 break-words">{title}</span>
+        <span className="list-titul block font-medium text-[15px] leading-snug text-[#16181A] line-clamp-2 break-words">{title}</span>
         {meta && <span className="block text-[13px] text-black/55 leading-snug mt-0.5 truncate">{meta}</span>}
         {detail && <span className="block text-[13px] text-black/55 leading-snug mt-0.5 text-pretty">{detail}</span>}
       </span>

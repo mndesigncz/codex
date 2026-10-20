@@ -131,7 +131,8 @@ const bezPretecni = (p) => p.evaluate(() => document.documentElement.scrollWidth
   tvrdi('D1 žádné cookies', (await ctx.cookies()).length === 0 && (await p.evaluate(() => document.cookie)) === '');
   tvrdi('D1 žádný service worker', (await p.evaluate(() => navigator.serviceWorker.getRegistrations().then(r => r.length))) === 0);
   // DESIGN v3: přepnutí do TO GO je v liště v „···" (Další možnosti), ne samostatné tlačítko.
-  await p.getByRole('button', { name: 'Další možnosti' }).click();
+  // v4: v témže „···" jsou i akce stránky — s nimi se jmenuje „Další akce" (MenuStranky).
+  await p.getByRole('button', { name: /^Další (možnosti|akce)$/ }).first().click();
   await p.getByRole('menuitem', { name: 'Přepnout do TO GO režimu' }).click();
   await p.waitForTimeout(500);
   await p.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
