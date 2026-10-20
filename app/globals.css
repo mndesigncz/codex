@@ -483,6 +483,11 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
   .list-actions:only-child { flex: 1 1 auto; }
   /* Akce mimo ocas (ListRow akceVRadku) zůstávají v prvním řádku vedle názvu. */
   .list-actions-radek { order: 0; }
+  /* v4 (V4): jediná akce řádku (ikona, „···", jedno tlačítko) zůstává v prvním řádku na R —
+     sama vpravo v druhém řádku vypadala jako zapomenutá (audit V20). Víc akcí (krokovač
+     skladu) jde dál do druhého řádku, jinak by titulu nezbylo místo. */
+  .list-tail-akce:has(> .list-actions > :only-child) { display: contents; }
+  .list-tail-akce:has(> .list-actions > :only-child) > .list-actions { flex: 0 0 auto; margin-left: 0; order: 0; }
 }
 
 /* ---------- Typografická škála (v3) ----------

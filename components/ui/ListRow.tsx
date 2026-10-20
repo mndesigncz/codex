@@ -77,7 +77,7 @@ export function ListRow({
           {valueMeta != null && <span className="block text-[13px] text-black/55 leading-snug mt-0.5">{valueMeta}</span>}
         </span>
       )}
-      {maOcas && <span className={`list-tail${jenDoplnek ? ' list-tail-tichy' : ''}`}>
+      {maOcas && <span className={`list-tail${jenDoplnek ? ' list-tail-tichy' : ''}${actions && !right && aside == null ? ' list-tail-akce' : ''}`}>
         {/* Doplněk se zapíná až od `lg`, ne od `md`.
             Na 768 px se objevil, ale řádek na něj místo neměl: pevné sloupce
             (číslo 7rem + doplněk 8,5rem) plus ikona, akce a šipka vytlačily
