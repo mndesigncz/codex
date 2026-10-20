@@ -1661,33 +1661,32 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
           {tlacitko}
           {okna}
         </div>
-      ) : undefined}>
-      {/* Zapsat za člena nahoře vedle souhrnu: dole by ho u dlouhého seznamu schovalo zkrácení „Zobrazit vše". */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <p className="t-meta min-w-0" data-navic-souhrn>{souhrnText.join(' · ')}</p>
-        {tlacitko}
-      </div>
-      {velikost === 'L' && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Segmented size="sm" ariaLabel={t('Stav zápisů')} value={filtr} onChange={setFiltr}
-            options={[
-              { id: 'ceka', label: t('Čeká'), count: pocty.ceka || undefined },
-              { id: 'uznano', label: t('Uznané'), count: pocty.uznano || undefined },
-              { id: 'odmitnuto', label: t('Odmítnuté'), count: pocty.odmitnuto || undefined },
-              { id: 'vse', label: t('Vše') },
-            ]} />
-          {lide.length > 1 && (
-            <Select aria-label={t('Člověk')} value={clovek} onChange={e => setClovek(e.target.value)} className="!w-auto max-w-full">
-              <option value="">{t('Všichni')}</option>
-              {lide.map(l => <option key={l.id} value={l.id}>{l.jmeno}</option>)}
-            </Select>
-          )}
-        </div>
-      )}
+      ) : undefined}
+      // v4 skladba (spec V2 — vzor pro fázi 2): filtr Měsíc (z katalogu) a Člověk v jedné řadě ½ + ½ × 36,
+      // segment stavů L→R × 36, souhrn, seznam a „Zapsat za člena" L→R × 44 na konci (mimo zkrácení
+      // „Zobrazit vše", takže ho dlouhý seznam neschová). Dřív čip, věta, tlačítko, segment a výběr
+      // pod sebou: pět pravých hran a čtyři výšky (Martinův příklad).
+      filtry={velikost === 'L' && lide.length > 1 ? (
+        <Select aria-label={t('Člověk')} value={clovek} onChange={e => setClovek(e.target.value)} className="field-s">
+          <option value="">{t('Všichni')}</option>
+          {lide.map(l => <option key={l.id} value={l.id}>{l.jmeno}</option>)}
+        </Select>
+      ) : undefined}
+      segment={velikost === 'L' ? (
+        <Segmented size="sm" ariaLabel={t('Stav zápisů')} value={filtr} onChange={setFiltr}
+          options={[
+            { id: 'ceka', label: t('Čeká'), count: pocty.ceka || undefined },
+            { id: 'uznano', label: t('Uznané'), count: pocty.uznano || undefined },
+            { id: 'odmitnuto', label: t('Odmítnuté'), count: pocty.odmitnuto || undefined },
+            { id: 'vse', label: t('Vše') },
+          ]} />
+      ) : undefined}
+      souhrn={<span data-navic-souhrn>{souhrnText.join(' · ')}</span>}
+      patka={tlacitko || undefined}>
       {videt.length === 0 ? (
-        <p className="t-meta mt-3">{filtr === 'ceka' ? t('Nic nečeká na uznání.') : t('Pro tenhle filtr tu nic není.')}</p>
+        <p className="t-meta">{filtr === 'ceka' ? t('Nic nečeká na uznání.') : t('Pro tenhle filtr tu nic není.')}</p>
       ) : (
-        <ul className="list mt-2">
+        <ul className="list">
           {videt.map(z => (
             <NavicRadek key={z.id} z={z} smiUznat={smiUznat}
               onUznat={x => setRozhoduji({ z: x, akce: 'uznat' })} onOdmitnout={x => setRozhoduji({ z: x, akce: 'odmitnout' })} />
@@ -1786,29 +1785,25 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
           {tlacitko}
           {okna}
         </div>
-      ) : undefined}>
-      {/* Dát trest nahoře vedle souhrnu: dole by ho u dlouhého seznamu schovalo zkrácení „Zobrazit vše". */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <p className="t-meta min-w-0" data-tresty-souhrn>{souhrnText.join(' · ')}</p>
-        {tlacitko}
-      </div>
-      {L && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Segmented size="sm" ariaLabel={t('Stav trestů')} value={filtr} onChange={setFiltr}
-            options={[
-              { id: 'plati', label: t('Platné'), count: pocty.plati || undefined },
-              { id: 'spor', label: t('Nesouhlasí'), count: pocty.spor || undefined },
-              { id: 'zruseno', label: t('Zrušené'), count: pocty.zruseno || undefined },
-              { id: 'vse', label: t('Vše') },
-            ]} />
-          {lide.length > 1 && (
-            <Select aria-label={t('Člověk')} value={clovek} onChange={e => setClovek(e.target.value)} className="!w-auto max-w-full">
-              <option value="">{t('Všichni')}</option>
-              {lide.map(l => <option key={l.id} value={l.id}>{l.jmeno}</option>)}
-            </Select>
-          )}
-        </div>
-      )}
+      ) : undefined}
+      // v4 skladba (spec V2): Měsíc + Člověk ½ + ½ × 36, segment L→R × 36, souhrn, obsah, „Dát trest" L→R × 44 na konci.
+      filtry={L && lide.length > 1 ? (
+        <Select aria-label={t('Člověk')} value={clovek} onChange={e => setClovek(e.target.value)} className="field-s">
+          <option value="">{t('Všichni')}</option>
+          {lide.map(l => <option key={l.id} value={l.id}>{l.jmeno}</option>)}
+        </Select>
+      ) : undefined}
+      segment={L ? (
+        <Segmented size="sm" ariaLabel={t('Stav trestů')} value={filtr} onChange={setFiltr}
+          options={[
+            { id: 'plati', label: t('Platné'), count: pocty.plati || undefined },
+            { id: 'spor', label: t('Nesouhlasí'), count: pocty.spor || undefined },
+            { id: 'zruseno', label: t('Zrušené'), count: pocty.zruseno || undefined },
+            { id: 'vse', label: t('Vše') },
+          ]} />
+      ) : undefined}
+      souhrn={<span data-tresty-souhrn>{souhrnText.join(' · ')}</span>}
+      patka={tlacitko || undefined}>
       {sporne.length > 0 && (
         <div className="mt-3" data-tresty-sporne>
           <p className="t-label">{t('Nesouhlasí')}</p>
