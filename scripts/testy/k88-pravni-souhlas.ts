@@ -86,7 +86,7 @@ export default function ({ eq, ok }: Testy) {
 
   // ---- Stripe ----
   const billing = cti('lib/billing.ts');
-  ok('Stripe: patička faktury z lib/firma.ts u nového zákazníka i před pokladnou', /invoice_settings: \{ footer: patickaFaktury\(\) \}/.test(billing) && /nastavPatickuFaktury\(s, customer\)/.test(billing));
+  ok('Stripe: patička faktury z lib/firma.ts u nového zákazníka i před pokladnou', /invoice_settings: \{ footer: patickaFaktury\(\) \}/.test(billing) && /nastavPatickuFaktury\(s, customer(, icoPodniku)?\)/.test(billing));
   ok('Stripe: consent_collection jen s STRIPE_SOUHLAS_PODMINEK=1', /env\.STRIPE_SOUHLAS_PODMINEK === '1'/.test(billing) && /\.\.\.\(souhlasVPokladne\(\) \? \{ consent_collection: \{ terms_of_service: 'required' as const \} \} : \{\}\)/.test(billing));
 
   // ---- export ----

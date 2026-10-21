@@ -35,7 +35,7 @@ export function obchodniPodminkyCs(f: Firma): Dokument {
       { id: 'strany', h: '1. Smluvní strany', li: [
         `Poskytovatel: ${provozovatel(f, 'cs')}. Kontakt: ${kontakty(f, 'cs')}. Managero je obchodní značka poskytovatele, ne samostatná společnost.`,
         'Zákazník: podnikatel (fyzická nebo právnická osoba), který si založí podnik v Manageru nebo objedná placený tarif v rámci své podnikatelské činnosti. Službu nelze objednat jako spotřebitel.',
-        'Kdo za zákazníka podnik zakládá nebo tarif objednává, prohlašuje, že je k tomu oprávněn. Poskytovatel může požádat o doložení IČO nebo oprávnění k podnikání a bez něj placený tarif nezřídit nebo smlouvu ukončit.',
+        'Placený tarif smí objednat jen podnikatel: v pokladně uvede své IČO (identifikační číslo osoby), které uložíme k podniku a uvedeme na faktuře. Kdo za zákazníka podnik zakládá nebo tarif objednává, prohlašuje, že je k tomu oprávněn a že IČO patří zákazníkovi. Poskytovatel může požádat o doložení IČO nebo oprávnění k podnikání a bez něj placený tarif nezřídit nebo smlouvu ukončit.',
       ] },
       { id: 'pojmy', h: '2. Pojmy', li: [
         'Služba: webová aplikace Managero na managero.app a mobilní aplikace Managero (pro podnik a jeho tým) a Managero client (pro hosty podniku).',
@@ -174,7 +174,7 @@ export function obchodniPodminkyEn(f: Firma): Dokument {
       { id: 'strany', h: '1. Parties', li: [
         `Provider: ${provozovatel(f, 'en')}. Contact: ${kontakty(f, 'en')}. Managero is the provider's trade name, not a separate company.`,
         'Customer: an entrepreneur (natural or legal person) who creates a business in Managero or orders a paid plan in the course of their business. The service cannot be ordered as a consumer.',
-        'Whoever creates a business or orders a plan on behalf of the customer confirms they are authorised to do so. The provider may ask for proof of the company ID or trade licence and refuse a paid plan or end the contract without it.',
+        'Only an entrepreneur may order a paid plan: at checkout they enter their Czech company ID (IČO), which we store with the business and show on the invoice. Whoever creates a business or orders a plan on behalf of the customer confirms they are authorised to do so and that the company ID belongs to the customer. The provider may ask for proof of the company ID or trade licence and refuse a paid plan or end the contract without it.',
       ] },
       { id: 'pojmy', h: '2. Definitions', li: [
         'Service: the Managero web app at managero.app and the mobile apps Managero (for the business and its team) and Managero client (for guests of the business).',

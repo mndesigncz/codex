@@ -42,7 +42,7 @@ export function soukromiCs(f: Firma): Dokument {
         'Zařízení: token pro doručení oznámení (web, iPhone, Android) a druh zařízení.',
         'Zabezpečení: počet neúspěšných pokusů o přihlášení s e-mailem a IP adresou; technické záznamy u poskytovatele hostingu.',
         'Podpora a komunikace: co nám napíšete nebo řeknete po telefonu, a odpověď.',
-        'Podniky jako zákazníci: název, fakturační adresa, IČO nebo DIČ (pokud je vyplníte), e-mail vlastníka, tarif a historie plateb. Údaje o kartě zpracovává jen Stripe.',
+        'Podniky jako zákazníci: název, fakturační adresa, IČO (povinné při objednávce placeného tarifu), DIČ (pokud ho vyplníte), e-mail vlastníka, tarif a historie plateb. Údaje o kartě zpracovává jen Stripe.',
         'Oznámení nezákonného obsahu: jméno a e-mail oznamovatele, obsah oznámení a naše rozhodnutí.',
       ] },
       { id: 'hoste', h: 'Co se zpracovává o hostech (Managero client)', li: [
@@ -144,7 +144,7 @@ export function soukromiEn(f: Firma): Dokument {
         'Devices: a token for delivering notifications (web, iPhone, Android) and device type.',
         'Security: the number of failed sign-in attempts with email and IP address; technical logs at the hosting provider.',
         'Support and communication: what you write or tell us by phone, and our reply.',
-        'Businesses as customers: name, billing address, company ID or VAT ID (if you enter them), owner email, plan and payment history. Card details are processed only by Stripe.',
+        'Businesses as customers: name, billing address, company ID (required when ordering a paid plan), VAT ID (if you enter it), owner email, plan and payment history. Card details are processed only by Stripe.',
         'Notices of illegal content: the reporter\'s name and email, the notice and our decision.',
       ] },
       { id: 'hoste', h: 'Data about guests (Managero client)', li: [
