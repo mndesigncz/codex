@@ -1754,9 +1754,11 @@ function VyplatniListina({ nahled }: WidgetProps) {
                       {smiZapis ? <button type="button" className="rounded-sm text-left" onClick={() => setOkno({ druh: 'smlouva', id: x.id })} aria-label={t('Smlouva: {jmeno}', { jmeno: x.jmeno })}>{x.smlouva ? <ChipSmlouvy r={x} hranice={pravidla?.hraniceOdvodu ?? null} /> : <Chip tone="muted" size="sm">{t('nastavit')}</Chip>}</button> : <ChipSmlouvy r={x} hranice={pravidla?.hraniceOdvodu ?? null} />}
                     </td>}
                     {sloupecVidet('stav') && <td className="px-1.5 py-1.5 text-left">
-                      <span className="flex flex-wrap items-center gap-1.5">
+                      {/* Úzký sloupec stavu: tlačítko pod čipem přes celou šířku buňky (v4 P2) — zalomené za čip
+                          stálo samo na řádku obsahovou šířkou (sonda skladba, odhaleno ukázkou s /api/payroll). */}
+                      <span className="flex flex-col items-start gap-1.5">
                         <ChipStavu r={x} jazyk={jazyk} />
-                        {smiZapis && !vyber.selecting && x.doplatit > 0 && <Button variant="secondary" size="sm" onClick={() => setOkno({ druh: 'vyplaceno', ids: [x.id] })} aria-label={t('Vyplaceno: {jmeno}', { jmeno: x.jmeno })}>{t('Vyplaceno…')}</Button>}
+                        {smiZapis && !vyber.selecting && x.doplatit > 0 && <Button variant="secondary" size="sm" className="w-full" onClick={() => setOkno({ druh: 'vyplaceno', ids: [x.id] })} aria-label={t('Vyplaceno: {jmeno}', { jmeno: x.jmeno })}>{t('Vyplaceno…')}</Button>}
                       </span>
                     </td>}
                   </tr>

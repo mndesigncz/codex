@@ -177,7 +177,8 @@ console.log('O3 Platby');
   for (const [popis, ua, ma] of [['provoz', UA_PROVOZ, false], ['web', UA_WEB, true]]) {
     const { ctx, p } = await kontext(ua, 'employer', { width: 1280, height: 950 });
     await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
-    await p.getByText('Zabezpečení').first().waitFor({ timeout: 15000 });
+    // Viditelná položka nabídky (dřív se náhodou chytil podtitul „…oznámení a zabezpečení." — audit N: podtitul vedení je jiný).
+    await p.getByText('Zabezpečení', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
     const t = await text(p);
     tvrdi(`nastavení (${popis}): položka Předplatné ${ma ? 'je' : 'není'}`, /Předplatné/.test(t) === ma, t.slice(0, 200));
     if (!ma) tvrdi('nastavení (provoz): žádná cena a Stripe', !ZAKAZANO.test(t), t.slice(0, 200));

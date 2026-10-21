@@ -43,9 +43,10 @@ import { kontext, konec, tvrdi, otevri, lista, upravit, vUpravach, dokud, dotazy
   await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
   await p.waitForTimeout(800);
   await p.getByRole('button', { name: /Stránky/ }).filter({ visible: true }).first().click();
-  // Audit N10 (2026-10): v Nastavení má sekce jeden nadpis „Stránky" — druhý „Rozložení stránek" byl navíc.
-  const nadpis = p.getByRole('heading', { name: 'Stránky', exact: true });
-  tvrdi('2: Nastavení → Stránky ukáže nadpis „Stránky" a větu o výchozí ploše', await dokud(() => nadpis.isVisible(), 3000) && await p.getByText('Výchozí plocha pro nové lidi a tablet.', { exact: false }).isVisible());
+  // Audit N10 (2026-10): v Nastavení nese sekci nadpis „Stránky" z nabídky — druhý velký nadpis
+  // „Rozložení stránek" byl navíc; zůstala jen věta o výchozí ploše.
+  const veta = p.getByText('Výchozí plocha pro nové lidi a tablet.', { exact: false });
+  tvrdi('2: Nastavení → Stránky ukáže větu o výchozí ploše a žádný druhý nadpis „Rozložení stránek"', await dokud(() => veta.isVisible(), 5000) && await p.getByRole('heading', { name: 'Rozložení stránek' }).count() === 0);
   const skupina = p.getByRole('region', { name: 'Zaměstnanci' });
   await dokud(async () => (await skupina.innerText()).includes('Výchozí z aplikace'), 3000);
   tvrdi('2: řádek Přehled u Zaměstnanců ukazuje „Výchozí z aplikace"', (await skupina.innerText()).includes('Výchozí z aplikace'), await skupina.innerText());
@@ -85,7 +86,7 @@ import { kontext, konec, tvrdi, otevri, lista, upravit, vUpravach, dokud, dotazy
   await p.waitForTimeout(400);
   tvrdi('3: po obnovení je Předávka zpátky', await plocha.locator('li[data-widget="uzaverky.predavka"]').count() === 1);
   await p.getByRole('button', { name: 'Zpět na stránky' }).click();
-  await dokud(() => nadpis.isVisible(), 3000);
+  await dokud(() => veta.isVisible(), 3000);
   await p.waitForTimeout(600);
   tvrdi('3: seznam ukazuje „Výchozí z aplikace"', (await skupina.innerText()).includes('Výchozí z aplikace'), await skupina.innerText());
   tvrdi('bez chyb v konzoli', chyby.length === 0, chyby.join(' | ').slice(0, 300));
