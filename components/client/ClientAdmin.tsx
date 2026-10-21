@@ -622,8 +622,10 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
                     // se zalamuje, `meta` by poznámku na telefonu uřízl na „Oslav…".
                     detail={detailRezervace(r)}
                     right={<Chip tone={TON_REZERVACE[r.stav]} size="sm">{RES_STATUS[r.stav]?.label ?? r.stav}</Chip>}
+                    // Akce mají na počítači jednu šířku (Usadit + Nedorazil + ···), ať čas a stav všech
+                    // řádků stojí v jednom sloupci — dřív „Hotovo“ vs. „Usadit · Nedorazil“ posouvaly čip i čas.
                     actions={krok || nedorazil === 'tlacitko' || dalsi.length ? (
-                      <>
+                      <span className="flex items-center justify-end gap-1.5 sm:min-w-[15.5rem]">
                         {krok && (
                           <Button size="sm" variant="primary" loading={pracuji === r.id} onClick={() => { void zmenit(r, { status: krok.na }); }}
                             aria-label={`${krok.popisek}: ${r.host}, ${r.cas}`}>{krok.popisek}</Button>
@@ -634,7 +636,7 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
                             aria-label={`Nedorazil: ${r.host}, ${r.cas}`}>Nedorazil</Button>
                         )}
                         {dalsi.length > 0 && <Menu size="sm" label={`Další akce s rezervací ${r.host}`} items={dalsi} />}
-                      </>
+                      </span>
                     ) : undefined} />
                 );
               })}

@@ -136,8 +136,9 @@ export default function Domov() {
               {clenstvi.map(m => {
                 const vm = kartaZClenstvi(m, odmeny, t);
                 return (
-                  <li key={m.slug}>
-                    <KartaPodniku {...vm} href={cesta(`/client/${m.slug}`)}
+                  <li key={m.slug} className="min-w-0">
+                    {/* Dvě karty vedle sebe (lg) mají stejnou výšku — razítka vedle bodů s lištou byla nižší. */}
+                    <KartaPodniku {...vm} className="h-full" href={cesta(`/client/${m.slug}`)}
                       ariaLabel={[m.name, `${vm.cislo} ${vm.jednotka ?? ''}`, vm.pripraveno ? t('Odměna připravena') : '', vm.veta ?? ''].filter(Boolean).join(', ')} />
                   </li>
                 );
