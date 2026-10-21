@@ -2032,3 +2032,9 @@ html[data-obal] .jen-web { display: none !important; }
 @media (hover: none) {
   .t-page + p.group > button.tap-target-sm { opacity: 0.5; }
 }
+
+/* Audit 2026-10 (K04/B12): záložky tabletu, jejichž obrazovka má vlastní kontejner stránky
+   (Postupy: p-6 + max-w-5xl na střed, Uzávěrka a Návody: p-6), sedí na stejné hraně L/R
+   jako Úkoly, Sklad a Objednávky — odsazení stránky dává obal tabletu, ne obrazovka. */
+.kiosk-zalozka > :first-child { padding: 0; max-width: none; margin-left: 0; margin-right: 0; }
+.kiosk-zalozka .plocha { padding-left: 0; padding-right: 0; padding-top: 0; }

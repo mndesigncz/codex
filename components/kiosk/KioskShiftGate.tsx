@@ -794,12 +794,13 @@ function PrepinacOsoby({ active, onShift }: { active: ActivePerson; onShift: Ros
   const lzePrepnout = onShift.length > 1;
   const lzePridat = offShift.length > 0;
   const interaktivni = lzePrepnout || lzePridat;
-  const tvar = 'flex items-center gap-2.5 rounded-full pl-2.5 pr-4 py-2 min-h-[44px]';
+  // max-w-full + min-w-0: na telefonu se čip zúží (jméno se zkrátí „…") a nepřeleze hodiny vedle.
+  const tvar = 'flex items-center gap-2.5 rounded-full pl-2.5 pr-4 py-2 min-h-[44px] max-w-full min-w-0';
   const vzhled = `btn-secondary ${tvar} transition`;
   const obsah = (
     <>
       <Avatar emoji={active.avatar} size="sm" ring={false} />
-      <span className="text-left leading-tight min-w-0">
+      <span className="text-left leading-tight min-w-0 flex-1">
         {/* Na telefonu popisek ustoupí jménu — 49 px na „Eva Testová" nestačilo. */}
         <span className="hidden sm:block t-label">{t('Zapisuje se jako')}</span>
         <span className="block font-bold text-[#16181A] text-sm truncate max-w-[7rem] sm:max-w-[11rem]">{active.name}</span>
@@ -817,7 +818,7 @@ function PrepinacOsoby({ active, onShift }: { active: ActivePerson; onShift: Ros
   }
 
   return (
-    <div ref={pop.ref} className="relative">
+    <div ref={pop.ref} className="relative min-w-0 max-w-full">
       <button
         type="button"
         ref={pop.triggerRef}
@@ -830,7 +831,7 @@ function PrepinacOsoby({ active, onShift }: { active: ActivePerson; onShift: Ros
         className={vzhled}
       >
         {obsah}
-        <Icon name="chevron" size={15} className="text-black/35" />
+        <Icon name="chevron" size={15} className="shrink-0 text-black/35" />
       </button>
 
       {open && (
