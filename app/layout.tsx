@@ -70,7 +70,7 @@ export default async function RootLayout({
   const jazyk = await getJazyk();
   const slovniky = jazyk === 'cs' ? undefined : await nactiSekce(jazyk, SEKCE_VZDY);
   return (
-    <html lang={jazyk} className={`${sans.variable} ${mono.variable}`} data-obal={obal ?? undefined}>
+    <html lang={jazyk} className={`${sans.variable} ${mono.variable}`} data-obal={obal ?? undefined} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

@@ -298,8 +298,9 @@ async function host(viewport, mobil) {
   p.on('pageerror', e => chyby.push(String(e)));
   p.on('console', msg => { if (msg.type() === 'error' && !/Failed to load resource/.test(msg.text())) chyby.push(msg.text()); });
 
-  // Moje
-  await p.goto(BASE + '/client/me', { waitUntil: 'networkidle' });
+  // Přestavba hosta (2026-10-21): Moje už pole „Mám poukaz“ nemá (Odměny mají jedno pole „Mám kód“, které
+  // poukaz rovnou přidá); ověření zůstatku bez účtu je na stránce podniku. Obě části proto jdou na podnik.
+  await p.goto(BASE + '/client/kavarna-u-lipy', { waitUntil: 'networkidle' });
   await p.getByLabel('Kód z poukazu').or(p.getByPlaceholder('Kód z poukazu')).first().waitFor({ timeout: 10000 });
   await p.getByPlaceholder('Kód z poukazu').fill('abcd 2345');
   tvrdi(`${jm} Moje: kód se formátuje`, (await p.getByPlaceholder('Kód z poukazu').inputValue()) === 'ABCD-2345');

@@ -78,13 +78,15 @@ export default function KartaPodniku(p: KartaPodnikuProps) {
           <p className="text-[15px] font-semibold leading-tight tracking-[-0.01em] truncate">{p.nazev}</p>
           {p.podtitul && <p className="h-karta-tlume text-[13px] leading-snug mt-0.5 truncate">{p.podtitul}</p>}
         </div>
-        {p.pripraveno && <span className="h-pripraveno shrink-0"><Icon name="check" size={13} strokeWidth={2.2} />{p.pripraveno}</span>}
-        {!p.pripraveno && p.qr && <span className="shrink-0">{p.qr}</span>}
+        {p.qr && <span className="shrink-0">{p.qr}</span>}
       </div>
-      <p className="mt-4 flex items-baseline gap-1.5 min-w-0">
-        <span className="text-[2.125rem] font-semibold leading-none tracking-[-0.03em] tabular-nums">{p.cislo}</span>
-        {p.jednotka && <span className="h-karta-tlume text-[15px] font-medium truncate">{p.jednotka}</span>}
-      </p>
+      <div className="mt-4 flex items-end gap-3 min-w-0">
+        <p className="flex items-baseline gap-1.5 min-w-0 flex-1">
+          <span className="text-[2.125rem] font-semibold leading-none tracking-[-0.03em] tabular-nums">{p.cislo}</span>
+          {p.jednotka && <span className="h-karta-tlume text-[15px] font-medium truncate">{p.jednotka}</span>}
+        </p>
+        {p.pripraveno && <span className="h-pripraveno shrink-0"><Icon name="check" size={13} strokeWidth={2.2} />{p.pripraveno}</span>}
+      </div>
       {p.prahy && p.prahy.prahy.length > 0 && <LisaBodu body={p.prahy.body} prahy={p.prahy.prahy} />}
       {p.veta && <p className="h-karta-tlume mt-2.5 text-[13px] leading-snug text-pretty">{p.veta}</p>}
       {p.children}

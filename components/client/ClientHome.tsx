@@ -58,6 +58,12 @@ export default function ClientHome() {
               </Link>
             </div>
           )}
+          {!signedIn && (
+            <p className="mt-4 text-sm text-black/60">
+              {t('Chceš to nejdřív vidět?')}{' '}
+              <Link href="/client/demo" className="tap-target-sm font-semibold text-black/80 underline underline-offset-2">{t('Projdi si ukázku bez účtu')}</Link>
+            </p>
+          )}
         </div>
         <div className="md:justify-self-end w-full md:max-w-xs space-y-5">
           <div>

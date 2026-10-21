@@ -67,7 +67,8 @@ for (const sirka of [390, 1280]) {
   await p.locator('[data-banner="41"]').getByRole('button', { name: 'Ukázat kupon', exact: true }).click();
   await p.waitForTimeout(500);
   tvrdi(`${L}: proklik banneru se zapsal`, udalosti.some(x => x.type === 'click' && x.id === 41), JSON.stringify(udalosti));
-  tvrdi(`${L}: banner na kupon otevřel Věrnost`, await p.getByRole('tab', { name: /Věrnost/ }).getAttribute('aria-selected') === 'true');
+  // Přestavba hosta: stránka podniku nemá záložky; banner na kupon skočí na „Co dostaneš“ (odměny podniku).
+  tvrdi(`${L}: banner na kupon skočil na odměny podniku`, await p.evaluate(() => { const r = document.getElementById('odmeny-podniku')?.getBoundingClientRect(); return !!r && r.top < window.innerHeight && r.bottom > 0; }));
   const text = await p.locator('body').innerText();
   tvrdi(`${L}: kupon, který brzy končí, má „Vyprší za 3 dny“`, /Vyprší za 3 dny/.test(text), text.slice(0, 200));
   tvrdi(`${L}: vyzvednutý kupon má platnost`, (text.match(/Vyprší za 3 dny/g) ?? []).length >= 2);

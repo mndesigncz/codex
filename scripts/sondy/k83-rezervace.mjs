@@ -8,6 +8,10 @@
 //  • odeslání pošle POST s časem z nabídky a potvrzenou rezervaci (auto-potvrzení) ohlásí
 //    jako potvrzenou;
 //  • německy bez přetečení.
+// Přestavba hosta (2026-10-21): rezervace je okno s čipy dnů a časů (koncept B 7), ne formulář
+// s <input type=date> a <select>. Čas = čip v radiogroup „Čas“, den = čip „Dnes / Zítra…“;
+// dostupnost dává /api/client/b/[slug]/sloty — tady nepodvržená, takže okno spadne na časy
+// z otevírací doby (stejná pravidla předstihu) a sonda tvrdí totéž co dřív.
 // Vedení: Nastavení › Rezervace a objednávky — přepínač „Potvrzovat rezervace automaticky"
 // a hranice skupiny se uloží PUTem; Objednávky › Fronta ukáže ručně zapsanou rezervaci se jménem.
 //
@@ -52,9 +56,11 @@ async function stranka(p) {
   await p.goto(`${BASE}/client/kavarna-u-lipy?tab=reserve`, { waitUntil: 'networkidle' });
   await p.waitForSelector('h1', { timeout: 30000 });
   await p.getByRole('heading', { name: 'Rezervovat stůl' }).waitFor({ timeout: 10000 });
-  await p.waitForTimeout(400);
+  await p.waitForTimeout(600);
 }
-const casy = (p) => p.locator('#r-time option').allTextContents();
+// Skupiny v okně: první = dny, druhá = časy (názvy skupin jsou přeložené, tak podle pořadí).
+const casy = (p) => p.locator('.modal-sheet [role="radiogroup"]').nth(1).locator('[role="radio"]').evaluateAll(els => els.filter(e => !e.disabled).map(e => e.textContent.trim())).catch(() => []);
+const vybranyDen = (p) => p.locator('.modal-sheet [role="radiogroup"]').first().locator('[aria-checked="true"]').innerText().catch(() => '');
 const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
 // ---------------------------------------------------------------------------
@@ -67,14 +73,14 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
   const c = await casy(p);
   tvrdi('H1: v 15:00 se nenabídne 8:00', c.length > 0 && !c.includes('08:00'), c.join(','));
   tvrdi('H1: první nabízený čas je 15:30 (předstih 30 minut), poslední 17:00', c[0] === '15:30' && c.at(-1) === '17:00', c.join(','));
-  tvrdi('H1: den je dnešek', await p.locator('#r-date').inputValue() === dnes);
-  await p.locator('#r-date').fill(zitra);
-  await p.waitForTimeout(300);
+  tvrdi('H1: den je dnešek', /Dnes/.test(await vybranyDen(p)));
+  await p.getByRole('radio', { name: 'Zítra', exact: true }).click();
+  await p.waitForTimeout(400);
   const cz = await casy(p);
   tvrdi('H1: zítra beze změny — od otevření 8:00', cz[0] === '08:00', cz.join(','));
-  await p.locator('#r-date').fill(dnes);
-  await p.waitForTimeout(300);
-  await p.getByRole('button', { name: 'Odeslat rezervaci' }).click();
+  await p.getByRole('radio', { name: 'Dnes', exact: true }).click();
+  await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Rezervovat 15:30/ }).click();
   const b = await dokud(() => (stav.rezervace ?? []).at(-1), 3000);
   tvrdi('H1: odeslání pošle POST s dnešním dnem a časem z nabídky (15:30)', !!b && b.date === dnes && b.time === '15:30', JSON.stringify(b));
   tvrdi('H5: rezervaci potvrzenou automaticky ohlásí jako potvrzenou', await dokud(() => p.getByText('Rezervace je potvrzená. Těšíme se na tebe.').isVisible(), 3000));
@@ -97,15 +103,15 @@ for (const jazyk of ['cs', 'de', 'pl']) {
   const veta = { cs: 'Dnes už se nedá rezervovat, vyber zítřek.', de: 'Heute kann man nicht mehr reservieren, wähl morgen.', pl: 'Na dziś nie da się już zarezerwować, wybierz jutro.' }[jazyk];
   const zitraTl = { cs: 'Zítra', de: 'Morgen', pl: 'Jutro' }[jazyk];
   tvrdi(`H2 ${jazyk}: ve 21:00 „${veta}"`, await dokud(() => p.getByText(veta).isVisible(), 3000));
-  tvrdi(`H2 ${jazyk}: žádný výběr času a odeslání zamčené`, await p.locator('#r-time').count() === 0 && await p.locator('form button[type="submit"]').isDisabled());
+  tvrdi(`H2 ${jazyk}: žádný výběr času a odeslání zamčené`, (await casy(p)).length === 0 && await p.locator('.modal-sheet button.btn-accent').isDisabled());
   tvrdi(`H2 ${jazyk}: bez přetečení`, await bezPreteceni(p));
   if (jazyk === 'cs') await p.screenshot({ path: OUT + 'k83-rezervace-host-vecer.png', fullPage: true });
-  const tl = p.getByRole('button', { name: zitraTl, exact: true });
+  const tl = p.getByRole('radio', { name: zitraTl, exact: true });
   const box = await tl.boundingBox();
   tvrdi(`H2 ${jazyk}: tlačítko „${zitraTl}" má aspoň 44 px`, !!box && box.height >= 44, JSON.stringify(box));
   await tl.click();
   await p.waitForTimeout(300);
-  tvrdi(`H2 ${jazyk}: „${zitraTl}" přepne den na zítřek a nabídne časy od 8:00`, await p.locator('#r-date').inputValue() === zitra && (await casy(p))[0] === '08:00');
+  tvrdi(`H2 ${jazyk}: „${zitraTl}" přepne den na zítřek a nabídne časy od 8:00`, (await vybranyDen(p)) === zitraTl && (await casy(p))[0] === '08:00');
   tvrdi(`H2 ${jazyk}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }

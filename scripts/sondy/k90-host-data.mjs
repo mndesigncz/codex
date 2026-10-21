@@ -68,7 +68,8 @@ for (const [nazev, viewport, mobil] of VELIKOSTI) {
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ dostupne: true, podniky: stav }) });
   });
   await ctx.route('**/api/client/account/export', r => { exportu++; return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-disposition': 'attachment; filename="x.json"' }, body: JSON.stringify({ aplikace: 'Managero client' }) }); });
-  await p.goto(BASE + '/client/me', { waitUntil: 'networkidle' }).catch(() => {});
+  // Přestavba hosta: souhlasy, export a smazání jsou na stránce Moje (profil z avataru), /client/me/profil.
+  await p.goto(BASE + '/client/me/profil', { waitUntil: 'networkidle' }).catch(() => {});
   const sekce = p.locator('[data-souhlasy-podniku]');
   await sekce.waitFor({ timeout: 15000 }).catch(() => {});
   tvrdi(`${nazev}: souhlasy po podnicích jsou`, await sekce.count() === 1);

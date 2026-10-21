@@ -95,7 +95,7 @@ export default function ClientShell({ me: meServer, children }: { me: ClientUser
     <HostCestyProvider demo={demo}>
       <HostShellKontext.Provider value={kontext}>
         <UKasyProvider prihlasen={!!me}>
-          <div className="min-h-[100dvh] flex flex-col" style={{ background: 'var(--bg)' }}>
+          <div className="min-h-[100dvh] flex flex-col">
             {demo && <DemoPruh />}
             {me ? <ListaPrihlaseny me={me} polozky={polozky} c={c} /> : <ListaHost />}
             <main className={`flex-1 w-full mx-auto max-w-5xl px-4 min-[360px]:px-5 sm:px-6 ${me ? 'pt-[max(env(safe-area-inset-top),20px)] md:pt-10 pb-32 md:pb-12' : 'pt-6 sm:pt-10 pb-6 sm:pb-10'}`}>{children}</main>
@@ -153,7 +153,6 @@ function ListaHost() {
 function ListaPrihlaseny({ me, polozky, c }: { me: ClientUser; polozky: readonly Polozka[]; c: (x: string) => string }) {
   const t = useT('klient-host');
   const { otevri } = useUKasy();
-  const { otevriNajit, skenPopis, skenIkona } = useHostShell();
   return (
     <header className="hidden md:block sticky top-0 z-30 chrome-edge">
       <div className="glass-strong !border-x-0 !border-t-0 !shadow-none border-b border-black/[0.06]">
@@ -172,8 +171,6 @@ function ListaPrihlaseny({ me, polozky, c }: { me: ClientUser; polozky: readonly
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <button type="button" onClick={otevriNajit} aria-label={skenIkona === 'camera' ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')} title={skenPopis}
-              className="tap-target btn-icon !h-10 !w-10"><Icon name={skenIkona} size={17} /></button>
             <button type="button" onClick={() => otevri()} className="btn btn-primary !h-10 !px-4 text-sm"><Icon name="qr" size={16} /> {t('Ukázat kartu')}</button>
             <Link href={c('/client/me/profil')} className="tap-target rounded-full" aria-label={t('Moje')} title={me.name}><AvatarHosta name={me.name} size={40} /></Link>
           </div>

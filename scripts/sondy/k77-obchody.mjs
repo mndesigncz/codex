@@ -259,8 +259,9 @@ console.log('O5 Smazání účtu');
   }
 
   // Host: Profil → Smazat účet → heslo → DELETE → odhlášení na /client.
+  // Přestavba hosta: účet a smazání jsou na stránce Moje (profil z avataru), /client/me/profil.
   {
-    const { ctx, p, smazani } = await ucet('customer', UA_KLIENT, '/client/me', [{ status: 200, body: { ok: true, smazanePodniky: 0 } }]);
+    const { ctx, p, smazani } = await ucet('customer', UA_KLIENT, '/client/me/profil', [{ status: 200, body: { ok: true, smazanePodniky: 0 } }]);
     await p.locator('#ucet').scrollIntoViewIfNeeded();
     await p.getByRole('button', { name: 'Smazat účet' }).first().click();
     const okno = p.getByRole('dialog');
@@ -276,7 +277,7 @@ console.log('O5 Smazání účtu');
   }
   // Špatné heslo: okno zůstane a řekne proč.
   {
-    const { ctx, p, smazani } = await ucet('customer', UA_KLIENT, '/client/me', [{ status: 400, body: { error: 'Heslo není správné.' } }]);
+    const { ctx, p, smazani } = await ucet('customer', UA_KLIENT, '/client/me/profil', [{ status: 400, body: { error: 'Heslo není správné.' } }]);
     await p.getByRole('button', { name: 'Smazat účet' }).first().click();
     const okno = p.getByRole('dialog');
     await okno.getByLabel('Heslo').fill('spatne-heslo-1');
@@ -328,6 +329,8 @@ console.log('O6 Reset hesla a O8 souhlas s novinkami');
   });
   const p = await ctx.newPage();
   await p.goto(BASE + '/client/login', { waitUntil: 'networkidle' });
+  // Přestavba hosta: výchozí je přihlášení kódem z e-mailu, heslo je druhá záložka.
+  await p.getByRole('tab', { name: 'Heslo' }).click();
   tvrdi('přihlášení hosta nabízí Zapomenuté heslo', await p.getByRole('link', { name: 'Zapomenuté heslo' }).count() === 1);
   await p.getByRole('link', { name: 'Zapomenuté heslo' }).click();
   await p.waitForURL(/zapomenute-heslo/);
@@ -383,7 +386,7 @@ console.log('O6 Reset hesla a O8 souhlas s novinkami');
     return json({});
   });
   const q = await ctx2.newPage();
-  await q.goto(BASE + '/client/me', { waitUntil: 'networkidle' });
+  await q.goto(BASE + '/client/me/profil', { waitUntil: 'networkidle' }); // přestavba hosta: souhlasy jsou na stránce Moje (profil)
   const prepinac = q.getByRole('switch', { name: 'Novinky a akce od podniků' });
   tvrdi('souhlas s novinkami: v profilu je vypnutý, dokud ho host nezapne', await prepinac.count() === 1 && (await prepinac.getAttribute('aria-checked')) === 'false');
   await prepinac.click();

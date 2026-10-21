@@ -51,7 +51,7 @@ export default function Podniky() {
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center gap-3">
         <h1 className="t-page flex-1 min-w-0">{t('Podniky')}</h1>
-        <button type="button" onClick={otevriNajit} className="btn btn-secondary !h-10 shrink-0" aria-label={skenIkona === 'camera' ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}>
+        <button type="button" onClick={otevriNajit} className="btn btn-secondary !h-11 shrink-0" aria-label={skenIkona === 'camera' ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}>
           <Icon name={skenIkona} size={17} />{skenPopis}
         </button>
       </div>

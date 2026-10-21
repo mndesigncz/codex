@@ -26,6 +26,7 @@ import { okJson, apiMessage } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import PromoBanners from './PromoBanners';
+import MamPoukaz from './MamPoukaz';
 import { SkonceneKarticky } from './loyalty/KartaRazitek';
 import HostHistorie from './loyalty/HostHistorie';
 import HostPravidla from './loyalty/HostPravidla';
@@ -126,8 +127,11 @@ export default function BusinessPage({ slug }: { slug: string }) {
     <div>
       <Hlavicka b={b} today={today} onRezervovat={b.reservationsOn ? () => setRezervace(true) : null} onMenu={() => skok('menu')} />
 
-      <div className="mt-5 space-y-8 sm:space-y-10">
-        {flash && <p role="status" className="toast-in note note-ok">{flash}</p>}
+      {flash && <p role="status" className="mt-5 toast-in note note-ok">{flash}</p>}
+      {/* Telefon: jeden sloupec. Monitor: vlevo moje karta, dnes, odměny a rezervace (drží se při posouvání),
+          vpravo akce, menu, novinky a informace — host u stolu na tabletu nemá kartu přes celou šířku. */}
+      <div className="mt-5 md:mt-8 grid grid-cols-1 md:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] gap-8 sm:gap-10 items-start">
+        <div className="space-y-8 sm:space-y-10 md:sticky md:top-24 min-w-0">
 
         {/* Členství: karta podniku s razítky a daty návštěv, nebo vstup s tím, co host dostane hned. */}
         <section id="vernost" aria-label={t('Věrnost')} className="scroll-mt-6 space-y-3">
@@ -165,6 +169,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
         {b.loyaltyOn && <Zebricek slug={slug} b={b} me={me} today={today} campaigns={d.stampCampaigns ?? []} coupons={d.coupons ?? []} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); void obnovHosta(); }} />}
 
         {d.signedIn && b.reservationsOn && (me?.reservations?.length ?? 0) > 0 && <MojeRezervace slug={slug} me={me} onDone={(m: string) => { setFlash(m); load(); }} />}
+        </div>
+        <div className="space-y-8 sm:space-y-10 min-w-0">
 
         {(d.events?.length ?? 0) > 0 && <Akce events={d.events} b={b} slug={slug} signedIn={d.signedIn} />}
 
@@ -199,12 +205,15 @@ export default function BusinessPage({ slug }: { slug: string }) {
             <HostPravidla b={b} campaigns={d.stampCampaigns ?? []} />
             {me?.member && <SkonceneKarticky list={me.endedCampaigns ?? []} />}
             {signedIn && <HostHistorie slug={slug} className="mt-5 border-t border-black/[0.06] pt-4" />}
+            {/* Zůstatek dárkového poukazu jde ověřit i bez účtu (kód z poukazu, jen čtení). */}
+            <div className="mt-5 border-t border-black/[0.06] pt-4"><MamPoukaz slug={slug} prihlasen={signedIn} /></div>
             <p className="mt-4 t-meta text-pretty">{t('Máš promo kód nebo dárkový poukaz?')} <Link href={cesta('/client/me/odmeny')} className="font-semibold text-black/80 underline underline-offset-2 tap-target-sm">{t('Zadej ho v Odměnách')}</Link></p>
           </section>
         )}
+        </div>
       </div>
 
-      {rezervace && <Rezervace slug={slug} nazev={b.name} adresa={b.address} maxOsob={b.maxParty || 8} dnes={today} prihlasen={!!d.signedIn} onClose={() => setRezervace(false)} onHotovo={() => { load(); }} />}
+      {rezervace && <Rezervace slug={slug} nazev={b.name} adresa={b.address} maxOsob={b.maxParty || 8} dnes={today} prihlasen={!!d.signedIn} hodiny={b.hours} krok={b.slotMinutes} dopredu={b.leadDays} onClose={() => setRezervace(false)} onHotovo={(m: string) => { setFlash(m); load(); }} />}
     </div>
   );
 }
@@ -229,7 +238,7 @@ function Hlavicka({ b, today, onRezervovat, onMenu }: { b: any; today: string; o
   ];
   return (
     <div>
-      <section className="h-karta -mx-4 min-[360px]:-mx-5 sm:mx-0 -mt-[max(env(safe-area-inset-top),20px)] md:mt-0 !rounded-t-none sm:!rounded-t-[28px] !rounded-b-[28px] !px-5 sm:!px-7 pt-[calc(max(env(safe-area-inset-top),20px)+4px)] md:pt-6 pb-12"
+      <section className="h-karta -mx-4 min-[360px]:-mx-5 sm:mx-0 -mt-[max(env(safe-area-inset-top),20px)] md:mt-0 !rounded-t-none sm:!rounded-t-[28px] !rounded-b-[28px] !px-5 sm:!px-7 !pt-[calc(max(env(safe-area-inset-top),20px)+4px)] md:!pt-6 !pb-14"
         style={{ ['--k-bg' as any]: bg, ['--k-ink' as any]: ink }}>
         <div className="flex items-center justify-between">
           <Link href={cesta('/client')} className="tap-target grid h-10 w-10 place-items-center rounded-full" style={{ background: 'color-mix(in srgb, var(--k-ink) 16%, transparent)' }} aria-label={t('Zpět na podniky')}><Icon name="chevronLeft" size={18} /></Link>
@@ -481,11 +490,11 @@ function MojeRezervace({ slug, me, onDone }: { slug: string; me: any; onDone: (m
                   {r.status === 'confirmed' ? (potvrzeno
                     ? <span className="chip chip-ok !h-9 justify-center"><Icon name="check" size={13} />{t('Potvrzeno tebou')}</span>
                     : <button type="button" onClick={() => { void potvrdit(r.id); }} disabled={potvrzuji === r.id}
-                        className="tap-target-sm inline-flex items-center justify-center gap-1.5 btn btn-primary btn-sm !h-9 disabled:opacity-50"
+                        className="tap-target inline-flex items-center justify-center gap-1.5 btn btn-primary btn-sm !h-9 disabled:opacity-50"
                         aria-label={t('Potvrdit rezervaci {kdy}', { kdy: `${fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} ${r.time}` })}>
                         <Icon name="check" size={14} />{potvrzuji === r.id ? '…' : t('Potvrdit', undefined, 'rezervace')}
                       </button>) : <span />}
-                  <button type="button" onClick={() => setZrusitId(r.id)} className="tap-target-sm btn btn-secondary btn-sm !h-9">{t('Zrušit', undefined, 'rezervace')}</button>
+                  <button type="button" onClick={() => setZrusitId(r.id)} className="tap-target btn btn-secondary btn-sm !h-9">{t('Zrušit', undefined, 'rezervace')}</button>
                 </div>
               )}
             </li>

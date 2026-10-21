@@ -13,15 +13,19 @@ import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import { okJson } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
-import { dayPlus } from '@/lib/pragueTime';
+import { dayPlus, pragueHM } from '@/lib/pragueTime';
+import { slotsFor, nejdriveDnes, type OpeningHours } from '@/lib/clientSlots';
 import { obnovHosta } from './data';
 import { useCesta } from './cesty';
 
 interface Sloty { den: string; osob: number; kapacita: boolean; sloty: { cas: string; volno: boolean }[]; dny: { den: string; otevreno: boolean }[] }
 const PRILEZITOSTI = ['Narozeniny', 'Rande', 'Pracovní', 'S dětmi'] as const; // i18n-ok: klíče slovníku, překládá se při vykreslení
 
-export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlasen, onClose, onHotovo }: {
-  slug: string; nazev: string; adresa: string; maxOsob: number; dnes: string; prihlasen: boolean; onClose: () => void; onHotovo: (zprava: string) => void;
+export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlasen, hodiny, krok = 30, dopredu = 30, onClose, onHotovo }: {
+  slug: string; nazev: string; adresa: string; maxOsob: number; dnes: string; prihlasen: boolean;
+  /** Otevírací doba podniku: náhradní časy, když server dostupnost nevrátí (výpadek) — pak bez „volné“. */
+  hodiny?: OpeningHours | null; krok?: number; dopredu?: number;
+  onClose: () => void; onHotovo: (zprava: string) => void;
 }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
@@ -40,14 +44,26 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
   useEffect(() => {
     let zivy = true;
     setNacitam(true); setChyba('');
-    fetch(`/api/client/b/${encodeURIComponent(slug)}/sloty?den=${den}&osob=${osob}`, { cache: 'no-store' }).then(okJson).then((x: Sloty) => {
+    // Náhrada bez serveru: časy z otevírací doby (a předstih pro dnešek), kapacita neznámá.
+    const zHodin = (): Sloty => ({
+      den, osob, kapacita: false,
+      sloty: slotsFor(hodiny, den, krok, den === dnes ? nejdriveDnes(pragueHM()) : undefined).map(cas => ({ cas, volno: true })),
+      dny: Array.from({ length: Math.min(dopredu, 13) + 1 }, (_, i) => dayPlus(dnes, i)).map(d => ({ den: d, otevreno: slotsFor(hodiny, d, krok).length > 0 })),
+    });
+    fetch(`/api/client/b/${encodeURIComponent(slug)}/sloty?den=${den}&osob=${osob}`, { cache: 'no-store' }).then(okJson).then((odpoved: Sloty) => {
       if (!zivy) return;
+      const x = Array.isArray(odpoved?.sloty) ? odpoved : zHodin();
       setSloty(x);
       // Vybraný čas zůstane, jen když je pořád volný; jinak první volný.
       setCas(c => (x.sloty ?? []).some(s => s.cas === c && s.volno) ? c : ((x.sloty ?? []).find(s => s.volno)?.cas ?? ''));
-    }).catch(e => { if (zivy) setChyba(String(e?.message || t('Časy se nenačetly.'))); }).finally(() => { if (zivy) setNacitam(false); });
+    }).catch(() => {
+      if (!zivy) return;
+      const x = zHodin();
+      setSloty(x);
+      setCas(c => x.sloty.some(s => s.cas === c) ? c : (x.sloty[0]?.cas ?? ''));
+    }).finally(() => { if (zivy) setNacitam(false); });
     return () => { zivy = false; };
-  }, [slug, den, osob, t]);
+  }, [slug, den, osob, hodiny, krok, dopredu, dnes]);
 
   const dny = sloty?.dny?.length ? sloty.dny : Array.from({ length: 7 }, (_, i) => ({ den: dayPlus(dnes, i), otevreno: true }));
   const nazevDne = (d: string) => d === dnes ? t('Dnes') : d === dayPlus(dnes, 1) ? t('Zítra') : fmtDatum(d, { jazyk, styl: 'denKratce' });
@@ -105,7 +121,7 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
             <p className="mt-5 text-[15px] font-semibold">{t('Den')}</p>
             <div className="mt-2.5 -mx-5 sm:-mx-6 px-5 sm:px-6 flex gap-2 overflow-x-auto scroll-fade-x pb-1" role="radiogroup" aria-label={t('Den')}>
               {dny.map(d => (
-                <button key={d.den} type="button" role="radio" aria-checked={den === d.den} disabled={!d.otevreno} onClick={() => setDen(d.den)} className="h-cip shrink-0 tap-target-sm cz-sentence">{nazevDne(d.den)}</button>
+                <button key={d.den} type="button" role="radio" aria-checked={den === d.den} disabled={!d.otevreno && d.den !== dnes} onClick={() => setDen(d.den)} className="h-cip h-cas shrink-0 cz-sentence">{nazevDne(d.den)}</button>
               ))}
             </div>
 
