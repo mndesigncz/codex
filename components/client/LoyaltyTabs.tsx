@@ -43,22 +43,25 @@ import { BodyPrehledy } from './loyalty/BodyPrehledy';
 import BodyZdroje from './loyalty/BodyZdroje';
 import { KonceptPanel, VerzePravidel, useKoncept } from './loyalty/BodyKoncept';
 import { usePlan } from '../Pro';
+import ProgramVernosti from './sprava/ProgramVernosti';
 import { MAX_ONLY_MSG } from '@/lib/plan';
 import { validujPravidla, novaPolePravidel, MAX_PRAH_NAVSTEV, MAX_PRAH_UTRATY, MAX_BODU_ZA_100, MAX_CASHBACK_PCT } from '@/lib/bodyPravidla';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
 // za to má) a „Kupony" s „Promo kódy" taky (co host uplatní).
-export type LoyaltySub = 'overview' | 'points' | 'bonus' | 'stamps' | 'coupons' | 'vouchers';
+export type LoyaltySub = 'program' | 'overview' | 'points' | 'bonus' | 'stamps' | 'coupons' | 'vouchers';
 export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
-  { id: 'overview', label: 'Přehled' },
+  { id: 'program', label: 'Program' },
+  { id: 'stamps', label: 'Razítka' },
   { id: 'points', label: 'Body a úrovně' },
   { id: 'bonus', label: 'Akce a bonusy' },
-  { id: 'stamps', label: 'Razítka' },
+  { id: 'overview', label: 'Přehled' },
   { id: 'coupons', label: 'Kupony a kódy' },
   { id: 'vouchers', label: 'Poukazy' },
 ];
 const KLIC_CASTI: Record<LoyaltySub, readonly string[]> = {
+  program: ['vernost.zobrazit'],
   overview: ['vernost.zobrazit'],
   points: ['vernost.zobrazit'],
   bonus: ['vernost.zobrazit'],
@@ -632,6 +635,7 @@ function BonusAkce({ toast }: { toast: (m: string) => void }) {
 // ---- Rozcestník (plocha stránky Věrnost) ---------------------------------------
 
 const POPIS_CASTI: Record<LoyaltySub, string> = {
+  program: 'Jak hosté sbírají, co za to dostanou a jak to vypadá v jejich telefonu.',
   overview: 'Jak si věrnostní program vede a co se v něm poslední dobou dělo.',
   points: 'Za co host dostane body, kolik se mu vrátí jako kredit, a jaké úrovně a slevy si tím odemyká.',
   bonus: 'Časově omezené akce: dvojnásobné body v happy hour, razítka navíc v úterý. Platí samy podle dne a hodiny.',
@@ -641,7 +645,9 @@ const POPIS_CASTI: Record<LoyaltySub, string> = {
 };
 
 /** Kolo 92: Kupony a kódy a Poukazy se přestěhovaly do Věrnost → Kupony a poukazy (components/client/sprava/KuponyAPoukazy). */
-const CASTI_PROGRAMU: LoyaltySub[] = ['overview', 'points', 'bonus', 'stamps'];
+// Kolo 92: „Program" je jedna stránka se živým náhledem karty (sprava/ProgramVernosti); podrobné
+// editory zůstávají jako další části, otevírá je „Upravit" z Programu.
+const CASTI_PROGRAMU: LoyaltySub[] = ['program', 'points', 'stamps', 'bonus', 'overview'];
 
 export default function LoyaltyTabs({ toast, oznam, otevriCast }: {
   toast: (m: string) => void; oznam: (text: string, ton?: 'ok' | 'bad') => void;
@@ -651,12 +657,13 @@ export default function LoyaltyTabs({ toast, oznam, otevriCast }: {
   // Části jako záložky aplikace: podle `ma` (do načtení oprávnění všechny, pak jen povolené).
   const { ma } = useOpravneni();
   const casti = LOYALTY_SUBS.filter(c => CASTI_PROGRAMU.includes(c.id) && ma(KLIC_CASTI[c.id]));
-  const [volba, setVolba] = useState<LoyaltySub>(otevriCast?.id ?? 'overview');
+  const [volba, setVolba] = useState<LoyaltySub>(otevriCast?.id ?? 'program');
   useEffect(() => { if (otevriCast) setVolba(otevriCast.id); }, [otevriCast]);
   const sub: LoyaltySub | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [ukladam, setUkladam] = useState(false);
   const { max: maMax } = usePlan();
-  const nastroj0 = sub === 'overview' ? <Overview toast={toast} oznam={oznam} />
+  const nastroj0 = sub === 'program' ? <ProgramVernosti otevri={setVolba} bonusy={<BonusAkce toast={toast} />} />
+    : sub === 'overview' ? <Overview toast={toast} oznam={oznam} />
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'bonus' ? <BonusAkce toast={toast} />
     : sub === 'stamps' ? <Stamps toast={toast} />
@@ -667,7 +674,7 @@ export default function LoyaltyTabs({ toast, oznam, otevriCast }: {
     <PlochaWidgetu
       stranka="vedeni.klient_vernost"
       hlavicka={{
-        title: 'Věrnost',
+        title: 'Věrnostní program',
         hintId: sub ? `loyalty-${sub}` : undefined,
         subtitle: sub ? POPIS_CASTI[sub] : undefined,
         // Jediné „Uložit" pro body, cashback i úrovně (dřív tři limetky pod sebou).

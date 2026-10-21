@@ -158,7 +158,7 @@ export function hodnoceni(dnes: string): any[] {
 /** Profil podniku (tvar /api/client/admin/profile). */
 export function profil(): any {
   return {
-    enabled: true, slug: SLUG, loyalty_on: true, points_per_100: 10, cashback_pct: 0, cashback_mode: 'credit', stamp_target: 10, stamp_reward: 'Káva podle výběru',
+    enabled: true, slug: SLUG, team_name: NAZEV, loyalty_on: true, points_per_100: 10, cashback_pct: 0, cashback_mode: 'credit', stamp_target: 10, stamp_reward: 'Káva podle výběru',
     silver_at: 10, gold_at: 25, platinum_at: 40, member_discount: 0, silver_discount: 0, gold_discount: 5, platinum_discount: 10, tier_by: 'visits',
     reservations_on: true, ordering_on: true, max_party: 8, lead_days: 30, slot_minutes: 30, auto_confirm: true, auto_confirm_max_party: 4,
     description: 'Malá kavárna u staré lípy. Výběrová káva, domácí koláče a klidná zahrádka.', tagline: 'Výběrová káva a koláče od rána',

@@ -178,8 +178,8 @@ export const klient: Obsluha = (p, k) => {
   if (cesta === '/api/client/cards') return ok(plastoveKarty(dnes));
   if (cesta === '/api/client/admin/bonus-rules') {
     return ok({ rules: [
-      { id: 1, name: 'Dvojitá razítka v úterý', multiplier: 1, stamp_bonus: 1, days: [2], hour_from: 14, hour_till: 17, valid_since: null, valid_till: null, active: false },
-      { id: 2, name: 'Šťastná hodina', multiplier: 2, stamp_bonus: 0, days: [1, 2, 3, 4, 5], hour_from: 14, hour_till: 16, valid_since: null, valid_till: null, active: false },
+      { id: 1, name: 'Dvojitá razítka v úterý', multiplier: 1, stampBonus: 1, days: [2], hourFrom: 14, hourTill: 17, validSince: null, validTill: null, active: false },
+      { id: 2, name: 'Šťastná hodina', multiplier: 2, stampBonus: 0, days: [1, 2, 3, 4, 5], hourFrom: 14, hourTill: 16, validSince: null, validTill: null, active: false },
     ], bezi: [] });
   }
   if (cesta === '/api/menu' && p.metoda === 'GET') return ok({ boards: menuDesky() });
