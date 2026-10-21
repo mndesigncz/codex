@@ -86,7 +86,7 @@ export function obchodniPodminkyCs(f: Firma): Dokument {
         `Výjimky, kdy vrátíme peníze (poměrnou nebo celou částku): chybná nebo dvojí platba; služba nebyla podstatnou část období dostupná z důvodů na straně poskytovatele nebo měla podstatnou vadu, kterou jsme neodstranili (článek 12); smlouvu vypověděl poskytovatel, aniž ji zákazník porušil; zákazník vypověděl smlouvu kvůli změně podmínek nebo cen (článek 18); a další případy, které stanoví zákon. Peníze vracíme na kartu, ze které platba proběhla, zpravidla do ${L.vraceniDni} dnů.`,
       ] },
       { id: 'akce', h: '11. Akce, kupony a doporučení', li: [
-        `Nabídka Max: po koupi tarifu Pro má podnik ${TARIFY.maxNabidkaDni} dní možnost přejít na Max se slevou ${TARIFY.maxNabidkaProcent} %. Délku slevy a její podmínky uvádí nabídka v aplikaci.`,
+        `Nabídka Max: po koupi tarifu Pro má podnik ${TARIFY.maxNabidkaDni} dní možnost přejít na Max se slevou ${TARIFY.maxNabidkaProcent} % na první platbu tarifu Max, jak ji uvádí nabídka v aplikaci.`,
         `Doporučení: každý podnik má vlastní odkaz pro doporučení. Když doporučený nový podnik poprvé zaplatí předplatné, dostane doporučující podnik kredit ve výši jedné měsíční ceny svého tarifu (u tarifu Zdarma ceny tarifu Pro), který se odečte z jeho dalších faktur. Odměnu lze získat nejvýš ${TARIFY.doporuceniMesicne}× za kalendářní měsíc.`,
         'Kredit a slevy nelze vyplatit v penězích ani převést a zanikají smazáním podniku. Slevové kódy se nesčítají, pokud nabídka neříká jinak. Při zneužití (například doporučení sebe sama nebo fiktivních podniků) můžeme kredit nebo slevu odebrat.',
       ] },
@@ -225,7 +225,7 @@ export function obchodniPodminkyEn(f: Firma): Dokument {
         `Exceptions where we refund (pro rata or in full): an erroneous or duplicate payment; the service was unavailable for a substantial part of the period for reasons on the provider's side or had a material defect we did not fix (section 12); the provider terminated the contract without breach by the customer; the customer terminated because of a change of terms or prices (section 18); and other cases set by law. Refunds go to the card used for the payment, usually within ${L.vraceniDni} days.`,
       ] },
       { id: 'akce', h: '11. Offers, coupons and referrals', li: [
-        `Max offer: after buying Pro, the business has ${TARIFY.maxNabidkaDni} days to switch to Max at a ${TARIFY.maxNabidkaProcent} % discount. The length and conditions of the discount are stated in the offer in the app.`,
+        `Max offer: after buying Pro, the business has ${TARIFY.maxNabidkaDni} days to switch to Max with a ${TARIFY.maxNabidkaProcent} % discount on the first Max payment, as stated in the offer in the app.`,
         `Referrals: every business has its own referral link. When a referred new business pays its first subscription, the referring business receives a credit equal to one month of its plan (for the Free plan, of the Pro plan), deducted from its next invoices. The reward can be earned at most ${TARIFY.doporuceniMesicne} times per calendar month.`,
         'Credits and discounts cannot be paid out or transferred and expire when the business is deleted. Discount codes cannot be combined unless the offer says otherwise. In case of abuse (for example self-referral or fictitious businesses) we may remove the credit or discount.',
       ] },
