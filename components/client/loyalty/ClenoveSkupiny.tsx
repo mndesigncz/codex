@@ -99,7 +99,7 @@ export default function ClenoveSkupiny({ toast }: { toast: (m: string, ton?: 'ok
           <ul className="list">
             {d.groups.filter(g => archiv || !g.archived).map(g => (
               <ListRow key={g.id}
-                title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{g.name}</span><Chip tone={tonBarvy(g.color)} size="sm">{g.dynamic ? 'Dynamická' : 'Ruční'}</Chip>{g.archived && <Chip tone="muted" size="sm">Archiv</Chip>}</span>}
+                title={<span className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0"><span className="truncate max-w-full">{g.name}</span><Chip tone={tonBarvy(g.color)} size="sm">{g.dynamic ? 'Dynamická' : 'Ruční'}</Chip>{g.archived && <Chip tone="muted" size="sm">Archiv</Chip>}</span>}
                 meta={[czCount(Number(g.members) || 0, HOST), Number(g.discount_pct) > 0 ? `sleva ${g.discount_pct} %` : null, g.dynamic ? popisPravidel(g.rules, money) : null, g.description].filter(Boolean).join(' · ')}
                 actions={<>
                   <Button size="sm" variant="secondary" onClick={() => setClenove(g)}>Členové</Button>
