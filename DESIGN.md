@@ -126,7 +126,8 @@ tenčí a menší (`stat-jednotka`); odstavce `text-wrap: pretty`; minimum písm
   „Rezervováno“ ✓), polotučně, nikdy verzálkami.
 - **Segment (přepínač pohledu):** `Segmented` — v4 **L→R**: vyplní šířku,
   položky rovným dílem (`sirka="plna"`, výchozí; `sirka="obsah"` jen v řadě
-  s jiným prvkem); výška **44 na stránce** (`md`), **36 v kartě** (`sm`). Když se
+  s jiným prvkem; `sirka="pruzna"` = pružný díl řady — vedle souseda vezme zbytek
+  šířky a položky se o něj dělí); výška **44 na stránce** (`md`), **36 v kartě** (`sm`). Když se
   nevejde, je to posuvný pás, který na telefonu přeteče **až k hraně obrazovky**
   (v kartě a v okně zůstává mezi L a R — pás useknutý o linku karty vypadal jako
   chyba) s vyblednutím 24 — konec pásu před R vypadal

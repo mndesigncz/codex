@@ -339,7 +339,7 @@ export default function TimeOffRequest() {
 
       <div className="space-y-3">
         <PoleVolna f={f} />
-        <Button variant="primary" icon="send" block loading={f.submitting} onClick={() => { void f.submit(); }}>{t('Odeslat žádost')}</Button>
+        <Button variant="primary" icon="send" className="w-full" loading={f.submitting} onClick={() => { void f.submit(); }}>{t('Odeslat žádost')}</Button>
       </div>
 
       <div className="pt-3 border-t border-black/[0.06]">

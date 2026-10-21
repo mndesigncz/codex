@@ -145,7 +145,8 @@ export function Menu({ items, label, size = 'md', align = 'right', icon = 'more'
           aria-haspopup="menu" aria-expanded={open}
           onClick={() => setOpen(v => !v)}
           onKeyDown={pop.onTriggerKeyDown}
-          className={open ? 'bg-black/[0.08]' : ''}
+          // `tap-target`: kruh 36 v řádku, dotyková plocha 44 (pseudoprvek, rozměr řádku se nemění).
+          className={`tap-target ${open ? 'bg-black/[0.08]' : ''}`}
         />
       ) : (
         <IconButton

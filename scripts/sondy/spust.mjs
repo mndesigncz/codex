@@ -183,6 +183,8 @@ export const ZELENE = [
   'preteceni-okna',
   'preteceni-jazyky',
   'preteceni-jazyky-zamestnanec',
+  // redesign v4 „skladba" (spec §8): hrany, řady, výšky, šířky, dvojice karet — 24 obrazovek, 390 + 1280, světle i tmavě
+  'skladba',
 ];
 
 const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy', 'preteceni-jadro']);
@@ -207,6 +209,8 @@ mkdirSync(DIR + 'shots', { recursive: true });
 
 const SOUBEZNE = Number(env.SONDY_SOUBEZNE ?? 3);
 const LIMIT_MS = Number(env.SONDY_LIMIT_MS ?? 240_000);
+// Sondy, které měří desítky obrazovek ve čtyřech bězích (motiv × šířka), potřebují víc času.
+const LIMITY = { skladba: 900_000 };
 
 function spust(jmeno) {
   return new Promise(resolve => {
@@ -215,7 +219,8 @@ function spust(jmeno) {
     let out = '';
     p.stdout.on('data', d => { out += d; });
     p.stderr.on('data', d => { out += d; });
-    const casovac = setTimeout(() => { out += `\n(čas vypršel po ${LIMIT_MS / 1000} s)`; p.kill('SIGKILL'); }, LIMIT_MS);
+    const limit = LIMITY[jmeno] ?? LIMIT_MS;
+    const casovac = setTimeout(() => { out += `\n(čas vypršel po ${limit / 1000} s)`; p.kill('SIGKILL'); }, limit);
     p.on('close', code => {
       clearTimeout(casovac);
       resolve({ jmeno, ok: code === 0, sekund: Math.round((Date.now() - start) / 1000), out });

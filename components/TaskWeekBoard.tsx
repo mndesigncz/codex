@@ -166,7 +166,8 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
               aria-current={isToday ? 'date' : undefined}
               className={`well md:shrink-0 md:w-[15rem] md:snap-start p-3 flex flex-col transition-shadow ${list.length === 0 && !onAddForDay ? 'gap-1 md:gap-3' : 'gap-3'} ${dragOver === key ? 'ring-2 ring-black/15' : ''}`}
             >
-              <div className="flex items-center justify-between gap-2 px-1">
+              {/* v4 (P5): hlavička dne na téže levé ose jako karty úkolů pod ní (dřív px-1 → o 4 px vpravo). */}
+              <div className="flex items-center justify-between gap-2">
                 <h3 className="t-card truncate">
                   {WD[d.getDay()]} <span className="text-black/45 font-normal tabular-nums">{fmtDatum(ymd(d), { jazyk, styl: 'kratce' })}</span>
                 </h3>
@@ -178,7 +179,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
 
               <div className="space-y-2 md:min-h-[3rem]">
                 {list.map(card)}
-                {list.length === 0 && <p className="t-meta px-1 md:px-0 md:text-center md:py-4">{t('Žádný úkol')}</p>}
+                {list.length === 0 && <p className="t-meta md:text-center md:py-4">{t('Žádný úkol')}</p>}
               </div>
 
               {onAddForDay && (

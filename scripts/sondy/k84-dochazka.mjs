@@ -121,7 +121,7 @@ async function vedeni({ viewport = TEL, mobil = true, jazyk = null, att = ATT } 
   await zamek.click();
   const hlaska = p.locator('[role="status"]', { hasText: 'je uzavřené — otevři ho ve Výplatní listině' });
   tvrdi('V1 (390): klepnutí na zámek řekne „<Měsíc> je uzavřené — otevři ho ve Výplatní listině."', await dokud(() => hlaska.isVisible(), 3000), await text(p.locator('[role="status"]')));
-  tvrdi('V1 (390): zamčený den nemá tužku ani koš', (await n.locator('li.list-row', { hasText: '09:00 – 17:00' }).last().getByRole('button', { name: /Upravit čas|Smazat záznam/ }).count()) === 0);
+  tvrdi('V1 (390): zamčený den nemá tužku ani koš', (await n.locator('li.list-row', { hasText: '09:00 – 17:00' }).last().getByRole('button', { name: /Upravit čas|Smazat záznam|Upravit nebo smazat/ }).count()) === 0);
   // Filtr na Evu: souhrn nahoře, řádky jen její, druhý klik ruší.
   await p.evaluate(() => window.scrollTo(0, 0));
   await lide.locator('button[data-clovek="16"]').click();
@@ -155,7 +155,9 @@ async function vedeni({ viewport = TEL, mobil = true, jazyk = null, att = ATT } 
   const { ctx, p, stav } = await vedeni();
   const n = nastroj(p);
   const eva = n.locator('li.list-row', { hasText: '09:02 – 17:31' });
-  await eva.getByRole('button', { name: 'Upravit čas: Eva Testová' }).click();
+  // v4 (V4): úprava a smazání řádku jsou v jednom „···".
+  await eva.getByRole('button', { name: 'Upravit nebo smazat záznam: Eva Testová' }).click();
+  await p.getByRole('menuitem', { name: 'Upravit čas…' }).click();
   const okno = p.getByRole('dialog', { name: 'Upravit čas na směně' });
   tvrdi('V2 (390): okno úpravy říká, že pauza 12:00–12:30 (30 min) zůstane', await dokud(() => okno.getByText(/Pauza 12:00–12:30 \(30 min\) zůstane/).isVisible(), 3000));
   const doPole = okno.locator('#dochazka-uprava-do');

@@ -203,7 +203,9 @@ const zmer = (p, sirka) => p.evaluate((sirka) => {
 const browser = await chromium.launch({ executablePath: CHROMIUM });
 const souhrn = {};
 let celkem = 0;
-for (const tema of TEMATA) for (const sirka of SIRKY) {
+// Čtyři běhy (motiv × šířka) souběžně, každý ve svém kontextu; výpis se drží po bězích.
+async function beh(tema, sirka) {
+  const radky = [];
   const mobil = sirka < 600;
   const ctx = await browser.newContext({ viewport: { width: sirka, height: mobil ? 844 : 900 }, isMobile: mobil, hasTouch: mobil, locale: 'cs-CZ', reducedMotion: 'reduce' });
   // Ukázka sama vynucuje světlý režim — tmavý se drží atributem (jako detektor a sonda dark).
@@ -228,12 +230,14 @@ for (const tema of TEMATA) for (const sirka of SIRKY) {
       const po = {};
       for (const x of n) po[x.pravidlo] = (po[x.pravidlo] ?? 0) + 1;
       for (const [k, v] of Object.entries(po)) souhrn[k] = (souhrn[k] ?? 0) + v;
-      console.log(`${n.length ? '✗' : '✓'} ${jmeno}: ${n.length ? Object.entries(po).map(([k, v]) => `${k} ${v}`).join(', ') : 'čisto'}`);
-      for (const x of n.slice(0, PODROBNE ? 99 : 4)) console.log(`    ${x.pravidlo} · ${x.kde} · ${x.co}`);
-    } catch (e) { console.log(`✗ ${jmeno}: nedoměřeno (${String(e).slice(0, 100)})`); celkem++; }
+      radky.push(`${n.length ? '✗' : '✓'} ${jmeno}: ${n.length ? Object.entries(po).map(([k, v]) => `${k} ${v}`).join(', ') : 'čisto'}`);
+      for (const x of n.slice(0, PODROBNE ? 99 : 4)) radky.push(`    ${x.pravidlo} · ${x.kde} · ${x.co}`);
+    } catch (e) { radky.push(`✗ ${jmeno}: nedoměřeno (${String(e).slice(0, 100)})`); celkem++; }
   }
   await ctx.close();
+  console.log(radky.join('\n'));
 }
+await Promise.all(TEMATA.flatMap(tema => SIRKY.map(sirka => beh(tema, sirka))));
 await browser.close();
 console.log(`\nSkladba: ${celkem} nálezů — ${Object.entries(souhrn).map(([k, v]) => `${k} ${v}`).join(', ') || 'žádné'}`);
 process.exit(celkem ? 1 : 0);

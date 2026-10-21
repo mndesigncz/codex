@@ -74,7 +74,10 @@ export function EmptyState({ illustration, icon, title, hint, action, compact = 
       {hint && <p className="t-meta mt-1 max-w-[17.5rem] text-pretty">{hint}</p>}
       {/* Akce se zalamují a dlouhý text tlačítka (německé „Karte aus dem heutigen Angebot anlegen" na 288 px)
           se zalomí dovnitř, místo aby vyčuhoval z karty (sondy preteceni-*). */}
-      {action && <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-full [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:h-auto [&_button]:min-h-11 [&_button]:py-2 [&_button]:text-center [&_a]:max-w-full [&_a]:whitespace-normal">{action}</div>}
+      {/* v4 (P2, V5): víc akcí pod sebou má jednu šířku — dřív každá svou šířku
+          („Založit menu z pokladny" nad širším „Založit menu z dnešní nabídky"), zubatě. Mřížka široká jako
+          nejdelší akce: jedna akce zůstává obsahové šířky (V7), víc jich má šířku společnou. */}
+      {action && <div className="mt-4 grid gap-2 w-fit max-w-full mx-auto [&_button]:w-full [&_button]:whitespace-normal [&_button]:h-auto [&_button]:min-h-11 [&_button]:py-2 [&_button]:text-center [&_a]:w-full [&_a]:whitespace-normal">{action}</div>}
     </div>
   );
 }

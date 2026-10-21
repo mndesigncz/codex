@@ -54,8 +54,9 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
   size?: 'sm' | 'md';
   className?: string;
   ariaLabel?: string;
-  /** plna (výchozí) = L→R, položky rovným dílem; obsah = šířka podle položek (segment v řadě s dalším prvkem). */
-  sirka?: 'plna' | 'obsah';
+  /** plna (výchozí) = L→R, položky rovným dílem; obsah = šířka podle položek (segment v řadě s dalším prvkem);
+   *  pruzna = pružný díl řady: v řádku se sousedem vezme zbytek šířky (flex: 1) a položky se o něj dělí rovným dílem. */
+  sirka?: 'plna' | 'obsah' | 'pruzna';
 }) {
   // Výška položky 28 / 36 v dráze s odsazením 4 → segment 36 / 44 (stupně S a M).
   const pad = size === 'sm' ? 'h-7 px-3 text-xs' : 'h-9 px-4 text-sm';
@@ -63,7 +64,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
   // výběr, tlačítko), se nesmí roztáhnout přes celý řádek: vytlačil by souseda za R (finance-uzaverky
   // C7). Tam je to pružný/obsahový díl řady; L→R platí, když stojí na řádku sám.
   const [vRade, setVRade] = useState(false);
-  const plna = sirka === 'plna' && !vRade;
+  const plna = (sirka === 'plna' && !vRade) || sirka === 'pruzna';
   const obalRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -166,7 +167,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
       // Šířka navíc (ne záporný okraj): okraj by zmenšil vnější rozměr a v zalamované řadě
       // by na týž řádek vylezl soused. flex-shrink 0, ať ho řada nesmrskne zpátky.
       style={presah ? { width: `calc(100% + ${presah}px)`, maxWidth: 'none', flexShrink: 0 } : undefined}
-      className={`${plna ? 'seg-plna flex' : 'inline-flex max-w-full'} min-w-0 seg-draha ${presah ? 'rounded-l-full' : 'rounded-full'} ${className}`}>
+      className={`${plna ? 'seg-plna flex' : 'inline-flex max-w-full'} ${sirka === 'pruzna' ? 'flex-1 !w-auto' : ''} min-w-0 seg-draha ${presah ? 'rounded-l-full' : 'rounded-full'} ${className}`}>
       <div ref={listRef} role="tablist" aria-label={ariaLabel} onScroll={zmerOkraje}
         style={{ ...(maska ? { WebkitMaskImage: maska, maskImage: maska } : {}), ...(presah ? { paddingRight: presah + 4 } : {}) }}
         // snap-x: po švihnutí prstem se pás zastaví na hraně položky, ne
