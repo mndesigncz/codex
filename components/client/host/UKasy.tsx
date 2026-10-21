@@ -24,6 +24,7 @@ import RazitkaMrizka from '../karta/RazitkaMrizka';
 import { useHostMe, useKartaHosta, obnovHosta } from './data';
 import { kartaZClenstvi, pripraveneOdmeny, type Odmena } from './model';
 import { useCesta, useJeDemo } from './cesty';
+import { slucUdalosti } from '@/lib/klient/slouceniOdezvy';
 
 interface Udalost {
   id: string; typ: 'razitko' | 'body' | 'kredit' | 'odmena' | 'uplatneno'; at: string;
@@ -116,10 +117,12 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
   };
 
   // Živá odezva: kurzor podle hodin serveru, dotaz každé 2,5 s, jen když je stránka vidět.
+  // Ptá se dál i po prvním načtení: čtečka zapíše razítko, razítka navíc a uplatnění odměny
+  // za sebou a druhá půlka může přijít až v dalším dotazu — přidá se do téhož listu
+  // (slucUdalosti: stejná karta = jedno „+2“, uplatnění pod tím).
   const [udalosti, setUdalosti] = useState<Udalost[] | null>(null);
   const kurzor = useRef<string | null>(null);
   useEffect(() => {
-    if (udalosti) return;
     let konec = false;
     const zeptejSe = async () => {
       if (document.visibilityState !== 'visible') return;
@@ -129,13 +132,13 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
         if (konec) return;
         if (typeof x?.kurzor === 'string') kurzor.current = x.kurzor;
         const nove: Udalost[] = Array.isArray(x?.udalosti) ? x.udalosti : [];
-        if (nove.length) { setUdalosti(nove); void obnovHosta(); try { navigator.vibrate?.(30); } catch { /* bez vibrace */ } }
+        if (nove.length) { setUdalosti(pred => slucUdalosti(pred ?? [], nove)); void obnovHosta(); try { navigator.vibrate?.(30); } catch { /* bez vibrace */ } }
       } catch { /* další pokus za chvíli */ }
     };
     void zeptejSe();
     const i = setInterval(zeptejSe, 2500);
     return () => { konec = true; clearInterval(i); };
-  }, [udalosti]);
+  }, []);
 
   const wallet = karta.data?.wallet ?? {};
   const [ios, setIos] = useState(false); const [android, setAndroid] = useState(false);

@@ -6,7 +6,7 @@
 //   Úrovně · Pravidla navíc (akce a bonusy, všechna vypnutá, dokud je podnik nezapne).
 // Každý řádek má „Upravit", který otevře podrobný editor (části Body a úrovně, Razítka, Akce
 // a bonusy) — ty zůstávají beze změny, ať se neztratí žádná funkce. Náhled je tatáž karta,
-// jakou host vidí v aplikaci (NahledKarty → po sloučení components/client/karta/KartaPodniku).
+// jakou host vidí v aplikaci (NahledKarty = re-export components/client/karta/KartaPodniku).
 //
 // Čísla v náhledu jsou ukázka stavu (host se 3 razítky), označená jako ukázka; nic se
 // nevymýšlí o skutečných hostech.
@@ -152,7 +152,7 @@ export default function ProgramVernosti({ otevri, bonusy }: {
                 <KartaPodniku nazev={nazev} logoUrl={p.logo_url || null} barva={p.accent || null} podtitul={hlavni.name}
                   cislo={`${UKAZKA_RAZITEK} / ${cil}`} jednotka="razítek"
                   veta={`Ještě ${czCount(cil - UKAZKA_RAZITEK, RAZITKO)} a ${String(hlavni.reward_title || 'odměna').toLowerCase()} je od nás.`}>
-                  <RazitkaMrizka pocet={UKAZKA_RAZITEK} cil={cil} barva={p.accent || null} popis={`${UKAZKA_RAZITEK} z ${cil} razítek`} />
+                  <div className="mt-4"><RazitkaMrizka pocet={UKAZKA_RAZITEK} cil={cil} popis={`${UKAZKA_RAZITEK} z ${cil} razítek`} /></div>
                 </KartaPodniku>
               ) : (
                 <KartaPodniku nazev={nazev} logoUrl={p.logo_url || null} barva={p.accent || null} podtitul="Body"

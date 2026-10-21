@@ -18,6 +18,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { zapisVerzi } from '@/lib/pravidlaVerze';
 import { pozadujTarif } from '@/lib/tarifServer';
+import { zajistiHosta } from '@/lib/klient/schema';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -235,12 +236,13 @@ export async function PUT(req: NextRequest) {
       WHERE team_id = ${u.team_id} RETURNING *`;
   }
   // Kolo 92 (kontrakt HOST ↔ SPRÁVA §5): telefon podniku pro akci „Zavolat" na stránce hosta. Zvlášť a se
-  // sloupcem zajištěným tady, ať uložení zbytku nezávisí na migraci (blok Host v /api/init ho zakládá taky).
+  // sloupcem zajištěným přes zajistiHosta (jediný zdroj schématu hosta, zrcadlo v bloku Host v /api/init),
+  // ať uložení zbytku nezávisí na migraci.
   if (b?.phone !== undefined) {
     const tel = String(b.phone ?? '').replace(/[^\d+ ()-]/g, '').trim().slice(0, 30);
     if (tel && tel.replace(/\D/g, '').length < 9) return NextResponse.json({ error: 'Telefon podniku má mít aspoň devět číslic.' }, { status: 400 });
     try {
-      await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS phone TEXT`;
+      await zajistiHosta();
       [pFinal] = await sql`UPDATE client_profiles SET phone = ${tel || null} WHERE team_id = ${u.team_id} RETURNING *`;
     } catch (e) { console.error('[profil] telefon', e); }
   }

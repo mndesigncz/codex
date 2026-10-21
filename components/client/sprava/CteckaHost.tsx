@@ -77,7 +77,7 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
           cislo={`${razitek} / ${cil}`} jednotka="razítek" pripraveno={pripraveno ? 'Připraveno' : null}
           veta={razitek >= cil ? 'Karta je plná, odměna je připravená.' : `Ještě ${czCount(cil - razitek, RAZITKO)} do odměny „${kampan.reward ?? 'odměna'}".`}
           ariaLabel={`${kampan.name}: ${razitek} z ${cil} razítek`}>
-          <RazitkaMrizka pocet={razitek} cil={cil} barva={h.accent ?? kampan.color ?? null} popis={`${razitek} z ${cil} razítek`} />
+          <div className="mt-4"><RazitkaMrizka pocet={razitek} cil={cil} popis={`${razitek} z ${cil} razítek`} /></div>
         </KartaPodniku>
       )}
 

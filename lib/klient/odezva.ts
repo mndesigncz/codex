@@ -4,7 +4,8 @@
 // GET /api/client/card/stav?od=<kurzor>. Zdrojem jsou deníky, do kterých už dnes zapisuje
 // každá cesta u kasy (čtečka, párování s pokladnou, ruční úprava), takže čtečka pro odezvu
 // nemusí dělat nic navíc — jen dál zapisovat jako dnes:
-//   · client_stamp_events (kind 'earn', delta > 0, bez storna)  → razítko v kampani
+//   · client_stamp_events (kind 'earn' i 'manual', delta > 0, bez storna) → razítko v kampani
+//     ('manual' = razítka navíc s důvodem — čtečka je u kasy připisuje jako ruční úpravu)
 //   · client_loyalty_ledger (delta ≠ 0 / credit_delta ≠ 0)      → body / kredit
 //   · client_loyalty_ledger kind 'visit' bez kampaní            → razítko ve staré kartě podniku
 //   · client_coupon_claims.claimed_at, kupon kind 'stamps'      → odměna připravena
@@ -16,6 +17,7 @@ import { activeCampaigns, progressFor, prubehHosta } from '../stamps';
 import { stavKartyHosta } from '../razitkaPravidla';
 import { pragueToday } from '../pragueTime';
 import { zajistiHosta } from './schema';
+import { slucUdalosti } from './slouceniOdezvy';
 
 export type TypUdalosti = 'razitko' | 'body' | 'kredit' | 'odmena' | 'uplatneno';
 
@@ -74,7 +76,7 @@ export async function udalostiOd(customerId: number, od: string): Promise<Odezva
     FROM client_stamp_events e
     JOIN client_stamp_campaigns c ON c.id = e.campaign_id
     JOIN client_profiles p ON p.team_id = e.team_id JOIN teams t ON t.id = e.team_id
-    WHERE e.customer_id = ${customerId} AND e.kind = 'earn' AND e.delta > 0 AND e.undone_at IS NULL
+    WHERE e.customer_id = ${customerId} AND e.kind IN ('earn', 'manual') AND e.delta > 0 AND e.undone_at IS NULL
       AND e.created_at > ${od}::timestamp AND e.created_at > NOW() - make_interval(mins => ${MAX_ZPET_MIN}::int)
     ORDER BY e.created_at` as any[];
   const denik = await sql`
@@ -109,20 +111,15 @@ export async function udalostiOd(customerId: number, od: string): Promise<Odezva
       stavy.set(c.id, stavKartyHosta(c, pr ? prubehHosta(pr) : null).stamps);
     }
   }
-  // Součet razítek jedné kampaně v jednom okamžiku (účtenka se dvěma kávami) = jedna událost „+2“.
-  const sloucena = new Map<string, any>();
+  // Razítka jedné kampaně v jednom dotazu (účtenka se dvěma kávami, razítko + razítka navíc
+  // ze čtečky) = jedna událost „+2“ — sčítá slucUdalosti níž.
   for (const r of razitka) {
-    const k = `${r.campaign_id}:${iso(r.created_at).slice(0, 19)}`;
-    const x = sloucena.get(k);
-    if (x) x.delta += Number(r.delta); else sloucena.set(k, { ...r, delta: Number(r.delta) });
-  }
-  for (const r of sloucena.values()) {
     const cil = Number(r.required_stamps) || 0;
     const ted = stavy.get(Number(r.campaign_id));
     out.push({
-      id: `S${r.id}`, typ: 'razitko', at: iso(r.created_at), ...zaklad(r), delta: r.delta,
+      id: `S${r.id}`, typ: 'razitko', at: iso(r.created_at), ...zaklad(r), delta: Number(r.delta),
       // Plná karta se hned vynuluje a vydá odměnu; host má vidět „10 / 10“, ne „0 / 10“.
-      karta: { id: Number(r.campaign_id), nazev: String(r.kampan ?? ''), razitka: ted == null ? 0 : (ted === 0 && r.delta > 0 ? cil : ted), cil, odmena: r.reward_title ? String(r.reward_title) : null },
+      karta: { id: Number(r.campaign_id), nazev: String(r.kampan ?? ''), razitka: ted == null ? 0 : (ted === 0 && Number(r.delta) > 0 ? cil : ted), cil, odmena: r.reward_title ? String(r.reward_title) : null },
     });
   }
   const tymySRazitkem = new Set(tymy);
@@ -142,6 +139,5 @@ export async function udalostiOd(customerId: number, od: string): Promise<Odezva
     if (r.redeemed_at && iso(r.redeemed_at) > iso(od)) out.push({ id: `U${r.id}`, typ: 'uplatneno', at: iso(r.redeemed_at), ...z, delta: 0, nazev: String(r.title) });
     if (r.kind === 'stamps' && iso(r.claimed_at) > iso(od)) out.push({ id: `O${r.id}`, typ: 'odmena', at: iso(r.claimed_at), ...z, delta: 0, nazev: String(r.title) });
   }
-  out.sort((a, b) => a.at.localeCompare(b.at));
-  return { kurzor, udalosti: out };
+  return { kurzor, udalosti: slucUdalosti([], out) };
 }

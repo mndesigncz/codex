@@ -189,6 +189,8 @@ export const ZELENE = [
   'preteceni-host',
   // redesign v4 „skladba" (spec §8): hrany, řady, výšky, šířky, dvojice karet — 24 obrazovek, 390 + 1280, světle i tmavě
   'skladba',
+  // ověření kola 92: čtečka u kasy ↔ host (přibalená odměna, jedna akce, živá odezva +2 a uplatnění)
+  'k92-ctecka-host',
 ];
 
 const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy', 'preteceni-jadro']);
