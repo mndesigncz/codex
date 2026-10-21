@@ -2712,9 +2712,9 @@
   "Nastavit polohu": "Nastaviť polohu",
   "Další krok": "Ďalší krok",
   "Všechno je nastavené. Hosté tě najdou, rezervují, objednají a sbírají body.": "Všetko je nastavené. Hostia ťa nájdu, rezervujú, objednajú a zbierajú body.",
-  "o {n} víc než minulých 30 dní": "o {n} viac ako minulých 30 dní",
-  "o {n} míň než minulých 30 dní": "o {n} menej ako minulých 30 dní",
-  "stejně jako minulých 30 dní": "rovnako ako minulých 30 dní",
+  "o {n} víc než předtím": "o {n} viac ako predtým",
+  "o {n} míň než předtím": "o {n} menej ako predtým",
+  "stejně jako předtím": "rovnako ako predtým",
   "Program": "Program",
   "vše potvrzené": "všetko potvrdené",
   "Noví členové · 30 dní": "Noví členovia · 30 dní",
@@ -2751,5 +2751,6 @@
   "Razítka a body za 14 dní": "Pečiatky a body za 14 dní",
   "Kolik razítek hosté dostali po dnech a kolik bodů se rozdalo.": "Koľko pečiatok hostia dostali po dňoch a koľko bodov sa rozdalo.",
   "Automatizace": "Automatizácie",
-  "Které zprávy odcházejí samy a kolik jich odešlo tento měsíc. Výchozí vypnuté.": "Ktoré správy odchádzajú samy a koľko ich odišlo tento mesiac. Predvolene vypnuté."
+  "Které zprávy odcházejí samy a kolik jich odešlo tento měsíc. Výchozí vypnuté.": "Ktoré správy odchádzajú samy a koľko ich odišlo tento mesiac. Predvolene vypnuté.",
+  "Věrnostní program": "Vernostný program"
 }

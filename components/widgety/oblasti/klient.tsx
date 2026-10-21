@@ -940,7 +940,7 @@ const vyberZdravi = (raw: any): Zdravi => ({
 });
 
 function rozdil(n: number, t: PrekladFn): string {
-  return n > 0 ? t('o {n} víc než minulých 30 dní', { n }) : n < 0 ? t('o {n} míň než minulých 30 dní', { n: -n }) : t('stejně jako minulých 30 dní');
+  return n > 0 ? t('o {n} víc než předtím', { n }) : n < 0 ? t('o {n} míň než předtím', { n: -n }) : t('stejně jako předtím');
 }
 
 function ZdraviProgramu({ velikost }: WidgetProps) {

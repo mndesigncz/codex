@@ -2709,9 +2709,9 @@
   "Nastavit polohu": "Ustaw lokalizację",
   "Další krok": "Dalej",
   "Všechno je nastavené. Hosté tě najdou, rezervují, objednají a sbírají body.": "Wszystko gotowe. Goście cię znajdą, zarezerwują, zamówią i zbierają punkty.",
-  "o {n} víc než minulých 30 dní": "o {n} więcej niż w poprzednich 30 dniach",
-  "o {n} míň než minulých 30 dní": "o {n} mniej niż w poprzednich 30 dniach",
-  "stejně jako minulých 30 dní": "tak samo jak w poprzednich 30 dniach",
+  "o {n} víc než předtím": "o {n} więcej niż wcześniej",
+  "o {n} míň než předtím": "o {n} mniej niż wcześniej",
+  "stejně jako předtím": "tak samo jak wcześniej",
   "Program": "Program",
   "vše potvrzené": "wszystko potwierdzone",
   "Noví členové · 30 dní": "Nowi członkowie · 30 dni",
@@ -2748,5 +2748,6 @@
   "Razítka a body za 14 dní": "Pieczątki i punkty, 14 dni",
   "Kolik razítek hosté dostali po dnech a kolik bodů se rozdalo.": "Ile pieczątek goście dostali dziennie i ile punktów przyznano.",
   "Automatizace": "Automatyzacje",
-  "Které zprávy odcházejí samy a kolik jich odešlo tento měsíc. Výchozí vypnuté.": "Które wiadomości wysyłają się same i ile wyszło w tym miesiącu. Domyślnie wyłączone."
+  "Které zprávy odcházejí samy a kolik jich odešlo tento měsíc. Výchozí vypnuté.": "Które wiadomości wysyłają się same i ile wyszło w tym miesiącu. Domyślnie wyłączone.",
+  "Věrnostní program": "Program lojalnościowy"
 }
