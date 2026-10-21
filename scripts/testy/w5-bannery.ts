@@ -125,8 +125,9 @@ export default async function ({ eq, ok }: Testy) {
   ok('událost: neukládá IP ani cookie', !/INSERT|sql`/.test(udalost));
   ok('veřejné API předává cílení', zdroj('app/api/client/b/[slug]/route.ts').includes('kontextHosta('));
   ok('hostovi se cílení ani statistika nevrací', !/target_kind|target_ref|views/.test(db.slice(db.indexOf('export function tvarBanneru'), db.indexOf('export async function aktivniBannery'))));
-  const sprava = zdroj('components/client/BrandTab.tsx');
-  ok('Vzhled používá nový editor bannerů', sprava.includes("loyalty/BanneryEditor"));
+  // Kolo 92: bannery jsou kanál kampaně — editor se přestěhoval ze Vzhledu do Kampaní.
+  const sprava = zdroj('components/client/sprava/KampaneStranka.tsx');
+  ok('Kampaně používají nový editor bannerů', sprava.includes("loyalty/BanneryEditor"));
   eq('popis cílení: úroveň', popisCile({ target_kind: 'level', target_ref: 'gold' }, { urovne: { gold: 'Zlatý' } }), 'Úroveň: Zlatý');
   eq('popis cílení: smazaná skupina', popisCile({ target_kind: 'group', target_ref: '5' }, { skupiny: {} }), 'Skupina: smazaná skupina');
   eq('popis cílení: výchozí', popisCile({}), 'Všem hostům');
