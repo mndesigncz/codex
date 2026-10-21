@@ -386,7 +386,11 @@ async function portalConfiguration(s: Stripe): Promise<string> {
   }
   const conf = await s.billingPortal.configurations.create({
     // Neutrální: konfigurace portálu je jedna pro všechny jazyky zákazníků.
-    business_profile: { headline: 'Managero' },
+    business_profile: {
+      headline: 'Managero',
+      privacy_policy_url: 'https://www.managero.app/soukromi',
+      terms_of_service_url: 'https://www.managero.app/obchodni-podminky',
+    },
     features: {
       invoice_history: { enabled: true },
       payment_method_update: { enabled: true },
@@ -394,7 +398,10 @@ async function portalConfiguration(s: Stripe): Promise<string> {
       subscription_cancel: { enabled: true, mode: 'at_period_end', cancellation_reason: { enabled: true, options: ['too_expensive', 'missing_features', 'switched_service', 'unused', 'other'] } },
       subscription_update: {
         enabled: true, default_allowed_updates: ['price'], proration_behavior: 'create_prorations',
-        products: Array.from(byProduct.entries()).map(([product, ps]) => ({ product, prices: ps })),
+        // Změna tarifu ve zkušební době trial neukončí (výchozí end_trial by hned strhl kartu).
+        trial_update_behavior: 'continue_trial',
+        // Bez adjustable_quantity Stripe u produktu změnu počtu kusů zapne.
+        products: Array.from(byProduct.entries()).map(([product, ps]) => ({ product, prices: ps, adjustable_quantity: { enabled: false } })),
       },
     },
     metadata: { app: 'managero' },
