@@ -512,5 +512,6 @@
   "Bez směn": "No shifts",
   "návrh": "draft",
   "Ukázat měsíc jako mřížku": "Show month as a grid",
-  "Ukázat dny jako seznam": "Show days as a list"
+  "Ukázat dny jako seznam": "Show days as a list",
+  "Potvrdit a uložit rozvrh jen uloží — tým ho uvidí, až ho publikuješ. „Uložit a publikovat“ nahoře udělá obojí najednou.": "Confirm and save only saves the schedule — the team sees it once you publish. “Save and publish” at the top does both at once."
 }

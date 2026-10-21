@@ -1842,12 +1842,16 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                   : t('Návrh se přidá k uloženým směnám a počítá s nimi — nic se nesmaže.')} />
             </ul>
           )}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* v4 (P12): pár akcí ½ + ½ přes šířku; dřív dvě obsahové pilulky vlevo. */}
+          <div className="rada rada-rovne rada-s">
             <Button variant="primary" size="sm" icon="check" loading={committing} disabled={preview.proposed.length === 0 || publishing} onClick={() => { void commitPreview(); }}>
               {t('Potvrdit a uložit')}
             </Button>
             <Button variant="secondary" size="sm" disabled={committing || publishing} onClick={zahoditNavrh}>{t('Zahodit náhled')}</Button>
           </div>
+          {/* Dvě podobné cesty (audit 2026-10 V07): rozdíl jednou větou — tady se jen uloží,
+              „Uložit a publikovat" nahoře navíc pošle týmu upozornění. */}
+          {smiPublikovat && <p className="t-meta text-pretty" data-rozdil-ulozeni>{t('Potvrdit a uložit rozvrh jen uloží — tým ho uvidí, až ho publikuješ. „Uložit a publikovat“ nahoře udělá obojí najednou.')}</p>}
         </Well>
       )}
 
