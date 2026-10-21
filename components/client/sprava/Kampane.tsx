@@ -29,6 +29,7 @@ import KombinaceVyber from '../loyalty/KombinaceVyber';
 const CLEN: CzNoun = { one: 'člen', few: 'členové', many: 'členů' };
 const CLENOVI: CzNoun = { one: 'členovi', few: 'členům', many: 'členům' };
 const HOST: CzNoun = { one: 'host', few: 'hosté', many: 'hostů' };
+const EMAILU: CzNoun = { one: 'e-mail', few: 'e-maily', many: 'e-mailů' };
 const MIX = '__mix__';
 const KROKY = ['Komu', 'Co', 'Kontrola'] as const;
 
@@ -110,6 +111,15 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
   const odeslane = d.history.filter((h: any) => h.status !== 'scheduled');
   const naplanovane = d.history.filter((h: any) => h.status === 'scheduled');
   const kanalText = (k: string) => KANALY_ZPRAVY.find(x => x.id === k)?.label ?? 'Oznámení v aplikaci';
+  /** Stav e-mailů odeslané kampaně (dávky, neúspěchy) — jen u kanálu s e-mailem. */
+  const emailInfo = (h: any): string | null => {
+    const kn = String(h.channels ?? 'push');
+    if (kn === 'push') return null;
+    const celkem = Number(h.email_total) || 0, pos = Number(h.email_pos) || 0;
+    if (celkem === 0) return 'e-mail nikomu';
+    if (pos < celkem) return `e-maily se odesílají (${pos} z ${celkem})`;
+    return `${czCount(Number(h.email_sent) || 0, EMAILU)} odesláno${Number(h.email_failed) > 0 ? `, ${czCount(Number(h.email_failed), EMAILU)} se nepodařilo` : ''}`;
+  };
 
   return (
     <div className="space-y-5">
@@ -165,7 +175,7 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
                         <tr key={h.id} className="border-t border-black/[0.06] align-top">
                           <td className="py-3 pr-3 min-w-0"><p className="font-medium text-[15px] leading-snug">{h.title}</p><p className="t-meta">{dbTimeDayHM(h.sent_at)}</p></td>
                           <td className="py-3 pr-3 text-black/70">{komu(String(h.audience ?? ''))}</td>
-                          <td className="py-3 pr-3 text-black/70">{kanalText(String(h.channels ?? 'push'))}</td>
+                          <td className="py-3 pr-3 text-black/70">{kanalText(String(h.channels ?? 'push'))}{emailInfo(h) && <span className="block t-meta">{emailInfo(h)}</span>}</td>
                           <td className="py-3 pr-3 text-right">{Number(h.recipients) || 0}{Number(h.muted) > 0 && <span className="block t-meta">{Number(h.muted)} bez souhlasu</span>}</td>
                           <td className="py-3 text-right font-semibold">
                             {po}{pred > 0 && <span className="font-normal text-black/55"> ({pred})</span>}
@@ -182,7 +192,7 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
                   const po = Number(h.visits_after) || 0, pred = Number(h.visits_before) || 0;
                   return (
                     <ListRow key={h.id} title={h.title}
-                      meta={`${dbTimeDayHM(h.sent_at)} · ${komu(String(h.audience ?? ''))} · doručeno ${Number(h.recipients) || 0}`}
+                      meta={[dbTimeDayHM(h.sent_at), komu(String(h.audience ?? '')), `doručeno ${Number(h.recipients) || 0}`, emailInfo(h)].filter(Boolean).join(' · ')}
                       value={`${po} přišlo`} valueMeta={pred > 0 ? `předtím ${pred}` : h.still_running ? 'měří se' : undefined} />
                   );
                 })}
@@ -377,6 +387,7 @@ function Pruvodce({ d, publika, start, editId, oznam, onZavrit, onHotovo }: {
             <ListRow title={f.title} meta={f.body || 'Bez textu'} />
             {priloha && <ListRow title="Příloha" meta={priloha.kupon ? `Kupon ${priloha.kupon.title}` : priloha.promo ? `Promo kód ${priloha.promo.code}` : ''} />}
           </ul>
+          <p className="text-sm text-black/70" aria-live="polite">{vetaPublika}</p>
           <div className="space-y-3">
             <p className="field-label">Kdy</p>
             <Segmented ariaLabel="Kdy kampaň odejde" value={f.kdy} onChange={v => setF({ ...f, kdy: v })}

@@ -5,7 +5,7 @@
 // kupon vybraným členům, přidání do skupiny z CSV a archiv skupin, zprávy e-mailem (kanál, dosah, náhled
 // s odhlášením, zkouška sobě, kombinace podmínek) a automatizace zapínané zvlášť; na 390 px bez vodorovného posuvu.
 import {
-  kontext, konec, tvrdi, otevri, dokud, fixtura,
+  kontext, konec, tvrdi, otevri, dokud, fixtura, BASE,
 } from './k68-spolecne.mjs';
 
 const CLIENT = (tab) => `/employer/overview?mode=client&tab=${tab}`;
@@ -108,7 +108,7 @@ async function behy(viewport, mobil) {
     tvrdi(`${jmeno} duplicity: pošle POST { hlavniId: 101, duplicitaId: 103 }`, await dokud(() => stav.z.slouceni.some(s => s.hlavniId === 101 && s.duplicitaId === 103), 2500), JSON.stringify(stav.z.slouceni));
     await dup.getByRole('button', { name: 'Hotovo' }).click();
 
-    await p.getByRole('button', { name: 'Deník' }).first().click();
+    await p.getByRole('button', { name: /^Profil hosta/ }).first().click();
     await p.getByRole('button', { name: 'Zablokovat' }).first().click();
     const blok = p.getByRole('dialog', { name: /Zablokovat/ });
     tvrdi(`${jmeno} blokace: nejdřív potvrzení v okně`, await dokud(() => blok.isVisible(), 1500));
@@ -116,7 +116,7 @@ async function behy(viewport, mobil) {
     tvrdi(`${jmeno} blokace: pošle PATCH { blocked: true }`, await dokud(() => stav.z.patch.some(x => x.blocked === true && x.id === 101), 2500), JSON.stringify(stav.z.patch));
     // Po blokaci se detail zavře a seznam načte znovu; teprve potom jde otevřít další (jinak by „Deník“ trefil jiný řádek).
     await p.getByRole('button', { name: 'Skrýt', exact: true }).waitFor({ state: 'detached', timeout: 4000 });
-    await p.getByRole('button', { name: 'Deník' }).first().click();
+    await p.getByRole('button', { name: /^Profil hosta/ }).first().click();
     await p.getByRole('button', { name: 'Odebrat z klubu' }).first().click();
     const smaz = p.getByRole('dialog', { name: /Odebrat .* z klubu/ });
     tvrdi(`${jmeno} odebrání: okno řekne, že to nejde vzít zpět`, await dokud(() => smaz.isVisible(), 1500) && /nejde/.test(await smaz.innerText()));
@@ -124,7 +124,7 @@ async function behy(viewport, mobil) {
     tvrdi(`${jmeno} odebrání: pošle DELETE s id člena`, await dokud(() => stav.z.del.some(d => /id=101/.test(d)), 2500), JSON.stringify(stav.z.del));
 
     await p.getByRole('button', { name: 'Skrýt', exact: true }).waitFor({ state: 'detached', timeout: 4000 });
-    await p.getByRole('button', { name: 'Deník' }).first().click();
+    await p.getByRole('button', { name: /^Profil hosta/ }).first().click();
     await p.getByRole('button', { name: 'Celá historie' }).first().click();
     tvrdi(`${jmeno} historie: přehled i část Návštěvy se načtou`, await dokud(async () => (await p.getByRole('tab', { name: 'Návštěvy' }).count()) > 0, 3000));
     await p.getByRole('tab', { name: 'Návštěvy' }).first().click();
@@ -174,34 +174,35 @@ async function behy(viewport, mobil) {
   // ---- zprávy e-mailem a automatizace ----
   {
     const { ctx, p, stav, chyby } = await kontext({ viewport, mobil, fix: fixtura('k69-b8-rozlozeni-zakaznici'), dalsi: podvrh });
-    await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
-    await p.locator('[data-plocha]').getByRole('tab', { name: 'Zprávy členům' }).click();
-    await p.locator('#bc-title').waitFor({ timeout: 8000 });
-    await p.locator('#bc-title').fill('Jarní nabídka');
-    await p.getByRole('tab', { name: 'E-mail', exact: true }).click();
+    // Kolo 92: zprávy a automatizace jsou stránka Kampaně (průvodce Komu · Co · Kontrola v okně, recepty automatizací).
+    await p.goto(BASE + CLIENT('campaigns'), { waitUntil: 'networkidle' });
+    await p.getByRole('button', { name: 'Nová kampaň' }).first().click();
+    const okno = p.getByRole('dialog');
+    await okno.getByRole('button', { name: 'Pokračovat k textu' }).waitFor({ timeout: 8000 });
+    await okno.getByRole('button', { name: 'Kombinace podmínek…' }).click();
+    tvrdi(`${jmeno} zprávy: kombinace podmínek se nabízí jako vlastní výběr`, await dokud(async () => (await okno.innerText()).includes('A zároveň') || (await okno.innerText()).includes('Vyber'), 2500));
+    await okno.getByRole('button', { name: /^Všichni členové/ }).click();
+    await okno.getByRole('button', { name: 'Pokračovat k textu' }).click();
+    await p.locator('#kp-title').fill('Jarní nabídka');
+    await okno.getByRole('tab', { name: 'E-mail', exact: true }).click();
     tvrdi(`${jmeno} zprávy: náhled ukáže e-mail s odhlášením`, await dokud(() => p.getByText('Odhlásit se z e-mailů').first().isVisible(), 2500));
-    tvrdi(`${jmeno} zprávy: dosah řekne, kolik lidí e-mail dostane`, await dokud(async () => /e-mail dostane 1 člen/.test(await p.locator('[data-plocha]').innerText()), 2500));
+    await okno.getByRole('button', { name: 'Pokračovat ke kontrole' }).click();
+    tvrdi(`${jmeno} zprávy: dosah řekne, kolik lidí e-mail dostane`, await dokud(async () => /e-mail dostane 1 člen/.test(await okno.innerText()), 2500));
     tvrdi(`${jmeno} zprávy: dosah se ptá serveru na zvolený kanál`, stav.dotazy.some(d => /broadcast\?dosah=all&kanal=email/.test(d.u)));
-    await p.getByRole('button', { name: 'Poslat zkušebně sobě' }).click();
+    await okno.getByRole('button', { name: 'Poslat zkušebně sobě' }).click();
     tvrdi(`${jmeno} zprávy: zkouška sobě pošle action test s kanálem e-mail`, await dokud(() => stav.z.zpravy.some(x => x.action === 'test' && x.channels === 'email'), 2500), JSON.stringify(stav.z.zpravy));
-    await p.getByText(/e-mailem na ja@example\.cz/).first().waitFor({ timeout: 3000 });
-    await p.locator('#bc-aud').selectOption('__mix__');
-    tvrdi(`${jmeno} zprávy: kombinace podmínek se nabízí jako vlastní výběr`, await dokud(async () => (await p.locator('[data-plocha]').innerText()).includes('A zároveň') || (await p.locator('[data-plocha]').innerText()).includes('Vyber'), 2500));
-    await p.locator('#bc-aud').selectOption('all');
-    await p.getByRole('button', { name: /^Poslat / }).first().click();
-    const potvrdit = p.getByRole('dialog', { name: 'Poslat zprávu?' });
-    tvrdi(`${jmeno} zprávy: odeslání se potvrdí`, await dokud(() => potvrdit.isVisible(), 1500));
-    await potvrdit.getByRole('button', { name: 'Poslat', exact: true }).click();
+    await okno.getByRole('button', { name: /^Poslat \d/ }).click();
     tvrdi(`${jmeno} zprávy: POST nese kanál e-mail`, await dokud(() => stav.z.zpravy.some(x => !x.action && x.channels === 'email' && x.title === 'Jarní nabídka'), 2500), JSON.stringify(stav.z.zpravy));
-    tvrdi(`${jmeno} zprávy: historie ukáže stav e-mailů (1 odesláno, 1 se nepodařilo)`, await p.getByText(/1 e-mail odesláno, 1 e-mail se nepodařilo/).count() >= 1);
+    tvrdi(`${jmeno} zprávy: historie ukáže stav e-mailů (1 odesláno, 1 se nepodařilo)`, await dokud(() => p.getByText(/1 e-mail odesláno, 1 e-mail se nepodařilo/).first().isVisible(), 3000));
     tvrdi(`${jmeno}: bez vodorovného scrollu (zprávy)`, await bezPreteceni(p));
 
-    await p.locator('[data-plocha]').getByRole('tab', { name: 'Automatizace' }).click();
-    const nastroj = p.locator('[data-plocha] li[data-widget="nastroj"]');
+    await p.getByRole('tab', { name: 'Automatizace' }).click();
+    const nastroj = p.locator('main');
     tvrdi(`${jmeno} automatizace: je vidět všech pět pravidel`, await dokud(async () => {
       const t = await nastroj.innerText();
       return ['Uvítací série', 'Po první návštěvě', 'Po dokončení karty', 'Narozeninový kupon', 'Chybíš nám'].every(x => t.includes(x));
     }, 5000));
+    await nastroj.getByRole('button', { name: 'Nastavit' }).first().click();
     await nastroj.getByRole('switch').first().click();
     tvrdi(`${jmeno} automatizace: zapnutí uvítací série pošle PUT s druhem uvitani`, await dokud(() => stav.z.automatizace.some(a => a.druh === 'uvitani' && a.enabled === true), 2500), JSON.stringify(stav.z.automatizace));
     tvrdi(`${jmeno} automatizace: náhled ukáže jméno a podnik dosazené do textu`, /Vítej v .+, Jana/.test(await nastroj.innerText()));

@@ -206,8 +206,8 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce, otevritPr
   const akceProfilu = (c: ClenRadek) => {
     const jen: VyberHostu = { ids: [c.id], pocet: 1 };
     return [
-      ...(piseZpravy ? [{ label: 'Napsat', icon: 'send', onClick: () => { setJednomu(jen); setOkno('zprava'); } }] : []),
-      ...((upravujeBody || upravujeKredit) ? [{ label: upravujeBody ? 'Body ±' : 'Kredit ±', icon: 'gift', onClick: () => setUpravuji(c) }] : []),
+      ...(piseZpravy ? [{ label: 'Napsat', icon: 'send', onClick: () => { setJednomu(jen); setOkno('zprava'); }, aria: `Napsat zprávu: ${c.name}` }] : []),
+      ...((upravujeBody || upravujeKredit) ? [{ label: upravujeBody ? 'Body ±' : 'Kredit ±', icon: 'gift', onClick: () => setUpravuji(c), aria: `Upravit body a kredit: ${c.name}` }] : []),
       ...(dalsiAkce ? dalsiAkce(jen).slice(0, 1).map(a => ({ label: a.label, icon: a.icon ?? 'tag', onClick: a.onClick })) : []),
     ];
   };

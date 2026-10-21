@@ -9,7 +9,7 @@
 // a akcí), export katalogu do CSV, historie změn kuponu před → po, editor posílá nová pole (položka nabídky, vyloučené
 // kategorie, X+Y, kusy celkem, uplatnění za den, noční hodiny 22–02) a náhled pohledem hosta ukáže „zdarma na položku“.
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, DIR } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, BASE, DIR } from './k68-spolecne.mjs';
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
 const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
@@ -52,7 +52,8 @@ for (const sirka of [1280, 390]) {
     return undefined;
   };
   const { ctx, p, stav, chyby } = await kontext({ viewport: { width: sirka, height: 950 }, mobil: sirka < 500, fix: nacti('k69-b8-rozlozeni-vernost'), dalsi });
-  await otevri(p, '/employer/overview?mode=client&tab=loyalty', 'vedeni.klient_vernost');
+  // Kolo 92: kupony jsou Věrnost → Kupony a poukazy (vlastní stránka bez plochy, výchozí část Kupony a kódy).
+  await p.goto(BASE + '/employer/overview?mode=client&tab=cards', { waitUntil: 'networkidle' });
   await p.getByRole('tab', { name: 'Kupony a kódy' }).click();
   await p.getByRole('heading', { name: 'Katalog kuponů' }).waitFor({ timeout: 15000 });
   await p.waitForTimeout(400);

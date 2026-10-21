@@ -101,7 +101,7 @@ export function ProfilHosta({ host, oznam, vidiDenik, onZmena, onZavrit, akce, v
   /** Křížek v hlavičce panelu (na telefonu ho kreslí okno). */
   onZavrit?: () => void;
   /** Akce profilu (Napsat, Body ±, Kupon) — jen ty, na které má divák oprávnění. */
-  akce: { label: string; icon: string; onClick: () => void }[];
+  akce: { label: string; icon: string; onClick: () => void; aria?: string }[];
 }) {
   const money = useMoney();
   const { ma: smi } = useOpravneni();
@@ -147,7 +147,7 @@ export function ProfilHosta({ host, oznam, vidiDenik, onZmena, onZavrit, akce, v
 
       {akce.length > 0 && (
         <Rada vyska="s">
-          {akce.map(a => <Button key={a.label} size="sm" variant="secondary" icon={a.icon} onClick={a.onClick}>{a.label}</Button>)}
+          {akce.map(a => <Button key={a.label} size="sm" variant="secondary" icon={a.icon} onClick={a.onClick} aria-label={a.aria}>{a.label}</Button>)}
         </Rada>
       )}
 

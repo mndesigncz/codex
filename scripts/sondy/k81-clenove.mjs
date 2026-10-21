@@ -8,7 +8,7 @@
 //
 // Měří na 390 a 1280 px: žádný vodorovný scroll stránky, tlačítka v hromadné liště se vejdou.
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, DIR, OUT } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, BASE, DIR, OUT } from './k68-spolecne.mjs';
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
 const CLIENT = (tab) => `/employer/overview?mode=client&tab=${tab}`;
@@ -148,9 +148,9 @@ async function behy(viewport, mobil) {
   tvrdi(`${jmeno}: bonus pro „vše podle filtru“ pošle filtr a očekávaný počet, ne seznam id`, bulk2?.action === 'points' && bulk2.delta === 25 && !bulk2.ids && bulk2.expected === 120 && !!bulk2.filter, JSON.stringify(bulk2));
   tvrdi(`${jmeno}: dva různé klíče pro dvě akce`, bulk1?.key !== bulk2?.key);
 
-  // ---- detail: poznámky a skupiny ----
-  await p.getByRole('button', { name: 'Deník' }).first().click();
-  await p.getByText('Nesnáší mléko').waitFor({ timeout: 5000 });
+  // ---- profil hosta: poznámky a skupiny (kolo 92: dřív rozbalovací „Deník" pod řádkem) ----
+  await p.getByRole('button', { name: 'Profil hosta Host 001' }).first().click();
+  await p.getByText('Nesnáší mléko').first().waitFor({ timeout: 5000 });
   tvrdi(`${jmeno}: poznámka k hostovi se ukáže s autorem`, await p.getByText(/Martin/).count() >= 1);
   await p.getByLabel('Nová poznámka').fill('Chce stůl u okna');
   await p.getByRole('button', { name: 'Přidat', exact: true }).click();
@@ -188,33 +188,40 @@ async function behy(viewport, mobil) {
   await p.waitForTimeout(500);
   tvrdi(`${jmeno}: dynamická skupina se založí s pravidly`, k().groups.some(g => g.m === 'POST' && g.name === 'Noví spáči' && g.rules?.quietDays === 45), JSON.stringify(k().groups));
 
-  // ---- zprávy ----
-  await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
-  await p.getByRole('tab', { name: 'Zprávy členům' }).click();
-  await p.getByText('Nová zpráva').waitFor({ timeout: 8000 });
-  tvrdi(`${jmeno}: limit „Dnes odesláno 2 z 5“`, await p.getByText(/Dnes odesláno 2 z 5/).count() >= 1);
-  await p.locator('#bc-title').fill('Jaro u nás');
-  await p.locator('#bc-body').fill('Pojď ochutnat');
-  await p.locator('#bc-priloha').selectOption('promo:4');
+  // ---- kampaně (kolo 92: zprávy členům jsou Kampaně → Zprávy, nová kampaň ve třech krocích) ----
+  await p.goto(BASE + CLIENT('campaigns'), { waitUntil: 'networkidle' });
+  await p.getByRole('button', { name: 'Nová kampaň' }).first().click();
+  const pruvodce = p.getByRole('dialog', { name: 'Komu to pošleme' });
+  await pruvodce.waitFor({ timeout: 8000 });
+  await pruvodce.getByRole('button', { name: 'Pokračovat k textu' }).click();
+  await p.locator('#kp-title').fill('Jaro u nás');
+  await p.locator('#kp-body').fill('Pojď ochutnat');
+  await p.locator('#kp-priloha').selectOption('promo:4');
   const nahled = p.getByLabel('Náhled zprávy');
   tvrdi(`${jmeno}: náhled ukazuje nadpis, text a promo kód`, /Jaro u nás/.test(await nahled.innerText()) && /Promo kód: JARO25/.test(await nahled.innerText()));
-  tvrdi(`${jmeno}: s přílohou se cíl přepne na Věrnost`, await p.locator('#bc-link').inputValue() === 'loyalty');
+  tvrdi(`${jmeno}: s přílohou se cíl přepne na Věrnost`, await p.locator('#kp-link').inputValue() === 'loyalty');
   tvrdi(`${jmeno}: bez vodorovného scrollu (zprávy)`, await bezPreteceni(p));
   await p.screenshot({ path: `${OUT}k81-${jmeno}-zpravy.png`, fullPage: true });
+  await p.getByRole('button', { name: 'Pokračovat ke kontrole' }).click();
+  tvrdi(`${jmeno}: limit „Dnes odesláno 2 z 5“`, await dokud(() => p.getByText(/Dnes odesláno 2 z 5/).isVisible(), 3000));
   await p.getByRole('button', { name: 'Poslat zkušebně sobě' }).click();
   await p.waitForTimeout(500);
   tvrdi(`${jmeno}: zkouška sobě pošle action = test a nic nezapíše do historie`, k().bc.some(b => b.m === 'POST' && b.action === 'test' && b.promoId === 4), JSON.stringify(k().bc));
+  await p.getByRole('dialog').getByRole('button', { name: 'Zavřít' }).first().click().catch(() => p.keyboard.press('Escape'));
+  await p.waitForTimeout(400);
 
-  // úprava naplánované zprávy
-  await p.locator('[aria-labelledby="bc-odeslane"]').getByRole('button', { name: 'Upravit', exact: true }).first().click();
-  await p.getByText('Úprava naplánované zprávy').waitFor({ timeout: 3000 });
-  tvrdi(`${jmeno}: úprava načte text a přílohu zprávy`, await p.locator('#bc-title').inputValue() === 'Víkendová akce' && await p.locator('#bc-priloha').inputValue() === 'coupon:3');
-  await p.locator('#bc-title').fill('Víkendová akce 2');
+  // úprava naplánované kampaně
+  await p.locator('[aria-labelledby="kp-plan"]').getByRole('button', { name: 'Upravit', exact: true }).first().click();
+  await p.getByRole('dialog', { name: 'Upravit kampaň' }).waitFor({ timeout: 3000 });
+  await p.getByRole('button', { name: 'Pokračovat k textu' }).click();
+  tvrdi(`${jmeno}: úprava načte text a přílohu zprávy`, await p.locator('#kp-title').inputValue() === 'Víkendová akce' && await p.locator('#kp-priloha').inputValue() === 'coupon:3');
+  await p.locator('#kp-title').fill('Víkendová akce 2');
+  await p.getByRole('button', { name: 'Pokračovat ke kontrole' }).click();
   await p.getByRole('button', { name: 'Uložit změny' }).click();
-  await p.getByRole('dialog').getByRole('button', { name: 'Uložit', exact: true }).click();
   await p.waitForTimeout(500);
   tvrdi(`${jmeno}: úprava pošle PATCH s id zprávy`, k().bc.some(b => b.m === 'PATCH' && b.id === 32 && b.title === 'Víkendová akce 2'), JSON.stringify(k().bc));
-  tvrdi(`${jmeno}: historie ukazuje účinek zprávy`, await p.getByText(/14 členů u kasy do 7 dní, předtím 10 \(\+4\)/).count() >= 1);
+  // Výsledek: příjemci u kasy do 7 dní (14), v závorce týden předtím (10).
+  tvrdi(`${jmeno}: historie ukazuje účinek zprávy`, await dokud(async () => /14\s*\(10\)|14 přišlo/.test(await p.locator('[aria-labelledby="kp-odeslane"]').innerText()), 3000));
 
   tvrdi(`${jmeno}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();

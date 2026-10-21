@@ -59,7 +59,9 @@ for (const [sirka, mobil] of [[390, true], [1280, false]]) {
   };
   const { ctx, p, chyby } = await kontext({ viewport: { width: sirka, height: sirka < 500 ? 844 : 900 }, mobil, dalsi });
   await zachytOkna(ctx);
+  // Kolo 92: plastové karty jsou část Věrnost → Kupony a poukazy (dřív samostatná záložka Kartičky).
   await p.goto(BASE + '/employer/overview?mode=client&tab=cards', { waitUntil: 'networkidle' });
+  await p.getByRole('tab', { name: 'Plastové karty' }).click();
   await p.locator('[data-testid="karty-seznam"]').waitFor({ timeout: 20000 });
   const text = await p.locator('main').innerText();
   tvrdi(`${jm}: jeden h1 „Kartičky“`, (await p.locator('h1').count()) === 1 && /Kartičky/.test(await p.locator('h1').innerText()));

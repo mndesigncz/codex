@@ -644,6 +644,21 @@ const POPIS_CASTI: Record<LoyaltySub, string> = {
   vouchers: 'Dárkové poukazy s jedinečným kódem a QR: peněžní hodnota, platnost, uplatnění po částech u kasy a tisk.',
 };
 
+/** Program + výzva k přechodu z Kartičky (stejná karta jako v Přehledu: výrazná pro podnik bez členů). */
+function ProgramSPrechodem({ oznam, otevri, bonusy }: { oznam: (text: string, ton?: 'ok' | 'bad') => void; otevri: (c: LoyaltySub) => void; bonusy: React.ReactNode }) {
+  const [clenu, setClenu] = useState<number | null>(null);
+  const nacti = useCallback(() => { fetch('/api/client/admin/loyalty').then(okJson).then(d => setClenu(Number(d?.summary?.members) || 0)).catch(() => setClenu(null)); }, []);
+  useEffect(() => { nacti(); }, [nacti]);
+  const imp = useImportKarticky(oznam, nacti);
+  return (
+    <div className="space-y-4">
+      {imp.smi && clenu != null && <PrechodZKarticky clenu={clenu} onOtevri={imp.otevri} />}
+      {imp.okno}
+      <ProgramVernosti otevri={otevri} bonusy={bonusy} />
+    </div>
+  );
+}
+
 /** Kolo 92: Kupony a kódy a Poukazy se přestěhovaly do Věrnost → Kupony a poukazy (components/client/sprava/KuponyAPoukazy). */
 // Kolo 92: „Program" je jedna stránka se živým náhledem karty (sprava/ProgramVernosti); podrobné
 // editory zůstávají jako další části, otevírá je „Upravit" z Programu.
@@ -662,7 +677,7 @@ export default function LoyaltyTabs({ toast, oznam, otevriCast }: {
   const sub: LoyaltySub | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [ukladam, setUkladam] = useState(false);
   const { max: maMax } = usePlan();
-  const nastroj0 = sub === 'program' ? <ProgramVernosti otevri={setVolba} bonusy={<BonusAkce toast={toast} />} />
+  const nastroj0 = sub === 'program' ? <ProgramSPrechodem oznam={oznam} otevri={setVolba} bonusy={<BonusAkce toast={toast} />} />
     : sub === 'overview' ? <Overview toast={toast} oznam={oznam} />
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'bonus' ? <BonusAkce toast={toast} />
