@@ -247,15 +247,21 @@ export const ostatni: Obsluha = (p, k) => {
   if (cesta === '/api/client/staff/scan') {
     const host = {
       customer: { id: 901, name: 'Klára Vojtíšková' }, member: true, points: 120, credit: 0, stamps: 3, visits: 6, spend: 1840,
-      campaigns: [], posledniAkce: null, polozky: [], lastVisit: null, birthdayToday: false, tierBy: 'visits',
+      // Kolo 92 (čtečka ve správě Managero client): karta razítek v barvě podniku a odměna, kterou si
+      // host vybral v aplikaci (záměr, kontrakt HOST ↔ SPRÁVA) — kombinovaná akce „Uplatnit … a přidat razítko".
+      campaigns: [{ id: 1, name: 'Kávová karta', required: 8, ruleType: 'visit', stamps: 3, reward: 'Káva zdarma', completed: 1, platiTed: true, color: '#2E5E4E' }],
+      openCoupons: [{ code: 'KV4-821', title: 'Sirup do kávy', kind: 'offer', fromStamps: false, validUntil: null, benefit: 'sirup zdarma' }],
+      zamer: { claimId: 812, code: 'KV4-821', title: 'Sirup do kávy', benefit: 'sirup zdarma', fromStamps: false, validUntil: null, createdAt: new Date(Date.now() - 4 * 60000).toISOString(), expiresAt: new Date(Date.now() + 116 * 60000).toISOString() },
+      accent: '#2E5E4E', podnik: 'Kavárna U Lípy',
+      posledniAkce: null, polozky: [], lastVisit: new Date(Date.now() - 6 * 86400000).toISOString(), birthdayToday: false, tierBy: 'visits',
       levelLabel: 'Člen', tier: 'bronze', discount: 0, discountSource: null, discountName: null, tierDiscount: 0,
-      nextTierAt: 10, nextTierLabel: 'Stříbrný', nextTierUnit: 'visits', stampedToday: false, openCoupons: [], affordable: [],
+      nextTierAt: 10, nextTierLabel: 'Stříbrný', nextTierUnit: 'visits', stampedToday: false, affordable: [],
       bills: [], parovani: null,
       rules: { pointsPer100: 5, stampTarget: 8, stampReward: 'Káva zdarma', cashbackPct: 0, bodyPravidla: null },
     };
     if (metoda === 'POST') {
       const akce = String(p.telo?.action ?? '');
-      if (akce === 'stamp') return ok({ ok: true, message: 'Klára Vojtíšková: razítko 4/8.', ...host, stamps: 4, stampedToday: true });
+      if (akce === 'stamp') return ok({ ok: true, message: 'Klára Vojtíšková: razítko 4/8.', ...host, stamps: 4, stampedToday: true, campaigns: host.campaigns.map(c => ({ ...c, stamps: 4 })) });
       if (akce === 'points') return ok({ ok: true, message: `Klára Vojtíšková: +${Math.floor((Number(p.telo?.amount) || 0) / 100) * 5} bodů.`, ...host });
       return chyba('V ukázce jde dát razítko nebo body z částky.', 400);
     }

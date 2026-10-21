@@ -183,7 +183,7 @@ export const klient: Obsluha = (p, k) => {
     ], bezi: [] });
   }
   if (cesta === '/api/menu' && p.metoda === 'GET') return ok({ boards: menuDesky() });
-  if (cesta === '/api/client/admin/redeem' && p.metoda === 'POST') return ok({ ok: true, title: 'Káva podle výběru', benefit: 'káva zdarma', badges: [] });
+  if (cesta === '/api/client/admin/redeem' && p.metoda === 'POST') { k.hlas('kupon-uplatnen', { kod: String(p.telo?.code ?? '') }); return ok({ ok: true, title: String(p.telo?.code) === 'KV4-821' ? 'Sirup do kávy' : 'Káva podle výběru', benefit: 'zdarma', badges: [] }); }
   if (cesta === '/api/client/admin/loyalty/prehled') return ok({ dny: radaPoDnech(dnes).map(d => ({ den: d.day, rozdano: d.points_given, utraceno: d.points_spent })), souhrn: {} });
   if (cesta === '/api/client/admin/orders') return ok({ orders: [], souhrn: { pocet: 9, soucet: 2140, hotovych: 8, prumer: 238, neprijato: 0 }, celkem: 0 });
   if (cesta === '/api/client/admin/banners') return ok({ banners: [] });
