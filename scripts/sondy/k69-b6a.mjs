@@ -24,7 +24,13 @@ import {
   kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, mine, ROLE, DIR, OUT, BASE,
 } from './k68-spolecne.mjs';
 
-const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
+// Posun o dny počítá s kalendářním dnem, ne s 24 h: kolem změny času (konec října) by „+7 × 24 h" po půlnoci
+// padlo o den vedle (00:30 CEST + 168 h = 23:30 CET předchozího dne).
+const praha = (o = 0) => {
+  const dnes = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
+  const d = new Date(`${dnes}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + o);
+  return d.toISOString().slice(0, 10);
+};
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDVCEREM: praha(-2), ZITRA: praha(1), POZDEJI: praha(20) };
 // Kolo 7: CAS_PRED = pražské „HH:MM" před půl hodinou (čas termínu, který už minul → „po čase");
 // těsně po půlnoci 00:00, ať zůstane dnešní.
