@@ -22,6 +22,7 @@ import { ZPRAV_DENNE, TITLE_MAX, BODY_MAX, type PrilohaZpravy } from '@/lib/zpra
 import { KANALY_ZPRAVY, vetaDosahu, type DosahZpravy, type KanalyZpravy } from '@/lib/zpravyKanaly';
 import { ctiKombinaci, stitekKombinace } from '@/lib/skupinyPravidla';
 import { apiMessage, okJson } from '@/lib/api';
+import { useSirka } from '@/lib/klientSprava/useSirka';
 import { j, type Hlaska } from '../import/typy';
 import ZpravyNahled from '../loyalty/ZpravyNahled';
 import KombinaceVyber from '../loyalty/KombinaceVyber';
@@ -69,6 +70,7 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
   const { data: d, error, reload } = useLoad<any>('/api/client/admin/broadcast', raw => ({ ...raw, history: Array.isArray(raw?.history) ? raw.history : [] }));
   const [pruvodce, setPruvodce] = useState<{ f: Zprava; editId: number | null } | null>(null);
   const [rusim, setRusim] = useState<any | null>(null);
+  const tabulka = useSirka(768);
   useEffect(() => { if (otevritNovou > 0) setPruvodce({ f: PRAZDNA, editId: null }); }, [otevritNovou]);
 
   const publika = useMemo<Publikum[]>(() => !d ? [] : [
@@ -157,7 +159,7 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
                 <p className="t-meta mt-0.5">Přišli = příjemci, kteří byli u kasy do 7 dní po odeslání. V závorce týden předtím.</p>
               </div>
               {/* Monitor: tabulka s čísly na pravé hraně; telefon: řádky seznamu (hodnota vpravo, P15). */}
-              <div className="hidden md:block px-5 pt-2 pb-2">
+              {tabulka ? <div className="px-5 pt-2 pb-2">
                 <table className="w-full text-sm tabular-nums">
                   <thead>
                     <tr className="t-label text-left">
@@ -186,8 +188,8 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
                     })}
                   </tbody>
                 </table>
-              </div>
-              <ul className="list px-4 md:hidden">
+              </div> : (
+              <ul className="list px-4">
                 {odeslane.map((h: any) => {
                   const po = Number(h.visits_after) || 0, pred = Number(h.visits_before) || 0;
                   return (
@@ -196,7 +198,7 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
                       value={`${po} přišlo`} valueMeta={pred > 0 ? `předtím ${pred}` : h.still_running ? 'měří se' : undefined} />
                   );
                 })}
-              </ul>
+              </ul>)}
             </Card>
           )}
         </>

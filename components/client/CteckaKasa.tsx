@@ -474,7 +474,7 @@ export default function CteckaKasa() {
         )}
 
         {faze.druh === 'host' && h && (
-          <div className="space-y-4">
+          <div className="space-y-4" data-testid="ctecka-host">
             <CteckaHost h={h} nazevPodniku={h.podnik ?? 'Tvůj podnik'} busy={busy} pocet={pocetRazitek} setPocet={setPocetRazitek}
               smiRazitko={smiKartu} smiKupon={smiKupon} smiNavic={op.ma('vernost.razitka_upravit')}
               onRazitko={() => { void razitko(); }} onKombinace={z => { void kombinace(z); }} onJiny={dalsi} />

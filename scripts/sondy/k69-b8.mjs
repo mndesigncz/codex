@@ -200,7 +200,8 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   await otevri(p, CLIENT('overview'), 'vedeni.klient');
   tvrdi('P6: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
   const dok = p.getByRole('navigation', { name: 'Spodní navigace klienta' });
-  tvrdi('P6: spodní dok klienta s odznakem u Objednávek', await dok.isVisible() && await dok.getByRole('button', { name: /Objednávky/ }).locator('span').filter({ hasText: /^\d+$/ }).count() > 0);
+  // Kolo 92: dok je Přehled · Rezervace · Čtečka · Hosté · Více; odznak nových objednávek nese „Více".
+  tvrdi('P6: spodní dok klienta s odznakem nových objednávek u „Více"', await dok.isVisible() && await dok.getByRole('button', { name: /Více/ }).locator('span').filter({ hasText: /^\d+$/ }).count() > 0);
   await p.screenshot({ path: OUT + 'k69-b8-prehled-tel.png', fullPage: true });
   await ctx.close();
 }

@@ -49,13 +49,13 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
   const cil = Number(kampan?.required) || Number(h.rules?.stampTarget) || 0;
   const razitek = kampan ? Number(kampan.stamps) || 0 : Number(h.stamps) || 0;
   const meta = h.member
-    ? [h.levelLabel && h.tier !== 'bronze' ? h.levelLabel : null, h.visits ? `${h.visits + 1}. ${NAVSTEVA.one}` : 'první návštěva', h.lastVisit ? `naposledy ${poslediNavsteva(h.lastVisit)}` : null].filter(Boolean).join(' · ')
+    ? [h.levelLabel && h.tier !== 'bronze' ? h.levelLabel : null, `${h.points ?? 0} b.`, h.visits ? `${h.visits + 1}. ${NAVSTEVA.one}` : 'první návštěva', h.lastVisit ? `naposledy ${poslediNavsteva(h.lastVisit)}` : null].filter(Boolean).join(' · ')
     : 'Ještě není členem tohoto podniku.';
   const lzeRazitko = smiRazitko && !h.stampedToday && (!!kampan || Number(h.rules?.stampTarget) > 0) && kampan?.platiTed !== false;
   const kRazitku = h.stampedToday ? 'Dnes razítko už má' : pocet > 1 ? `Přidat ${czCount(pocet, RAZITKO)}` : 'Jen přidat razítko';
   const pripraveno = (h.openCoupons ?? []).find((c: any) => c.fromStamps)?.title ?? null;
   return (
-    <div className="sloupec sloupec-4 min-w-0" data-testid="ctecka-host">
+    <div className="sloupec sloupec-4 min-w-0">
       <div className="flex items-start gap-3 min-w-0">
         <Avatar name={h.customer?.name} size="md" />
         <div className="min-w-0 flex-1">
@@ -98,9 +98,9 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
             <p className="t-meta">Pravidlo: 1 razítko za návštěvu{pocet > 1 ? ', navíc se zapíše s důvodem' : ''}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" variant="secondary" iconOnly icon="minus" aria-label="O razítko méně" disabled={pocet <= 1} onClick={() => setPocet(pocet - 1)} />
+            <Button size="lg" variant="secondary" iconOnly icon="minus" aria-label="O razítko méně" disabled={pocet <= 1} onClick={() => setPocet(pocet - 1)} />
             <span className="w-6 text-center text-lg font-bold tabular-nums" aria-live="polite">{pocet}</span>
-            <Button size="sm" variant="secondary" iconOnly icon="plus" aria-label="O razítko víc" disabled={pocet >= 3} onClick={() => setPocet(pocet + 1)} />
+            <Button size="lg" variant="secondary" iconOnly icon="plus" aria-label="O razítko víc" disabled={pocet >= 3} onClick={() => setPocet(pocet + 1)} />
           </div>
         </div>
       )}
@@ -113,7 +113,8 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
             {lzeRazitko ? `Uplatnit ${zamer.title.toLowerCase()} a přidat razítko` : `Uplatnit ${zamer.title.toLowerCase()}`}
           </Button>
         )}
-        {(lzeRazitko || h.stampedToday) && (
+        {/* Razítko bez platné karty (mimo okno, dnes už má) zůstává vidět zakázané — důvod říká karta níž. */}
+        {h.member && smiRazitko && (!!kampan || Number(h.rules?.stampTarget) > 0 || (h.campaigns ?? []).length > 0) && (
           <Button size="lg" variant={zamer ? 'secondary' : 'primary'} icon="check" className="w-full" loading={busy === 'stamp'}
             disabled={!lzeRazitko} onClick={onRazitko}>
             {zamer || h.stampedToday ? kRazitku : pocet > 1 ? `Přidat ${czCount(pocet, RAZITKO)}` : 'Razítko za návštěvu'}

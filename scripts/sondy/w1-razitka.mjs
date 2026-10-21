@@ -130,7 +130,8 @@ for (const [sirka, mobil] of [[1280, false], [390, true]]) {
 {
   const { ctx, p, stav, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-zakaznici'), dalsi: podvrh });
   await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
-  await p.getByRole('button', { name: 'Deník' }).first().click();
+  // Kolo 92: razítka člena jsou v profilu hosta (dřív rozbalovací „Deník").
+  await p.getByRole('button', { name: /^Profil hosta/ }).first().click();
   await p.getByRole('button', { name: 'Upravit razítka: Desátá dýmka zdarma' }).waitFor({ timeout: 8000 });
   tvrdi('člen: vidět rozdělanou kartu 4 / 10', (await p.locator('[data-plocha]').innerText()).includes('Desátá dýmka zdarma'));
   await p.getByRole('button', { name: 'Upravit razítka: Desátá dýmka zdarma' }).click();

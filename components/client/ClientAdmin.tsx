@@ -344,13 +344,17 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
           })}
           activeId={tab}
           onSelect={id => prejdi(id as Tab)}
-          more={{ onClick: () => setMoreOpen(v => !v), active: moreOpen || !DOCK.includes(tab) }} />
+          // Objednávky od stolu nejsou v doku (místo nich Čtečka a Hosté): jejich odznak nese „Více", ať nová
+          // objednávka na telefonu nezůstane bez upozornění.
+          more={{ onClick: () => setMoreOpen(v => !v), active: moreOpen || !DOCK.includes(tab),
+            badge: moreOpen || tab === 'orders' ? 0 : odznak('orders'), badgeLabel: popisOdznaku('orders', odznak('orders')) }} />
         <MobileMoreSheet
           open={moreOpen}
           onClose={() => setMoreOpen(false)}
           title="Managero client"
           groups={NAV_SECTIONS.filter(sec => sec.title && sec.title !== 'Dnešek').map(sec => ({
-            title: sec.title, items: sec.ids.map(id => moje.find(t => t.id === id)).filter((t): t is typeof TABS[number] => !!t),
+            title: sec.title, items: sec.ids.map(id => moje.find(t => t.id === id)).filter((t): t is typeof TABS[number] => !!t)
+              .map(t => { const n = odznak(t.id); return n > 0 ? { ...t, badge: n, badgeLabel: popisOdznaku(t.id, n) } : t; }),
           }))}
           activeId={tab}
           onSelect={id => prejdi(id as Tab)}

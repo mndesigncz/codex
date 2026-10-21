@@ -46,17 +46,21 @@ interface ClenRadek {
 
 interface Stranka { rows: ClenRadek[]; total: number; all: number; hasMore: boolean; nextOffset: number | null; segmenty: Partial<Record<SegmentHostu, number>> | null }
 
-/** Je okno aspoň `lg` (1024 px)? Tam stojí profil hosta jako panel vedle seznamu, jinak v okně zdola. */
-function useSiroke(): boolean {
+/**
+ * Je okno aspoň `px` široké? Profil hosta stojí od `lg` (1024) jako panel vedle seznamu, jinak v okně
+ * zdola; tabulka hodnoty hosta od `md` (768), pod ní řádky seznamu. Kreslí se vždy jen jedna podoba
+ * (jméno hosta je v DOM jednou — odečítač i sondy ho nečtou dvakrát).
+ */
+function useSiroke(px = 1024): boolean {
   const [siroke, setSiroke] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia('(min-width: 1024px)');
+    const mq = window.matchMedia(`(min-width: ${px}px)`);
     const zmer = () => setSiroke(mq.matches);
     zmer();
     mq.addEventListener('change', zmer);
     return () => mq.removeEventListener('change', zmer);
-  }, []);
+  }, [px]);
   return siroke;
 }
 
@@ -142,6 +146,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce, otevritPr
   // Profil hosta: id otevřeného; řádek si drží data, ať se panel otevře hned (bez dalšího dotazu na seznam).
   const [profil, setProfil] = useState<ClenRadek | null>(null);
   const siroke = useSiroke();
+  const tabulka = useSiroke(768);
   // Okno akce pro jednoho hosta z profilu (Napsat, Kupon) — jinak se bere výběr v seznamu.
   const [jednomu, setJednomu] = useState<VyberHostu | null>(null);
   useEffect(() => {
@@ -306,7 +311,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce, otevritPr
           <Card pad="none" className="min-w-0">
             {/* Monitor: tabulka s hodnotou hosta (čísla na pravé hraně, tabular-nums). Ø účet a body se při
                 otevřeném profilu schovají, ať jméno nepřeteče. Telefon: řádky seznamu (V4). */}
-            <div className="hidden md:block px-5 pt-1">
+            {tabulka ? <div className="px-5 pt-1">
               <table className="w-full text-sm tabular-nums" aria-label="Hosté">
                 <thead>
                   <tr className="t-label text-left">
@@ -343,22 +348,23 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce, otevritPr
                   })}
                 </tbody>
               </table>
-            </div>
-            <ul className="list px-4 md:hidden">
+            </div> : (
+            <ul className="list px-4">
               {d.rows.map(c => {
                 const prumer = prumernyUcet(c.spend, c.visits);
                 return (
                   <ListRow key={c.id}
                     lead={vybiraSe ? <SelectBox checked={vsechny || sel.has(c.id)} onChange={() => prepniRadek(c.id)} label={`Vybrat: ${c.name}`} /> : undefined}
                     title={<button type="button" onClick={() => setProfil(c)} aria-label={`Profil hosta ${c.name}`} className="block w-full min-w-0 text-left">
-                      <span className="block truncate">{c.name}</span><StitkyRadku c={c} />
+                      <span className="block truncate">{c.name}</span>
                     </button>}
+                    detail={<StitkyRadku c={c} />}
                     meta={`${c.visits} návšt. · naposledy ${predKolika(c.last_visit_at, ted)}`}
                     value={Number(c.spend) > 0 ? money(Number(c.spend)) : <>{cislo(c.points)} <span className="text-xs font-medium text-black/50">b.</span></>}
                     valueMeta={Number(c.spend) > 0 ? (prumer != null ? `Ø ${money(prumer)}` : undefined) : `${c.stamps} raz.`} />
                 );
               })}
-            </ul>
+            </ul>)}
             <div className="px-4 sm:px-5 py-3 flex items-center gap-3 flex-wrap border-t border-black/5">
               <p className="t-meta tabular-nums">Zobrazeno {d.rows.length} z {d.total}</p>
               {d.hasMore && <Button size="sm" variant="secondary" loading={dalsi} onClick={() => { void nactiDalsi(); }}>Načíst další</Button>}
