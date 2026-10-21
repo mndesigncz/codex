@@ -47,7 +47,7 @@ export default function ({ eq, ok }: Testy) {
 
   // ---- napojení ----
   const db = cti('lib/retenceDb.ts');
-  ok('náhled nic nemaže ani neposílá: každá akce za podmínkou ostry', /if \(!v\.ostry \|\| udelano >= RETENCE\.davkaHostu/.test(db) && /if \(v\.ostry && s\.auditLog\.kSmazani\)/.test(db) && /if \(v\.ostry && s\.oznameni\.kSmazani\)/.test(db) && /if \(v\.ostry\) \{\s*for \(const p of podniky/.test(db));
+  ok('náhled nic nemaže ani neposílá: každá akce za podmínkou ostry', /if \(!v\.ostry \|\| udelano >= RETENCE\.davkaHostu/.test(db) && /if \(v\.ostry && s\.auditLog\.kSmazani\)/.test(db) && /if \(v\.ostry && s\.oznameni\.kSmazani\)/.test(db) && /if \(!v\.ostry \|\| Date\.now\(\) > konec\) continue;\s*try \{\s*if \(krok === 'smazat'\)/.test(db));
   ok('anonymizace přes smazaniUctu (stejná cesta jako Smazat účet)', /smazUcet\(x\.id, \{ zDuvodu: 'retence' \}\)/.test(db));
   ok('každý běh se zapíše do retence_behy', /INSERT INTO retence_behy/.test(db) && /await zapisBeh\(s\)/.test(db));
   const cron = cti('app/api/retence/route.ts');

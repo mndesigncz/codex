@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { emailText, sazejHtml } from './i18n/email.ts';
 import { LOCALE_PRO_JAZYK, type Jazyk } from './i18n/config.ts';
 import { htmlNaText } from './emailAdresa.ts';
+import { firma, identifikace } from './firma.ts';
 
 // E-mail, o kterém aplikace ví, jestli odešel.
 //
@@ -72,6 +73,18 @@ interface SendArgs {
 }
 
 /**
+ * Patička s identifikací provozovatele (§ 435 OZ: jméno, IČO, sídlo, zápis, DPH) pod každým
+ * e-mailem, transakčním i hromadným. U zpráv jménem podniku (novinky, poukazy, objednávky)
+ * zůstává odesílatelem podnik — tahle řádka jen říká, kdo provozuje službu, která zprávu doručila.
+ * Česky: identifikace je údaj z českého rejstříku.
+ */
+export function sPatickouProvozovatele(html: string): string {
+  const f = firma();
+  const p = `<p style="font-family:-apple-system,system-ui,sans-serif;color:#8a917f;font-size:11px;line-height:1.5;max-width:500px;margin:16px auto 0;padding:0 28px;" data-provozovatel>${escHtml(identifikace(f))} ${escHtml(f.emailPodpory)}, ${escHtml(f.telefon)}</p>`;
+  return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, `${p}</body>`) : html + p;
+}
+
+/**
  * Jedno místo, kde se e-mail opravdu odešle — a jediné, kde se čte
  * `error`. Nikdy nevyhazuje: volající dostane `{ sent, error }`
  * a rozhodne se, co s tím říct člověku.
@@ -82,6 +95,7 @@ async function send({ label, to, subject, html, replyTo, attachments, headers }:
     // Bez klíče se nic neodešle. Tvrdit opak je horší než neodeslat.
     return { sent: false, error: 'RESEND_API_KEY není nastavený' };
   }
+  html = sPatickouProvozovatele(html);
   try {
     const { error } = await new Resend(key).emails.send({
       from: sender(label),

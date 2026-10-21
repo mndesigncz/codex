@@ -11,6 +11,7 @@ import ZaverecneCta from './landing/sekce/ZaverecneCta';
 import Paticka from './landing/sekce/Paticka';
 import { jsonLdRetezec } from './landing/seo';
 import { getT } from '@/lib/i18n/server';
+import { firma, identifikace } from '@/lib/firma';
 import './landing/landing.css';
 
 // Prodejní stránka pro nepřihlášené: co Managero je, co umí a co stojí.
@@ -30,6 +31,7 @@ import './landing/landing.css';
 export default async function Landing() {
   // Jazyk stránky: přepínač (cookie), jinak země návštěvníka (lib/i18n/jazykPozadavku.ts).
   const t = await getT(['landing']);
+  const f = firma();
   return (
     <div lang={t.jazyk} className="ld-root">
       <ForceLight />
@@ -50,7 +52,8 @@ export default async function Landing() {
         <ZaverecneCta />
       </main>
 
-      <Paticka />
+      {/* Identifikace provozovatele (§ 435 OZ) se skládá na serveru z lib/firma.ts (env FIRMA_* tam přebíjí výchozí údaje). */}
+      <Paticka provozovatel={{ text: identifikace(f, t.jazyk === 'cs' ? 'cs' : 'en'), email: f.emailPodpory, telefon: f.telefon }} />
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdRetezec() }} />
     </div>

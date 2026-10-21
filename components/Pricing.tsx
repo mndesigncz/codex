@@ -198,7 +198,7 @@ export default function Pricing() {
               ))}
             </div>
           </details>
-          <p className="ld-meta mt-6">{t('Ceny jsou bez DPH. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.')}</p>
+          <p className="ld-meta mt-6">{t('Ceny jsou konečné, provozovatel není plátcem DPH. Předplatné se automaticky obnovuje, dokud ho nezrušíš. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.')}</p>
         </div>
       </div>
     </section>

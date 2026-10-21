@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { HLASKA_BEZ_SOUHLASU, VERZE_PODMINEK, VERZE_ZASAD, potrebujeSouhlas, souhlasZTela } from '@/lib/pravni/verze';
-import { nactiSouhlas, zapisSouhlas } from '@/lib/pravni/souhlasDb';
+import { jeVlastnikPodniku, nactiSouhlas, zapisSouhlas } from '@/lib/pravni/souhlasDb';
 
 export const dynamic = 'force-dynamic';
 
 // Souhlas s aktuální verzí podmínek a zásad (spuštění, balík P) — pro bránu
 // components/pravni/NovaVerze.tsx. Osobní věc účtu: jen přihlášení, žádné oprávnění.
 //
-// GET  → { potreba, verzePodminek, verzeZasad, odsouhlaseno: { podminky, zasady, kdy } }
+// GET  → { potreba, vlastnik, verzePodminek, verzeZasad, odsouhlaseno: { podminky, zasady, kdy } }
+//        `vlastnik` = vlastní aspoň jeden podnik: brána mu ukáže i obchodní podmínky a zpracovatelskou smlouvu.
 //        `potreba` = přihlášený (mimo sdílený tablet) nemá odsouhlasené dnešní verze.
 //        Před migrací sloupců se brána neukazuje (potreba false) — nejde to uložit.
 // POST { terms: true } → uloží dnešní verze a čas; bez výslovného `true` 400.
@@ -26,6 +27,7 @@ export async function GET() {
   const r = await nactiSouhlas(id);
   return NextResponse.json({
     potreba: r ? potrebujeSouhlas(r.role, r) : false,
+    vlastnik: await jeVlastnikPodniku(id),
     verzePodminek: VERZE_PODMINEK,
     verzeZasad: VERZE_ZASAD,
     odsouhlaseno: r ? { podminky: r.terms_version, zasady: r.privacy_version, kdy: r.terms_accepted_at } : null,

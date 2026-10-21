@@ -292,7 +292,7 @@ export default function Cesta() {
                   </div>
                 </div>
               </div>
-              <SouhlasPodminek id="cs-souhlas" className="mt-4" checked={souhlas} chyba={chybaSouhlasu}
+              <SouhlasPodminek id="cs-souhlas" podnik className="mt-4" checked={souhlas} chyba={chybaSouhlasu}
                 onChange={v => { setSouhlas(v); if (v) setChybaSouhlasu(null); }} />
               {prihlaseniSelhalo && (
                 <p className="note note-wait mt-4 text-sm" role="alert">

@@ -7,6 +7,7 @@
 // Bez veřejného klíče (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) se okno rovnou
 // přepne na přesměrování do pokladny Stripe, aby platba šla vždycky.
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { loadStripe, type Stripe, type StripeEmbeddedCheckout } from '@stripe/stripe-js';
 import { Icon } from './Icons';
@@ -16,6 +17,7 @@ import { DiscardGuard } from './ui/DiscardGuard';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { tg } from '@/lib/i18n/stav';
+import { cestaDokumentu } from '@/lib/pravni/odkazy';
 
 const stripePromise = new Map<string, Promise<Stripe | null>>();
 function stripeJs(jazyk: string): Promise<Stripe | null> | null {
@@ -113,12 +115,20 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
             <div className={`card p-5 ${plan === 'pro' ? 'card-accent' : 'card-info'}`}>
               <p className="t-label">{PLAN_NAMES[plan]}</p>
               <p className="mt-1"><span className="text-3xl font-bold tracking-tight text-[#16181A]">{czk(amount)}</span> <span className="text-sm text-black/45">{interval === 'year' ? t('ročně') : t('měsíčně')}</span></p>
-              {interval === 'year' && <p className="text-[13px] text-black/45"><s>{czk(pr.yearCompare)}</s> · {t('ušetříte {castka}', { castka: czk(pr.yearCompare - pr.year) })}</p>}
+              {/* Úspora se počítá (12 × měsíční cena − roční), jako na landingu (Pricing.tsx). Dřív tu stála
+                  přeškrtnutá „srovnávací“ cena (PRICES.*.yearCompare), kterou nikdo nikdy neúčtoval —
+                  klamavá referenční cena (§ 4 a 5 zákona o ochraně spotřebitele). */}
+              {interval === 'year' && <p className="text-[13px] text-black/55">{t('Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.', { castka: czk(12 * pr.month - pr.year), mesicne: czk(Math.round(pr.year / 12)) })}</p>}
               <ul className="mt-4 space-y-1.5">
                 {points.map(p => <li key={p} className="text-[13px] text-[#16181A] flex items-start gap-2"><Icon name="check" size={14} className={`shrink-0 mt-0.5 ${plan === 'pro' ? 'text-[#5B7A08]' : 'text-[#0A5CC0]'}`} />{p}</li>)}
               </ul>
               <p className="mt-4 text-[11px] text-black/45">
-                {trial ? t('Zrušit jde kdykoli během zkušební doby, nic se nestrhne.') : t('Kdykoli zrušit, platí do konce zaplaceného období.')} {t('Ceny bez DPH, fakturu pošle Stripe.')}
+                {trial ? t('Zrušit jde kdykoli během zkušební doby, nic se nestrhne.') : t('Kdykoli zrušit, platí do konce zaplaceného období.')} {t('Ceny jsou konečné (neplátce DPH), předplatné se obnovuje automaticky, fakturu pošle Stripe.')}
+              </p>
+              {/* Podmínky placeného tarifu po ruce před platbou (Stripe checklist, OP čl. 6, 7 a 10); nová záložka nezavře pokladnu. */}
+              <p className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-black/55">
+                <Link href={cestaDokumentu('obchodni-podminky', jazyk === 'cs' ? 'cs' : 'en')} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center underline underline-offset-2">{t('Obchodní podmínky')}</Link>
+                <Link href={cestaDokumentu('zruseni-predplatneho', jazyk === 'cs' ? 'cs' : 'en')} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center underline underline-offset-2">{t('Zrušení předplatného a vrácení peněz')}</Link>
               </p>
             </div>
           </aside>

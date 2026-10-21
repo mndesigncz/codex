@@ -14,6 +14,7 @@ import { zajistiClenstvi, clenstviUzivatele, prepniTym } from './tenant';
 import { obalZUserAgent, rolePatriDoObalu } from './obal';
 import { cistyJazyk } from './i18n/config';
 import { verzeRelace, relaceOdvolana, RELACE_ODVOLANA } from './authVerze';
+import { zaznamenejNavstevu } from './naposledy';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -91,6 +92,8 @@ async function stavUzivatele(id: number, cerstve: boolean): Promise<StavUzivatel
     const v = u && !smazan ? { role: String(u.role), teamId: u.team_id == null ? null : Number(u.team_id), sv } : 'smazan' as const;
     if (stavCache.size > 5000) stavCache.clear();
     stavCache.set(id, { at: Date.now(), v });
+    // Retence: „naposledy v aplikaci“ (nejvýš jednou za 6 h, nikdy nevyhazuje; lib/naposledy.ts).
+    if (v !== 'smazan') await zaznamenejNavstevu(id);
     return v;
   } catch {
     return null;

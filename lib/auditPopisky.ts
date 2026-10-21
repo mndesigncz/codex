@@ -204,6 +204,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'billing.customer_reset': 'Zákazník platební brány zapomenut',
   'billing.referral': 'Měsíc zdarma za doporučení',
   'billing.upgrade': 'Změna tarifu na vyšší',
+  'billing.ico': 'IČO podniku z objednávky předplatného',
+  'billing.ico_neplatne': 'IČO z objednávky předplatného neprošlo kontrolou',
   // úkoly (kolo 7)
   'ukoly.fotka': 'Úkol splněn s fotkou jako důkazem',
   // způsob počítání bodů (kolo 91): přepočet automatických bodů zpětně a jeho vrácení

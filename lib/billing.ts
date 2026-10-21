@@ -31,6 +31,8 @@ import { zapomenTarif } from './tarifServer';
 import { notifyUsers } from './push';
 import { audit } from './audit';
 import { pragueToday } from './pragueTime';
+import { patickaFaktury } from './firma';
+import { poleIcoPokladny, icoZPokladny, platneIco, fakturacniPoleIco } from './icoPokladna';
 import {
   rezimZKlice, rezimZLivemode, rozhodniOZdroji, jeChybejiciZdroj, jeChybejiciZakaznik, jeSmazanyZakaznik,
   udalostPatriDoRezimu, vyhodnotPredplatne, nabidnoutTrial, jeZivyStav, ulozenyRezim, type StripeRezim,
@@ -197,6 +199,8 @@ export async function ensureCustomer(teamId: number): Promise<string> {
     name: String(t.name ?? `Podnik ${teamId}`),
     email: t.owner_email ?? undefined,
     metadata: { teamId: String(teamId), app: 'managero' },
+    // Patička faktur: identifikace provozovatele a „Nejsem plátce DPH“ (§ 435 OZ, lib/firma.ts).
+    invoice_settings: { footer: patickaFaktury() },
     // Jazyk podniku (kolo 76); před migrací sloupce a bez nastavení čeština.
     preferred_locales: [stripeLocale(await jazykPodniku(teamId))],
   });
@@ -241,6 +245,60 @@ async function sZakaznikem<T>(teamId: number, akce: (customer: string) => Promis
   }
 }
 
+/**
+ * Patička faktury u zákazníka Stripe (identifikace provozovatele, neplátce DPH) — z lib/firma.ts,
+ * jedna pravda pro web i faktury. Doplní ji i zákazníkům založeným dřív a po změně údajů
+ * (přechod na s.r.o., DIČ). Nepovedená aktualizace pokladnu nezastaví: fakturu pak ponese
+ * výchozí patička z dashboardu Stripe (Settings → Invoices → Default footer), viz docs/PRAVNI.md.
+ */
+async function nastavPatickuFaktury(s: Stripe, customer: string, ico: string | null = null): Promise<void> {
+  try {
+    // IČO odběratele (B2B, OP čl. 1) na fakturu, když ho podnik už má v profilu (lib/icoPokladna.ts).
+    await s.customers.update(customer, { invoice_settings: { footer: patickaFaktury(), ...(ico ? { custom_fields: fakturacniPoleIco(ico) } : {}) } });
+  } catch (e) {
+    console.error('billing: patičku faktury se nepodařilo nastavit', customer, (e as { message?: string })?.message ?? e);
+  }
+}
+
+/** IČO podniku z Nastavení → Profil podniku, jen platné (kontrolní součet). Před migrací null. */
+async function icoPodnikuProFakturu(teamId: number): Promise<string | null> {
+  try {
+    const [r] = await sql`SELECT ico FROM teams WHERE id = ${teamId}`;
+    return platneIco(r?.ico);
+  } catch { return null; }
+}
+
+/**
+ * Po zaplacení (checkout.session.completed): IČO z povinného pole pokladny k podniku (teams.ico)
+ * a na faktury zákazníka Stripe, název firmy (pokud ho člověk v pokladně uvedl) do jména zákazníka.
+ * Neplatný kontrolní součet se neuloží, jen zapíše do historie změn. Nikdy nevyhazuje: webhook se
+ * kvůli tomu nesmí opakovat.
+ */
+async function ulozIcoZPokladny(s: Stripe, session: Stripe.Checkout.Session): Promise<void> {
+  try {
+    const teamId = Number(session.client_reference_id ?? session.metadata?.teamId);
+    if (!Number.isFinite(teamId) || teamId <= 0) return;
+    const { ico, zadano } = icoZPokladny(session.custom_fields);
+    if (!zadano) return;
+    if (!ico) {
+      audit(teamId, null, 'billing.ico_neplatne', 'team', teamId, `IČO z pokladny neprošlo kontrolou: ${zadano.slice(0, 12)}`);
+      return;
+    }
+    const zmena = await sql`UPDATE teams SET ico = ${ico} WHERE id = ${teamId} AND ico IS DISTINCT FROM ${ico} RETURNING id`;
+    if (zmena.length) audit(teamId, null, 'billing.ico', 'team', teamId, `IČO z pokladny: ${ico}`);
+    const customer = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+    if (customer) {
+      const firma = String(session.customer_details?.business_name ?? '').trim();
+      await s.customers.update(customer, {
+        ...(firma ? { name: firma.slice(0, 256) } : {}),
+        invoice_settings: { footer: patickaFaktury(), custom_fields: fakturacniPoleIco(ico) },
+      });
+    }
+  } catch (e) {
+    console.error('[billing] IČO z pokladny se nepodařilo uložit', session.id, (e as { message?: string })?.message ?? e);
+  }
+}
+
 /** Chce pokladna Stripe souhlas s podmínkami? Jen s výslovným STRIPE_SOUHLAS_PODMINEK=1 (viz createCheckout). */
 export function souhlasVPokladne(env: Record<string, string | undefined> = process.env): boolean {
   return env.STRIPE_SOUHLAS_PODMINEK === '1';
@@ -263,7 +321,9 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
   // Trial s kartou jen jednou na podnik — kdo už předplatné měl, platí hned.
   // Stejné pravidlo používají texty v aplikaci (billingPravidla.nabidnoutTrial).
   const trial = nabidnoutTrial({ hadSubscription: t.had_subscription, stripeSubscriptionId: t.stripe_subscription_id });
-  const session = await sZakaznikem(teamId, customer => s.checkout.sessions.create({
+  // B2B (OP čl. 1): povinné IČO v pokladně; má-li ho podnik v profilu, je předvyplněné i na faktuře.
+  const icoPodniku = await icoPodnikuProFakturu(teamId);
+  const session = await sZakaznikem(teamId, async customer => { await nastavPatickuFaktury(s, customer, icoPodniku); return s.checkout.sessions.create({
     mode: 'subscription',
     customer,
     client_reference_id: String(teamId),
@@ -275,6 +335,7 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
     // zákazníka podle toho, co člověk vyplní v pokladně.
     tax_id_collection: { enabled: true },
     customer_update: { name: 'auto', address: 'auto' },
+    custom_fields: [poleIcoPokladny(icoPodniku, jazyk)],
     locale: stripeLocale(jazyk),
     subscription_data: {
       metadata: { teamId: String(teamId), plan },
@@ -286,7 +347,8 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
     metadata: { teamId: String(teamId), plan, interval },
     // Souhlas s obchodními podmínkami přímo v pokladně (spuštění, balík P) — JEN se zapnutým
     // STRIPE_SOUHLAS_PODMINEK=1: Stripe vytvoření pokladny odmítne, když v dashboardu
-    // (Settings → Public details) chybí adresa podmínek. Bez proměnné se chová jako dřív.
+    // (Settings → Public details → Terms of service) chybí adresa podmínek. Bez proměnné se
+    // chová jako dřív. Adresa má být https://www.managero.app/obchodni-podminky (docs/PRAVNI.md).
     ...(souhlasVPokladne() ? { consent_collection: { terms_of_service: 'required' as const } } : {}),
     ...(mode === 'embedded' ? {
       // Stripe hodnotu přejmenoval: „embedded“ už neexistuje, platí „embedded_page“.
@@ -298,7 +360,7 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
       success_url: `${appUrl()}/employer/overview?view=settings&tab=billing&billing=success`,
       cancel_url: `${appUrl()}/employer/overview?view=settings&tab=billing&billing=cancel`,
     }),
-  }));
+  }); });
   if (mode === 'embedded') {
     if (!session.client_secret) throw new Error('Stripe nevrátil klíč pokladny.');
     return { clientSecret: session.client_secret };
@@ -495,6 +557,7 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
+      if (session.mode === 'subscription') await ulozIcoZPokladny(s, session);
       if (session.mode === 'subscription' && session.subscription) {
         const sub = await s.subscriptions.retrieve(String(typeof session.subscription === 'string' ? session.subscription : session.subscription.id));
         await applySubscription(sub);

@@ -52,7 +52,9 @@ export default async function ({ eq, ok }: Testy) {
   // ---- eskalace nahlášeného obsahu ----
   eq('moderace: e-mail provozovatele z MODERACE_EMAIL', kontaktModerace({ MODERACE_EMAIL: 'moderace@firma.cz', FIRMA_EMAIL_PODPORY: 'podpora@firma.cz' }), 'moderace@firma.cz');
   eq('moderace: jinak e-mail podpory', kontaktModerace({ FIRMA_EMAIL_PODPORY: ' podpora@firma.cz ' }), 'podpora@firma.cz');
-  eq('moderace: zástupné pole ani nesmysl ne', [kontaktModerace({ FIRMA_EMAIL_PODPORY: '{{EMAIL_PODPORY}}' }), kontaktModerace({ MODERACE_EMAIL: 'x' }), kontaktModerace({})], [null, null, null]);
+  eq('moderace: zástupné pole z prostředí ne', kontaktModerace({ FIRMA_EMAIL_PODPORY: '{{EMAIL_PODPORY}}' }), null);
+  // Bez proměnných (FIRMA_* nejsou od 2026-10-21 povinné) jde nahlášení na výchozí e-mail podpory z lib/firma.ts.
+  eq('moderace: bez proměnných výchozí e-mail podpory', [kontaktModerace({ MODERACE_EMAIL: 'x' }), kontaktModerace({})], ['podpora@managero.app', 'podpora@managero.app']);
   eq('moderace: lhůta 24 hodin', LHUTA_NAHLASENI_HODIN, 24);
   eq('moderace: čerstvé nahlášení má skoro celou lhůtu', stavLhuty('open', 0.5), { stav: 'v_lhute', zbyvaHodin: 24 });
   eq('moderace: poslední hodina', stavLhuty('open', 23.2), { stav: 'v_lhute', zbyvaHodin: 1 });
