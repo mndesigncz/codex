@@ -281,10 +281,10 @@ export function MamKod({ onHotovo }: { onHotovo: (zprava: string) => void }) {
   };
   return (
     <form onSubmit={odeslat} aria-label={t('Mám kód')}>
+      <label htmlFor="mam-kod" className="field-label">{t('Mám kód')}</label>
       <div className="flex gap-2">
-        <label htmlFor="mam-kod" className="sr-only">{t('Mám kód')}</label>
         <input id="mam-kod" value={kod} onChange={e => { setKod(e.target.value.toUpperCase().slice(0, 40)); setChyba(''); setPodnik(null); }}
-          placeholder={t('Mám kód — promo, poukaz, karta')} autoComplete="off" autoCapitalize="characters" spellCheck={false} data-transient
+          placeholder={t('Promo, poukaz nebo karta')} autoComplete="off" autoCapitalize="characters" spellCheck={false} data-transient
           className="field flex-1 min-w-0 h-kod !tracking-[0.08em] placeholder:font-sans placeholder:tracking-normal" />
         <button type="submit" disabled={busy || !kod.trim()} className="btn btn-primary shrink-0 disabled:opacity-40">{busy ? '…' : t('Použít')}</button>
       </div>

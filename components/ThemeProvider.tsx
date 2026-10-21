@@ -52,8 +52,8 @@ function apply(theme: Theme) {
 
 export function ThemeProvider({ children, initial }: { children: React.ReactNode; initial?: Theme }) {
   // Host (/client…) bez výslovné volby jede podle telefonu: skript v app/layout.tsx to značí
-  // atributem `data-motiv-vychozi`, ať se první vykreslení nepřeblikne do světlého.
-  const vychozi = (): VolbaMotivu => (typeof document !== 'undefined' && document.documentElement.getAttribute('data-motiv-vychozi') === 'system' ? 'system' : 'light');
+  // proměnnou `window.__motivVychozi`, ať se první vykreslení nepřeblikne do světlého.
+  const vychozi = (): VolbaMotivu => (typeof window !== 'undefined' && (window as any).__motivVychozi === 'system' ? 'system' : 'light');
   const [volba, setVolba] = useState<VolbaMotivu>(() => initial ?? vychozi());
   // Preference systému: zjišťuje se až v prohlížeči (server ji nezná), takže první vykreslení je vždy shodné.
   const [systemTmavy, setSystemTmavy] = useState(false);

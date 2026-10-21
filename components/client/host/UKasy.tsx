@@ -154,7 +154,7 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center modal-overlay" onClick={m.guard.attemptClose}>
       <div ref={m.ref} {...m.dialogProps} onClick={e => e.stopPropagation()}
-        className="modal-sheet h-vyjed w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] sm:mb-6 max-h-[calc(100dvh-12px)] overflow-y-auto overscroll-contain px-5 sm:px-6 pt-3 pb-[max(env(safe-area-inset-bottom),20px)]">
+        className="modal-sheet h-vyjed w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] sm:mb-6 min-h-[calc(100dvh-24px)] sm:min-h-0 max-h-[calc(100dvh-12px)] overflow-y-auto overscroll-contain px-5 sm:px-6 pt-3 pb-[max(env(safe-area-inset-bottom),20px)]">
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-black/15" aria-hidden />
         {udalosti ? (
           <Odezva udalosti={udalosti} podnik={clenstvi.find(c => c.slug === udalosti[0]?.slug) ?? null} onHotovo={onClose} onDalsi={() => { setUdalosti(null); }} hodnotitHref={cesta('/client/me/aktivita')} />
@@ -172,8 +172,8 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
               {karta.data?.svg
                 ? <span dangerouslySetInnerHTML={{ __html: karta.data.svg }} className="block w-full h-full" role="img" aria-label={t('QR kód karty {kod}', { kod: karta.data.code })} />
                 : karta.data?.code
-                  ? <p className="h-kod text-xl text-[#16181A] text-center break-all">{karta.data.code}</p>
-                  : karta.chyba ? <p className="text-sm text-[#16181A]/70 text-center px-3">{t('QR se nenačetlo. Řekni obsluze kód níž.')}</p>
+                  ? <p className="h-kod text-xl text-center break-all" style={{ color: '#16181A' }}>{karta.data.code}</p>
+                  : karta.chyba ? <p className="text-sm text-center px-3" style={{ color: 'rgba(22,24,26,0.7)' }}>{t('QR se nenačetlo. Řekni obsluze kód níž.')}</p>
                   : <span className="block w-full h-full rounded-xl bg-black/[0.06] animate-pulse" aria-hidden />}
             </div>
             <p className="mt-4 text-center h-kod text-[22px]" aria-label={t('Kód karty {kod}', { kod: karta.data?.code ?? '' })}>{karta.data?.code ?? ' '}</p>

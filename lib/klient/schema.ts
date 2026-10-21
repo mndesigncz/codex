@@ -23,6 +23,7 @@ export function zajistiHosta(): Promise<void> {
       await sql`CREATE INDEX IF NOT EXISTS client_coupon_claims_customer_redeemed ON client_coupon_claims (customer_id, redeemed_at)`;
       await sql`CREATE INDEX IF NOT EXISTS client_stamp_events_customer_time ON client_stamp_events (customer_id, created_at DESC)`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS host_aktivita_videno TIMESTAMP`;
+      await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS phone TEXT`;
     })().catch(e => { pripraveno = null; throw e; });
   }
   return pripraveno;

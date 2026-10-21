@@ -3161,6 +3161,8 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_stamp_events_customer_time ON client_stamp_events (customer_id, created_at DESC)`);
     // Schránka (Aktivita): kdy host naposledy otevřel schránku — z toho odznak nepřečtených v doku.
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS host_aktivita_videno TIMESTAMP`);
+    // Telefon podniku pro akci „Zavolat“ na stránce podniku (vyplňuje správa ve Stránce a vzhledu).
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS phone TEXT`);
     // ---- konec Host ----
 
 

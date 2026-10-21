@@ -12,7 +12,7 @@ import { LogoPodniku } from '../karta/KartaPodniku';
 import { useCesta } from './cesty';
 import { useHostShell } from '../ClientShell';
 import { useHostMe, useTed } from './data';
-import { hlavniKampan, stavOtevreni } from './model';
+import { hlavniKampan, stavOtevreni, popisOtevreni } from './model';
 import { useT } from '@/lib/i18n/client';
 import { okJson } from '@/lib/api';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
@@ -100,7 +100,7 @@ function Radek({ b, m, href, dnes, hm }: { b: any; m?: any; href: string; dnes: 
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold leading-tight truncate">{b.name}</span>
           <span className="block t-meta truncate mt-0.5">
-            <span className={o.otevreno ? 'text-ok-ink font-medium' : ''}>{o.otevreno ? t('Otevřeno do {cas}', { cas: o.doKdy ?? '' }) : o.odKdy ? t('Otevírá v {cas}', { cas: o.odKdy }) : t('Dnes zavřeno')}</span>
+            <span className={o.otevreno ? 'text-ok-ink font-medium' : ''}>{popisOtevreni(o, t)}</span>
             {b.address ? ` · ${b.address}` : b.tagline ? ` · ${b.tagline}` : ''}
           </span>
         </span>

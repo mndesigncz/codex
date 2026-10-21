@@ -83,7 +83,7 @@ export default function ({ eq, ok }: Testy) {
   ok('blokace: blokovaný člen body nesbírá (award i razítka)', client.includes('export async function jeClenBlokovan') && (client.match(/jeClenBlokovan\(teamId, customerId\)/g) ?? []).length >= 2);
   ok('blokace: razítka v kampaních taky', precti('lib/stamps.ts').includes('jeClenBlokovan(c.team_id, customerId)'));
   ok('blokace: u kasy obsluha dostane důvod', precti('app/api/client/staff/scan/route.ts').includes('je ve věrnostním programu zablokovaný'));
-  ok('blokace: host nevybere kupon ani promo kód', precti('app/api/client/b/[slug]/promo/route.ts').includes('jeClenBlokovan(teamId, me.id)') && precti('app/api/client/b/[slug]/coupons/[id]/claim/route.ts').includes('jeClenBlokovan(teamId, me.id)'));
+  ok('blokace: host nevybere kupon ani promo kód', precti('lib/klient/promo.ts').includes('jeClenBlokovan(teamId, me.id)') && precti('app/api/client/b/[slug]/coupons/[id]/claim/route.ts').includes('jeClenBlokovan(teamId, me.id)'));
   ok('blokace: bonus bodů hromadně blokovanému nejde', precti('app/api/client/admin/customers/bulk/route.ts').includes('AND blocked = FALSE'));
   const ui = precti('components/client/loyalty/ClenSprava.tsx');
   ok('rozhraní: blokace a odebrání člena se potvrzují', ui.includes('<Potvrdit') && ui.includes('Odebrat z klubu') && ui.includes('Zablokovat'));

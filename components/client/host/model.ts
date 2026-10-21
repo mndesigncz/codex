@@ -112,9 +112,14 @@ export function krestni(jmeno: string | null | undefined): string {
 }
 
 /** Je podnik teď otevřený? Podle otevírací doby (klíč dne „0“–„6“ jako lib/clientSlots dayKey). */
-export function stavOtevreni(hours: any, den: string, hm: string): { otevreno: boolean; doKdy: string | null; odKdy: string | null } {
+export function stavOtevreni(hours: any, den: string, hm: string): { otevreno: boolean; doKdy: string | null; odKdy: string | null; dnesZavreno: boolean } {
   const h = hours?.[dayKey(den)];
-  if (!h || h.closed || !h.open || !h.close) return { otevreno: false, doKdy: null, odKdy: null };
+  if (!h || h.closed || !h.open || !h.close) return { otevreno: false, doKdy: null, odKdy: null, dnesZavreno: true };
   const otevreno = hm >= h.open && hm < h.close;
-  return { otevreno, doKdy: otevreno ? h.close : null, odKdy: !otevreno && hm < h.open ? h.open : null };
+  return { otevreno, doKdy: otevreno ? h.close : null, odKdy: !otevreno && hm < h.open ? h.open : null, dnesZavreno: false };
+}
+
+/** „Otevřeno do 20:00“ / „Otevírá v 7:30“ / „Teď zavřeno“ / „Dnes zavřeno“. */
+export function popisOtevreni(o: ReturnType<typeof stavOtevreni>, t: T): string {
+  return o.otevreno ? t('Otevřeno do {cas}', { cas: o.doKdy ?? '' }) : o.odKdy ? t('Otevírá v {cas}', { cas: o.odKdy }) : o.dnesZavreno ? t('Dnes zavřeno') : t('Teď zavřeno');
 }

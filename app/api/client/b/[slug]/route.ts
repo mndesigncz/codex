@@ -17,6 +17,7 @@ import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { dokdyDnes } from '@/lib/bonusAkce';
 import { planClena } from '@/lib/propadaniBoduDb';
 import { planKreditu } from '@/lib/bodyPravidlaDb';
+import { datRazitek } from '@/lib/klient/domov';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -136,6 +137,8 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       endedCampaigns,
       reservations, claims,
     };
+    // Kolečka razítek s daty návštěv (lib/klient/domov.ts).
+    mine.razitkaData = await datRazitek(me.id, teamId, mine.campaigns.map((c: any) => ({ id: Number(c.id), stamps: Number(c.stamps) || 0 })));
     // Body, kterým brzy vyprší platnost (jen když podnik propadání používá).
     if (p.loyalty_on && Number(p.points_expire_days) > 0) {
       const pl = await planClena(teamId, me.id, p);
@@ -260,5 +263,5 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       bonus = { name: bn.nazev, multiplier: bn.nasobic, stampBonus: bn.razitka, until: konec == null ? null : `${String(konec).padStart(2, '0')}:00` };
     }
   }
-  return NextResponse.json({ business: publicProfile(p), bonus, menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
+  return NextResponse.json({ business: { ...publicProfile(p), phone: p.phone ? String(p.phone).slice(0, 30) : '' }, bonus, menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
 }

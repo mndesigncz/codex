@@ -120,7 +120,7 @@ function Radek({ p, nove, onHodnoceno }: { p: Polozka; nove: boolean; onHodnocen
       href = cesta(`/client/${p.slug}?tab=order`); break;
     case 'novinka': ikona = 'inbox'; titul = p.titul ?? t('Novinka'); text = p.text; href = cesta(`/client/${p.slug}`); break;
     case 'odpoved':
-      ikona = 'chat'; titul = t('{podnik} odpověděl na hodnocení', { podnik: p.podnik });
+      ikona = 'chat'; titul = t('Odpověď na tvoje hodnocení');
       text = <span className="block"><span className="block">„{p.text}“</span>{p.poznamka ? <span className="block mt-1 text-black/50">{t('Tvoje hodnocení: {n} z 5 · {pozn}', { n: p.hodnoceni ?? 0, pozn: p.poznamka })}</span> : null}</span>;
       break;
     case 'hodnotit': return <Hodnotit p={p} onHotovo={() => onHodnoceno(p.id)} />;
@@ -167,8 +167,8 @@ function Hodnotit({ p, onHotovo }: { p: Polozka; onHotovo: () => void }) {
       <div className="flex items-start gap-3">
         <LogoPodniku nazev={p.podnik} barva={p.accent} velikost={40} />
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold leading-snug">{t('Jak to bylo v {podnik}?', { podnik: p.podnik })}</p>
-          <p className="t-meta mt-0.5">{p.kind === 'order' ? t('objednávka od stolu') : t('rezervace')}</p>
+          <p className="text-[15px] font-semibold leading-snug">{t('Jak to bylo?')}</p>
+          <p className="t-meta mt-0.5">{p.podnik} · {p.kind === 'order' ? t('objednávka od stolu') : t('rezervace')}</p>
           <div className="mt-2 flex items-center gap-0.5" role="radiogroup" aria-label={t('Hodnocení')}>
             {[1, 2, 3, 4, 5].map(n => (
               <button key={n} type="button" role="radio" aria-checked={hvezdy === n} aria-label={t('{n} z 5', { n })} onClick={() => setHvezdy(n)}

@@ -145,7 +145,7 @@ export default function ({ eq, ok }: Testy) {
 
   ok('S1: razítka se připisují optimisticky (podmínka na rev) a ref se zabere dřív než zápis', /AND rev = \$\{s\.rev\}/.test(stamps) && /ON CONFLICT \(campaign_id, customer_id, ref\)/.test(stamps));
   ok('S2: vyzvednutí kuponu: pád vložení vrací body i kus z limitu', /await vratKus\(c\.id\)\.catch/.test(zdroj('app/api/client/b/[slug]/coupons/[id]/claim/route.ts')) && /award\(teamId, me\.id, cost, 'coupon'/.test(zdroj('app/api/client/b/[slug]/coupons/[id]/claim/route.ts')));
-  const promo = zdroj('app/api/client/b/[slug]/promo/route.ts');
+  const promo = zdroj('lib/klient/promo.ts') /* logika promo kódu přesunuta z routy (jedno pole „Mám kód“) */;
   ok('S4: počítadlo promo kódu je atomické (limit přímo v UPDATE) a promo kód hlídá podmínky kuponu', /UPDATE client_promos SET uses = uses \+ 1/.test(promo) && /max_uses IS NULL OR uses < max_uses/.test(promo) && /claimBlocker\(/.test(promo));
   ok('S4: při pádu po zabrání kódu se použití i počítadlo vrací', /vratPouziti\(/.test(promo));
   ok('S6: připisování z účtenky jde po krocích a guard účtenky se při pádu uvolní k převzetí', /spustKrok\(hotove/.test(scan) && /awarded_at = NOW\(\) - INTERVAL '1 minute'/.test(scan));

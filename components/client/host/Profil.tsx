@@ -56,7 +56,7 @@ export default function Profil() {
         <StatRow>
           <Stat label={t('Návštěvy')} value={navstev} note={t('celkem')} />
           <Stat label={t('Odměny')} value={uplatneno} note={t('uplatněno')} />
-          <Stat label={t('Body')} value={body} note={t('ve všech podnicích')} />
+          <Stat label={t('Body')} value={body} note={t('dohromady')} />
         </StatRow>
       </section>
 
@@ -106,7 +106,7 @@ export default function Profil() {
 function VolbaMotivuHosta() {
   const t = useT('klient-host');
   const { volba, setTheme } = useTheme();
-  const volby: { id: VolbaMotivu; label: string }[] = [{ id: 'system', label: t('Podle telefonu') }, { id: 'light', label: t('Světlý') }, { id: 'dark', label: t('Tmavý') }];
+  const volby: { id: VolbaMotivu; label: string }[] = [{ id: 'system', label: t('Systém') }, { id: 'light', label: t('Světlý') }, { id: 'dark', label: t('Tmavý') }];
   return (
     <div>
       <p className="text-[15px] font-medium mb-2.5">{t('Vzhled')}</p>

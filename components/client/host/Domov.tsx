@@ -62,16 +62,16 @@ export default function Domov() {
         <div className="space-y-5 md:sticky md:top-24">
           {/* Moje karta: jeden kód pro všechny podniky. QR je vidět hned; „Zvětšit“ = U kasy přes celou výšku. */}
           <section aria-label={t('Moje karta')} className="h-moje p-4 sm:p-5 flex items-center gap-4">
-            <button type="button" onClick={() => otevri()} className="h-qr-pole shrink-0 w-[6.5rem] h-[6.5rem] p-2.5" aria-label={t('Zvětšit QR kód karty')}>
+            <button type="button" onClick={() => otevri()} className="h-qr-pole shrink-0 w-24 h-24 p-2" aria-label={t('Zvětšit QR kód karty')}>
               {karta.data?.svg ? <span dangerouslySetInnerHTML={{ __html: karta.data.svg }} className="block w-full h-full" aria-hidden />
                 : <span className="block w-full h-full rounded-lg bg-black/[0.06]" aria-hidden />}
             </button>
             <div className="min-w-0 flex-1">
               <p className="h-moje-tlume text-[13px] leading-snug">{t('Moje karta · všechny podniky')}</p>
               <p className="h-kod text-[17px] mt-1 truncate">{karta.data?.code ?? (karta.chyba ? t('Nenačetla se') : '')}</p>
-              <div className="mt-3 flex gap-2">
-                <button type="button" onClick={() => otevri()} className="h-pilulka-sklo tap-target-sm"><Icon name="expand" size={15} />{t('Zvětšit')}</button>
-                <Link href={cesta('/client/me/profil#karta')} className="h-pilulka-sklo tap-target-sm"><Icon name="card" size={15} />{t('Peněženka')}</Link>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => otevri()} className="h-pilulka-sklo tap-target-sm min-w-0"><Icon name="expand" size={15} /><span className="truncate">{t('Zvětšit')}</span></button>
+                <Link href={cesta('/client/me/profil#karta')} className="h-pilulka-sklo tap-target-sm min-w-0"><Icon name="card" size={15} /><span className="truncate">{t('Wallet')}</span></Link>
               </div>
             </div>
           </section>
