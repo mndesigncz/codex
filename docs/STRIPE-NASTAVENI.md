@@ -41,8 +41,35 @@ neumí vypsat; na cenách ani předplatných žádné nejsou (předplatné neexi
      výchozí `end_trial` by při přechodu Pro ↔ Max v trialu hned strhl kartu, což odporuje slibu
      „30 dní zdarma“.
 
-   Pozor: kdyby někdy kód konfiguraci zakládal sám (jiný účet, sandbox bez konfigurace),
-   tyhle dvě hodnoty v `portalConfiguration` nenastavuje — stojí za doplnění v kódu.
+   Totéž (i s odkazy na podmínky a soukromí) teď nastavuje i kód v `lib/billing.ts →
+   portalConfiguration`, když konfiguraci zakládá sám (sandbox, nový účet).
+3. **Barvy značky** (Settings → Branding) přes API: hlavní barva `#C8F542` (limetková
+   z manifestu), doplňková `#16181A`, tlačítko v pokladně `#16181A` na bílém pozadí.
+   Logo ani ikonu konektor nahrát neumí.
+
+## ⚠ Účet zatím neumí přijímat platby
+
+`charges_enabled: false`, `payouts_enabled: false`, důvod `requirements.past_due`. Chybí:
+- **ověření totožnosti** — automatické ověření jména, data narození a telefonu selhalo
+  (`verification_failed_keyed_identity`); Stripe chce **doklad totožnosti** (občanku/pas)
+  a **selfie (proof of liveness)**;
+- **bankovní účet pro výplaty** (`external_account`).
+
+Dokud tohle Martin v Dashboardu nedoplní (Settings → Business → nebo banner nahoře v
+Dashboardu), živá pokladna zaplatit nepůjde. Přes API to doplnit nejde a ani nemá —
+doklad, selfie a účet zadává jen majitel.
+
+## Veřejné údaje teď vs. cíl
+
+| Pole | Teď | Má být |
+|---|---|---|
+| Název pro zákazníky | Managero | ✅ |
+| Výpis na kartě | MANAGERO | ✅ |
+| E-mail podpory | info@mndesign.cz | **podpora@managero.app** |
+| Telefon podpory | +420727960413 | ✅ |
+| Web | managero.app | **https://www.managero.app** |
+| Odkaz podpory | https://managero.app/podpora | (může zůstat, ideálně s www) |
+| Adresa podpory | Míru 482, 790 70 Javorník | ✅ |
 
 Nic jsem nemazal, nevracel ani neplatil; webhook ani podpisový klíč se neměnily
 (`STRIPE_WEBHOOK_SECRET` ve Vercelu zůstává platný).
@@ -75,5 +102,8 @@ Nic jsem nemazal, nevracel ani neplatil; webhook ani podpisový klíč se neměn
 
 **Stripe Tax**: nechat vypnutý, nepřidávat žádné daňové sazby ani registrace.
 
-Volitelně: **Settings → Branding** — teď je výchozí modrá Stripe bez loga; nahrát logo/ikonu
-a barvu Managera (projeví se v pokladně, portálu i fakturách).
+Volitelně: **Settings → Branding** — barvy jsou nastavené, chybí nahrát ikonu a logo
+(`public/icon-512.png`).
+
+Proč to musí Martin: konektor Stripe nemá zápis do veřejných údajů účtu, nastavení faktur
+ani e-mailů předplatného (u vlastního účtu to Stripe API vůbec neumožňuje — jen Dashboard).
