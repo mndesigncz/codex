@@ -2712,5 +2712,8 @@
   "Tento měsíc už nemáš body k rozdání.": "You have no points left to give this month.",
   "Můžeš poslat 1 až {n} b.": "You can send 1 to {n} pts.",
   "Nastaveno {hotovo} z {celkem}": "{hotovo} of {celkem} set up",
-  "Nastaveno z {pct} %": "{pct} % set up"
+  "Nastaveno z {pct} %": "{pct} % set up",
+  "{pct} % tržby": "{pct} % of sales",
+  "Výsledek je bez nájmu a energií.": "The result excludes rent and utilities.",
+  "Doplnit pravidelné náklady": "Add recurring costs"
 }

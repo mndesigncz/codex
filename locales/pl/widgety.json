@@ -2712,5 +2712,8 @@
   "Tento měsíc už nemáš body k rozdání.": "W tym miesiącu nie masz już punktów do rozdania.",
   "Můžeš poslat 1 až {n} b.": "Możesz wysłać od 1 do {n} pkt.",
   "Nastaveno {hotovo} z {celkem}": "Skonfigurowano {hotovo} z {celkem}",
-  "Nastaveno z {pct} %": "Skonfigurowano w {pct} %"
+  "Nastaveno z {pct} %": "Skonfigurowano w {pct} %",
+  "{pct} % tržby": "{pct} % utargu",
+  "Výsledek je bez nájmu a energií.": "Wynik jest bez czynszu i mediów.",
+  "Doplnit pravidelné náklady": "Uzupełnij stałe koszty"
 }

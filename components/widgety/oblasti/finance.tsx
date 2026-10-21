@@ -39,6 +39,7 @@ import {
   KVADRANTY, kamSlyPenize, kcNaHodinuPoDnech, maticeMenu, mzdyDnes, mzdyMesice, podilMezd, podilNakladu, rozsahMesicu, rozsahSrovnani,
   trzbaNaHodinu, urlFinanci, vyberDochazkuDnes, vyberFinance, zmenaProti as zmena, zmenySouhrnu,
   type FinanceMesice, type Kvadrant, type PolozkaMatice, type SrovnaniFinanci,
+  KLIC_OTEVRI_PEVNE,
 } from '@/lib/financeWidgety';
 import { useUlozeno } from '@/lib/useUlozeno';
 import { fmtDenVTydnu } from '@/lib/i18n/format';
@@ -176,6 +177,15 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
   const data = useDataWidgetu(ok ? urlFinanci(mesic) : null, vyberFinance);
   const f = data.data;
   const naFinancich = useNaFinancich();
+  const nav = useNavigace();
+  const smi = useSmi();
+  // „Doplň pravidelné náklady" jako odkaz rovnou do okna (audit 2026-10 V16), ne cesta slovy „Financích › ··· › …".
+  const smiPevne = smi('finance.nastaveni') && nav.smiPohled('finance');
+  const otevriPevne = () => {
+    try { sessionStorage.setItem(KLIC_OTEVRI_PEVNE, '1'); } catch { /* bez úložiště */ }
+    if (naFinancich) window.dispatchEvent(new Event(KLIC_OTEVRI_PEVNE));
+    else nav.onNavigate('finance');
+  };
   // Srovnání (kolo 8): na Financích podle přepínače v hlavičce (předchozí období / loni) — druhý dotaz na
   // srovnávané období dá změnu všem čtyřem číslům. Jinde stačí prevRevenue ze serveru.
   const srovnani = useContext(SrovnaniStrankyFinanci);
@@ -192,7 +202,10 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
     const pozTrzby = `${t('z uzávěrek')} · ${trend != null ? `${sZnamenkem(trend)} ${protiCemu}` : t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n: s.closingsCount })}`;
     // Bez finance.mzdy API mzdy nepošle a hrubý výsledek je bez nich — nula by lhala.
     const mzdy = s.mzdySkryte ? t('skryto') : money(mzdyMesice(f));
-    const pozMzdy = s.mzdySkryte ? t('mzdy vidí jen role s oprávněním') : s.wagesWorked > 0 ? t('z docházky × sazby') : t('z denních výplat');
+    // Mzdy jako % tržby (audit 2026-10, vzor Toast Now „Labor % of sales"): jen ze skutečných čísel období.
+    const podilMezdPct = mzdyMesice(f) > 0 ? podilMezd(f)?.podil ?? null : null;
+    const pozMzdyZdroj = s.mzdySkryte ? t('mzdy vidí jen role s oprávněním') : s.wagesWorked > 0 ? t('z docházky × sazby') : t('z denních výplat');
+    const pozMzdy = podilMezdPct != null ? `${t('{pct} % tržby', { pct: podilMezdPct })} · ${pozMzdyZdroj}` : pozMzdyZdroj;
     // Pevné náklady (kolo 81): v L samostatný údaj jen tam, kde mřížka zůstane sudá (bez spropitného);
     // se spropitným jde částka do poznámky výsledku. Bez vyplněných nákladů výsledek řekne, že je bez nájmu.
     const zaklad: Metrika[] = ['nakupy', 'mzdy', ...(s.tips > 0 ? ['spropitne' as const] : [])];
@@ -228,12 +241,22 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
               <div key={k} className="min-w-0">
                 <dt className="t-label !text-white/55 truncate">{polozky[k].stitek}</dt>
                 <dd className="mt-1 text-[15px] font-semibold tabular-nums text-white truncate">{polozky[k].hodnota}</dd>
+                {k === 'mzdy' && podilMezdPct != null && <dd className="mt-0.5 text-[12px] text-white/60 tabular-nums truncate" data-podil-mezd>{t('{pct} % tržby', { pct: podilMezdPct })}</dd>}
                 {polozky[k].zmena != null && <dd className="mt-0.5 text-[12px] truncate"><Zmena pct={polozky[k].zmena} inkoust /></dd>}
               </div>
             ))}
           </dl>
           {/* Inkoust kreslí údaje bez poznámek — u výsledku je ale poznámka to hlavní: po nájmu, nebo bez něj. */}
-          <p className="mt-3 text-[13px] text-white/60 text-pretty">{t('Výsledek')}: {pozVysledek}</p>
+          {!s.fixedCostsSet && smiPevne ? (
+            <p className="mt-3 text-[13px] text-white/60 text-pretty">
+              {t('Výsledek je bez nájmu a energií.')}{' '}
+              <button type="button" onClick={otevriPevne} className="tap-target-sm font-semibold text-white underline underline-offset-2 hover:no-underline" data-doplnit-pevne>
+                {t('Doplnit pravidelné náklady')}
+              </button>
+            </p>
+          ) : (
+            <p className="mt-3 text-[13px] text-white/60 text-pretty">{t('Výsledek')}: {pozVysledek}</p>
+          )}
         </div>
       );
     } else {

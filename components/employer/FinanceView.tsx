@@ -25,7 +25,8 @@
 // CSV pro účetní se skládá v prohlížeči ze stejného /api/finance, jaký kreslí
 // obrazovka, takže čísla v souboru sedí s tím, co vedení vidí.
 
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { KLIC_OTEVRI_PEVNE } from '@/lib/financeWidgety';
 import { Icon } from '../Icons';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -607,6 +608,15 @@ export default function FinanceView() {
   const zmenObdobi = (p: PresetObdobiFinanci, o: string) => { setPreset(p); setMesic(o); };
   const [exportuji, setExportuji] = useState(false);
   const [pevne, setPevne] = useState(false);
+  // Widget Souhrn měsíce odkazuje „doplň pravidelné náklady" rovnou sem (audit 2026-10 V16):
+  // na Financích událostí, odjinud přes příznak v sessionStorage po přechodu na stránku.
+  useEffect(() => {
+    if (!smi('finance.nastaveni')) return;
+    const otevri = () => { try { sessionStorage.removeItem(KLIC_OTEVRI_PEVNE); } catch { /* bez úložiště */ } setPevne(true); };
+    try { if (sessionStorage.getItem(KLIC_OTEVRI_PEVNE) === '1') otevri(); } catch { /* bez úložiště */ }
+    window.addEventListener(KLIC_OTEVRI_PEVNE, otevri);
+    return () => window.removeEventListener(KLIC_OTEVRI_PEVNE, otevri);
+  }, [smi]);
   const [podleDodavatelu, setPodleDodavatelu] = useState(false);
   const [upgrade, setUpgrade] = useState<string | null>(null);
   const monitor = useMonitor();

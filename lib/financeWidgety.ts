@@ -998,3 +998,7 @@ export function maticeMenu(polozky: readonly { id: string; name: string; qty: nu
   out.sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name, 'cs'));
   return { prumerKusy: Math.round(prumerKusy * 10) / 10, prumerMarze: Math.round(prumerMarze * 10) / 10, polozky: out, pocty, bezReceptury };
 }
+
+/** Příznak (sessionStorage) i název události: otevřít okno Pravidelné náklady na Financích
+ *  — odkaz „doplň pravidelné náklady" z widgetu Souhrn měsíce (audit 2026-10 V16). */
+export const KLIC_OTEVRI_PEVNE = 'managero-otevri-pevne-naklady';

@@ -2715,5 +2715,8 @@
   "Tento měsíc už nemáš body k rozdání.": "Tento mesiac už nemáš body na rozdanie.",
   "Můžeš poslat 1 až {n} b.": "Môžeš poslať 1 až {n} b.",
   "Nastaveno {hotovo} z {celkem}": "Nastavené {hotovo} z {celkem}",
-  "Nastaveno z {pct} %": "Nastavené na {pct} %"
+  "Nastaveno z {pct} %": "Nastavené na {pct} %",
+  "{pct} % tržby": "{pct} % tržby",
+  "Výsledek je bez nájmu a energií.": "Výsledok je bez nájmu a energií.",
+  "Doplnit pravidelné náklady": "Doplniť pravidelné náklady"
 }
