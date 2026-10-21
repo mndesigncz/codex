@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Icon } from '../Icons';
-import { Button } from '../ui';
+import { Button, Rada } from '../ui';
 import PoleMnozstvi from './PoleMnozstvi';
 import { CONTENT_UNITS } from '@/lib/jednotky';
 import { useSymbol } from '../CurrencyProvider';
@@ -300,19 +300,23 @@ export default function NewStockEntry({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* v4 (V5, P12): hlavní akce přes šířku, pod ní pár ½ + ½ (Uložit a přidat další · Zrušit) —
+          dřív dvě obsahové pilulky vlevo pod plnou šířkou, řada končila v půlce okna. */}
+      <div className="sloupec sloupec-2">
         {/* Potvrzení formuláře je `primary` (DP §3.1) — dřív ručně psaná tmavá pilulka. */}
-        <Button type="submit" variant="primary" size={big ? 'lg' : 'md'} className="flex-1 min-w-[10rem] justify-center"
+        <Button type="submit" variant="primary" size={big ? 'lg' : 'md'} className="w-full justify-center"
           loading={saving} disabled={uploading || !name.trim()}>
           {added.length > 0 ? t('Zapsat a zavřít') : t('Zapsat do skladu')}
         </Button>
-        <Button variant="secondary" size={big ? 'lg' : 'md'} icon="plus" disabled={saving || uploading || !name.trim()}
-          title={t('Uloží a nechá kategorii, jednotku i dodavatele nastavené')} onClick={() => save(true)}>
-          {t('Uložit a přidat další')}
-        </Button>
-        {onCancel && (
-          <Button variant="ghost" size={big ? 'lg' : 'md'} disabled={saving} onClick={onCancel}>{t('Zrušit', undefined, 'dialog')}</Button>
-        )}
+        <Rada vyska={big ? 'l' : 'm'}>
+          <Button variant="secondary" size={big ? 'lg' : 'md'} icon="plus" disabled={saving || uploading || !name.trim()}
+            title={t('Uloží a nechá kategorii, jednotku i dodavatele nastavené')} onClick={() => save(true)}>
+            {t('Uložit a přidat další')}
+          </Button>
+          {onCancel && (
+            <Button variant="ghost" size={big ? 'lg' : 'md'} disabled={saving} onClick={onCancel}>{t('Zrušit', undefined, 'dialog')}</Button>
+          )}
+        </Rada>
       </div>
       <p className="t-meta">
         {ma('sklad.pridat')

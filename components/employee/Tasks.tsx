@@ -269,7 +269,8 @@ export default function Tasks({ user }: Props) {
     );
 
   const zbyva = skupiny.poTerminu.length + skupiny.dnes.length;
-  const prepinac = <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
+  // Segment stránky = 44 (md), stojí nad toolbarem přes celou šířku (P10, P11).
+  const prepinac = <Segmented ariaLabel={t('Zobrazení')} value={view} onChange={setView}
     options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }]} />;
   const sFiltry = tasks.length > 0 && view !== 'prehled';
   // Sekce „Za body navíc": se seznamem jen když dnes něco je; jinak tichý řádek se „Zapsat navíc".
@@ -317,7 +318,9 @@ export default function Tasks({ user }: Props) {
           hledání s Filtry a pás záložek — první úkol na y=427 z 844. Teď jeden řádek
           Seznam/Týden/Měsíc · lupa · Filtry · n; souhrn dne je až od md (po termínu je hned
           první sekce seznamu, červeně), záložky stavu od devíti úkolů nebo se zapnutým stavem. */}
-      {tasks.length > 0 && (
+      {/* Na telefonu se souhrn nekreslí vůbec (ne jen `hidden`): skrytý prvek pořád dostával mezeru space-y
+          a ovládání pod hlavičkou začínalo o 24 px níž než na ostatních obrazovkách. */}
+      {tasks.length > 0 && !naTelefonu && (
         <div className="hidden md:block">
           <UkolySouhrn hotovo={karty.dnesHotovo} celkem={karty.dnesCelkem} poTerminu={karty.poTerminu}
             onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />

@@ -298,7 +298,9 @@ export default function InventoryReport({ initialCategory, predani = 0 }: Props)
               desetinne={sloupce.data?.mnozstvi === true && jednotkaSnesDesetiny(item.unit)}
               // Bez popisku odečítač přečte jen „číslo" a člověk neví, čeho.
               ariaLabel={item.unit ? t('Množství — {nazev} ({jednotka})', { nazev: item.name, jednotka: item.unit }) : t('Množství — {nazev}', { nazev: item.name })}
-              className="!w-44 max-w-full"
+              // 160 na telefonu: ocas začíná na ose textu (za tečkou stavu) — krokovač 176 + Uložit + „···"
+              // by se do něj nevešly a „···" by spadlo na vlastní řádek.
+              className="!w-40 sm:!w-44 max-w-full"
             />
             {/* Uložit je `primary` jen s rozepsanou změnou — limetka na obrazovce
                 je jedna a v řádku nikdy (DP §3.1). v3: bez změny je neviditelné (místo
