@@ -3095,6 +3095,11 @@ export async function GET(request: Request) {
     // Retence (lib/retence.ts): kdy šlo hostovi upozornění před anonymizací a kdy klikl „Ponechat účet“.
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS retence_upozorneno_at TIMESTAMP`);
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS retence_ponechat_at TIMESTAMP`);
+    // Retence podniků (lib/retence.ts rozhodniPodnik): kdy byl člověk naposledy v aplikaci (lib/naposledy.ts)
+    // a kdy vlastník a správci předplatného dostali upozornění 30 a 7 dní před smazáním zrušeného podniku.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS naposledy_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS retence_upozorneno30_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS retence_upozorneno7_at TIMESTAMP`);
     // Souhrny běhů retence (náhled i ostré): jen počty a id, žádné osobní údaje. Správa platformy → Retence.
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS retence_behy (

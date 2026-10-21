@@ -54,6 +54,9 @@ export const RETENCE_TEXT = {
   auditLogLet: 3,
   oznameniDni: 365,
   zrusenyPodnikDni: 90,
+  /** E-mail vlastníkovi a správcům předplatného před smazáním zrušeného podniku (dny předem): první a druhý. */
+  podnikUpozorneniDni: 30,
+  podnikDruheUpozorneniDni: 7,
   /** Počítadla neúspěšných přihlášení (auth_attempts) se mažou po (dny). */
   pokusyPrihlaseniDni: 1,
 } as const;
