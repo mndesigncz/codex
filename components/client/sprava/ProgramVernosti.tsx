@@ -44,6 +44,7 @@ export default function ProgramVernosti({ otevri, bonusy }: {
   const raz = useLoad<any[]>('/api/client/admin/stamps', raw => (Array.isArray(raw?.campaigns) ? raw.campaigns : []));
   const kup = useLoad<any[]>('/api/client/admin/coupons', raw => (Array.isArray(raw?.coupons) ? raw.coupons : []));
   const [pohled, setPohled] = useState<'clen' | 'necelen'>('clen');
+  const [nahled, setNahled] = useState(false);
   if (profil.error) return <ErrorState title="Program se nenačetl" onRetry={profil.reload} detail={profil.error} />;
   if (!profil.data || !raz.data) return <div className="space-y-4"><Skeleton className="h-40" /><Skeleton className="h-64" /></div>;
   const d: Data = { p: profil.data, kampane: raz.data.filter(c => c.status !== 'archived'), kupony: kup.data ?? [] };
@@ -131,7 +132,12 @@ export default function ProgramVernosti({ otevri, bonusy }: {
         </div>
       </div>
 
-      <aside className="lg:sticky lg:top-4 space-y-3 min-w-0" aria-label="Náhled pro hosta">
+      <aside className="max-lg:order-first lg:sticky lg:top-4 space-y-3 min-w-0" aria-label="Náhled pro hosta">
+        {/* Telefon: náhled nahoře, sbalený (rám telefonu by odsunul program o obrazovku). */}
+        <Button variant="secondary" icon={nahled ? 'chevronUp' : 'chevron'} className="w-full lg:hidden" aria-expanded={nahled} onClick={() => setNahled(v => !v)}>
+          {nahled ? 'Skrýt náhled' : 'Náhled karty hosta'}
+        </Button>
+        <div className={nahled ? 'space-y-3' : 'space-y-3 max-lg:hidden'}>
         <div className="flex items-center justify-between gap-3">
           <p className="t-label">Náhled · tak to uvidí host</p>
           <Chip tone="muted" size="sm">ukázka</Chip>
@@ -169,6 +175,7 @@ export default function ProgramVernosti({ otevri, bonusy }: {
             <div aria-hidden className="h-11 rounded-full bg-[#C8F542] grid place-items-center text-[15px] font-semibold text-[#16181A]">{pohled === 'clen' ? 'Ukázat kartu' : 'Přidat se'}</div>
           </div>
         </RamTelefonu>
+        </div>
       </aside>
     </div>
   );
