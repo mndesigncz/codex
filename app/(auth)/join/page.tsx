@@ -85,7 +85,7 @@ function JoinForm() {
             {token ? t('Přijmout pozvánku') : t('Připojit se k týmu')}
           </h1>
           <p className="text-[15px] text-black/60 text-pretty">
-            {token && teamName ? t('Byli jste pozváni do týmu {tym}.', { tym: teamName }) : t('Zadejte kód týmu od svého zaměstnavatele.')}
+            {token && teamName ? t('Máš pozvánku do týmu {tym}.', { tym: teamName }) : t('Zadej kód týmu od svého zaměstnavatele.')}
           </p>
         </div>
 
@@ -99,7 +99,7 @@ function JoinForm() {
               </div>
             )}
             <div>
-              <label htmlFor="join-jmeno" className="field-label">{t('Vaše jméno')}</label>
+              <label htmlFor="join-jmeno" className="field-label">{t('Tvoje jméno')}</label>
               <input id="join-jmeno" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t('Jana Nováková')} required className={inputClass} />
             </div>
             <div>
@@ -123,7 +123,7 @@ function JoinForm() {
           </form>
 
           <p className="text-center text-black/60 text-sm mt-6">
-            {t('Už máte účet?')} <Link href="/login" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Přihlásit se')}</Link>
+            {t('Už máš účet?')} <Link href="/login" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Přihlásit se')}</Link>
           </p>
         </div>
       </div>

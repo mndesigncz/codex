@@ -149,7 +149,7 @@ export default function ChatView({ user, openConversationId = null }: Props) {
               illustration="chat"
               compact
               title={t('Zatím žádné konverzace')}
-              hint={t('Napište kolegovi — vlákno vznikne prvním odeslaným řádkem.')}
+              hint={t('Napiš kolegovi — vlákno vznikne prvním odeslaným řádkem.')}
               action={<Button icon="plus" onClick={() => setNewOpen(true)}>{t('Nová zpráva')}</Button>}
             />
           )}
@@ -187,7 +187,7 @@ export default function ChatView({ user, openConversationId = null }: Props) {
         ) : (
           <div className="flex-1 hidden md:flex flex-col items-center justify-center text-black/45 gap-3">
             <Icon name="chat" size={48} className="text-black/15" />
-            <p className="text-sm">{t('Vyberte konverzaci')}</p>
+            <p className="text-sm">{t('Vyber konverzaci')}</p>
           </div>
         )}
       </section>
@@ -317,7 +317,7 @@ function Thread({
       if (!r.ok) { setModeraceZprava(d.error || t('Zablokovat se nepodařilo.')); return; }
       setMessages(prev => prev.filter(x => x.senderId !== m.senderId));
       setModeraceZprava(t('Uživatel {jmeno} je zablokovaný a jeho zprávy se nezobrazují. Odblokovat jde v Nastavení, Zabezpečení.', { jmeno: m.senderName }));
-    } catch { setModeraceZprava(t('Zablokovat se nepodařilo. Zkontrolujte připojení.')); }
+    } catch { setModeraceZprava(t('Zablokovat se nepodařilo. Zkontroluj připojení.')); }
   };
   const smazZpravu = async (m: ChatMessage) => {
     setModeraceZprava('');
@@ -326,7 +326,7 @@ function Thread({
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setModeraceZprava(d.error || t('Zprávu se nepodařilo smazat.')); return; }
       setMessages(prev => prev.filter(x => x.id !== m.id));
-    } catch { setModeraceZprava(t('Zprávu se nepodařilo smazat. Zkontrolujte připojení.')); }
+    } catch { setModeraceZprava(t('Zprávu se nepodařilo smazat. Zkontroluj připojení.')); }
   };
   const reagovat = async (m: ChatMessage, emoji: string) => {
     setReakceChyba('');
@@ -620,7 +620,7 @@ function Thread({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
           }}
-          placeholder={t('Napište zprávu…')}
+          placeholder={t('Napiš zprávu…')}
           aria-label={t('Text zprávy')}
           className="flex-1 min-w-0 resize-none field border border-black/[0.08] px-4 py-2.5 leading-snug text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
         />

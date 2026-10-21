@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('blokace selhala', e);
-    return NextResponse.json({ error: 'Blokaci se zatím nepodařilo uložit. Zkuste to znovu.' }, { status: 503 });
+    return NextResponse.json({ error: 'Blokaci se zatím nepodařilo uložit. Zkus to znovu.' }, { status: 503 });
   }
 }
 

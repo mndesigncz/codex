@@ -151,6 +151,6 @@ export async function POST(req: NextRequest) {
     const people = await teamPeople(u.team_id);
     return NextResponse.json({ event: shape(row, people) });
   } catch {
-    return NextResponse.json({ error: 'Akce nejsou dostupné — spusť /api/init.' }, { status: 400 });
+    return NextResponse.json({ error: 'Akce se ještě připravují. Zkus to za chvíli znovu.' }, { status: 400 });
   }
 }

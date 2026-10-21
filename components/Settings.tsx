@@ -413,7 +413,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     e.preventDefault();
     setPwdErr('');
     setPwdMsg('');
-    if (!currentPassword || !newPassword) { setPwdErr(t('Vyplňte všechna pole.')); return; }
+    if (!currentPassword || !newPassword) { setPwdErr(t('Vyplň všechna pole.')); return; }
     if (newPassword.length < 8) { setPwdErr(t('Nové heslo musí mít alespoň 8 znaků.')); return; }
     if (newPassword !== confirmPassword) { setPwdErr(t('Nová hesla se neshodují.')); return; }
     setSavingPwd(true);
@@ -477,7 +477,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
   return (
     <div ref={korenRef} className={vOkne ? 'space-y-4' : 'px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
-      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')}
+      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Tvůj profil, jazyk, vzhled, oznámení a zabezpečení.')}
         className={zobrazeni === 'sekce' ? 'hidden md:block' : ''} />}
       <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
 

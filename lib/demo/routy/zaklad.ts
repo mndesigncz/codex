@@ -68,6 +68,8 @@ const TYM = {
   low_stock_default: 5, critical_stock_default: 2, business_type: 'kavarna', pay_daily_cash: false,
   closing_requires_shift: true, show_team_schedule: true, payout_from_register: true, tips_in_drawer: false,
   drawer_float: null, dashboard_config: {}, levels_config: [], points_config: {}, currency: 'CZK', locale: 'cs-CZ',
+  // Profil podniku v ukázce (Nastavení › Profil podniku): adresa a IČO/DIČ jako u skutečného API.
+  address: 'Lipová 12, 602 00 Brno', ico: null, dic: null, ico_dic_ok: true,
 };
 
 /** Adresa právě běžící ukázky bez #fragmentu (next-auth při fragmentu načítá znovu). */

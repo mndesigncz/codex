@@ -34,7 +34,7 @@
   "Hledat v {kategorie}…": "Search in {kategorie}…",
   "Hotovo — spočítáno: {polozky}, zapsáno: {rozdily}.": "Done — counted: {polozky}, logged: {rozdily}.",
   "Inventura": "Stocktake",
-  "Inventura bude dostupná po dokončení migrace (/api/init).": "The stocktake will be available once the migration finishes (/api/init).",
+  "Inventura se ještě připravuje. Zkus to za chvíli znovu.": "Stocktaking is still being set up. Try again in a moment.",
   "Inventura skladu": "Stocktake",
   "Inventura {datum}": "Stocktake {datum}",
   "Inventuru se nepodařilo načíst.": "Couldn’t load the stocktake.",

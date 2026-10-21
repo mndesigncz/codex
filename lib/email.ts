@@ -121,11 +121,11 @@ export async function sendInvitationEmail(to: string, name: string, tempPassword
   return send({
     label: 'Managero',
     to,
-    subject: 'Vítejte v Managero',
+    subject: 'Vítej v Managero',
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px; background: #0A0A0C; color: white; border-radius: 20px;">
-        <h1 style="color: #C8F542; font-size: 26px;">Vítejte, ${escHtml(name)}!</h1>
-        <p style="color: rgba(235,235,245,0.6);">Byli jste přidáni do systému Managero.</p>
+        <h1 style="color: #C8F542; font-size: 26px;">Vítej, ${escHtml(name)}!</h1>
+        <p style="color: rgba(235,235,245,0.6);">Vedení tě přidalo do týmu v Managero.</p>
         <div style="background: #16181A; border-radius: 12px; padding: 20px; margin: 24px 0;">
           <p style="margin: 0; color: rgba(235,235,245,0.6); font-size: 14px;">Přihlašovací e-mail</p>
           <p style="margin: 4px 0 16px; font-weight: bold;">${escHtml(to)}</p>
@@ -159,10 +159,10 @@ export async function sendPasswordResetEmail(to: string, name: string, cesta: st
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; background: #F1F4EC; color: #16181A; border-radius: 20px;">
         <h1 style="font-size: 22px; margin: 0 0 8px;">Nové heslo</h1>
-        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, požádali jste o obnovení hesla. Odkaz platí hodinu a jde použít jednou.</p>
+        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, přišla žádost o obnovení hesla k tvému účtu. Odkaz platí hodinu a jde použít jednou.</p>
         <a href="${escHtml(url)}" style="display: inline-block; margin-top: 8px; background: #C8F542; color: #16181A; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">Nastavit nové heslo</a>
-        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud jste o nic nežádali, e-mail ignorujte, heslo zůstává beze změny.</p>
-        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(url)}</p>
+        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud jsi o nic nežádal(a), e-mail ignoruj, heslo zůstává beze změny.</p>
+        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevři: ${escHtml(url)}</p>
       </div>
     `,
   });
@@ -174,14 +174,14 @@ export async function sendAccountDeleteEmail(to: string, name: string, cesta: st
   return send({
     label: 'Managero',
     to,
-    subject: 'Potvrďte smazání účtu Managero',
+    subject: 'Potvrď smazání účtu Managero',
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; background: #F1F4EC; color: #16181A; border-radius: 20px;">
         <h1 style="font-size: 22px; margin: 0 0 8px;">Smazání účtu</h1>
-        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, někdo požádal o smazání účtu s tímto e-mailem. Když jste to byli vy, potvrďte to odkazem. Odkaz platí hodinu.</p>
+        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, někdo požádal o smazání účtu s tímto e-mailem. Když jsi to byl(a) ty, potvrď to odkazem. Odkaz platí hodinu.</p>
         <a href="${escHtml(url)}" style="display: inline-block; margin-top: 8px; background: #16181A; color: #ffffff; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">Přejít k potvrzení</a>
-        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud jste o smazání nežádali, e-mail ignorujte. Účet zůstane beze změny.</p>
-        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(url)}</p>
+        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud jsi o smazání nežádal(a), e-mail ignoruj. Účet zůstane beze změny.</p>
+        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevři: ${escHtml(url)}</p>
       </div>
     `,
   });
@@ -193,14 +193,14 @@ export async function sendEmailVerification(to: string, name: string, cesta: str
   return send({
     label: 'Managero',
     to,
-    subject: 'Potvrďte e-mail pro Managero',
+    subject: 'Potvrď e-mail pro Managero',
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; background: #F1F4EC; color: #16181A; border-radius: 20px;">
-        <h1 style="font-size: 22px; margin: 0 0 8px;">Potvrďte e-mail</h1>
-        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, díky za registraci podniku. Potvrďte prosím, že tahle adresa patří vám — budou na ni chodit faktury, zálohy a obnovení hesla. Odkaz platí 48 hodin.</p>
+        <h1 style="font-size: 22px; margin: 0 0 8px;">Potvrď e-mail</h1>
+        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, díky za registraci podniku. Potvrď prosím, že tahle adresa patří tobě — budou na ni chodit faktury, zálohy a obnovení hesla. Odkaz platí 48 hodin.</p>
         <a href="${escHtml(url)}" style="display: inline-block; margin-top: 8px; background: #C8F542; color: #16181A; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">Potvrdit e-mail</a>
-        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud jste se neregistrovali, e-mail ignorujte.</p>
-        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(url)}</p>
+        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud ses neregistroval(a), e-mail ignoruj.</p>
+        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevři: ${escHtml(url)}</p>
       </div>
     `,
   });
@@ -349,7 +349,7 @@ export async function sendPlatbaEmail(to: string, v: { druh: 'platba_selhala' | 
         <p style="color:#5c6353;font-size:14px;">Dobrý den${v.jmeno ? `, ${escHtml(v.jmeno)}` : ''}.</p>
         <p style="color:#5c6353;font-size:14px;">${escHtml(text)}</p>
         <a href="${escHtml(odkaz)}" style="display:inline-block;margin-top:8px;background:#C8F542;color:#16181A;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:bold;">Otevřít Předplatné</a>
-        <p style="color:#8a917f;font-size:12px;margin-top:22px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(odkaz)}</p>
+        <p style="color:#8a917f;font-size:12px;margin-top:22px;">Pokud tlačítko nefunguje, otevři: ${escHtml(odkaz)}</p>
       </div>`,
   });
 }

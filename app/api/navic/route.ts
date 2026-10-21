@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
       }
       if (nabidka.requirePhoto && !z.photoUrl && !(b?.uznat && smiUznat)) return chyba('K tomuhle úkolu je potřeba fotka.', 400);
     } catch (e) {
-      if (predMigraci(e)) return chyba('Nabídka navíc ještě není připravená — spusť /api/init.', 503);
+      if (predMigraci(e)) return chyba('Nabídka navíc se ještě připravuje. Zkus to za chvíli znovu.', 503);
       throw e;
     }
   }
@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true, item }, { status: 201 });
   } catch (e) {
-    if (predMigraci(e)) return chyba('Zápis navíc ještě není připravený — spusť /api/init.', 503);
+    if (predMigraci(e)) return chyba('Zápis navíc se ještě připravuje. Zkus to za chvíli znovu.', 503);
     console.error('navic POST', e);
     return chyba('Zápis se neuložil.', 500);
   }

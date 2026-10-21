@@ -52,25 +52,25 @@ export const EMAIL = {
     cs: 'Pozvánka do týmu', en: 'Team invitation', de: 'Einladung in ein Team', sk: 'Pozvánka do tímu', pl: 'Zaproszenie do zespołu',
   },
   pozvankaText: {
-    cs: '{kdo} vás zve do týmu {tym} v aplikaci pro správu podniku.',
+    cs: '{kdo} tě zve do týmu {tym} v aplikaci pro správu podniku.',
     en: '{kdo} invites you to the team {tym} in the business management app.',
-    de: '{kdo} lädt Sie in das Team {tym} in der App zur Betriebsverwaltung ein.',
-    sk: '{kdo} vás pozýva do tímu {tym} v aplikácii na správu podniku.',
+    de: '{kdo} lädt dich in das Team {tym} in der App zur Betriebsverwaltung ein.',
+    sk: '{kdo} ťa pozýva do tímu {tym} v aplikácii na správu podniku.',
     pl: '{kdo} zaprasza Cię do zespołu {tym} w aplikacji do zarządzania lokalem.',
   },
   pozvankaPokyn: {
-    cs: 'Klikněte na tlačítko níže a vytvořte si účet zaměstnance.',
+    cs: 'Klepni na tlačítko níž a vytvoř si účet zaměstnance.',
     en: 'Click the button below to create your employee account.',
-    de: 'Klicken Sie auf die Schaltfläche unten und erstellen Sie Ihr Mitarbeiterkonto.',
-    sk: 'Kliknite na tlačidlo nižšie a vytvorte si účet zamestnanca.',
+    de: 'Klick auf die Schaltfläche unten und erstelle dein Mitarbeiterkonto.',
+    sk: 'Klikni na tlačidlo nižšie a vytvor si účet zamestnanca.',
     pl: 'Kliknij przycisk poniżej, aby utworzyć konto pracownika.',
   },
   pozvankaTlacitko: {
     cs: 'Přijmout pozvánku →', en: 'Accept the invitation →', de: 'Einladung annehmen →', sk: 'Prijať pozvánku →', pl: 'Przyjmij zaproszenie →',
   },
   pozvankaOdkaz: {
-    cs: 'Pokud tlačítko nefunguje, otevřete: {url}', en: 'If the button doesn\'t work, open: {url}',
-    de: 'Falls die Schaltfläche nicht funktioniert, öffnen Sie: {url}', sk: 'Ak tlačidlo nefunguje, otvorte: {url}',
+    cs: 'Pokud tlačítko nefunguje, otevři: {url}', en: 'If the button doesn\'t work, open: {url}',
+    de: 'Falls die Schaltfläche nicht funktioniert, öffne: {url}', sk: 'Ak tlačidlo nefunguje, otvor: {url}',
     pl: 'Jeśli przycisk nie działa, otwórz: {url}',
   },
   novinkyPaticka: {

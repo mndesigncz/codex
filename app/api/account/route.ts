@@ -69,7 +69,7 @@ export async function PATCH(request: Request) {
   // Password change flow
   if (currentPassword !== undefined || newPassword !== undefined) {
     if (!currentPassword || !newPassword) {
-      return NextResponse.json({ error: 'Zadejte současné i nové heslo.' }, { status: 400 });
+      return NextResponse.json({ error: 'Zadej současné i nové heslo.' }, { status: 400 });
     }
     if (String(newPassword).length < 8) {
       return NextResponse.json({ error: 'Nové heslo musí mít alespoň 8 znaků.' }, { status: 400 });
@@ -155,10 +155,10 @@ export async function DELETE(request: Request) {
   if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const heslo = String(body?.password ?? '');
-  if (!heslo) return NextResponse.json({ error: 'Zadejte heslo.' }, { status: 400 });
+  if (!heslo) return NextResponse.json({ error: 'Zadej heslo.' }, { status: 400 });
   // Pokusy o hádání hesla přes tenhle endpoint se počítají jako u přihlášení.
   const gate = await hit(`smazani:${id}`, 5, 60 * 60, { failClosed: true });
-  if (!gate.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkuste to později.' }, { status: 429 });
+  if (!gate.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkus to později.' }, { status: 429 });
   if (!(await hesloSedi(id, heslo))) return NextResponse.json({ error: 'Heslo není správné.' }, { status: 400 });
   try {
     const r = await smazUcet(id, { smazatPodnik: body?.smazatPodnik === true, potvrzeni: body?.potvrzeni ?? null, zDuvodu: 'aplikace' });
@@ -168,6 +168,6 @@ export async function DELETE(request: Request) {
   } catch (e) {
     console.error('smazání účtu selhalo', e);
     // Kroky jsou opakovatelné; člověk to může zkusit znovu.
-    return NextResponse.json({ error: 'Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.' }, { status: 500 });
+    return NextResponse.json({ error: 'Účet se nepodařilo smazat. Zkus to znovu, nebo napiš podpoře.' }, { status: 500 });
   }
 }

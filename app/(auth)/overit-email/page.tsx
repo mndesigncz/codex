@@ -15,7 +15,7 @@ export default async function Stranka({ searchParams }: { searchParams: Promise<
       <main className="min-h-[100dvh] flex items-center justify-center p-4">
         <div className="card p-6 max-w-md w-full text-center">
           <h1 className="t-page">{t('Odkaz nefunguje')}</h1>
-          <p className="t-meta mt-3 text-pretty">{t('Odkaz je neúplný nebo už neplatí. Nový pošlete v aplikaci v Nastavení → Zabezpečení.')}</p>
+          <p className="t-meta mt-3 text-pretty">{t('Odkaz je neúplný nebo už neplatí. Nový si pošleš v aplikaci v Nastavení → Zabezpečení.')}</p>
           <Link href="/" className="btn btn-secondary mt-6 tap-target">{t('Do aplikace')}</Link>
         </div>
       </main>

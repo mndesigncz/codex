@@ -212,6 +212,6 @@ export default function ({ eq, ok }: Testy) {
   eq('e-mail: předmět objednávky česky a německy', [emailText('objednavkaPredmet', 'cs', { podnik: 'Café', datum: '1. 9.' }), emailText('objednavkaPredmet', 'de', { podnik: 'Café', datum: '1.9.' })], ['Objednávka — Café (1. 9.)', 'Bestellung — Café (1.9.)']);
   ok('e-mail: každý text má všech pět jazyků a stejné {parametry}', Object.values(EMAIL).every((t: any) => JAZYKY.every(j => t[j]?.length > 3 && JSON.stringify(jmenaVeZprave(t[j])) === JSON.stringify(jmenaVeZprave(t.cs)))));
   const vlozeni = sazejHtml('pozvankaText', 'de', { kdo: `<strong>${escHtml('<img src=x onerror=1>')}</strong>`, tym: `<strong>${escHtml('A&B')}</strong>` }, {}, escHtml);
-  ok('e-mail: jména se escapují, markup z kódu zůstane', !vlozeni.includes('<img') && vlozeni.includes('&lt;img') && vlozeni.includes('A&amp;B') && vlozeni.includes('<strong>') && vlozeni.includes('Sie'));
+  ok('e-mail: jména se escapují, markup z kódu zůstane', !vlozeni.includes('<img') && vlozeni.includes('&lt;img') && vlozeni.includes('A&amp;B') && vlozeni.includes('<strong>') && vlozeni.includes('dich')); // pozvánka do týmu tyká (audit 2026-10, sjednocení tykání)
   ok('e-mail: předmět s HTML ve jménu podniku zůstane prostý text (escapuje se až v HTML)', emailText('pozvankaPredmet', 'en', { tym: '<b>x</b>' }) === 'Invitation to the team <b>x</b>');
 }

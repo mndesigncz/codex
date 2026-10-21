@@ -84,7 +84,7 @@ export default function NewConversation({ open, onClose, meId, conversations, on
   return (
     <Modal open={open} onClose={onClose} size="md"
       title={t('Nová zpráva')}
-      subtitle={t('Vyberte kolegu — vlákno se otevře hned.')}>
+      subtitle={t('Vyber kolegu — vlákno se otevře hned.')}>
       <div className="space-y-3">
         <SearchField value={q} onChange={setQ} placeholder={t('Hledat v týmu…')}
           ariaLabel={t('Hledat kolegu')} autoFocus />
@@ -98,7 +98,7 @@ export default function NewConversation({ open, onClose, meId, conversations, on
         {mates !== null && shown.length === 0 && (
           <EmptyState illustration="tym" compact
             title={q ? t('Nikdo neodpovídá hledání') : t('V týmu zatím nikdo další není')}
-            hint={q ? t('Zkuste jiné jméno nebo pozici.') : t('Pozvěte kolegy v sekci Tým.')} />
+            hint={q ? t('Zkus jiné jméno nebo pozici.') : t('Pozvi kolegy v sekci Tým.')} />
         )}
 
         {mates !== null && shown.length > 0 && (

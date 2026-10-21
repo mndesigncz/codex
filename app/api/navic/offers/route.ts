@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     audit(c.teamId, c.meId, 'navic.nabidka.pridat', 'extra_offer', Number(row.id), `${n.title} · ${n.points} b${n.bonusCzk ? ` + ${mena.money(n.bonusCzk)}` : ''}${n.autoApprove ? ' · uznává se samo' : ''}`);
     return NextResponse.json({ ok: true, offer: tvarNabidky(row) }, { status: 201 });
   } catch (e) {
-    if (predMigraci(e)) return chyba('Nabídka navíc ještě není připravená — spusť /api/init.', 503);
+    if (predMigraci(e)) return chyba('Nabídka navíc se ještě připravuje. Zkus to za chvíli znovu.', 503);
     console.error('navic/offers POST', e);
     return chyba('Položka se neuložila.', 500);
   }

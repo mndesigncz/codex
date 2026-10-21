@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       await audit(c.teamId, c.meId, 'points.prepocet_vracen', 'body_prepocty', id, `${r.radku} záznamů`);
       return NextResponse.json({ ok: true, historie: await historiePrepoctu(c.teamId) });
     } catch {
-      return NextResponse.json({ error: 'Přepočet se nepodařilo vrátit. Spusť /api/init.' }, { status: 500 });
+      return NextResponse.json({ error: 'Přepočet se nepodařilo vrátit. Zkus to za chvíli znovu.' }, { status: 500 });
     }
   }
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   try {
     v = await spocitejPrepocet(c.teamId, rozsah, pravidla);
   } catch (e) {
-    const zprava = e instanceof Error && /nenalezen/.test(e.message) ? e.message : 'Přepočet se nepodařilo spočítat. Spusť /api/init.';
+    const zprava = e instanceof Error && /nenalezen/.test(e.message) ? e.message : 'Přepočet se nepodařilo spočítat. Zkus to za chvíli znovu.';
     return NextResponse.json({ error: zprava }, { status: /nenalezen/.test(zprava) ? 404 : 500 });
   }
 
@@ -74,6 +74,6 @@ export async function POST(req: NextRequest) {
       `${rozsah.typ === 'podnik' ? 'výchozí podniku' : rozsah.typ === 'postup' ? `postup #${rozsah.id}` : `úkol #${rozsah.id}`}: ${nahled.zaznamu} záznamů, ${nahled.lidi} lidí, ${znamenko}${nahled.celkem} b${nahled.hodnoceni ? `, ${nahled.hodnoceni} starších hodnocení nahrazuje` : ''}`);
     return NextResponse.json({ ok: true, id, nahled, historie: await historiePrepoctu(c.teamId) });
   } catch {
-    return NextResponse.json({ error: 'Přepočet se nepodařilo uložit. Spusť /api/init.' }, { status: 500 });
+    return NextResponse.json({ error: 'Přepočet se nepodařilo uložit. Zkus to za chvíli znovu.' }, { status: 500 });
   }
 }

@@ -152,7 +152,7 @@ export default function Cesta() {
       if (smiPlatby) jdi('tarif');
       else { router.push('/employer/start'); router.refresh(); }
     } catch {
-      setChyba(t('Chyba serveru. Zkuste to prosím znovu.'));
+      setChyba(t('Registrace se teď nepovedla. Zkus to prosím znovu.'));
       setOdesila(false);
     }
   };

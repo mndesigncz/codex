@@ -3749,9 +3749,9 @@ function ScheduleRulesManager() {
       // Neuložené tržby zůstanou „neuložené" i v signálu u tlačítka.
       setUlozeno(d?.trzbyNeulozeny ? stavPravidel(ulozeneTrzby) : stavTed);
       if (d?.trzbyNeulozeny) {
-        setErr(t('Počet lidí podle tržeb se neuložil — databáze ho ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.'));
+        setErr(t('Počet lidí podle tržeb se teď neuložil, zkus to za chvíli znovu. Ostatní pravidla jsou uložená.'));
       } else if (d?.limityNeulozeny) {
-        setErr(t('Limity rozvrhu se neuložily — databáze je ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.'));
+        setErr(t('Limity rozvrhu se teď neuložily, zkus to za chvíli znovu. Ostatní pravidla jsou uložená.'));
       } else {
         setUlozeneTrzby(trzbyTed);
         setMsg(t('Uloženo. Pravidla se použijí při dalším generování rozvrhu.'));
