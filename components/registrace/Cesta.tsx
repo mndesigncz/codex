@@ -286,7 +286,7 @@ export default function Cesta() {
                 </div>
                 <div>
                   <label htmlFor="cs-email" className="cs-popisek">{t('E-mail')}</label>
-                  <input id="cs-email" type="email" inputMode="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder={t('vas@email.cz')} className="cs-pole" />
+                  <input id="cs-email" type="email" inputMode="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder={t('jmeno@email.cz')} className="cs-pole" />
                 </div>
                 <div>
                   <label htmlFor="cs-heslo" className="cs-popisek">{t('Heslo')}</label>

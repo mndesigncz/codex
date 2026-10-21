@@ -91,7 +91,8 @@ export default function LoginForm() {
             <JazykMenu />
           </div>
 
-          <h1 className="t-page">{t('Přihlásit se')}</h1>
+          {/* Audit L04: „Přihlásit se" byl nadpis i tlačítko pod ním; nadpis teď vítá. */}
+          <h1 className="t-page">{t('Vítej zpátky')}</h1>
           <p className="text-[15px] text-black/60 mt-2 mb-8">{t('Přihlas se e-mailem a heslem.')}</p>
 
           {justRegistered && (
@@ -102,8 +103,8 @@ export default function LoginForm() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="login-email" className="field-label">{t('Email')}</label>
-              <input id="login-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('vas@email.cz')} required className={inputClass} />
+              <label htmlFor="login-email" className="field-label">{t('E-mail')}</label>
+              <input id="login-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('jmeno@email.cz')} required className={inputClass} />
             </div>
             <div>
               <label htmlFor="login-heslo" className="field-label">{t('Heslo')}</label>
@@ -125,8 +126,9 @@ export default function LoginForm() {
 
           <div className="mt-8 pt-6 border-t border-black/[0.07] space-y-2 text-center text-sm">
             <p className="text-black/60">{t('Provozuješ podnik?')} <Link href="/register" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Vytvořit účet')}</Link></p>
-            <PravniOdkazy jazyk={jazykPravni} className="justify-center text-xs text-black/55" />
             <p className="text-black/60">{t('Máš kód týmu nebo pozvánku?')} <Link href="/join" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Připojit se')}</Link></p>
+            {/* Právní odkazy jako patička — dřív stály mezi „Vytvořit účet" a „Připojit se". */}
+            <PravniOdkazy jazyk={jazykPravni} className="justify-center text-xs text-black/55 pt-3" />
           </div>
         </div>
       </div>

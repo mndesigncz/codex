@@ -103,8 +103,8 @@ function JoinForm() {
               <input id="join-jmeno" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t('Jana Nováková')} required className={inputClass} />
             </div>
             <div>
-              <label htmlFor="join-email" className="field-label">{t('Email')}</label>
-              <input id="join-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('vas@email.cz')} required disabled={!!token}
+              <label htmlFor="join-email" className="field-label">{t('E-mail')}</label>
+              <input id="join-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('jmeno@email.cz')} required disabled={!!token}
                 className={`${inputClass} ${token ? 'opacity-60' : ''}`} />
             </div>
             <div>
