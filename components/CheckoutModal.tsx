@@ -7,6 +7,7 @@
 // Bez veřejného klíče (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) se okno rovnou
 // přepne na přesměrování do pokladny Stripe, aby platba šla vždycky.
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { loadStripe, type Stripe, type StripeEmbeddedCheckout } from '@stripe/stripe-js';
 import { Icon } from './Icons';
@@ -16,6 +17,7 @@ import { DiscardGuard } from './ui/DiscardGuard';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { tg } from '@/lib/i18n/stav';
+import { cestaDokumentu } from '@/lib/pravni/odkazy';
 
 const stripePromise = new Map<string, Promise<Stripe | null>>();
 function stripeJs(jazyk: string): Promise<Stripe | null> | null {
@@ -122,6 +124,11 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
               </ul>
               <p className="mt-4 text-[11px] text-black/45">
                 {trial ? t('Zrušit jde kdykoli během zkušební doby, nic se nestrhne.') : t('Kdykoli zrušit, platí do konce zaplaceného období.')} {t('Ceny jsou konečné (neplátce DPH), předplatné se obnovuje automaticky, fakturu pošle Stripe.')}
+              </p>
+              {/* Podmínky placeného tarifu po ruce před platbou (Stripe checklist, OP čl. 6, 7 a 10); nová záložka nezavře pokladnu. */}
+              <p className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-black/55">
+                <Link href={cestaDokumentu('obchodni-podminky', jazyk === 'cs' ? 'cs' : 'en')} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center underline underline-offset-2">{t('Obchodní podmínky')}</Link>
+                <Link href={cestaDokumentu('zruseni-predplatneho', jazyk === 'cs' ? 'cs' : 'en')} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center underline underline-offset-2">{t('Zrušení předplatného a vrácení peněz')}</Link>
               </p>
             </div>
           </aside>

@@ -130,5 +130,7 @@
   "bez limitu": "bez limitu",
   "Zbývá {n, plural, one {# místo} few {# místa} other {# míst}}": "{n, plural, one {Zostało # miejsce} few {Zostały # miejsca} many {Zostało # miejsc} other {Zostało # miejsca}}",
   "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {Został # link} few {Zostały # linki} many {Zostało # linków} other {Zostało # linku}}",
-  "Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "Oszczędzasz {castka} w porównaniu z płatnością miesięczną, co daje {mesicne} miesięcznie."
+  "Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "Oszczędzasz {castka} w porównaniu z płatnością miesięczną, co daje {mesicne} miesięcznie.",
+  "Obchodní podmínky": "Warunki handlowe",
+  "Zrušení předplatného a vrácení peněz": "Anulowanie subskrypcji i zwroty"
 }
