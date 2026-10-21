@@ -138,12 +138,13 @@ export function SazebnikTrestu() {
 
   return (
     <Card aria-labelledby="sazebnik-trestu-titulek" data-sazebnik-trestu>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="sazebnik-trestu-titulek" className="t-card flex items-center gap-2">
+      {/* v4 (P2 a): akce na R v řádku s titulem i na telefonu — dřív se zalomila pod titul a stála sama vlevo. */}
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="sazebnik-trestu-titulek" className="t-card flex min-w-0 items-center gap-2">
           <Icon name="clipboard" size={17} className="shrink-0 text-black/40" />
           {t('Sazebník trestů')}
         </h2>
-        {smi && <Button variant="secondary" size="sm" icon="plus" onClick={() => setOkno({ polozka: null })}>{t('Nová položka')}</Button>}
+        {smi && <Button variant="secondary" size="sm" icon="plus" className="shrink-0" onClick={() => setOkno({ polozka: null })}>{t('Nová položka')}</Button>}
       </div>
       <p className="t-meta mt-1 text-pretty">{t('Typické prohřešky s body a krácením prémie — v okně Dát trest se vyberou jedním klepnutím. Krátí se jen prémie, nikdy mzda.')}</p>
       {data.error ? (

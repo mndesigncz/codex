@@ -1467,9 +1467,18 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
               </div>
             ) : (
               <div className="min-w-0 space-y-3">
+                <div>
+                  <label className="field-label">{t('Datum')}</label>
+                  {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
+                      width and overflow the card without it */}
+                  <input type="date" aria-label={t('Datum uzávěrky')} value={form.date} onChange={set('date')}
+                    className={`${inputClass} appearance-none min-w-0 text-left`}
+                    style={{ WebkitAppearance: 'none' }} />
+                </div>
                 {eligible.length > 0 && (
-                  // v4 (P2): volby směn jako rovné díly přes celou šířku (1 sloupec na telefonu, 2 od sm) — ne pilulka vlastní šířky vlevo.
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  // v4 (P2, P14): volby směn pod polem Datum, přes celou šířku sloupce. Dřív nad ním — od sm pole Datum
+                  // sedělo o řádek níž než „Kasa na začátku" vedle sebe a pilulka měla půl sloupce.
+                  <div className="grid grid-cols-1 gap-2">
                     {eligible.map(s => {
                       const active = form.date === s.date;
                       return (
@@ -1487,14 +1496,6 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                     })}
                   </div>
                 )}
-                <div>
-                  <label className="field-label">{t('Datum')}</label>
-                  {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
-                      width and overflow the card without it */}
-                  <input type="date" aria-label={t('Datum uzávěrky')} value={form.date} onChange={set('date')}
-                    className={`${inputClass} appearance-none min-w-0 text-left`}
-                    style={{ WebkitAppearance: 'none' }} />
-                </div>
               </div>
             )}
           </div>

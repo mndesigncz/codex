@@ -102,7 +102,8 @@ export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyb
     <div className={`min-w-0 ${className}`} data-nabidka-navic>
       {label && <p className="t-label mb-1.5">{label}</p>}
       {/* Pás zůstává mezi L a R karty (P11 v kartě) — dřív `-mx-1 px-1` vyčuhoval o 4 px přes hranu obsahu. */}
-      <div className="flex gap-2 overflow-x-auto scroll-fade-x scrollbar-none snap-x snap-proximity py-0.5">
+      {/* Od sm, kde je místa dost, je pás řadou rovných dílů L→R (P2) — dřív tři obsahové pilulky vlevo a půl karty prázdné. */}
+      <div className="flex gap-2 overflow-x-auto scroll-fade-x scrollbar-none snap-x snap-proximity py-0.5 sm:grid sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] sm:overflow-visible sm:[mask-image:none] sm:[-webkit-mask-image:none]">
         {nabidka.map(n => {
           const { je, plno, vycerpano, titulek } = stav(n);
           return (
@@ -111,7 +112,7 @@ export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyb
               title={titulek}
               icon={n.autoApprove ? 'check' : 'plus'}
               onClick={() => onVyber(n)}
-              className="shrink-0 snap-start min-h-[44px]">
+              className="shrink-0 snap-start min-h-[44px] sm:w-full sm:min-w-0 sm:whitespace-normal sm:h-auto sm:py-2 sm:text-center">
               {popisekNabidky(n, money)}{plno && <> · {t('Obsazeno')}</>}
             </Button>
           );

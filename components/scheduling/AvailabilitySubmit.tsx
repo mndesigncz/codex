@@ -368,7 +368,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         {/* Do minulosti nejde — dostupnost na uplynulý měsíc nemá smysl. Tichá akce „Jako minulý měsíc"
             se na telefonu zalomí pod přepínač a drží se levého okraje. */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <MonthNav velikost="s" value={month} onChange={setMonth} min={currentMonth} />
+          <MonthNav velikost="s" value={month} onChange={setMonth} min={currentMonth} className="sm:!w-full" />
           {ukazJakoMinule && !loading && !loadFailed && (
             <Button variant="ghost" size="sm" icon="copy" onClick={() => { void jakoMinule(); }} className="tap-target"
               title={t('Převezme z minulého měsíce, co se opakovalo podle dne v týdnu — jen do dnů, které ještě nemají vlastní stav.')}>
@@ -486,7 +486,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
                 min={1}
                 value={maxShifts}
                 onChange={(e) => { setMaxShifts(e.target.value); zmena(); }}
-                className="!w-full sm:!w-40"
+                className="!w-full"
               />
             </Field>
 
@@ -506,7 +506,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
             {/* Jako sekce pod plochou Mých směn vedení (h2) není hlavní akcí
                 obrazovky — limetku tam má „Hotovo“ v úpravách. Tmavá. Tmavá
                 je i tehdy, když limetku nese plovoucí lišta s rozepsanou změnou. */}
-            <Button variant={headingLevel === 'h2' || listaOdeslani ? 'primary' : 'accent'} icon="send" block loading={saving} disabled={loadFailed} onClick={submit}
+            <Button variant={headingLevel === 'h2' || listaOdeslani ? 'primary' : 'accent'} icon="send" className="w-full" loading={saving} disabled={loadFailed} onClick={submit}
               title={loadFailed ? t('Nejdřív je potřeba načíst, co jsi poslal/a dřív.') : undefined}>
               {existing ? t('Aktualizovat dostupnost') : t('Odeslat dostupnost')}
             </Button>
