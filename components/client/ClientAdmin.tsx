@@ -40,9 +40,10 @@ import BrandTab from './BrandTab';
 import LoyaltyTabs, { LOYALTY_SUBS, type LoyaltySub } from './LoyaltyTabs';
 import PrechodZKarticky, { PRECHOD_TLACITKO, PRECHOD_OTAZKA, PRECHOD_POPIS, useImportKarticky } from './PrechodZKarticky';
 import ClenoveSprava from './loyalty/ClenoveSprava';
-import ZpravyRozeslani from './loyalty/ZpravyRozeslani';
-import Automatizace from './loyalty/Automatizace';
 import KuponVybranym from './loyalty/KuponVybranym';
+import CteckaPanel from './sprava/CteckaPanel';
+import KampaneStranka, { CASTI_KAMPANI, type CastKampani } from './sprava/KampaneStranka';
+import KuponyAPoukazy, { type CastKuponu } from './sprava/KuponyAPoukazy';
 import type { VyberHostu } from './loyalty/ClenoveHromadne';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
@@ -70,13 +71,20 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { otevriNaTisk, otevriVeSystemu } from '@/lib/stahni';
 import PromoKody from './loyalty/KuponyPromo';
-import KartickySprava from './KartickySprava';
 
 // Nastavení účtu v okně: stejná obrazovka jako v administraci (profil, vzhled a jazyk, oznámení, zabezpečení),
 // jen se stahuje až při otevření, ať ho Client nenese s každým načtením.
 const NastaveniUctu = dynamic(() => import('../Settings'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
 
-type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'cards' | 'brand' | 'settings';
+// Kolo 92 (přestavba správy Managero client, audit C + koncept B): čtyři oblasti místo jedenácti
+// rovnocenných záložek. IA je z auditu C (Provoz · Hosté · Program · Podnik), pojmenování oblasti
+// s programem z konceptu B („Věrnost"): majitel kavárny hledá „věrnost", slovo „program" samo nic
+// neříká, a „Provoz" (ne „Dnes" z B) proto, že stoly a čtečka nejsou jen dnešek. Přehled stojí nad
+// oblastmi sám. Id záložek zůstávají kvůli odkazům z oznámení, widgetů a sond (`tab=customers`
+// = Hosté, `tab=loyalty` = Program, `tab=cards` = Kupony a poukazy, `tab=brand` = Stránka podniku);
+// nové jsou `reader` (čtečka u kasy uvnitř správy, dřív jen zvláštní trasa), `campaigns`
+// (zprávy, automatizace a bannery — dřív rozházené po Zákaznících a Vzhledu) a `reviews`.
+type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'reader' | 'menu' | 'events' | 'customers' | 'campaigns' | 'reviews' | 'loyalty' | 'cards' | 'brand' | 'settings';
 
 /** Záložky Clientu a klíče, které je otevírají (stačí kterýkoli; null = každý s klient.prehled). */
 const TABS: { id: Tab; label: string; icon: string; klice: readonly string[] | null }[] = [
@@ -84,27 +92,30 @@ const TABS: { id: Tab; label: string; icon: string; klice: readonly string[] | n
   { id: 'reservations', label: 'Rezervace', icon: 'calendarCheck', klice: ['rezervace.zobrazit'] },
   { id: 'orders', label: 'Objednávky', icon: 'cup', klice: ['objednavky.zobrazit'] },
   { id: 'tables', label: 'Stoly', icon: 'location', klice: ['stoly.zobrazit'] },
+  { id: 'reader', label: 'Čtečka u kasy', icon: 'card', klice: ['vernost.karta', 'kupony.uplatnit', 'poukazy.uplatnit'] },
+  { id: 'customers', label: 'Hosté', icon: 'users', klice: ['zakaznici.zobrazit'] },
+  { id: 'campaigns', label: 'Kampaně', icon: 'send', klice: ['zakaznici.zpravy', 'klient.vzhled'] },
+  { id: 'reviews', label: 'Hodnocení', icon: 'star', klice: ['zakaznici.recenze'] },
+  { id: 'loyalty', label: 'Program', icon: 'gift', klice: ['vernost.zobrazit'] },
+  // Kupony a promo kódy, dárkové poukazy a plastové karty (dřív Věrnost → Kupony, Věrnost → Poukazy a samostatné Kartičky).
+  { id: 'cards', label: 'Kupony a poukazy', icon: 'tag', klice: ['kupony.spravovat', 'kupony.uplatnit', 'poukazy.zobrazit', 'poukazy.uplatnit', 'vernost.zobrazit'] },
+  { id: 'brand', label: 'Stránka podniku', icon: 'sparkle', klice: ['klient.vzhled'] },
   { id: 'menu', label: 'Menu', icon: 'leaf', klice: ['menu.zobrazit'] },
   { id: 'events', label: 'Akce', icon: 'calendar', klice: ['akce.zobrazit'] },
-  { id: 'customers', label: 'Zákazníci', icon: 'users', klice: ['zakaznici.zobrazit', 'zakaznici.recenze', 'zakaznici.zpravy'] },
-  { id: 'loyalty', label: 'Věrnost', icon: 'gift', klice: ['vernost.zobrazit', 'kupony.spravovat', 'kupony.uplatnit'] },
-  // Fyzické kartičky (spuštění, balík C): dávky k tisku, karty, blokace a náhrada (KartickySprava).
-  { id: 'cards', label: 'Kartičky', icon: 'card', klice: ['vernost.zobrazit'] },
-  { id: 'brand', label: 'Vzhled', icon: 'sparkle', klice: ['klient.vzhled'] },
   { id: 'settings', label: 'Nastavení', icon: 'settings', klice: ['klient.nastaveni'] },
 ];
 const JE_TAB = (x: unknown): x is Tab => TABS.some(t => t.id === x);
 
-// Deset sourozenců v jedné řadě je seznam, ne navigace — proto skupiny, stejně
-// jako v administraci a v mobilním „Více".
+/** Čtyři oblasti správy (rail na počítači, skupiny v listu „Více" na telefonu). */
 const NAV_SECTIONS: { title: string | null; ids: Tab[] }[] = [
   { title: null, ids: ['overview'] },
-  { title: 'Dnešek', ids: ['reservations', 'orders'] },
-  { title: 'Podnik', ids: ['tables', 'menu', 'events'] },
-  { title: 'Hosté', ids: ['customers', 'loyalty', 'cards'] },
-  { title: 'Nastavení', ids: ['brand', 'settings'] },
+  { title: 'Provoz', ids: ['reservations', 'orders', 'tables', 'reader'] },
+  { title: 'Hosté', ids: ['customers', 'campaigns', 'reviews'] },
+  { title: 'Věrnost', ids: ['loyalty', 'cards'] },
+  { title: 'Podnik', ids: ['brand', 'menu', 'events', 'settings'] },
 ];
-const DOCK: Tab[] = ['overview', 'reservations', 'orders'];
+/** Telefon: čtečka uprostřed pod palcem (obsluha u kasy), Hosté vedle; zbytek v „Více". */
+const DOCK: Tab[] = ['overview', 'reservations', 'reader', 'customers'];
 
 const URL_SOUHRN = '/api/client/admin/summary';
 /** Jak často skořápka obnoví odznaky (stejný rytmus jako příjem objednávek ve StaffInbox). */
@@ -183,6 +194,9 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
   const prejdi = useCallback((t: Tab) => { setVolba(t); setMoreOpen(false); }, []);
   // Odkaz z průvodce přechodem z Kartičky umí otevřít rovnou část Věrnosti (Kupony, Poukazy…).
   const [castVernosti, setCastVernosti] = useState<{ id: LoyaltySub; n: number } | null>(null);
+  const [castKuponu, setCastKuponu] = useState<{ id: CastKuponu; n: number } | null>(null);
+  const [castKampani, setCastKampani] = useState<{ id: CastKampani; n: number } | null>(null);
+  const [profilHosta, setProfilHosta] = useState<{ id: number; n: number } | null>(null);
   const otevriHosta = useCallback((q: string) => { setHledatHosta(q); prejdi('customers'); }, [prejdi]);
   // Stránka pro hosty: v aplikaci Managero je /client zavřené (lib/obal.ts ho přesměruje na úvod), takže
   // window.open s relativní cestou skončil na přehledu. Celá adresa v prohlížeči uvnitř aplikace (web: nová záložka).
@@ -200,7 +214,16 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
       onNavigate: (pohled, arg) => {
         const t = mistni(pohled);
         if (!t) { nadrazena.onNavigate(pohled, arg); return; }
+        // Kupony a poukazy se z Věrnosti přestěhovaly do vlastní stránky; staré odkazy (průvodce importem) tam vedou dál.
+        if (t === 'loyalty' && (arg === 'coupons' || arg === 'vouchers')) {
+          setCastKuponu(c => ({ id: arg === 'coupons' ? 'kupony' : 'poukazy', n: (c?.n ?? 0) + 1 }));
+          prejdi('cards');
+          return;
+        }
         if (t === 'loyalty' && arg && LOYALTY_SUBS.some(c => c.id === arg)) setCastVernosti(c => ({ id: arg as LoyaltySub, n: (c?.n ?? 0) + 1 }));
+        if (t === 'campaigns' && arg && CASTI_KAMPANI.some(c => c.id === arg)) setCastKampani(c => ({ id: arg as CastKampani, n: (c?.n ?? 0) + 1 }));
+        // Globální hledání otevře profil hosta (`clen:<id>`).
+        if (t === 'customers' && arg?.startsWith('clen:')) setProfilHosta(c => ({ id: Number(arg.slice(5)) || 0, n: (c?.n ?? 0) + 1 }));
         prejdi(t);
       },
       // Odkaz „Věrnost ›" na stránce Věrnost by vedl tam, kde člověk už je —
@@ -300,9 +323,12 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
                 {tab === 'tables' && <StolyStranka oznam={oznam} />}
                 {tab === 'menu' && <MenuEditor />}
                 {tab === 'events' && <EventsView user={(user ?? {}) as { id?: string }} oznam={oznam} />}
-                {tab === 'customers' && <ZakazniciStranka oznam={oznam} hledat={hledatHosta} />}
-                {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} promos={<PromoKody oznam={oznam} />} oznam={oznam} otevriCast={castVernosti} />}
-                {tab === 'cards' && <KartickySprava oznam={oznam} />}
+                {tab === 'reader' && <CteckaPanel />}
+                {tab === 'customers' && <ZakazniciStranka oznam={oznam} hledat={hledatHosta} profil={profilHosta} />}
+                {tab === 'campaigns' && <KampaneStranka oznam={oznam} castKampani={castKampani} />}
+                {tab === 'reviews' && <HodnoceniStranka oznam={oznam} />}
+                {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} oznam={oznam} otevriCast={castVernosti} />}
+                {tab === 'cards' && <KuponyAPoukazy oznam={oznam} promos={<PromoKody oznam={oznam} />} otevriCast={castKuponu} />}
                 {tab === 'brand' && <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6"><BrandTab toast={t => oznam(t)} onChange={obnovSouhrn} /></div>}
                 {tab === 'settings' && <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6"><SettingsTab oznam={oznam} onChange={obnovSouhrn} /></div>}
               </ErrorBoundary>
@@ -1246,46 +1272,41 @@ function StolyStranka({ oznam }: { oznam: Hlaska }) {
   );
 }
 
-// ---- Zákazníci ------------------------------------------------------------------
+// ---- Hosté ----------------------------------------------------------------------
+//
+// Kolo 92: Hosté jsou CRM — segmenty s počty, hodnota hosta v řádku, štítky a profil
+// s časovou osou (ClenoveSprava). Hodnocení, zprávy a automatizace mají vlastní stránky
+// (Hodnocení, Kampaně) — dřív čtyři části pod jedním přepínačem „Zákazníci".
 
-type CastZakazniku = 'members' | 'reviews' | 'messages' | 'automations';
-const CASTI_ZAKAZNIKU: { id: CastZakazniku; label: string; klic: string; popis: string }[] = [
-  { id: 'members', label: 'Členové', klic: 'zakaznici.zobrazit', popis: 'Kdo se k podniku přidal, kolik má bodů a razítek, deník změn.' },
-  { id: 'reviews', label: 'Hodnocení', klic: 'zakaznici.recenze', popis: 'Host dostane po hotové rezervaci nebo objednávce výzvu k hodnocení. Slabé hodnocení (1 až 2 hvězdy) ti přijde jako oznámení.' },
-  { id: 'messages', label: 'Zprávy členům', klic: 'zakaznici.zpravy', popis: 'Novinka, akce nebo nabídka pro členy: oznámení v aplikaci a push, nebo e-mail. Nejvýš pět za den.' },
-  { id: 'automations', label: 'Automatizace', klic: 'zakaznici.zpravy', popis: 'Zprávy, které odejdou samy: uvítání, po první návštěvě, po dokončení karty, k narozeninám a „Chybíš nám“.' },
-];
-
-function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) {
-  // Části jako záložky aplikace: podle `ma` (do načtení oprávnění všechny, pak jen povolené).
+function ZakazniciStranka({ oznam, hledat, profil }: { oznam: Hlaska; hledat: string; profil: { id: number; n: number } | null }) {
   const { ma } = useOpravneni();
-  const casti = CASTI_ZAKAZNIKU.filter(c => ma(c.klic));
-  const [volba, setVolba] = useState<CastZakazniku>('members');
-  const cast = casti.find(c => c.id === volba) ?? casti[0] ?? null;
   // Kupon vybraným členům: akce v liště výběru, okno posílání kuponů je z části Kupony.
   const [kuponVyber, setKuponVyber] = useState<VyberHostu | null>(null);
   const dalsiAkce = ma('kupony.spravovat') ? (vyber: VyberHostu) => [{ label: 'Kupon', icon: 'tag', onClick: () => setKuponVyber(vyber) }] : undefined;
-  const nastroj = !cast ? null
-    : cast.id === 'members' ? <ClenoveSprava oznam={oznam} hledat={hledat} dalsiAkce={dalsiAkce} />
-    : cast.id === 'reviews' ? <Recenze oznam={oznam} />
-    : cast.id === 'automations' ? <Automatizace oznam={oznam} />
-    : <ZpravyRozeslani oznam={oznam} />;
   return (
     <>
     {kuponVyber && <KuponVybranym vyber={kuponVyber} oznam={oznam} onZavrit={() => setKuponVyber(null)} onHotovo={() => setKuponVyber(null)} />}
     <PlochaWidgetu
       stranka="vedeni.klient_zakaznici"
       hlavicka={{
-        title: 'Zákazníci',
+        title: 'Hosté',
         hintId: 'clientadmin-7',
-        subtitle: cast?.popis,
-        aside: casti.length > 1 && cast
-          ? <Segmented options={casti.map(c => ({ id: c.id, label: c.label }))} value={cast.id} onChange={setVolba} size="sm" ariaLabel="Části zákazníků" />
-          : undefined,
+        subtitle: 'Kdo k vám chodí, kolik utratí a kdy přišel naposledy.',
       }}
-      nastroj={nastroj}
+      nastroj={<ClenoveSprava oznam={oznam} hledat={hledat} dalsiAkce={dalsiAkce} otevritProfil={profil} />}
     />
     </>
+  );
+}
+
+/** Hodnocení: samostatná stránka (dřív část Zákazníků). */
+function HodnoceniStranka({ oznam }: { oznam: Hlaska }) {
+  return (
+    <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 space-y-5">
+      <PageHeader hintId="clientadmin-hodnoceni" title="Hodnocení"
+        subtitle="Host dostane po návštěvě výzvu k hodnocení. Slabé hodnocení ti přijde jako oznámení." />
+      <Recenze oznam={oznam} />
+    </div>
   );
 }
 

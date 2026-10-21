@@ -5,7 +5,11 @@
 // Oprávnění: skupiny zakaznici.skupiny, poznámky zakaznici.poznamky, deník vernost.zobrazit.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Chip, ListRow, Skeleton, Textarea, Well, useLoad } from '../../ui';
+import { Avatar, Button, Chip, IconButton, ListRow, Rada, Skeleton, Stat, StatRow, Textarea, Well, useLoad } from '../../ui';
+import { tonBarvy } from '@/lib/clenoveFiltr';
+import { prumernyUcet, predKolika, stitkyHosta } from '@/lib/klientSprava/segmentyHostu';
+import { varovaniHosta } from '@/lib/klientPrehled';
+import { cislo } from '@/lib/klientSprava/format';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney } from '../../CurrencyProvider';
 import { casovaOsa, zbyvaDoUrovne, zbyvaDoOdmeny, type UdalostOsy } from '@/lib/clenPrehled';
@@ -72,6 +76,129 @@ export default function DetailClena({ customerId, jmeno, zablokovany = false, oz
           </>
         )}
     </Well>
+  );
+}
+
+/** Řádek seznamu hostů, jak ho profil potřebuje (podmnožina ClenRadek z ClenoveSprava). */
+export interface HostProfilu {
+  id: number; name: string; email?: string; points: number; stamps: number; visits: number; spend?: number; credit?: number;
+  joined_at: string; last_visit_at: string | null; open_coupons: number; level?: string; level_label?: string;
+  skupiny?: { id: number; name: string; color: string | null }[]; has_birthday_month?: boolean; blocked?: boolean;
+}
+
+/**
+ * Profil hosta (kolo 92, koncept B „D", audit C §7): CRM na jedné obrazovce. Kdo to je (štítky
+ * automatické i ruční, alergie z poznámek), tři čísla jeho hodnoty, akce (Napsat, Body ±, Kupon),
+ * poslední poznámka pro kolegy a jedna časová osa všeho, co se s ním dělo (body, razítka, kupony,
+ * poukazy, objednávky). Pod tím rezervace, razítka, skupiny, poznámky a správa člena — tytéž
+ * části jako dřív v rozbalovacím „Deníku", jen pohromadě. Na počítači panel vedle seznamu,
+ * na telefonu okno zdola (volá ClenoveSprava).
+ */
+export function ProfilHosta({ host, oznam, vidiDenik, onZmena, onZavrit, akce, vOkne = false }: {
+  host: HostProfilu; oznam: Hlaska; vidiDenik: boolean; onZmena: () => void;
+  /** V okně nese jméno titulek okna — v profilu se neopakuje. */
+  vOkne?: boolean;
+  /** Křížek v hlavičce panelu (na telefonu ho kreslí okno). */
+  onZavrit?: () => void;
+  /** Akce profilu (Napsat, Body ±, Kupon) — jen ty, na které má divák oprávnění. */
+  akce: { label: string; icon: string; onClick: () => void }[];
+}) {
+  const money = useMoney();
+  const { ma: smi } = useOpravneni();
+  const ted = new Date();
+  const { data: pr } = useLoad<any>(vidiDenik ? `/api/client/admin/loyalty?customerId=${host.id}&detail=1` : null,
+    raw => ({ ...raw, osa: casovaOsa({ ledger: raw?.ledger, claims: raw?.claims, vouchers: raw?.vouchers, orders: raw?.orders }, money), kampane: Array.isArray(raw?.kampane) ? raw.kampane : [] }));
+  const { data: pozn } = useLoad<{ notes: Poznamka[] }>(smi('zakaznici.poznamky') ? `/api/client/admin/notes?customerId=${host.id}` : null,
+    raw => ({ notes: Array.isArray(raw?.notes) ? raw.notes : [] }));
+  const varovani = pozn ? varovaniHosta(pozn.notes.map(n => n.body)) : null;
+  const posledniPoznamka = pozn?.notes[0] ?? null;
+  const stitky = stitkyHosta(host, ted);
+  const prumer = prumernyUcet(host.spend, host.visits);
+  const zbyva = pr?.uroven && pr?.clen ? zbyvaDoUrovne(pr.uroven, pr.uroven.unit === 'spend' ? pr.clen.spend : pr.clen.visits, money) : null;
+  const razitka = pr ? zbyvaDoOdmeny(pr.kampane) : [];
+  const sg = host.skupiny ?? [];
+  return (
+    <div className="sloupec sloupec-6 min-w-0" data-profil-hosta={host.id}>
+      <div className="flex items-start gap-3 min-w-0">
+        <Avatar name={host.name} size="lg" />
+        <div className="min-w-0 flex-1">
+          {!vOkne && <h2 className="t-section leading-tight break-words">{host.name}</h2>}
+          <p className={vOkne ? 't-meta mt-2' : 't-meta mt-1'}>{`členem od ${denCesky(host.joined_at)} · naposledy ${predKolika(host.last_visit_at, ted)}`}</p>
+        </div>
+        {onZavrit && <IconButton icon="close" size="sm" aria-label="Zavřít profil" onClick={onZavrit} />}
+      </div>
+
+      {(stitky.length > 0 || (host.level && host.level !== 'bronze') || host.has_birthday_month || varovani || sg.length > 0 || host.blocked) && (
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Štítky hosta">
+          {host.blocked && <Chip tone="bad" size="sm">Zablokovaný</Chip>}
+          {stitky.map(s => <Chip key={s.text} tone={s.ton} size="sm">{s.text}</Chip>)}
+          {host.level && host.level !== 'bronze' && <Chip tone={host.level === 'silver' ? 'muted' : 'ink'} size="sm">{host.level_label}</Chip>}
+          {varovani && <Chip tone="bad" size="sm" icon="warning">{varovani.length > 28 ? `${varovani.slice(0, 26)}…` : varovani}</Chip>}
+          {host.has_birthday_month && <Chip tone="info" size="sm" icon="gift">Narozeniny tento měsíc</Chip>}
+          {sg.map(g => <Chip key={g.id} tone={tonBarvy(g.color)} size="sm">{g.name}</Chip>)}
+        </div>
+      )}
+
+      <StatRow>
+        <Stat label="Návštěvy" value={host.visits} />
+        <Stat label="Útrata" value={Number(host.spend) > 0 ? money(Number(host.spend)) : '–'} note={prumer != null ? `Ø ${money(prumer)}` : undefined} />
+        <Stat label="Body" value={cislo(host.points)} note={host.stamps ? `${host.stamps} razítek` : undefined} />
+      </StatRow>
+
+      {akce.length > 0 && (
+        <Rada vyska="s">
+          {akce.map(a => <Button key={a.label} size="sm" variant="secondary" icon={a.icon} onClick={a.onClick}>{a.label}</Button>)}
+        </Rada>
+      )}
+
+      {posledniPoznamka && (
+        <p className="well rounded-[var(--r-md)] px-4 py-3 text-sm text-black/75 text-pretty">
+          „{posledniPoznamka.body}“<span className="t-meta"> · {[posledniPoznamka.autor, dbTimeDayHM(posledniPoznamka.created_at)].filter(Boolean).join(', ')}</span>
+        </p>
+      )}
+
+      {vidiDenik && (
+        <section aria-labelledby={`osa-${host.id}`} className="space-y-3">
+          <div>
+            <h3 id={`osa-${host.id}`} className="t-card">Historie</h3>
+            {(zbyva || razitka.length > 0) && <p className="t-meta mt-0.5">{[zbyva, ...razitka].filter(Boolean).join(' · ')}</p>}
+          </div>
+          {pr === null ? <Skeleton className="h-24" />
+            : pr.osa.length === 0 ? <p className="t-meta">Zatím žádná historie.</p>
+            : (
+              <ol className="relative space-y-4 pl-6 before:absolute before:left-[5px] before:top-1.5 before:bottom-1.5 before:w-px before:bg-black/10" aria-label="Časová osa hosta">
+                {pr.osa.slice(0, 12).map((u: UdalostOsy, i: number) => (
+                  <li key={`${u.druh}-${u.at}-${i}`} className="relative min-w-0">
+                    <span aria-hidden className={`absolute -left-6 top-1 h-[11px] w-[11px] rounded-full border-2 ${i === 0 ? 'bg-[#C8F542] border-[#16181A]' : 'bg-white border-black/30'}`} />
+                    <p className="text-[15px] font-medium leading-snug break-words">{u.titulek}</p>
+                    <p className="t-meta">{[dbTimeDayHM(u.at), u.meta, POPISEK_DRUHU[u.druh]].filter(Boolean).join(' · ')}</p>
+                  </li>
+                ))}
+              </ol>
+            )}
+        </section>
+      )}
+
+      <Well className="space-y-4">
+        {smi('rezervace.zobrazit') && <RezervaceClena customerId={host.id} />}
+        {vidiDenik && <RazitkaClen customerId={host.id} oznam={oznam} />}
+        <SkupinyClena customerId={host.id} oznam={oznam} />
+        {smi('zakaznici.poznamky') && <PoznamkyClena customerId={host.id} oznam={oznam} />}
+        {vidiDenik && <HistorieRozbal customerId={host.id} />}
+        {smi('zakaznici.sprava_clenu') && <SpravaClena clen={{ id: host.id, name: host.name, blocked: host.blocked === true }} oznam={oznam} onZmena={onZmena} />}
+      </Well>
+    </div>
+  );
+}
+
+/** Celá historie po částech (návštěvy, body, útraty, kupony…) — dlouhá, proto až na požádání. */
+function HistorieRozbal({ customerId }: { customerId: number }) {
+  const [otevrena, setOtevrena] = useState(false);
+  return (
+    <div className="space-y-2">
+      <Button size="sm" variant="secondary" className="w-full" aria-expanded={otevrena} onClick={() => setOtevrena(v => !v)}>{otevrena ? 'Skrýt celou historii' : 'Celá historie po částech'}</Button>
+      {otevrena && <HistorieClena customerId={customerId} />}
+    </div>
   );
 }
 

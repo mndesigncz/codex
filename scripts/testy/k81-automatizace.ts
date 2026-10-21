@@ -96,7 +96,8 @@ export default function ({ eq, ok }: Testy) {
   const ui = precti('components/client/loyalty/Automatizace.tsx');
   ok('rozhraní: každé pravidlo má vypínač, náhled, zkoušku a deník', ['SwitchRow', 'ZpravyNahled', 'Poslat zkoušku sobě', 'Co odešlo'].every(x => ui.includes(x)));
   ok('rozhraní: uvítací série má až tři zprávy s dny', ui.includes('MAX_KROKU_UVITANI') && ui.includes('Za kolik dní po přidání'));
-  const admin = precti('components/client/ClientAdmin.tsx');
-  ok('rozhraní: Automatizace jsou část Zákazníků za oprávněním zpráv', admin.includes("id: 'automations', label: 'Automatizace', klic: 'zakaznici.zpravy'"));
+  // Kolo 92: Automatizace jsou část stránky Kampaně (dřív Zákazníků), pořád za oprávněním zpráv.
+  const kampane = precti('components/client/sprava/KampaneStranka.tsx');
+  ok('rozhraní: Automatizace jsou část Kampaní za oprávněním zpráv', kampane.includes("{ id: 'automatizace', label: 'Automatizace', klic: 'zakaznici.zpravy' }"));
   ok('schéma: tabulky automatizací jsou v init i v mazání účtu a podniku', init.includes('CREATE TABLE IF NOT EXISTS client_automatizace_log') && precti('lib/smazaniUctu.ts').includes("client_automatizace_log: 'smazat'") && precti('lib/smazaniUctu.ts').includes("'client_automatizace'"));
 }

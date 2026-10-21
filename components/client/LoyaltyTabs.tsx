@@ -32,9 +32,6 @@ import { useMoney, useSymbol } from '../CurrencyProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
-import Poukazy from './Poukazy';
-import OdkazCtecka from './OdkazCtecka';
-import Kupony from './loyalty/Kupony';
 import ClenoveSkupiny from './loyalty/ClenoveSkupiny';
 import PrechodZKarticky, { useImportKarticky } from './PrechodZKarticky';
 import KampanEditor, { kampanDoFormulare, prazdnaKampan, type FormKampane } from './loyalty/KampanEditor';
@@ -643,14 +640,17 @@ const POPIS_CASTI: Record<LoyaltySub, string> = {
   vouchers: 'Dárkové poukazy s jedinečným kódem a QR: peněžní hodnota, platnost, uplatnění po částech u kasy a tisk.',
 };
 
-export default function LoyaltyTabs({ toast, promos, oznam, otevriCast }: {
-  toast: (m: string) => void; promos: React.ReactNode; oznam: (text: string, ton?: 'ok' | 'bad') => void;
+/** Kolo 92: Kupony a kódy a Poukazy se přestěhovaly do Věrnost → Kupony a poukazy (components/client/sprava/KuponyAPoukazy). */
+const CASTI_PROGRAMU: LoyaltySub[] = ['overview', 'points', 'bonus', 'stamps'];
+
+export default function LoyaltyTabs({ toast, oznam, otevriCast }: {
+  toast: (m: string) => void; oznam: (text: string, ton?: 'ok' | 'bad') => void;
   /** Zvenku (z průvodce přechodem z Kartičky) otevře zadanou část; `n` se zvyšuje při každém požadavku. */
   otevriCast?: { id: LoyaltySub; n: number } | null;
 }) {
   // Části jako záložky aplikace: podle `ma` (do načtení oprávnění všechny, pak jen povolené).
   const { ma } = useOpravneni();
-  const casti = LOYALTY_SUBS.filter(c => ma(KLIC_CASTI[c.id]));
+  const casti = LOYALTY_SUBS.filter(c => CASTI_PROGRAMU.includes(c.id) && ma(KLIC_CASTI[c.id]));
   const [volba, setVolba] = useState<LoyaltySub>(otevriCast?.id ?? 'overview');
   useEffect(() => { if (otevriCast) setVolba(otevriCast.id); }, [otevriCast]);
   const sub: LoyaltySub | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
@@ -660,11 +660,9 @@ export default function LoyaltyTabs({ toast, promos, oznam, otevriCast }: {
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'bonus' ? <BonusAkce toast={toast} />
     : sub === 'stamps' ? <Stamps toast={toast} />
-    : sub === 'coupons' ? <div className="space-y-4"><Kupony toast={toast} />{promos}</div>
-    : sub === 'vouchers' ? <Poukazy toast={toast} />
     : null;
-  // Čtečka u kasy: celoobrazovkový režim pro terminál s čtečkou kódů (vstup z Věrnosti).
-  const nastroj = nastroj0 && ma('vernost.karta') ? <div className="space-y-3"><OdkazCtecka />{nastroj0}</div> : nastroj0;
+  // Čtečka u kasy má od kola 92 vlastní položku v Provozu, odkaz „Režim čtečky" tu už nestojí.
+  const nastroj = nastroj0;
   return (
     <PlochaWidgetu
       stranka="vedeni.klient_vernost"

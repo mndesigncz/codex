@@ -20,7 +20,7 @@ import BanneryEditor from './loyalty/BanneryEditor';
 /** Předvolené barvy značky — podnik si může vybrat i vlastní. */
 const ACCENTS = ['#C8F542', '#E8A33D', '#D9644A', '#7C9A6B', '#4A7DBF', '#9B6BAE', '#16181A'];
 
-async function uploadImage(f: File): Promise<string> {
+export async function uploadImage(f: File): Promise<string> {
   const { compressImage } = await import('@/lib/clientImage');
   const fd = new FormData();
   fd.append('file', await compressImage(f));

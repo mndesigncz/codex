@@ -12,9 +12,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BulkBar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, SearchField, SelectBox, Select, Skeleton,
+  BulkBar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, SearchField, SelectBox, Select, Skeleton,
   useLoad, useSelection, type BulkAction,
 } from '../../ui';
+import { cislo } from '@/lib/klientSprava/format';
+import { SEGMENTY_HOSTU, prumernyUcet, predKolika, stitkyHosta, type SegmentHostu } from '@/lib/klientSprava/segmentyHostu';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney, useSymbol } from '../../CurrencyProvider';
 import { czCount, type CzNoun } from '@/lib/czech';
@@ -25,7 +27,7 @@ import {
 } from '@/lib/clenoveFiltr';
 import { PRECHOD_TLACITKO, useImportKarticky } from '../PrechodZKarticky';
 import type { Hlaska } from '../import/typy';
-import DetailClena, { denCesky } from './ClenoveDetail';
+import { ProfilHosta, denCesky } from './ClenoveDetail';
 import { UpravaClenaOkno } from './BodyUpravaClena';
 import Duplicity from './Duplicity';
 import { HromadnaSkupina, HromadnyBonus, HromadnaZprava, type VyberHostu } from './ClenoveHromadne';
@@ -42,7 +44,21 @@ interface ClenRadek {
   skupiny?: { id: number; name: string; color: string | null }[]; has_birthday_month?: boolean; blocked?: boolean;
 }
 
-interface Stranka { rows: ClenRadek[]; total: number; all: number; hasMore: boolean; nextOffset: number | null }
+interface Stranka { rows: ClenRadek[]; total: number; all: number; hasMore: boolean; nextOffset: number | null; segmenty: Partial<Record<SegmentHostu, number>> | null }
+
+/** Je okno aspoň `lg` (1024 px)? Tam stojí profil hosta jako panel vedle seznamu, jinak v okně zdola. */
+function useSiroke(): boolean {
+  const [siroke, setSiroke] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const zmer = () => setSiroke(mq.matches);
+    zmer();
+    mq.addEventListener('change', zmer);
+    return () => mq.removeEventListener('change', zmer);
+  }, []);
+  return siroke;
+}
 
 type Okno = 'skupina' | 'bonus' | 'zprava' | null;
 
@@ -50,9 +66,11 @@ type Okno = 'skupina' | 'bonus' | 'zprava' | null;
  * Seznam členů s filtry a hromadnými akcemi. `dalsiAkce` je místo pro akce, které
  * dodá jiný okruh (poslat kupon vybraným): přidají se do lišty výběru za ty vlastní.
  */
-export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
+export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce, otevritProfil = null }: {
   oznam: Hlaska; hledat?: string;
   dalsiAkce?: (vyber: VyberHostu) => BulkAction[];
+  /** Zvenku (globální hledání „clen:<id>") otevře profil hosta; `n` roste s každým požadavkem. */
+  otevritProfil?: { id: number; n: number } | null;
 }) {
   const money = useMoney();
   const symbol = useSymbol();
@@ -99,7 +117,8 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
     setChyba(null);
     fetch(`/api/client/admin/customers?${dotaz}&limit=${STRANKA}`).then(okJson).then(raw => {
       if (id !== pozadavek.current) return;
-      setD({ rows: Array.isArray(raw?.customers) ? raw.customers : [], total: Number(raw?.total) || 0, all: Number(raw?.all) || 0, hasMore: !!raw?.hasMore, nextOffset: raw?.nextOffset ?? null });
+      setD({ rows: Array.isArray(raw?.customers) ? raw.customers : [], total: Number(raw?.total) || 0, all: Number(raw?.all) || 0, hasMore: !!raw?.hasMore, nextOffset: raw?.nextOffset ?? null,
+        segmenty: raw?.segmenty && typeof raw.segmenty === 'object' ? raw.segmenty : null });
     }).catch(e => { if (id === pozadavek.current) { setD(null); setChyba(apiMessage(e, 'Členové se nenačetli.')); } });
   }, [dotaz, verze]);
   const nactiDalsi = async () => {
@@ -120,7 +139,17 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
 
   const imp = useImportKarticky(oznam, reload);
   const smiImport = imp.smi;
-  const [otevreny, setOtevreny] = useState<number | null>(null);
+  // Profil hosta: id otevřeného; řádek si drží data, ať se panel otevře hned (bez dalšího dotazu na seznam).
+  const [profil, setProfil] = useState<ClenRadek | null>(null);
+  const siroke = useSiroke();
+  // Okno akce pro jednoho hosta z profilu (Napsat, Kupon) — jinak se bere výběr v seznamu.
+  const [jednomu, setJednomu] = useState<VyberHostu | null>(null);
+  useEffect(() => {
+    if (!otevritProfil?.id) return;
+    fetch(`/api/client/admin/customers?limit=200`).then(okJson)
+      .then(raw => { const c = (Array.isArray(raw?.customers) ? raw.customers : []).find((x: ClenRadek) => x.id === otevritProfil.id); if (c) setProfil(c); })
+      .catch(() => {});
+  }, [otevritProfil]);
   const [upravuji, setUpravuji] = useState<ClenRadek | null>(null);
   const [verzeDeniku, setVerzeDeniku] = useState(0);
   const [exportuji, setExportuji] = useState(false);
@@ -132,7 +161,8 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
   const [vsechny, setVsechny] = useState(false);
   useEffect(() => { sel.exit(); setVsechny(false); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [dotaz]);
   const pocetVyberu = vsechny ? (d?.total ?? 0) : sel.count;
-  const vyber: VyberHostu = vsechny ? { filter: filtr, pocet: d?.total ?? 0 } : { ids: [...sel.selected], pocet: sel.count };
+  const vyberSeznamu: VyberHostu = vsechny ? { filter: filtr, pocet: d?.total ?? 0 } : { ids: [...sel.selected], pocet: sel.count };
+  const vyber: VyberHostu = jednomu ?? vyberSeznamu;
   const prepniRadek = (id: number) => {
     if (vsechny && d) { setVsechny(false); sel.selectAll(d.rows.map(r => r.id).filter(x => x !== id)); return; }
     sel.toggle(id);
@@ -143,13 +173,14 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
     if (d.total > HROMADNA_MAX) { oznam(`Filtr odpovídá ${czCount(d.total, { one: 'hostovi', few: 'hostům', many: 'hostům' })}, najednou jde vybrat nejvýš ${HROMADNA_MAX}. Zúži filtr.`, 'bad'); return; }
     setVsechny(true);
   };
-  const hotovoHromadne = () => { setOkno(null); sel.exit(); setVsechny(false); setOtevreny(null); reload(); reloadSkupin(); };
+  const hotovoHromadne = () => { setOkno(null); setJednomu(null); sel.exit(); setVsechny(false); reload(); reloadSkupin(); };
+  const zavriOkno = () => { setOkno(null); setJednomu(null); };
 
   const akceVyberu: BulkAction[] = [
     ...(meniSkupiny ? [{ label: 'Do skupiny', icon: 'users', primary: true, onClick: () => setOkno('skupina') }] : []),
     ...(upravujeBody ? [{ label: 'Bonus bodů', icon: 'gift', onClick: () => setOkno('bonus') }] : []),
     ...(piseZpravy ? [{ label: 'Zpráva', icon: 'send', onClick: () => setOkno('zprava') }] : []),
-    ...(dalsiAkce ? dalsiAkce(vyber) : []),
+    ...(dalsiAkce ? dalsiAkce(vyberSeznamu) : []),
   ];
 
   const exportuj = async () => {
@@ -165,10 +196,23 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
   const nastavFiltr = (zmena: Partial<FiltrClenu>) => setNavrh(p => ({ ...p, ...zmena }));
   const zrusFiltry = () => { setQ(''); setNavrh({ ...PRAZDNY_FILTR }); setFiltr({ ...PRAZDNY_FILTR }); };
   const pocetPodminek = pocetFiltru(navrh);
-  const jeFiltrovano = pocetPodminek > 0 || !!filtr.q;
+  const jeFiltrovano = pocetPodminek > 0 || !!filtr.q || !!filtr.segment;
   const skupiny = sk?.groups ?? [];
   const rucniSkupiny = skupiny.filter(g => !g.dynamic && !g.archived);
   const prazdnaCelkem = d && d.all === 0;
+  const ted = new Date();
+  const vybiraSe = meniSkupiny || upravujeBody || piseZpravy;
+  /** Akce v profilu hosta: jen ty, na které má divák oprávnění. */
+  const akceProfilu = (c: ClenRadek) => {
+    const jen: VyberHostu = { ids: [c.id], pocet: 1 };
+    return [
+      ...(piseZpravy ? [{ label: 'Napsat', icon: 'send', onClick: () => { setJednomu(jen); setOkno('zprava'); } }] : []),
+      ...((upravujeBody || upravujeKredit) ? [{ label: upravujeBody ? 'Body ±' : 'Kredit ±', icon: 'gift', onClick: () => setUpravuji(c) }] : []),
+      ...(dalsiAkce ? dalsiAkce(jen).slice(0, 1).map(a => ({ label: a.label, icon: a.icon ?? 'tag', onClick: a.onClick })) : []),
+    ];
+  };
+  const segment = navrh.segment;
+  const pocetVsech = d?.all ?? null;
 
   return (
     <div className="space-y-4">
@@ -186,6 +230,24 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
           {smiSpravu && <Button size="sm" variant="secondary" icon="users" onClick={() => setDuplicity(true)}>Duplicity</Button>}
         </div>
       </div>
+
+      {/* Segmenty jako čipy s počty (koncept B, audit C §7): klepnutí filtruje seznam, druhé klepnutí zruší.
+          Počty jsou ze serveru ze stejných dat jako seznam (lib/klientSprava/segmentyHostu.ts). */}
+      {d?.segmenty && (pocetVsech ?? 0) > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto scroll-fade-x" role="group" aria-label="Segmenty hostů">
+          <button type="button" aria-pressed={!segment} onClick={() => { setNavrh(p => ({ ...p, segment: '' })); setFiltr(p => ({ ...p, segment: '' })); }}
+            className={`filter-pill tap-target-sm tabular-nums whitespace-nowrap ${!segment ? 'seg-on' : 'seg-off glass'}`}>Všichni · {pocetVsech}</button>
+          {SEGMENTY_HOSTU.map(sg => {
+            const n = d.segmenty?.[sg.id] ?? 0;
+            const on = segment === sg.id;
+            return (
+              <button key={sg.id} type="button" aria-pressed={on} title={sg.popis}
+                onClick={() => { const v = on ? '' : sg.id; setNavrh(p => ({ ...p, segment: v })); setFiltr(p => ({ ...p, segment: v })); }}
+                className={`filter-pill tap-target-sm tabular-nums whitespace-nowrap ${on ? 'seg-on' : 'seg-off glass'}`}>{sg.label} · {n}</button>
+            );
+          })}
+        </div>
+      )}
 
       {filtryOtevrene && (
         <Card className="space-y-4" aria-label="Filtry členů">
@@ -240,49 +302,84 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
             )}
           </Card>
         ) : (
-          <Card pad="none">
-            <ul className="list px-5">
+          <div className={profil && siroke ? 'grid grid-cols-[minmax(0,1fr)_22.5rem] gap-4 items-start' : ''}>
+          <Card pad="none" className="min-w-0">
+            {/* Monitor: tabulka s hodnotou hosta (čísla na pravé hraně, tabular-nums). Ø účet a body se při
+                otevřeném profilu schovají, ať jméno nepřeteče. Telefon: řádky seznamu (V4). */}
+            <div className="hidden md:block px-5 pt-1">
+              <table className="w-full text-sm tabular-nums" aria-label="Hosté">
+                <thead>
+                  <tr className="t-label text-left">
+                    {vybiraSe && <th className="w-10 py-3"><span className="sr-only">Výběr</span></th>}
+                    <th className="font-medium py-3 pr-3">Host</th>
+                    <th className="font-medium py-3 pr-3 text-right">Návštěvy</th>
+                    <th className="font-medium py-3 pr-3 text-right">Útrata</th>
+                    {!profil && <th className="font-medium py-3 pr-3 text-right">Ø účet</th>}
+                    <th className="font-medium py-3 pr-3">Naposledy</th>
+                    {!profil && <th className="font-medium py-3 text-right">Body</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.rows.map(c => {
+                    const prumer = prumernyUcet(c.spend, c.visits);
+                    const otevren = profil?.id === c.id;
+                    return (
+                      <tr key={c.id} className={`border-t border-black/[0.06] align-top ${otevren ? 'bg-black/[0.035]' : 'hover:bg-black/[0.02]'}`}>
+                        {vybiraSe && <td className="py-3"><SelectBox checked={vsechny || sel.has(c.id)} onChange={() => prepniRadek(c.id)} label={`Vybrat: ${c.name}`} /></td>}
+                        <td className="py-2.5 pr-3 min-w-0">
+                          <button type="button" onClick={() => setProfil(otevren ? null : c)} aria-expanded={otevren}
+                            aria-label={`Profil hosta ${c.name}`} className="tap-target-sm block w-full min-w-0 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+                            <span className="block text-[15px] font-medium leading-snug text-[#16181A] break-words">{c.name}</span>
+                            <StitkyRadku c={c} />
+                          </button>
+                        </td>
+                        <td className="py-3 pr-3 text-right">{c.visits}</td>
+                        <td className="py-3 pr-3 text-right font-semibold">{Number(c.spend) > 0 ? money(Number(c.spend)) : '–'}</td>
+                        {!profil && <td className="py-3 pr-3 text-right text-black/70">{prumer != null ? money(prumer) : '–'}</td>}
+                        <td className="py-3 pr-3 text-black/70 whitespace-nowrap">{predKolika(c.last_visit_at, ted)}</td>
+                        {!profil && <td className="py-3 text-right">{cislo(c.points)}</td>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <ul className="list px-4 md:hidden">
               {d.rows.map(c => {
-                const uroven = { id: c.level ?? 'bronze', label: c.level_label ?? 'Člen' };
-                const sg = c.skupiny ?? [];
-                const vybran = vsechny || sel.has(c.id);
+                const prumer = prumernyUcet(c.spend, c.visits);
                 return (
-                  <li key={c.id}>
-                    <ListRow as="div"
-                      lead={(meniSkupiny || upravujeBody || piseZpravy) ? <SelectBox checked={vybran} onChange={() => prepniRadek(c.id)} label={`Vybrat: ${c.name}`} /> : undefined}
-                      title={<span className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                        <span className="truncate max-w-full">{c.name}</span>
-                        {uroven.id !== 'bronze' && <Chip tone={uroven.id === 'silver' ? 'muted' : 'ink'} size="sm">{uroven.label}</Chip>}
-                        {c.level_reduced && <Chip tone="wait" size="sm">snížená po pauze</Chip>}
-                        {c.blocked && <Chip tone="bad" size="sm">Zablokovaný</Chip>}
-                        {Number(c.discount) > 0 && <Chip tone="ok" size="sm">{`Sleva ${c.discount} %${c.discount_source === 'skupina' && c.discount_name ? ` (${c.discount_name})` : ''}`}</Chip>}
-                        {c.has_birthday_month && <Chip tone="info" size="sm" icon="gift">Narozeniny</Chip>}
-                        {sg.slice(0, 2).map(g => <Chip key={g.id} tone={tonBarvy(g.color)} size="sm">{g.name}</Chip>)}
-                        {sg.length > 2 && <Chip tone="muted" size="sm">{`+${sg.length - 2}`}</Chip>}
-                      </span>}
-                      meta={[c.email, `člen od ${denCesky(c.joined_at)}`, c.last_visit_at ? `naposledy ${denCesky(c.last_visit_at)}` : 'zatím nebyl'].filter(Boolean).join(' · ')}
-                      value={<>{c.points.toLocaleString('cs-CZ')} <span className="text-xs font-medium text-black/50">b.</span></>}
-                      valueMeta={`${c.stamps} raz. · ${c.visits} návšt.${Number(c.spend) > 0 ? ` · ${money(Number(c.spend))}` : ''}${Number(c.credit) > 0 ? ` · kredit ${money(Number(c.credit))}` : ''}`}
-                      aside={<>{c.reservations} rez.{c.open_coupons ? ` · ${c.open_coupons} kup.` : ''}</>}
-                      actions={(upravujeBody || upravujeKredit || rozbali) ? (
-                        <>
-                          {(upravujeBody || upravujeKredit) && <Button size="sm" variant="secondary" onClick={() => setUpravuji(c)} aria-label={`Upravit body a kredit: ${c.name}`}>{upravujeBody ? 'Body ±' : 'Kredit ±'}</Button>}
-                          {rozbali && <Button size="sm" variant="ghost" aria-expanded={otevreny === c.id} onClick={() => setOtevreny(otevreny === c.id ? null : c.id)}>{otevreny === c.id ? 'Skrýt' : vidiDenik ? 'Deník' : maPoznamky ? 'Poznámky' : 'Skupiny'}</Button>}
-                        </>
-                      ) : undefined} />
-                    {otevreny === c.id && <DetailClena key={verzeDeniku} customerId={c.id} jmeno={c.name} zablokovany={c.blocked === true} oznam={oznam} vidiDenik={vidiDenik} onZmena={() => { setOtevreny(null); reload(); }} />}
-                  </li>
+                  <ListRow key={c.id}
+                    lead={vybiraSe ? <SelectBox checked={vsechny || sel.has(c.id)} onChange={() => prepniRadek(c.id)} label={`Vybrat: ${c.name}`} /> : undefined}
+                    title={<button type="button" onClick={() => setProfil(c)} aria-label={`Profil hosta ${c.name}`} className="block w-full min-w-0 text-left">
+                      <span className="block truncate">{c.name}</span><StitkyRadku c={c} />
+                    </button>}
+                    meta={`${c.visits} návšt. · naposledy ${predKolika(c.last_visit_at, ted)}`}
+                    value={Number(c.spend) > 0 ? money(Number(c.spend)) : <>{cislo(c.points)} <span className="text-xs font-medium text-black/50">b.</span></>}
+                    valueMeta={Number(c.spend) > 0 ? (prumer != null ? `Ø ${money(prumer)}` : undefined) : `${c.stamps} raz.`} />
                 );
               })}
             </ul>
-            <div className="px-5 py-3 flex items-center gap-3 flex-wrap border-t border-black/5">
+            <div className="px-4 sm:px-5 py-3 flex items-center gap-3 flex-wrap border-t border-black/5">
               <p className="t-meta tabular-nums">Zobrazeno {d.rows.length} z {d.total}</p>
               {d.hasMore && <Button size="sm" variant="secondary" loading={dalsi} onClick={() => { void nactiDalsi(); }}>Načíst další</Button>}
             </div>
           </Card>
+          {profil && siroke && (
+            <Card className="sticky top-4 max-h-[calc(100dvh-6rem)] overflow-y-auto scrollbar-thin" aria-label={`Profil hosta ${profil.name}`}>
+              <ProfilHosta key={`${profil.id}-${verzeDeniku}`} host={profil} oznam={oznam} vidiDenik={vidiDenik} akce={akceProfilu(profil)}
+                onZavrit={() => setProfil(null)} onZmena={() => { setProfil(null); reload(); }} />
+            </Card>
+          )}
+          </div>
         )}
+      {profil && !siroke && (
+        <Modal open onClose={() => setProfil(null)} size="lg" title={profil.name}>
+          <ProfilHosta key={`${profil.id}-${verzeDeniku}`} vOkne host={profil} oznam={oznam} vidiDenik={vidiDenik} akce={akceProfilu(profil)}
+            onZmena={() => { setProfil(null); reload(); }} />
+        </Modal>
+      )}
       {imp.okno}
-      {duplicity && <Duplicity oznam={oznam} onZavrit={() => setDuplicity(false)} onSlouceno={() => { setOtevreny(null); reload(); }} />}
+      {duplicity && <Duplicity oznam={oznam} onZavrit={() => setDuplicity(false)} onSlouceno={() => { setProfil(null); reload(); }} />}
 
       <BulkBar count={pocetVyberu}
         totalLabel={d && pocetVyberu < d.total ? `Vybrat vše (${d.total})` : undefined}
@@ -291,14 +388,33 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
         actions={akceVyberu}
         note={vsechny ? 'Vybráni jsou všichni, kdo splňují filtr, i ti, které ještě nevidíš.' : undefined} />
 
-      {okno === 'skupina' && <HromadnaSkupina vyber={vyber} skupiny={rucniSkupiny} oznam={oznam} onZavrit={() => setOkno(null)} onHotovo={hotovoHromadne} />}
-      {okno === 'bonus' && <HromadnyBonus vyber={vyber} oznam={oznam} onZavrit={() => setOkno(null)} onHotovo={hotovoHromadne} />}
-      {okno === 'zprava' && <HromadnaZprava vyber={vyber} nazevPodniku={null} oznam={oznam} onZavrit={() => setOkno(null)} onHotovo={hotovoHromadne} />}
+      {okno === 'skupina' && <HromadnaSkupina vyber={vyber} skupiny={rucniSkupiny} oznam={oznam} onZavrit={zavriOkno} onHotovo={hotovoHromadne} />}
+      {okno === 'bonus' && <HromadnyBonus vyber={vyber} oznam={oznam} onZavrit={zavriOkno} onHotovo={hotovoHromadne} />}
+      {okno === 'zprava' && <HromadnaZprava vyber={vyber} nazevPodniku={null} oznam={oznam} onZavrit={zavriOkno} onHotovo={hotovoHromadne} />}
 
       {upravuji && (
         <UpravaClenaOkno clen={upravuji} smiBody={upravujeBody} smiKredit={upravujeKredit} oznam={oznam}
           onHotovo={() => { reload(); setVerzeDeniku(v => v + 1); }} onZavrit={() => setUpravuji(null)} />
       )}
     </div>
+  );
+}
+
+/** Štítky v řádku hosta: automatické (Štamgast, Nový, Chybí N dní), úroveň, narozeniny a dvě skupiny. */
+function StitkyRadku({ c }: { c: ClenRadek }) {
+  const auto = stitkyHosta(c, new Date());
+  const sg = c.skupiny ?? [];
+  const uroven = c.level ?? 'bronze';
+  if (!auto.length && uroven === 'bronze' && !c.has_birthday_month && !sg.length && !c.blocked && !c.level_reduced) return null;
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-1 min-w-0">
+      {c.blocked && <Chip tone="bad" size="sm">Zablokovaný</Chip>}
+      {auto.map(a => <Chip key={a.text} tone={a.ton} size="sm">{a.text}</Chip>)}
+      {uroven !== 'bronze' && <Chip tone={uroven === 'silver' ? 'muted' : 'ink'} size="sm">{c.level_label ?? 'Člen'}</Chip>}
+      {c.level_reduced && <Chip tone="wait" size="sm">snížená po pauze</Chip>}
+      {c.has_birthday_month && <Chip tone="info" size="sm" icon="gift">Narozeniny</Chip>}
+      {sg.slice(0, 2).map(g => <Chip key={g.id} tone={tonBarvy(g.color)} size="sm">{g.name}</Chip>)}
+      {sg.length > 2 && <Chip tone="muted" size="sm">{`+${sg.length - 2}`}</Chip>}
+    </span>
   );
 }

@@ -27,7 +27,9 @@ const filtr = (o: Partial<FiltrClenu> = {}): FiltrClenu => ({ ...PRAZDNY_FILTR, 
 export default async function ({ eq, ok }: Testy) {
   // ---- vstup filtru ----
   eq('filtr: z adresy se přečtou všechny podmínky', normalizujFiltr(new URLSearchParams('q=jana&level=gold&group=7&quietDays=60&birthdayMonth=1&openCoupon=1&spendOver=2000')),
-    { q: 'jana', level: 'gold', group: 7, quietDays: 60, birthdayMonth: true, openCoupon: true, spendOver: 2000 });
+    { q: 'jana', level: 'gold', group: 7, quietDays: 60, birthdayMonth: true, openCoupon: true, spendOver: 2000, segment: '' });
+  // Kolo 92: segment z čipů nad seznamem hostů (lib/klientSprava/segmentyHostu.ts) jde adresou tam i zpět.
+  eq('filtr: segment hostů projde a neznámý se zahodí', [normalizujFiltr(new URLSearchParams('segment=chybi')).segment, normalizujFiltr(new URLSearchParams('segment=vip')).segment], ['chybi', '']);
   eq('filtr: nesmysly se zahodí (= bez omezení)', normalizujFiltr(new URLSearchParams('level=diamant&group=-3&quietDays=abc&spendOver=-5&birthdayMonth=ne')), PRAZDNY_FILTR);
   eq('filtr: počet dní má strop 3650', normalizujFiltr({ quietDays: 99999 }).quietDays, 3650);
   eq('filtr: tělo požadavku (booleany a čísla) projde stejně', normalizujFiltr({ quietDays: 30, birthdayMonth: true, level: 'silver' }), { ...PRAZDNY_FILTR, quietDays: 30, birthdayMonth: true, level: 'silver' });
