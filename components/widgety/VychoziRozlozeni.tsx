@@ -102,7 +102,9 @@ function EditorVychoziho({ stranka, onZpet }: { stranka: DefiniceStranky; onZpet
   );
 }
 
-export default function VychoziRozlozeni() {
+/** `vNastaveni`: Nastavení › Stránky už má nadpis „Stránky" — druhý velký nadpis
+ *  „Rozložení stránek" pod ním byl navíc (audit N10); zůstane jen věta. */
+export default function VychoziRozlozeni({ vNastaveni = false }: { vNastaveni?: boolean } = {}) {
   const { opravneni, nacteno } = useOpravneni();
   const t = useT('widgety');
   const [upravuji, setUpravuji] = useState<IdStranky | null>(null);
@@ -118,8 +120,12 @@ export default function VychoziRozlozeni() {
 
   return (
     <div className="space-y-5">
-      <PageHeader as="h2" title={t('Rozložení stránek')}
-        subtitle={t('Výchozí plocha pro nové lidi a tablet. Každý si ji pak upraví po svém, pokud ji nezamkneš.')} />
+      {vNastaveni ? (
+        <p className="t-meta text-pretty">{t('Výchozí plocha pro nové lidi a tablet. Každý si ji pak upraví po svém, pokud ji nezamkneš.')}</p>
+      ) : (
+        <PageHeader as="h2" title={t('Rozložení stránek')}
+          subtitle={t('Výchozí plocha pro nové lidi a tablet. Každý si ji pak upraví po svém, pokud ji nezamkneš.')} />
+      )}
       {!nacteno ? (
         <Card><div className="space-y-3"><Skeleton className="h-5 w-40 rounded-full" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div></Card>
       ) : skupiny.length === 0 ? (

@@ -183,5 +183,6 @@
   "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "Za každý splnený krok +1 b, kľúčový +2 b (vlastné body kroku majú prednosť), nesplnený nič neuberie.",
   "Za splněný úkol {z} b, položky checklistu se nepočítají.": "Za splnenú úlohu {z} b, položky checklistu sa nepočítajú.",
   "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "Za uzávierku {z} b, povinné veci dňa sa nepočítajú.",
-  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "Za uzávierku {z} b, za každú nesplnenú povinnú vec dňa −{s} b."
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "Za uzávierku {z} b, za každú nesplnenú povinnú vec dňa −{s} b.",
+  "Tvůj účet a nastavení podniku.": "Tvoj účet a nastavenia podniku."
 }

@@ -183,5 +183,6 @@
   "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "+1 pt for each step done, +2 for a key one (a step's own points win), a missed step takes nothing away.",
   "Za splněný úkol {z} b, položky checklistu se nepočítají.": "{z} pts for a completed task, checklist items don't count.",
   "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "{z} pts for the closing, the day's required items don't count.",
-  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} pts for the closing, −{s} pts for each required item of the day left undone."
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} pts for the closing, −{s} pts for each required item of the day left undone.",
+  "Tvůj účet a nastavení podniku.": "Your account and business settings."
 }

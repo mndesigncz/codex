@@ -43,8 +43,9 @@ import { kontext, konec, tvrdi, otevri, lista, upravit, vUpravach, dokud, dotazy
   await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
   await p.waitForTimeout(800);
   await p.getByRole('button', { name: /Stránky/ }).filter({ visible: true }).first().click();
-  const nadpis = p.getByRole('heading', { name: 'Rozložení stránek' });
-  tvrdi('2: Nastavení → Stránky ukáže „Rozložení stránek"', await dokud(() => nadpis.isVisible(), 3000));
+  // Audit N10 (2026-10): v Nastavení má sekce jeden nadpis „Stránky" — druhý „Rozložení stránek" byl navíc.
+  const nadpis = p.getByRole('heading', { name: 'Stránky', exact: true });
+  tvrdi('2: Nastavení → Stránky ukáže nadpis „Stránky" a větu o výchozí ploše', await dokud(() => nadpis.isVisible(), 3000) && await p.getByText('Výchozí plocha pro nové lidi a tablet.', { exact: false }).isVisible());
   const skupina = p.getByRole('region', { name: 'Zaměstnanci' });
   await dokud(async () => (await skupina.innerText()).includes('Výchozí z aplikace'), 3000);
   tvrdi('2: řádek Přehled u Zaměstnanců ukazuje „Výchozí z aplikace"', (await skupina.innerText()).includes('Výchozí z aplikace'), await skupina.innerText());

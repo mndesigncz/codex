@@ -477,7 +477,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
   return (
     <div ref={korenRef} className={vOkne ? 'space-y-4' : 'px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
-      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Tvůj profil, jazyk, vzhled, oznámení a zabezpečení.')}
+      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={isEmployer ? t('Tvůj účet a nastavení podniku.') : t('Tvůj profil, jazyk, vzhled, oznámení a zabezpečení.')}
         className={zobrazeni === 'sekce' ? 'hidden md:block' : ''} />}
       <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
 
@@ -898,7 +898,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           ) : section === 'roles' ? (
             <RoleEditor />
           ) : section === 'stranky' ? (
-            <VychoziRozlozeni />
+            <VychoziRozlozeni vNastaveni />
           ) : section === 'audit' ? (
             // Historie změn s hledáním, lidmi, oblastmi a „Načíst starší" (kolo 7) — vlastní soubor.
             <SekceHistorie />

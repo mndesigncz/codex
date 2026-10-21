@@ -2025,3 +2025,10 @@ html[data-obal] .jen-web { display: none !important; }
    V řadě s dalším prvkem ho dělá pružným dílem `Rada deleni="pruzne"` (nebo `sirka="obsah"`). */
 .seg-plna { width: 100%; }
 .seg-plna-pas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); }
+
+/* Audit 2026-10 (průřez 9): „Skrýt tenhle popis" u podtitulku PageHeader se ukazoval jen
+   na hover (opacity-0 → group-hover) — na telefonu a tabletu ho nikdo neviděl. Na
+   dotykových zařízeních je křížek vidět tlumeně pořád (cíl 44 drží .tap-target-sm). */
+@media (hover: none) {
+  .t-page + p.group > button.tap-target-sm { opacity: 0.5; }
+}

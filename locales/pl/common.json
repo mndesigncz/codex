@@ -183,5 +183,6 @@
   "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "Za każdy wykonany krok +1 pkt, kluczowy +2 pkt (własne punkty kroku mają pierwszeństwo), niewykonany nic nie odejmuje.",
   "Za splněný úkol {z} b, položky checklistu se nepočítají.": "Za wykonane zadanie {z} pkt, punkty listy się nie liczą.",
   "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "Za zamknięcie {z} pkt, obowiązkowe rzeczy dnia się nie liczą.",
-  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "Za zamknięcie {z} pkt, za każdą niewykonaną obowiązkową rzecz dnia −{s} pkt."
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "Za zamknięcie {z} pkt, za każdą niewykonaną obowiązkową rzecz dnia −{s} pkt.",
+  "Tvůj účet a nastavení podniku.": "Twoje konto i ustawienia lokalu."
 }

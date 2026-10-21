@@ -91,5 +91,7 @@
   "Reagovat {emoji}": "React {emoji}",
   "Reakce {emoji}: {jmena}": "Reaction {emoji}: {jmena}",
   "Reakci se nepodařilo uložit.": "The reaction could not be saved.",
-  "Přejít na původní zprávu": "Go to the original message"
+  "Přejít na původní zprávu": "Go to the original message",
+  "Napiš otázku ankety.": "Write the poll question.",
+  "Vyplň aspoň dvě možnosti.": "Fill in at least two options."
 }

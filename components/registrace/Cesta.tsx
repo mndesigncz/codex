@@ -129,6 +129,10 @@ export default function Cesta() {
   const zalozit = async (e: React.FormEvent) => {
     e.preventDefault();
     setChyba(''); setExistuje(false);
+    // Audit (průřez 3): „Založit podnik" je aktivní a po klepnutí řekne, co chybí — dřív
+    // bylo zašedlé, dokud nebylo vše vyplněné, a člověk nevěděl proč.
+    if (!jmeno.trim()) { setChyba(t('Napiš své jméno.')); return; }
+    if (!email.trim()) { setChyba(t('Napiš e-mail, na který ti pošleme přístup.')); return; }
     if (heslo.length < 8) { setChyba(t('Heslo musí mít alespoň 8 znaků.')); return; }
     if (!souhlas) { setChybaSouhlasu(t('Bez souhlasu s podmínkami účet založit nejde.')); return; }
     setOdesila(true);
@@ -304,7 +308,7 @@ export default function Cesta() {
                   {chyba}{existuje && <> <Link href="/login" className="font-semibold underline underline-offset-2">{t('Přihlásit se')}</Link></>}
                 </p>
               )}
-              <button type="submit" disabled={odesila || prihlaseniSelhalo || !jmeno.trim() || !email.trim() || heslo.length < 8} className="cs-dal mt-6">
+              <button type="submit" disabled={odesila || prihlaseniSelhalo} className="cs-dal mt-6">
                 {odesila ? t('Zakládám podnik…') : t('Založit podnik')}
               </button>
             </form>

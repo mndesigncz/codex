@@ -91,5 +91,7 @@
   "Reagovat {emoji}": "Zareaguj {emoji}",
   "Reakce {emoji}: {jmena}": "Reakcja {emoji}: {jmena}",
   "Reakci se nepodařilo uložit.": "Nie udało się zapisać reakcji.",
-  "Přejít na původní zprávu": "Przejdź do oryginalnej wiadomości"
+  "Přejít na původní zprávu": "Przejdź do oryginalnej wiadomości",
+  "Napiš otázku ankety.": "Wpisz pytanie ankiety.",
+  "Vyplň aspoň dvě možnosti.": "Wypełnij co najmniej dwie opcje."
 }
