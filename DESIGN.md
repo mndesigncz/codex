@@ -1312,6 +1312,8 @@ obrazovky potřebuje — vědět, co ten prvek **je**.
 
 ## Tmavý režim
 
+> **Změna 2026-10-21 (přestavba hosta):** hostovské obrazovky (`/client…`) už nejsou natvrdo světlé — jedou podle motivu telefonu (viz „Host: karta podniku, U kasy a dok“ níž). Pravidlo „vždy světlý“ dál platí pro správu Managero client (`?mode=client`), landing a `/demo`.
+
 Tmavý režim se nabízí v administraci, u zaměstnance a na tabletu; volba se
 ukládá do prohlížeče (a na účet). **Managero client je vždy světlý** — hostovské
 stránky (`/client…`, stránka podniku, přihlášení hosta) i správa Managero client
@@ -2167,3 +2169,29 @@ obrazovce; `-mr-2`/`-mx-2`, kterými se dorovnává glyf nebo číslo místo mř
 `mt-*` mezi bloky uvnitř widgetu místo `gap` (`Sloupec`, sloty `Widget`); mezery
 mimo škálu 4 / 8 / 12 / 16 / 20 / 24 / 32; hodnota řádku pod textem vlevo;
 segment v půlce šířky nebo končící před R.
+
+## Host: karta podniku, U kasy a dok (přestavba 2026-10-21)
+
+Podle auditu C (IA) a konceptu B (vizuál). Kód: `components/client/host/*`, `components/client/karta/*`,
+třídy `.h-*` v `app/globals.css` (každá s tmavou variantou).
+
+- **Motiv:** host jede podle telefonu (`window.__motivVychozi` ze skriptu v `app/layout.tsx`, volba
+  Systém / Světlý / Tmavý v Moje → Jazyk a vzhled, jen na zařízení). Pole QR (`.h-qr-pole`) je bílé vždy.
+- **Karta podniku** (`KartaPodniku`, sdílená se správou jako živý náhled): plná barva značky (`--k-bg`),
+  písmo podle kontrastu (`onAccent` → `--k-ink`), logo v bílém čtverci, **jedno číslo** 34/600 tabular
+  (razítka X / N, nebo body), jedna věta, stav „Připraveno“ (`.h-pripraveno`, limetka) vpravo u čísla.
+  Bez barvy podniku grafit `#2B2F33`, nikdy limetka.
+- **Razítka s datem** (`RazitkaMrizka`): kolečka 5 v řadě, plné = datum návštěvy („2.9.“), prázdné
+  čárkované, poslední = odměna v limetkovém obrysu; právě připsané docvakne (`.h-pop`, 220 ms) s prstencem.
+- **Dok hosta:** `Karta · Podniky · [U kasy] · Odměny · Aktivita`; U kasy je inkoustový kruh 56 s limetkovou
+  ikonou QR (tmavě limetkový kruh), vystupuje nad dok. Aktivní položka = limetková pilulka pod ikonou.
+  Profil („Moje“) je za avatarem (limetkový kruh s iniciálami) v hlavičce Karty a v liště od md.
+- **Telefon bez horní lišty** pro přihlášeného: obrazovka začíná svým nadpisem (t-page 28–32). Od md lišta
+  se čtyřmi položkami, „Ukázat kartu“ (inkoust) a avatarem.
+- **U kasy / Razítko připsáno / Rezervace / Živý poukaz** jsou `<Modal>` (na telefonu zdola, U kasy na
+  celou výšku). Odezva: `.h-plus` (limetkový kruh 72 s „+1“), karta razítek, dvě akce ½ + ½ × 52.
+- **Stránka podniku:** hlavička v barvě podniku přes šířku telefonu, pod ní karta s řadou akcí (`.h-akce`,
+  4 rovné díly, ikona v jamce 40 + popisek 13); od md dva sloupce (karta a odměny vlevo, menu a info vpravo).
+- **Čipy dne a času** (`.h-cip`, výška 36, v rezervaci 44 `.h-cas`): vybraný inkoust, obsazený přeškrtnutý.
+- **Slovník:** Karta (ne Kartička), Odměny, Připraveno, Vyměnit, Mám kód, U kasy, Přijdu; žádné emoji.
+

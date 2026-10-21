@@ -43,7 +43,6 @@ export default function Odmeny() {
   useEffect(() => { if (zprava) { const i = setTimeout(() => setZprava(''), 5000); return () => clearTimeout(i); } }, [zprava]);
 
   if (me.chyba && !d) return <ErrorState title={t('Odměny se nenačetly')} hint={t('Zkontroluj připojení a zkus to znovu.')} onRetry={() => { void me.obnov(); }} />;
-  const pocet = odmeny.length + (d?.poukazy ?? []).filter((p: any) => p.stav === 'active').length;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -52,7 +51,7 @@ export default function Odmeny() {
       {zprava && <p role="status" className="mt-3 toast-in note note-ok">{zprava}</p>}
       <div className="mt-5">
         <Segmented<Zalozka> ariaLabel={t('Části odměn')} value={zal} onChange={setZal} options={[
-          { id: 'pripravene', label: t('K uplatnění'), count: pocet || undefined },
+          { id: 'pripravene', label: t('K uplatnění') },
           { id: 'nabidky', label: t('Nabídky') },
           { id: 'vyzvy', label: t('Výzvy') },
           { id: 'historie', label: t('Historie') },
@@ -132,19 +131,21 @@ function Nabidky({ nabidky, onZprava }: { nabidky: any[]; onZprava: (m: string) 
         {nabidky.map(n => {
           const chybi = Math.max(0, n.costPoints - n.points);
           return (
-            <li key={`${n.slug}-${n.id}`} className="py-4 flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-semibold leading-snug text-pretty">{n.title}</p>
-                <p className="t-meta mt-0.5">{[n.business, n.benefit, n.costPoints ? t('{n} b.', { n: n.costPoints }) : t('zdarma')].filter(Boolean).join(' · ')}</p>
-                {chybi > 0 && (
-                  <div className="mt-2.5 flex items-center gap-2.5">
-                    <span className="h-postup flex-1 max-w-[12rem]" aria-hidden><span style={{ width: `${Math.round((n.points / n.costPoints) * 100)}%` }} /></span>
-                    <span className="text-xs text-black/55 tabular-nums">{t('chybí {n} b.', { n: chybi })}</span>
-                  </div>
-                )}
+            <li key={`${n.slug}-${n.id}`} className="py-4">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold leading-snug text-pretty">{n.title}</p>
+                  <p className="t-meta mt-0.5">{[n.business, n.benefit, n.costPoints ? t('{n} b.', { n: n.costPoints }) : t('zdarma')].filter(Boolean).join(' · ')}</p>
+                </div>
+                <button type="button" onClick={() => void vymen(n)} disabled={busy === n.id || chybi > 0}
+                  className="btn btn-secondary btn-sm shrink-0 !h-9 disabled:opacity-40">{busy === n.id ? '…' : n.costPoints ? t('Vyměnit') : t('Vzít si')}</button>
               </div>
-              <button type="button" onClick={() => void vymen(n)} disabled={busy === n.id || chybi > 0}
-                className="btn btn-secondary btn-sm shrink-0 !h-9 disabled:opacity-40">{busy === n.id ? '…' : n.costPoints ? t('Vyměnit') : t('Vzít si')}</button>
+              {chybi > 0 && (
+                <div className="mt-2.5 flex items-center gap-2.5">
+                  <span className="h-postup flex-1" aria-hidden><span style={{ width: `${Math.round((n.points / n.costPoints) * 100)}%` }} /></span>
+                  <span className="text-xs text-black/55 tabular-nums shrink-0">{t('chybí {n} b.', { n: chybi })}</span>
+                </div>
+              )}
             </li>
           );
         })}
