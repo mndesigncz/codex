@@ -83,7 +83,7 @@ export default function ProgramVernosti({ otevri, bonusy }: {
               actions={<Button size="sm" variant="secondary" onClick={() => otevri('stamps')}>{aktivni.length ? 'Upravit' : 'Založit'}</Button>} />
             <ListRow lead={<span className="h-10 w-10 rounded-full bg-black/[0.045] grid place-items-center"><Icon name="coins" size={18} /></span>}
               title="Body"
-              meta={bodyZa100 > 0 ? `${bodyZa100} b. za každých 100 Kč útraty${Number(p.cashback_pct) > 0 ? ` · ${p.cashback_pct} % zpět jako kredit` : ''}` : 'Body se nesbírají.'}
+              meta={bodyZa100 > 0 ? `${bodyZa100} b. za každých ${money(100)} útraty${Number(p.cashback_pct) > 0 ? ` · ${p.cashback_pct} % zpět jako kredit` : ''}` : 'Body se nesbírají.'}
               actions={<Button size="sm" variant="secondary" onClick={() => otevri('points')}>Upravit</Button>} />
           </ul>
         </Card>
@@ -155,7 +155,7 @@ export default function ProgramVernosti({ otevri, bonusy }: {
             ) : (
               <KartaPodniku nazev={nazev} logoUrl={p.logo_url || null} barva={p.accent || null} podtitul="Staň se členem"
                 cislo={Number(p.welcome_points) > 0 ? `+${p.welcome_points}` : hlavni ? cil : bodyZa100}
-                jednotka={Number(p.welcome_points) > 0 ? 'bodů hned' : hlavni ? 'políček na kartě' : 'b. za 100 Kč'}
+                jednotka={Number(p.welcome_points) > 0 ? 'bodů hned' : hlavni ? 'políček na kartě' : `b. za ${money(100)}`}
                 veta={hlavni ? `${hlavni.reward_title || 'Odměna'} za ${czCount(cil, NAVSTEVA)}.` : 'Sbírej body za každou útratu.'} />
             )}
             {zebricek.length > 0 && (
