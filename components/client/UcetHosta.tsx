@@ -20,7 +20,7 @@ import { useT } from '@/lib/i18n/client';
 
 interface SouhlasPodniku { teamId: number; podnik: string; slug: string | null; push: boolean; email: boolean }
 
-export default function UcetHosta({ novinky, novinkyEmail = true, onFlash }: { novinky: boolean; novinkyEmail?: boolean; onFlash: (m: string) => void }) {
+export default function UcetHosta({ novinky, novinkyEmail = true, onFlash, cast }: { novinky: boolean; novinkyEmail?: boolean; onFlash: (m: string) => void; /** Profil: jen oznámení, nebo jen soukromí (export, provozovatel, smazání). */ cast?: 'oznameni' | 'soukromi' }) {
   const t = useT('klient-host');
   const [souhlas, setSouhlas] = useState(novinky);
   const [email, setEmail] = useState(novinkyEmail);
@@ -130,10 +130,31 @@ export default function UcetHosta({ novinky, novinkyEmail = true, onFlash }: { n
     try { setStazeno(await ulozZAdresy('/api/client/account/export', 'managero-client-moje-data.json')); }
     finally { setStahuji(false); }
   };
+  const exportBlok = (linka: boolean) => (
+    <div className={linka ? 'mt-5 pt-4 border-t border-black/[0.07]' : 'mt-3'} data-export-hosta>
+      <h3 className="t-card">{t('Stáhnout moje data')}</h3>
+      <p className="t-meta mt-0.5 text-pretty">{t('Soubor JSON se vším, co o tobě v podnicích vedeme: členství, body a jejich historie, razítka, kredit, kupony, objednávky, rezervace, hodnocení a souhlasy.')}</p>
+      <Button variant="secondary" icon="download" className="mt-3 w-full justify-center" loading={stahuji} onClick={stahnout}>{t('Stáhnout moje data')}</Button>
+      <p role="status" aria-live="polite" className="t-meta mt-1.5 min-h-[1.25rem]">
+        {stazeno === 'stazeno' ? t('Soubor je stažený.') : stazeno === 'sdileno' ? t('Soubor je připravený ke sdílení.') : ''}
+      </p>
+      {stazeno === 'nejde' && <p role="alert" className="note note-danger">{t('Data se nepodařilo stáhnout. Zkus to za chvíli znovu.')}</p>}
+    </div>
+  );
+
+  // Profil hosta (přestavba): oznámení a soukromí jsou dvě sekce pod sebou; `cast` vybere jednu.
+  if (cast === 'soukromi') return (
+    <section id="soukromi" aria-labelledby="h-soukromi-hosta" className="card p-4 sm:p-5 scroll-mt-24">
+      <h2 id="h-soukromi-hosta" className="t-section">{t('Soukromí a data')}</h2>
+      {exportBlok(false)}
+      <ProvozovatelInfo className="mt-3 text-sm text-black/60" />
+      <SmazatUcet jeHost />
+    </section>
+  );
 
   return (
     <section id="ucet" aria-labelledby="h-ucet-hosta" className="card p-4 sm:p-5 scroll-mt-24">
-      <h2 id="h-ucet-hosta" className="t-section">{t('Oznámení a soukromí')}</h2>
+      <h2 id="h-ucet-hosta" className="t-section">{cast === 'oznameni' ? t('Oznámení a novinky') : t('Oznámení a soukromí')}</h2>
       {nativni && (
         <ul className="list mt-2">
           <SwitchRow title={t('Upozornění v telefonu')} checked={pushZapnut} onChange={zmenPush}
@@ -177,18 +198,11 @@ export default function UcetHosta({ novinky, novinkyEmail = true, onFlash }: { n
         </ul>
       )}
 
-      <div className="mt-5 pt-4 border-t border-black/[0.07]" data-export-hosta>
-        <h3 className="t-card">{t('Stáhnout moje data')}</h3>
-        <p className="t-meta mt-0.5 text-pretty">{t('Soubor JSON se vším, co o tobě v podnicích vedeme: členství, body a jejich historie, razítka, kredit, kupony, objednávky, rezervace, hodnocení a souhlasy.')}</p>
-        <Button variant="secondary" icon="download" className="mt-3 w-full sm:w-auto justify-center" loading={stahuji} onClick={stahnout}>{t('Stáhnout moje data')}</Button>
-        <p role="status" aria-live="polite" className="t-meta mt-1.5 min-h-[1.25rem]">
-          {stazeno === 'stazeno' ? t('Soubor je stažený.') : stazeno === 'sdileno' ? t('Soubor je připravený ke sdílení.') : ''}
-        </p>
-        {stazeno === 'nejde' && <p role="alert" className="note note-danger">{t('Data se nepodařilo stáhnout. Zkus to za chvíli znovu.')}</p>}
-      </div>
-
-      <ProvozovatelInfo className="mt-3 text-sm text-black/60" />
-      <SmazatUcet jeHost />
+      {cast !== 'oznameni' && <>
+        {exportBlok(true)}
+        <ProvozovatelInfo className="mt-3 text-sm text-black/60" />
+        <SmazatUcet jeHost />
+      </>}
     </section>
   );
 }

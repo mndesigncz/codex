@@ -21,6 +21,11 @@ interface Ctx {
    * takže změna na jiném zařízení se sem při příštím přihlášení promítne.
    */
   pouzijZUctu: (t: unknown) => void;
+  /**
+   * Výchozí volba prostředí, kde člověk motiv výslovně nezvolil (host v Managero client: podle
+   * telefonu). Nic neukládá, takže na provozní stránky téhož prohlížeče nemá vliv.
+   */
+  pouzijVychozi?: (v: VolbaMotivu) => void;
 }
 const ThemeContext = createContext<Ctx>({ theme: 'light', volba: 'light', setTheme: () => {}, toggle: () => {}, setForcedLight: () => {}, pouzijZUctu: () => {} });
 
@@ -46,7 +51,10 @@ function apply(theme: Theme) {
 }
 
 export function ThemeProvider({ children, initial }: { children: React.ReactNode; initial?: Theme }) {
-  const [volba, setVolba] = useState<VolbaMotivu>(initial ?? 'light');
+  // Host (/client…) bez výslovné volby jede podle telefonu: skript v app/layout.tsx to značí
+  // atributem `data-motiv-vychozi`, ať se první vykreslení nepřeblikne do světlého.
+  const vychozi = (): VolbaMotivu => (typeof document !== 'undefined' && document.documentElement.getAttribute('data-motiv-vychozi') === 'system' ? 'system' : 'light');
+  const [volba, setVolba] = useState<VolbaMotivu>(() => initial ?? vychozi());
   // Preference systému: zjišťuje se až v prohlížeči (server ji nezná), takže první vykreslení je vždy shodné.
   const [systemTmavy, setSystemTmavy] = useState(false);
   // Managero client (hostovské stránky i jeho správa) je světlý vždycky —
@@ -57,7 +65,7 @@ export function ThemeProvider({ children, initial }: { children: React.ReactNode
   // Load persisted preference on mount
   useEffect(() => {
     const stored = cti(KLIC_MOTIVU) ?? cti(KLIC_MOTIVU_STARY) ?? cti(KLIC_MOTIVU_Z_UCTU);
-    setVolba(stored ?? initial ?? 'light');
+    setVolba(stored ?? initial ?? vychozi());
   }, [initial]);
 
   useEffect(() => {
@@ -93,8 +101,13 @@ export function ThemeProvider({ children, initial }: { children: React.ReactNode
     setVolba(t);
   };
 
+  const pouzijVychozi = (v: VolbaMotivu) => {
+    if (cti(KLIC_MOTIVU) ?? cti(KLIC_MOTIVU_STARY) ?? cti(KLIC_MOTIVU_Z_UCTU)) return;
+    setVolba(v);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, volba, setTheme, toggle: () => setTheme(theme === 'dark' ? 'light' : 'dark'), setForcedLight, pouzijZUctu }}>
+    <ThemeContext.Provider value={{ theme, volba, setTheme, toggle: () => setTheme(theme === 'dark' ? 'light' : 'dark'), setForcedLight, pouzijZUctu, pouzijVychozi }}>
       {children}
     </ThemeContext.Provider>
   );

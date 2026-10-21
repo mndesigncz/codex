@@ -7,6 +7,9 @@ import { jmenaPolozek, prubehHosta, activeCampaigns, progressFor } from '@/lib/s
 import { kartaProHosta } from '@/lib/razitkaPravidla';
 import { poukazyHosta } from '@/lib/poukazyHostDb';
 import { planClena } from '@/lib/propadaniBoduDb';
+import { datRazitek, zebricky, nabidkyHosta } from '@/lib/klient/domov';
+import { benefitLabel } from '@/lib/coupons';
+import { menaZRadku } from '@/lib/mena';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -34,10 +37,17 @@ export async function GET() {
       FROM client_orders o JOIN client_profiles p ON p.team_id = o.team_id JOIN teams t ON t.id = o.team_id
       WHERE o.customer_id = ${me.id} ORDER BY o.created_at DESC LIMIT 40` as any[];
   } catch { orders = []; }
-  const claims = await sql`
-    SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title, c.valid_until, p.slug, COALESCE(NULLIF(t.share_theme->>'businessName',''), t.name) AS business
+  // Kupony: druh (odměna za razítka = „stamps“) a výhoda větou, ať host v Odměnách ví, co dostane.
+  const claimRows = await sql`
+    SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title, c.valid_until, c.kind, c.benefit_kind, c.percent_off, c.amount_off, c.xy_buy, c.xy_free,
+           (SELECT mi.name FROM menu_items mi WHERE mi.id = c.menu_item_id) AS menu_item_name,
+           t.currency, t.locale, p.slug, COALESCE(NULLIF(t.share_theme->>'businessName',''), t.name) AS business
     FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id JOIN client_profiles p ON p.team_id = cl.team_id JOIN teams t ON t.id = cl.team_id
-    WHERE cl.customer_id = ${me.id} ORDER BY cl.redeemed_at NULLS FIRST, cl.claimed_at DESC LIMIT 40`;
+    WHERE cl.customer_id = ${me.id} ORDER BY cl.redeemed_at NULLS FIRST, cl.claimed_at DESC LIMIT 40` as any[];
+  const claims = claimRows.map(r => ({
+    id: r.id, code: r.code, claimed_at: r.claimed_at, redeemed_at: r.redeemed_at, title: r.title, valid_until: r.valid_until,
+    slug: r.slug, business: r.business, kind: r.kind ?? 'offer', benefit: benefitLabel(r, menaZRadku(r.currency, r.locale).money) || null,
+  }));
   const [profile] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
   // Souhlas s novinkami podniků (opt-in): chybí-li nastavení nebo sloupec, je to NE.
   let novinky = false;
@@ -85,12 +95,21 @@ export async function GET() {
       skupinyBy.get(t)!.push({ name: String(r.name), discount: Number(r.discount_pct) || 0 });
     }
   } catch { /* před migrací */ }
+  // Domovská karta: data razítek rozdělané karty a žebříček odměn za body (lib/klient/domov.ts).
+  const razitkaBy = new Map<number, Record<string, string[]>>();
+  await Promise.all(memberships.map(async m => {
+    const k = campsByTeam.get(Number(m.team_id)) ?? [];
+    if (k.length) razitkaBy.set(Number(m.team_id), await datRazitek(me.id, Number(m.team_id), k.map((c: any) => ({ id: Number(c.id), stamps: Number(c.stamps) || 0 }))));
+  }));
+  const zebricekBy = await zebricky(memberships.map(m => Number(m.team_id)), today);
   return NextResponse.json({
     me: { ...(profile ?? me), novinky },
-    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), spend: spendBy.get(Number(m.team_id)) ?? 0, groupDiscounts: skupinyBy.get(Number(m.team_id)) ?? [], credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [], expiring: expiringBy.get(Number(m.team_id)) ?? null })),
+    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), spend: spendBy.get(Number(m.team_id)) ?? 0, groupDiscounts: skupinyBy.get(Number(m.team_id)) ?? [], credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [], expiring: expiringBy.get(Number(m.team_id)) ?? null, razitkaData: razitkaBy.get(Number(m.team_id)) ?? {}, zebricek: (zebricekBy.get(Number(m.team_id)) ?? []).map(z => ({ title: z.title, cost: z.cost })) })),
     reservations, orders, claims, today,
     // Dárkové poukazy přiřazené mně (kód, zůstatek, platnost); bez jmen a poznámek z podniku.
     poukazy: await poukazyHosta(me.id, today),
+    // Odměny → Nabídky: kupony k vzetí napříč podniky (za body nebo zdarma).
+    nabidky: await nabidkyHosta(me.id, today),
   });
 }
 
