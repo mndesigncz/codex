@@ -50,16 +50,21 @@ export default function PravniStranka({ klic, jazyk, dodatek }: {
         <p className="mt-2 t-meta">{jazyk === 'en' ? 'Effective from' : 'Platí od'}: {d.aktualizace}</p>
 
         {d.obsah && (
-          <nav aria-label={jazyk === 'en' ? 'Contents' : 'Obsah'} className="mt-6 rounded-2xl border border-black/[0.08] px-4 py-3">
-            <p className="t-label">{jazyk === 'en' ? 'Contents' : 'Obsah'}</p>
-            <ol className="mt-1 grid gap-x-6 sm:grid-cols-2 list-none">
-              {d.sekce.map(s => (
-                <li key={s.id} className="min-w-0">
-                  <a href={`#${s.id}`} className="tap-target-sm inline-flex items-center text-sm text-black/70 underline-offset-2 hover:underline text-pretty">{s.h}</a>
-                </li>
-              ))}
-            </ol>
-          </nav>
+          // Obsah je sbalený: na telefonu by 24 řádků odsunulo první článek pod ohyb.
+          <details className="mt-6 rounded-2xl border border-black/[0.08] px-4 group">
+            <summary className="min-h-11 flex items-center cursor-pointer text-sm font-medium text-black/70 select-none">
+              {jazyk === 'en' ? `Contents (${d.sekce.length})` : `Obsah (${d.sekce.length})`}
+            </summary>
+            <nav aria-label={jazyk === 'en' ? 'Contents' : 'Obsah'} className="pb-3">
+              <ol className="grid gap-x-6 sm:grid-cols-2 list-none">
+                {d.sekce.map(s => (
+                  <li key={s.id} className="min-w-0">
+                    <a href={`#${s.id}`} className="min-h-11 sm:min-h-9 inline-flex items-center text-sm text-black/70 underline-offset-2 hover:underline text-pretty">{s.h}</a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          </details>
         )}
 
         <div className="mt-8 grid gap-8">

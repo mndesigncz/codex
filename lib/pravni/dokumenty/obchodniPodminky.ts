@@ -28,7 +28,7 @@ export function obchodniPodminkyCs(f: Firma): Dokument {
   const L = LHUTY;
   return {
     titulek: 'Obchodní podmínky pro podniky',
-    uvod: `Tyto obchodní podmínky upravují smlouvu o poskytování služby Managero podnikům, tedy používání aplikace pro provoz podniku a předplatné placených tarifů. Uzavírají se mezi poskytovatelem a podnikatelem, který si v Manageru založí podnik. Platí od ${UCINNOST.cs}.`,
+    uvod: `Tyto obchodní podmínky upravují smlouvu o poskytování služby Managero podnikům, tedy používání aplikace pro provoz podniku a předplatné placených tarifů. Uzavírají se mezi poskytovatelem a podnikatelem, který si v Manageru založí podnik.`,
     aktualizace: UCINNOST.cs,
     obsah: true,
     sekce: [
@@ -167,7 +167,7 @@ export function obchodniPodminkyEn(f: Firma): Dokument {
   const L = LHUTY;
   return {
     titulek: 'Business terms',
-    uvod: `These business terms govern the contract for the Managero service provided to businesses: use of the app for running a business and subscriptions to paid plans. They are concluded between the provider and an entrepreneur who creates a business in Managero. Effective from ${UCINNOST.en}. This English version is for information only; the Czech version prevails.`,
+    uvod: `These business terms govern the contract for the Managero service provided to businesses: use of the app for running a business and subscriptions to paid plans. They are concluded between the provider and an entrepreneur who creates a business in Managero. This English version is for information only; the Czech version prevails.`,
     aktualizace: UCINNOST.en,
     obsah: true,
     sekce: [

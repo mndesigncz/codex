@@ -22,7 +22,7 @@ export function zpracovatelskaSmlouvaCs(f: Firma): Dokument {
   const L = LHUTY, R = RETENCE_TEXT;
   return {
     titulek: 'Zpracovatelská smlouva',
-    uvod: `Smlouva o zpracování osobních údajů podle čl. 28 obecného nařízení o ochraně osobních údajů (GDPR) mezi zákazníkem, který v Manageru provozuje podnik (správce), a poskytovatelem služby Managero (zpracovatel). Je nedílnou součástí [[obchodni-podminky|obchodních podmínek]] a uzavírá se jejich přijetím. Platí od ${UCINNOST.cs}.`,
+    uvod: `Smlouva o zpracování osobních údajů podle čl. 28 obecného nařízení o ochraně osobních údajů (GDPR) mezi zákazníkem, který v Manageru provozuje podnik (správce), a poskytovatelem služby Managero (zpracovatel). Je nedílnou součástí [[obchodni-podminky|obchodních podmínek]] a uzavírá se jejich přijetím.`,
     aktualizace: UCINNOST.cs,
     obsah: true,
     sekce: [
@@ -118,7 +118,7 @@ export function zpracovatelskaSmlouvaEn(f: Firma): Dokument {
   const L = LHUTY, R = RETENCE_TEXT;
   return {
     titulek: 'Data processing agreement',
-    uvod: `Agreement on the processing of personal data under Article 28 of the General Data Protection Regulation (GDPR) between the customer running a business in Managero (controller) and the provider of the Managero service (processor). It forms an integral part of the [[obchodni-podminky|business terms]] and is concluded by accepting them. Effective from ${UCINNOST.en}. This English version is for information only; the Czech version prevails.`,
+    uvod: `Agreement on the processing of personal data under Article 28 of the General Data Protection Regulation (GDPR) between the customer running a business in Managero (controller) and the provider of the Managero service (processor). It forms an integral part of the [[obchodni-podminky|business terms]] and is concluded by accepting them. This English version is for information only; the Czech version prevails.`,
     aktualizace: UCINNOST.en,
     obsah: true,
     sekce: [

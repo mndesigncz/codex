@@ -13,7 +13,7 @@ import { kontakty, provozovatel, type Dokument } from './typy.ts';
 export function podminkyCs(f: Firma): Dokument {
   return {
     titulek: 'Podmínky užívání',
-    uvod: `Tyto podmínky upravují používání aplikací Managero (pro lidi v podniku: vedení, zaměstnance a brigádníky) a Managero client (pro hosty podniků). Pro podnik jako zákazníka platí navíc [[obchodni-podminky|obchodní podmínky]]. Platí od ${UCINNOST.cs}.`,
+    uvod: `Tyto podmínky upravují používání aplikací Managero (pro lidi v podniku: vedení, zaměstnance a brigádníky) a Managero client (pro hosty podniků). Pro podnik jako zákazníka platí navíc [[obchodni-podminky|obchodní podmínky]].`,
     aktualizace: UCINNOST.cs,
     obsah: true,
     sekce: [
@@ -84,7 +84,7 @@ export function podminkyCs(f: Firma): Dokument {
 export function podminkyEn(f: Firma): Dokument {
   return {
     titulek: 'Terms of use',
-    uvod: `These terms govern the use of the Managero app (for people in a business: management, staff and temporary workers) and the Managero client app (for guests of businesses). For a business as customer, the [[obchodni-podminky|business terms]] also apply. Effective from ${UCINNOST.en}. This English version is for information only; the Czech version prevails.`,
+    uvod: `These terms govern the use of the Managero app (for people in a business: management, staff and temporary workers) and the Managero client app (for guests of businesses). For a business as customer, the [[obchodni-podminky|business terms]] also apply. This English version is for information only; the Czech version prevails.`,
     aktualizace: UCINNOST.en,
     obsah: true,
     sekce: [
