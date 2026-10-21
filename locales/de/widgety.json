@@ -2689,5 +2689,10 @@
   "jen {komu}": "nur {komu}",
   "Bez ceny či balení": "Ohne Preis oder Packung",
   "Přidat úkol…": "Aufgabe hinzufügen…",
-  "Např. Objednat mléko zítra": "Z. B. Milch morgen bestellen"
+  "Např. Objednat mléko zítra": "Z. B. Milch morgen bestellen",
+  "Odpíchnout odchod?": "Ausstempeln?",
+  "Pauza skončí a odchod se zapíše na {cas}. Dnes odpracováno {delka}.": "Die Pause endet und das Ausstempeln wird um {cas} erfasst. Heute gearbeitet: {delka}.",
+  "Odchod se zapíše na {cas}. Na směně od {od}, to je {delka}.": "Das Ausstempeln wird um {cas} erfasst. Im Dienst seit {od}, das sind {delka}.",
+  "Potvrdit odchod": "Ausstempeln bestätigen",
+  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Aus Versehen getippt? Tippe auf Zurück — es wird nichts erfasst."
 }

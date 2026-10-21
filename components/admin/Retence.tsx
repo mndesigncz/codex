@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { useLoad, PageHeader, ListRow, EmptyState, ErrorState, PageSkeleton, Chip, Button, Stat, StatRow } from '@/components/ui';
 import { dbTimeDayHM } from '@/lib/pragueTime';
-import { okJson } from '@/lib/api';
+import { okJson, apiMessage } from '@/lib/api';
 
 interface Souhrn {
   rezim: 'nahled' | 'ostry';
@@ -28,14 +28,24 @@ interface Data {
 const cislo = (n: number) => String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
 
 export default function RetenceSprava() {
-  const z = useLoad<Data>('/api/admin/retence', r => ({ zapnuta: r.zapnuta === true, lhuty: r.lhuty, behy: Array.isArray(r.behy) ? r.behy : [] }));
+  // Bez lhůt nejde nic z obrazovky říct pravdivě — neúplná odpověď je chyba načtení
+  // (dřív pád na `lhuty.neaktivniHostMesicu`, audit 2026-10 B8). Běh bez souhrnu se vynechá.
+  const z = useLoad<Data>('/api/admin/retence', r => {
+    if (!r?.lhuty || typeof r.lhuty !== 'object') throw new Error('Odpověď serveru je neúplná (chybí lhůty).');
+    const behy = (Array.isArray(r.behy) ? r.behy : []).filter((b: any) => b && b.souhrn && b.souhrn.hoste && b.souhrn.auditLog && b.souhrn.oznameni && b.souhrn.podniky);
+    return {
+      zapnuta: r.zapnuta === true,
+      lhuty: r.lhuty,
+      behy: behy.map((b: any) => ({ ...b, souhrn: { ...b.souhrn, chyby: Array.isArray(b.souhrn.chyby) ? b.souhrn.chyby : [], hoste: { ...b.souhrn.hoste, ukazkaId: Array.isArray(b.souhrn.hoste.ukazkaId) ? b.souhrn.hoste.ukazkaId : [] }, podniky: { ...b.souhrn.podniky, ukazkaId: Array.isArray(b.souhrn.podniky.ukazkaId) ? b.souhrn.podniky.ukazkaId : [] } } })),
+    };
+  });
   const [bezi, setBezi] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
 
   const spocitat = async () => {
     setBezi(true); setChyba(null);
     try { await okJson(await fetch('/api/admin/retence', { method: 'POST' })); z.reload(); }
-    catch (e) { setChyba((e as Error).message || 'Náhled se nepodařilo spočítat.'); }
+    catch (e) { setChyba(apiMessage(e, 'Náhled se nepodařilo spočítat.')); }
     setBezi(false);
   };
 

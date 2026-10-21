@@ -2688,5 +2688,10 @@
   "jen {komu}": "only {komu}",
   "Bez ceny či balení": "No price or pack",
   "Přidat úkol…": "Add a task…",
-  "Např. Objednat mléko zítra": "E.g. Order milk tomorrow"
+  "Např. Objednat mléko zítra": "E.g. Order milk tomorrow",
+  "Odpíchnout odchod?": "Clock out?",
+  "Pauza skončí a odchod se zapíše na {cas}. Dnes odpracováno {delka}.": "Your break ends and clock-out is recorded at {cas}. Worked today: {delka}.",
+  "Odchod se zapíše na {cas}. Na směně od {od}, to je {delka}.": "Clock-out will be recorded at {cas}. On shift since {od}, that is {delka}.",
+  "Potvrdit odchod": "Confirm clock-out",
+  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Tapped by mistake? Go back — nothing will be recorded."
 }

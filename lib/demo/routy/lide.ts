@@ -43,7 +43,10 @@ export const lide: Obsluha = (p, k) => {
       }
       const moje = s.pichacky.filter(x => x.employeeId === meId).sort((a, b) => b.clockIn.localeCompare(a.clockIn));
       const otevrena = moje.find(x => x.clockOut == null) ?? null;
-      const ja: Record<string, unknown> = { id: meId, openSince: otevrena?.clockIn ?? null };
+      // Dnešní směna z rozvrhu ukázky (jako skutečné API): bez ní Píchačky psaly „Dnes nemáš
+      // směnu v rozvrhu" a o widget níž „Nejbližší směna: Právě probíhá" (audit 2026-10 B7).
+      const smena = smenaDnes(s, meId);
+      const ja: Record<string, unknown> = { id: meId, openSince: otevrena?.clockIn ?? null, shiftStart: smena?.startTime ?? null, shiftEnd: smena?.endTime ?? null, shiftDate: smena ? s.dnes : null };
       if (opr.has('finance.moje_mzda') || opr.has('finance.mzdy')) ja.hourlyRate = clen(meId).hourlyRate;
       return ok({ roster: [ja], entries: moje.map(x => ({ id: x.id, employeeId: x.employeeId, clockIn: x.clockIn, clockOut: x.clockOut, source: x.source, note: x.note })) });
     }

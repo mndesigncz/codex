@@ -2691,5 +2691,10 @@
   "jen {komu}": "len {komu}",
   "Bez ceny či balení": "Bez ceny či balenia",
   "Přidat úkol…": "Pridať úlohu…",
-  "Např. Objednat mléko zítra": "Napr. Objednať mlieko zajtra"
+  "Např. Objednat mléko zítra": "Napr. Objednať mlieko zajtra",
+  "Odpíchnout odchod?": "Odpípnuť odchod?",
+  "Pauza skončí a odchod se zapíše na {cas}. Dnes odpracováno {delka}.": "Pauza skončí a odchod sa zapíše na {cas}. Dnes odpracované {delka}.",
+  "Odchod se zapíše na {cas}. Na směně od {od}, to je {delka}.": "Odchod sa zapíše na {cas}. Na smene od {od}, to je {delka}.",
+  "Potvrdit odchod": "Potvrdiť odchod",
+  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Ak si klikol/a omylom, daj Späť — nič sa nezapíše."
 }
