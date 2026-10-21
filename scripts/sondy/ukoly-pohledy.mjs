@@ -126,7 +126,15 @@ for (const w of [1280, 390]) {
 
   // Měsíc
   const pohledy = p.locator('[data-plocha]').getByRole('tablist', { name: 'Zobrazení' }).or(p.locator('[aria-label="Zobrazení"]')).first();
-  await pohledy.getByRole('tab', { name: 'Měsíc', exact: true }).click();
+  // Audit 2026-10 (V27): na telefonu jsou Měsíc a Přehled v „···" hlavičky (pět pohledů v pásu se
+  // na 390 px uřízlo „Za b…"); od md zůstávají v segmentu.
+  const prepniPohled = async (nazev) => {
+    const tab = pohledy.getByRole('tab', { name: nazev, exact: true });
+    if (await tab.count()) { await tab.click(); return; }
+    await p.getByRole('button', { name: 'Další akce' }).first().click();
+    await p.getByRole('menuitem', { name: nazev, exact: true }).click();
+  };
+  await prepniPohled('Měsíc');
   const kal = nastroj.getByRole('group', { name: 'Kalendář úkolů' });
   await kal.waitFor({ timeout: 5000 });
   const bunky = kal.locator('button');
@@ -138,7 +146,7 @@ for (const w of [1280, 390]) {
   if (w === 1280) await p.screenshot({ path: OUT + 'ukoly-mesic.png', fullPage: true });
 
   // Přehled (graf)
-  await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).click();
+  await prepniPohled('Přehled');
   const lista = nastroj.getByRole('group', { name: 'Období', exact: true });
   await lista.waitFor({ timeout: 5000 });
   tvrdi(`${w}: Přehled má tlačítko období a graf`, await lista.getByRole('button').count() === 1 && await nastroj.locator('[role=group][aria-label^="Úkoly: "]').count() >= 1);

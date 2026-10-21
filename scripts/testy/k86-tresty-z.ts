@@ -89,7 +89,11 @@ export default function ({ eq, ok }: Testy) {
   ok('katalog: ikona warning, rychlý filtr obdobi (tento / minulý)', !!w && w.ikona === 'warning' && w.rychlyFiltr === 'obdobi'
     && (w.nastaveni ?? []).some(n => n.klic === 'obdobi' && n.typ === 'vyber' && n.moznosti.map(m => m.id).join(',') === 'tento,minuly'));
   const domu = stranka('zamestnanec.domu')!;
-  eq('Domů: Moje tresty úplně nahoře jako malá karta', domu.vychozi['typ:zamestnanec']?.[0], { w: 'moje-smeny.tresty', s: 'S' });
+  // Audit 2026-10 (Z01): nahoře píchačky a dnešní směna (dřív tresty úplně nahoře), Moje tresty jako malá karta za Navíc.
+  const vychoziDomu = domu.vychozi['typ:zamestnanec'] ?? [];
+  eq('Domů: nahoře píchačky a směna, Moje tresty malá karta hned za Navíc', [vychoziDomu[0]?.w, vychoziDomu[1]?.w,
+    vychoziDomu.find(x => x.w === 'moje-smeny.tresty')?.s, vychoziDomu.findIndex(x => x.w === 'moje-smeny.tresty') === vychoziDomu.findIndex(x => x.w === 'moje-smeny.navic') + 1],
+    ['dochazka.moje_pichacky', 'moje.nejblizsi_smena', 'S', true]);
   const odmeny = stranka('zamestnanec.odmeny')!;
   const vychoziOdmeny = odmeny.vychozi['typ:zamestnanec'] ?? [];
   eq('Odměny: Moje tresty jako velká sekce za Navíc', [vychoziOdmeny.find(x => x.w === 'moje-smeny.tresty')?.s,

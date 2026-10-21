@@ -91,7 +91,10 @@ async function otevriPlochu(p, cesta, stranka) {
 }
 async function nastaveni(p) {
   await otevriPlochu(p, '/employer/overview?view=rewards', 'vedeni.odmeny');
-  await p.getByRole('tablist', { name: 'Část stránky' }).getByRole('tab', { name: 'Nastavení' }).click();
+  // Audit 2026-10 (V35): na telefonu je Nastavení odměn v „···" hlavičky, od md v segmentu.
+  const zalozka = p.getByRole('tablist', { name: 'Část stránky' }).getByRole('tab', { name: 'Nastavení' });
+  if (await zalozka.count()) await zalozka.click();
+  else { await p.getByRole('button', { name: 'Další akce' }).first().click(); await p.getByRole('menuitem', { name: 'Nastavení odměn' }).click(); }
   const karta = p.locator('[data-nastaveni-rezimu]');
   await karta.waitFor({ timeout: 10000 });
   return karta;

@@ -327,5 +327,6 @@
   "Zobrazit": "Zobacz",
   "Vrátit na tuto verzi": "Przywróć tę wersję",
   "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# notatka} few {# notatki} many {# notatek} other {# notatki}}",
-  "nová": "nowa"
+  "nová": "nowa",
+  "Inventura se po aktualizaci aplikace ještě připravuje. Obnov stránku za chvíli.": "Inwentaryzacja jest jeszcze przygotowywana po aktualizacji aplikacji. Odśwież stronę za chwilę."
 }

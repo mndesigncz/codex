@@ -73,9 +73,13 @@ export function apiMessage(e: unknown, fallback = 'Načtení se nepovedlo.'): st
   // nebo z `statusMessage` se hledá ve slovníku `api` (jazyk uživatele, pro
   // hosta jazyk hosta). Věta, která ve slovníku není (třeba s číslem), zůstane česky.
   if (e instanceof ApiError) return tg(e.message);
+  // Chyba programu (TypeError „Cannot read properties of undefined…“ z neúplné
+  // odpovědi, SyntaxError z rozbitého JSON) je anglický vnitřek, ne věta pro
+  // člověka — průvodce ji tak ukazoval doslova (audit 2026-10 B5). Patří sem i
+  // `TypeError: Failed to fetch`, výpadek spojení.
+  if (e instanceof TypeError || e instanceof SyntaxError || e instanceof RangeError || e instanceof ReferenceError) return tg(fallback);
   const m = (e as any)?.message;
-  // `TypeError: Failed to fetch` je výpadek spojení, ne odpověď serveru;
-  // anglická hláška z prohlížeče člověku nic neřekne.
+  // Anglická hláška z prohlížeče o síti člověku nic neřekne.
   if (typeof m === 'string' && m && !/fetch|network|load failed/i.test(m)) return tg(m);
   return tg(fallback);
 }

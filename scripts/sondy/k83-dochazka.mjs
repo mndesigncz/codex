@@ -179,8 +179,13 @@ for (const jazyk of [null, 'de', 'pl']) {
   await k.p.locator('[data-plocha="zamestnanec.moje_smeny"] li[data-instance]:not([hidden])').first().waitFor({ timeout: 20000 });
   await k.p.waitForTimeout(1200);
   const w = widget(k.p, 'dochazka.moje_zaznamy');
-  tvrdi('M5 (390): výpadek API = „Widget se nenačetl" se „Zkusit znovu" jen v Moje docházka', await dokud(() => w.getByText('Widget se nenačetl').isVisible(), 4000)
-    && await w.getByRole('button', { name: 'Zkusit znovu' }).isVisible());
+  // Audit 2026-10 (V01): selžou-li dva a víc RŮZNÝCH dotazů, plocha ukáže jednu lištu výpadku se
+  // „Zkusit znovu" a widgety jen ztlumenou větu. Tady kromě /api/attendance selhává i to, co
+  // kontext nepodvrhuje (výplaty, rozvrh týmu) — sonda proto přijme obě poctivé podoby chyby.
+  const vlastniChyba = async () => await w.getByText('Widget se nenačetl').isVisible() && await w.getByRole('button', { name: 'Zkusit znovu' }).isVisible();
+  const lista = k.p.locator('[data-lista-vypadku]');
+  const pres = async () => await lista.isVisible() && await lista.getByRole('button', { name: 'Zkusit znovu' }).isVisible() && await w.locator('[data-w-vypadek]').isVisible();
+  tvrdi('M5 (390): výpadek API = Moje docházka řekne, že se nenačetla, a jde zkusit znovu (vlastní chyba, nebo lišta výpadku)', await dokud(async () => (await vlastniChyba()) || (await pres()), 4000));
   await k.ctx.close();
 }
 

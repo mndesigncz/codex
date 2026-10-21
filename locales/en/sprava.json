@@ -1535,7 +1535,7 @@
   "{n}× ten den": "{n}× that day",
   "{org} · tržby, mzdy, uzávěrky a sklad za každý podnik i celkem.": "{org} · revenue, wages, closings and stock for each business and in total.",
   "{pct} % výdajů": "{pct} % of expenses",
-  "{podnik}: {nazev} se nepodařilo {akce}. Zkus to za chvíli znovu.": "{podnik}: couldn't {akce} {nazev}. Try again in a moment.",
+  "{podnik}: {nazev} se nepodařilo {akce}. Zkus to za chvíli znovu.": "{podnik}: {nazev} could not be {akce}. Try again in a moment.",
   "{pole}: napiš číslo, třeba 12 nebo 0,5.": "{pole}: enter a number, e.g. 12 or 0.5.",
   "{popis} — výběr barvy": "{popis} — color picker",
   "{p} % tržeb": "{p} % of revenue",
@@ -1871,5 +1871,15 @@
   "Další možnosti": "More options",
   "Upravit nebo smazat záznam: {jmeno}": "Edit or delete record: {jmeno}",
   "Upravit čas…": "Edit time…",
-  "Smazat záznam…": "Delete record…"
+  "Smazat záznam…": "Delete record…",
+  "Akce se po aktualizaci aplikace ještě připravují. Obnov stránku za chvíli.": "Events are still being prepared after an app update. Reload the page in a moment.",
+  "Aplikace se zrovna aktualizuje — obnov stránku za chvíli.": "The app is updating right now — reload the page in a moment.",
+  "Sdílení se po aktualizaci aplikace ještě připravuje. Obnov stránku za chvíli.": "Sharing is still being prepared after an app update. Reload the page in a moment.",
+  "Menu se ještě připravuje": "The menu is still being prepared",
+  "Napiš název karty.": "Enter a card title.",
+  "Napiš název akce.": "Enter the event name.",
+  "Vyber datum akce.": "Choose the event date.",
+  "Nastavení odměn": "Rewards settings",
+  "V práci": "Doing",
+  "Schválit": "Approve"
 }

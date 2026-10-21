@@ -1535,7 +1535,7 @@
   "{n}× ten den": "{n}× tego dnia",
   "{org} · tržby, mzdy, uzávěrky a sklad za každý podnik i celkem.": "{org} · przychody, wynagrodzenia, zamknięcia kasy i magazyn dla każdego lokalu i łącznie.",
   "{pct} % výdajů": "{pct} % wydatków",
-  "{podnik}: {nazev} se nepodařilo {akce}. Zkus to za chvíli znovu.": "{podnik}: nie udało się {akce} {nazev}. Spróbuj za chwilę ponownie.",
+  "{podnik}: {nazev} se nepodařilo {akce}. Zkus to za chvíli znovu.": "{podnik}: nie udało się {akce} {nazev}. Spróbuj ponownie za chwilę.",
   "{pole}: napiš číslo, třeba 12 nebo 0,5.": "{pole}: wpisz liczbę, np. 12 lub 0,5.",
   "{popis} — výběr barvy": "{popis} — wybór koloru",
   "{p} % tržeb": "{p} % przychodów",
@@ -1871,5 +1871,15 @@
   "Další možnosti": "Więcej opcji",
   "Upravit nebo smazat záznam: {jmeno}": "Edytuj lub usuń wpis: {jmeno}",
   "Upravit čas…": "Edytuj czas…",
-  "Smazat záznam…": "Usuń wpis…"
+  "Smazat záznam…": "Usuń wpis…",
+  "Akce se po aktualizaci aplikace ještě připravují. Obnov stránku za chvíli.": "Wydarzenia są jeszcze przygotowywane po aktualizacji aplikacji. Odśwież stronę za chwilę.",
+  "Aplikace se zrovna aktualizuje — obnov stránku za chvíli.": "Aplikacja właśnie się aktualizuje — odśwież stronę za chwilę.",
+  "Sdílení se po aktualizaci aplikace ještě připravuje. Obnov stránku za chvíli.": "Udostępnianie jest jeszcze przygotowywane po aktualizacji aplikacji. Odśwież stronę za chwilę.",
+  "Menu se ještě připravuje": "Menu jest jeszcze przygotowywane",
+  "Napiš název karty.": "Wpisz tytuł karty.",
+  "Napiš název akce.": "Wpisz nazwę wydarzenia.",
+  "Vyber datum akce.": "Wybierz datę wydarzenia.",
+  "Nastavení odměn": "Ustawienia nagród",
+  "V práci": "W toku",
+  "Schválit": "Zatwierdź"
 }

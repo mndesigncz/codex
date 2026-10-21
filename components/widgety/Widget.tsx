@@ -14,7 +14,7 @@
 // náhled nebo režim úprav, jestli smí nést inkoust), mu dává plocha přes
 // kontext — autor widgetu to nemusí protahovat props.
 
-import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Card, ErrorState, Menu, MenuPanel, Modal, Skeleton, type MenuItem } from '../ui';
 import { StavovaKarta } from '../ui/StavovaKarta';
@@ -26,6 +26,7 @@ import { useT } from '@/lib/i18n/client';
 import { usePopover } from '@/lib/usePopover';
 import { useJeTelefon } from '@/lib/useJeTelefon';
 import { useNavigace, useSmi } from './NavigaceKontext';
+import { useVypadekPlochy } from './Vypadek';
 // Registr importuje odsud `Chybi` a tady se z něj berou filtry polí: kruh je neškodný, obě strany
 // sahají na import až za běhu (v lineWidget a při vykreslení), ne při načtení modulu.
 import { viditelnaPole, viditelneMoznosti } from './registr';
@@ -289,7 +290,7 @@ function RychlyFiltr({ pole, hodnota, onZmena, inkoust, idTitulku, uzky, jenHodn
  * Co obal potřebuje ze stavu dat — výsledek useDataWidgetu (nebo useLoad)
  * jakéhokoli typu. Bez `set`, ať jde předat `StavDat<Polozka[]>` bez přetypování.
  */
-export type StavNacteni = Pick<LoadState<unknown>, 'data' | 'error' | 'loading' | 'reload'> & { vypnuto?: boolean };
+export type StavNacteni = Pick<LoadState<unknown>, 'data' | 'error' | 'loading' | 'reload'> & { vypnuto?: boolean; url?: string };
 
 export interface ObalWidgetuProps {
   /** Jen odkaz a výjimky; jinak název z registru, ať titulek nemůže ujet od galerie. */
@@ -409,10 +410,26 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const { nahlasSkryti } = k;
   useEffect(() => { nahlasSkryti(prazdny); }, [prazdny, nahlasSkryti]);
   useEffect(() => () => nahlasSkryti(false), [nahlasSkryti]);
+  const zkusitZnovu = () => aktivni.forEach(s => { if (s.error) s.reload(); });
+  // Výpadek jednou lištou (Vypadek.tsx): chyba se hlásí ploše; při dvou a víc
+  // nenačtených widgetech plocha ukáže lištu a tenhle widget jen ztlumenou větu.
+  const vypadek = useVypadekPlochy();
+  const klicVypadku = useId();
+  const zkusitRef = useRef(zkusitZnovu);
+  zkusitRef.current = zkusitZnovu;
+  const hlasitChybu = !!chyba && !k.nahled && !k.upravy;
+  // Zdroj chyby = adresa prvního selhaného dotazu (bez ní widget sám za sebe).
+  // Bez query: Tržba po dnech a Průměrná účtenka čtou /api/pos/daily s jiným obdobím — pořád jeden endpoint.
+  const zdrojChyby = hlasitChybu ? (aktivni.find(s => s.error)?.url?.split('?')[0] ?? klicVypadku) : null;
+  useEffect(() => {
+    if (!vypadek) return;
+    vypadek.nahlas(klicVypadku, zdrojChyby, zdrojChyby ? () => zkusitRef.current() : null);
+  }, [vypadek, klicVypadku, zdrojChyby]);
+  useEffect(() => () => vypadek?.nahlas(klicVypadku, null, null), [vypadek, klicVypadku]);
+  const vHromadnem = hlasitChybu && !!vypadek?.hromadny;
   if (prazdny && !k.upravy && !k.nahled) return null;
 
   const idTitulku = `w-${k.instance}-t`;
-  const zkusitZnovu = () => aktivni.forEach(s => { if (s.error) s.reload(); });
 
   // Cíl karty z katalogu (kolo 71): klepnutí na kartu v klidu naviguje do
   // sekce, odkud jsou data — samotné klepnutí obsluhuje plocha na <li>
@@ -456,13 +473,27 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
 
   let obsah: React.ReactNode;
   if (nacitam) obsah = <KostraTela tvar={kostra ?? kostraWidgetu(k.definice, k.velikost)} velikost={k.velikost} />;
+  else if (chyba && vHromadnem) obsah = <p className={`t-meta flex items-center gap-1.5 ${inkoust ? '!text-white/60' : ''}`} data-w-vypadek=""><Icon name="clock" size={13} className="shrink-0" />{t('Nenačteno — čeká na spojení.')}</p>;
   else if (chyba) obsah = <ErrorState compact vlevo title={t('Widget se nenačetl')} onRetry={zkusitZnovu} detail={chyba} />;
   else if (prazdno === null) obsah = <p className="t-meta">{t('Teď tu nic není.')}</p>;
   else if (prazdno !== undefined) obsah = prazdno;
   else obsah = children;
 
   const vidiOdkaz = !!odkaz && nav.smiPohled(odkaz.pohled);
-  if (k.vOkne) return <div className="min-w-0" aria-busy={nacitam || undefined}>{obsah}</div>;
+  // V okně (zvětšený widget, schránka ke schválení) bez karty a hlavičky, ale se všemi sloty:
+  // dřív jen `obsah`, takže „Schválit vše" z patky nebo segment stavu v okně chyběly.
+  if (k.vOkne) {
+    const dataOk = !nacitam && !chyba && prazdno === undefined;
+    return (
+      <div className="min-w-0 flex flex-col gap-3" aria-busy={nacitam || undefined}>
+        {filtry != null && filtry !== false && <div className="rada rada-rovne rada-s" data-w-filtry="">{filtry}</div>}
+        {segment != null && segment !== false && !nacitam && !chyba && <div data-w-segment="">{segment}</div>}
+        {souhrn != null && souhrn !== false && dataOk && <p className="t-meta" data-w-souhrn="">{souhrn}</p>}
+        <div className="min-w-0">{obsah}</div>
+        {patka != null && patka !== false && dataOk && <div className="rada rada-rovne rada-m pt-1" data-w-patka="">{patka}</div>}
+      </div>
+    );
+  }
   const mozeZvetsit = !!k.zvetsit && !k.nahled && !k.upravy;
   // Prázdný stav (věta místo dat): malá karta se pak neroztahuje na výšku čísla a věta stojí nahoře.
   // Dřív `justify-end` a min. výška 8,5 rem nechaly samotnou větu u dna prázdné karty — vypadalo to

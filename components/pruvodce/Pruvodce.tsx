@@ -161,6 +161,8 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       const d = await okJson(await fetch(znovu ? '/api/onboarding?znovu=1' : '/api/onboarding')) as Nacteno;
       // Podnik bez průvodce, cizí člen nebo hotový průvodce: tady není co dělat.
       if (d.stav === 'nedostupny' || (d.stav === 'hotovo' && !znovu)) { router.replace('/employer/overview'); return; }
+      // Neúplná odpověď (bez podniku) je chyba načtení, ne pád na `podnik.name`.
+      if (!d || typeof d !== 'object' || !d.podnik) throw new Error(tRef.current('Průvodce se nepodařilo načíst. Zkontroluj připojení a zkus to znovu.'));
       const podnik = d.podnik;
       const inf: InfoPodniku = {
         name: podnik.name, currency: podnik.currency, locale: podnik.locale, week_start: podnik.week_start,

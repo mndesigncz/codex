@@ -816,7 +816,9 @@ function NovaOdmena({ onZavrit, onHotovo }: { onZavrit: () => void; onHotovo: ()
   const cenaCislo = Math.round(Number(cena));
   const jde = nazev.trim().length > 0 && Number.isFinite(cenaCislo) && cenaCislo >= 1;
   const ulozit = async () => {
-    if (!jde || ukladam) return;
+    if (ukladam) return;
+    // Aktivní tlačítko a hláška, co chybí (audit 2026-10 průřez 3) — ne šedé „Přidat odměnu" bez vysvětlení.
+    if (!jde) { setChyba(!nazev.trim() ? t('Napiš název odměny.') : t('Cena musí být aspoň 1 bod.')); return; }
     setUkladam(true);
     setChyba(null);
     try {
@@ -836,7 +838,7 @@ function NovaOdmena({ onZavrit, onHotovo }: { onZavrit: () => void; onHotovo: ()
       <Modal open onClose={onZavrit} size="sm" title={t('Přidat odměnu')} subtitle={t('Za co si tým může vyměnit body')}
         footer={<>
           <Button variant="secondary" onClick={onZavrit}>{t('Zrušit', undefined, 'dialog')}</Button>
-          <Button variant="primary" icon="plus" onClick={ulozit} loading={ukladam} disabled={!jde}>{t('Přidat odměnu')}</Button>
+          <Button variant="primary" icon="plus" onClick={ulozit} loading={ukladam}>{t('Přidat odměnu')}</Button>
         </>}>
         <form className="space-y-4" onSubmit={e => { e.preventDefault(); void ulozit(); }}>
           <Field id="odmena-nazev" label={t('Název')}>
@@ -1164,7 +1166,8 @@ export function PochvalaOkno({ clovek, onClose, onHotovo }: {
   const n = Math.round(Number(body));
   const jde = kdo !== '' && Number.isFinite(n) && n >= 1 && n <= 500;
   const uloz = async () => {
-    if (!jde || ukladam) return;
+    if (ukladam) return;
+    if (!jde) { setChyba(kdo === '' ? t('Vyber, komu body dáváš.') : t('Body můžou být 1 až 500.')); return; }
     setUkladam(true); setChyba(null);
     try {
       await fetch(URL_POCHVALY, {
@@ -1186,7 +1189,7 @@ export function PochvalaOkno({ clovek, onClose, onHotovo }: {
       <Modal open onClose={onClose} size="sm" title={t('Pochválit')} subtitle={clovek?.jmeno ?? t('Body navíc za dobře odvedenou práci')}
         footer={<>
           <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
-          <Button variant="primary" icon="award" onClick={uloz} loading={ukladam} disabled={!jde}>{t('Dát body')}</Button>
+          <Button variant="primary" icon="award" onClick={uloz} loading={ukladam}>{t('Dát body')}</Button>
         </>}>
         <div className="space-y-4">
           {!clovek && (
@@ -1297,7 +1300,8 @@ export function PodekovaniOkno({ komu, onClose, onHotovo }: {
   const n = Number(body);
   const jde = kdo !== '' && n > 0 && n <= zbyva && !ukladam;
   const uloz = async () => {
-    if (!jde) return;
+    if (ukladam) return;
+    if (!jde) { setChyba(kdo === '' ? t('Vyber, komu děkuješ.') : zbyva <= 0 ? t('Tento měsíc už nemáš body k rozdání.') : t('Můžeš poslat 1 až {n} b.', { n: zbyva })); return; }
     setUkladam(true); setChyba(null);
     try {
       await fetch('/api/rewards/awards', {
@@ -1319,7 +1323,7 @@ export function PodekovaniOkno({ komu, onClose, onHotovo }: {
       <Modal open onClose={onClose} size="sm" title={t('Poděkovat')} subtitle={komu?.jmeno ?? t('Body kolegovi za to, co pro tebe udělal')}
         footer={<>
           <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
-          <Button variant="primary" icon="award" onClick={uloz} loading={ukladam} disabled={!jde}>{t('Poslat díky')}</Button>
+          <Button variant="primary" icon="award" onClick={uloz} loading={ukladam}>{t('Poslat díky')}</Button>
         </>}>
         <div className="space-y-4" data-podekovani-okno>
           {/* Kolik ještě můžu rozdat — Bonusly to ukazuje nahoře v každém okně, ať člověk nehádá. */}

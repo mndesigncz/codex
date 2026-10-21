@@ -311,8 +311,11 @@ const cast = (p, nazev) => p.locator('[data-plocha]').getByRole('tab', { name: n
   await ohodnotit.click();
   tvrdi('V6: …otevře okno hodnocení Evy', await dokud(() => p.getByRole('dialog', { name: /Hodnotit směnu/ }).isVisible(), 3000));
   await p.keyboard.press('Escape');
-  await cast(p, 'Nastavení').click();
+  // Audit 2026-10 (V35): na telefonu je Nastavení odměn v „···" hlavičky (v pásu se pět částí uřízlo).
+  await p.getByRole('button', { name: 'Další akce' }).first().click();
+  await p.getByRole('menuitem', { name: 'Nastavení odměn' }).click();
   await p.waitForTimeout(500);
+  tvrdi('V6: Nastavení na telefonu z „···" se otevře a segment ho ukáže vybrané', (await cast(p, 'Nastavení').getAttribute('aria-selected')) === 'true');
   tvrdi('V6: Nastavení na telefonu nepřetéká', await bezPreteceni(p));
   await p.screenshot({ path: OUT + 'k69-b7-vedeni-nastaveni-tel.png', fullPage: true });
   // Kolo 7 (odmena-katalog-formular-telefon): Název přes celou šířku, Emoji | Cena vedle sebe, Přidat přes celou šířku.

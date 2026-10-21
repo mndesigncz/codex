@@ -82,6 +82,11 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                     <p className={`font-semibold leading-snug ${compact ? 'text-sm' : 'text-[15px]'} ${done ? 'text-black/40 line-through' : skipped ? 'text-black/45' : 'text-[#16181A]'}`}>
                       {s.text}
                     </p>
+                    {/* V běhu (compact) je délka pod textem: jako čip vedle textu a „Přeskočit"
+                        sevřela krok v okně 360 px na 1–2 slova na řádek (audit 2026-10 V29). */}
+                    {compact && s.minutes != null && !skipped && (
+                      <p className="t-meta mt-0.5 inline-flex items-center gap-1 tabular-nums"><Icon name="clock" size={12} />{fmtMinutes(s.minutes)}</p>
+                    )}
                     {skipped ? (
                       <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-wait-ink">
                         <Icon name="play" size={13} />  {t('Přeskočeno')}
@@ -111,7 +116,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                       )
                     )}
                   </div>
-                  {s.minutes != null && !skipped && (
+                  {!compact && s.minutes != null && !skipped && (
                     <Chip tone="muted" size="sm" icon="clock" className="flex-shrink-0 tabular-nums">{fmtMinutes(s.minutes)}</Chip>
                   )}
                   {/* Přeskočit / vrátit. Text zůstává vidět i v plovoucím běhu: samotná šipka

@@ -25,10 +25,25 @@ export interface Zasah { id: number; actor: string; action: string; teamId: numb
 export interface Clen { id: number; name: string; email: string; role: string; avatar: string | null; createdAt: string | null }
 export interface Detail { team: PodnikRadek; members: Clen[]; zasahy: Zasah[] }
 
+/** Ověří tvar detailu podniku. Neúplná odpověď (200 bez `team.plan`) dřív shodila
+ *  celou stránku na „Tady se něco pokazilo" (audit 2026-10 B8); teď je to chyba
+ *  načtení s „Zkusit znovu" a seznamy bez pole jsou prázdné, ne pád. */
+export function overDetail(raw: any): Detail {
+  const team = raw?.team;
+  if (!team || typeof team !== 'object' || !team.plan || typeof team.plan !== 'object') {
+    throw new Error('Odpověď serveru je neúplná (chybí údaje o podniku).');
+  }
+  return {
+    team: team as PodnikRadek,
+    members: Array.isArray(raw.members) ? raw.members : [],
+    zasahy: Array.isArray(raw.zasahy) ? raw.zasahy : [],
+  };
+}
+
 /** POST na admin API; vrací nový detail, chyba letí ven s textem ze serveru. */
 export async function zasah(url: string, body: unknown): Promise<Detail> {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return okJson(r) as Promise<Detail>;
+  return overDetail(await okJson(r));
 }
 
 export function iniciala(jmeno: string): string {
