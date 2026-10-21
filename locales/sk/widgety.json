@@ -1239,7 +1239,7 @@
   "Tablet": "Tablet",
   "Tablet si rozložení neupravuje — nastavuje ho vedení v Nastavení → Stránky.": "Tablet si rozloženie neupravuje — nastavuje ho vedenie v Nastaveniach → Stránky.",
   "Tabule je zatím prázdná.": "Tabuľa je zatiaľ prázdna.",
-  "Tabulky pro menu ještě nejsou v databázi.": "Tabuľky pre menu ešte nie sú v databáze.",
+  "Menu se po aktualizaci aplikace ještě připravuje.": "Menu sa po aktualizácii aplikácie ešte pripravuje.",
   "Tahle stránka neexistuje": "Táto stránka neexistuje",
   "Tahouni": "Ťahúni",
   "Takový widget tu není. Zkus jiné slovo.": "Taký widget tu nie je. Skús iné slovo.",
@@ -2696,5 +2696,13 @@
   "Pauza skončí a odchod se zapíše na {cas}. Dnes odpracováno {delka}.": "Pauza skončí a odchod sa zapíše na {cas}. Dnes odpracované {delka}.",
   "Odchod se zapíše na {cas}. Na směně od {od}, to je {delka}.": "Odchod sa zapíše na {cas}. Na smene od {od}, to je {delka}.",
   "Potvrdit odchod": "Potvrdiť odchod",
-  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Ak si klikol/a omylom, daj Späť — nič sa nezapíše."
+  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Ak si klikol/a omylom, daj Späť — nič sa nezapíše.",
+  "Nejsi připojený k internetu.": "Nie si pripojený na internet.",
+  "Nejsme připojení k serveru.": "Nie sme pripojení k serveru.",
+  "{n, plural, one {# widget se nenačetl} few {# widgety se nenačetly} other {# widgetů se nenačetlo}} — zkusíme to znovu sami.": "{n, plural, one {# widget sa nenačítal} few {# widgety sa nenačítali} other {# widgetov sa nenačítalo}} — skúsime to znova sami.",
+  "Nenačteno — čeká na spojení.": "Nenačítané — čaká na spojenie.",
+  "vyřízeno": "vybavené",
+  "Všechno je vyřízené.": "Všetko je vybavené.",
+  "Vyřídit na jednom místě": "Vybaviť na jednom mieste",
+  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# vec čaká} few {# veci čakajú} other {# vecí čaká}} na tvoje rozhodnutie — vybavíš ich tu, bez prechádzania medzi stránkami."
 }

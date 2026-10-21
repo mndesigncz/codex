@@ -36,6 +36,7 @@ import { jeCilVPrekryvu, jeInteraktivniCil, jePrekryvOtevreny, smiKlepnutiNavigo
 import { PLAN_ENFORCED } from '@/lib/plan';
 import { DenHost } from './DenHost';
 import { KontextWidgetuCtx, KostraWidgetu, PojistkaWidgetu, SchematickyWidget, type KontextWidgetu } from './Widget';
+import { ListaVypadku, VypadekProvider } from './Vypadek';
 import { lineWidget, maCoNastavit, predstahni } from './registr';
 import { useRozlozeni, type Rozlozeni, type UdalostRozlozeni } from './useRozlozeni';
 import { usePodrzeni, vibruj, type Podrzeni } from './usePodrzeni';
@@ -1287,7 +1288,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   const nastavovanaDef = nastavovana ? najdiWidget(nastavovana.widget) : undefined;
 
   return (
-    <>
+    <VypadekProvider>
     <div
       ref={koren}
       data-plocha={stranka.id}
@@ -1319,6 +1320,8 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
           {t('Podrž widget nebo klepni na Upravit.')}
         </Hint>
       )}
+
+      {!upravy && !vychoziRezim && <ListaVypadku />}
 
       {zaloha && !celaChyba && (
         <p className="note note-wait">
@@ -1455,7 +1458,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
       const def = pol ? najdiWidget(pol.widget) : undefined;
       return pol && def ? <ZvetsenyWidget p={pol} def={def} nazev={nazevPolozky(pol)} stranka={stranka} onClose={() => setVelky(null)} /> : null;
     })()}
-    </>
+    </VypadekProvider>
   );
 }
 

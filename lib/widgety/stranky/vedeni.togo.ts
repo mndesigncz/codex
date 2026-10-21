@@ -14,6 +14,9 @@
 // Kolo 8 (R8-4): hned pod Pokladnou dnes stojí Mzdy dnes (náklad směny proti dnešní tržbě — právě tady
 // se rozhoduje „pustit někoho domů dřív") a vedle nich Otevřené účty, ať na telefonu stojí S vedle S
 // a mřížka nenechá osiřelou buňku.
+// Audit 2026-10 (V42, V09): pod čísla dne přibylo Čeká na tebe — „co hoří" na telefonu, odkud
+// se tlačítkem Vyřídit na jednom místě schvaluje volno, výměny, uzávěrky, navíc i tresty bez
+// přepínání do plné správy. Když nic nečeká, karta se nekreslí.
 // Nástroj stránka nemá.
 import type { DefiniceStranky } from '../typy.ts';
 
@@ -26,6 +29,7 @@ export const STRANKA: DefiniceStranky = {
   nastroj: null,
   inkoust: true,
   doporucene: [
+    'prehled.ceka_na_tebe',
     'pokladna.dnes',
     'finance.mzdy_dnes',
     'trzby.otevrene',
@@ -45,6 +49,7 @@ export const STRANKA: DefiniceStranky = {
       { w: 'pokladna.dnes', s: 'M' },
       { w: 'finance.mzdy_dnes', s: 'S' },
       { w: 'trzby.otevrene', s: 'S' },
+      { w: 'prehled.ceka_na_tebe', s: 'M' },
       { w: 'trzby.po_dnech', s: 'M' },
       { w: 'dochazka.dnes_v_podniku', s: 'M' },
       { w: 'vyroba.k_vyrobe', s: 'M' },

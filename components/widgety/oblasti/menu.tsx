@@ -118,7 +118,7 @@ function StavMenu({ velikost, nahled }: WidgetProps) {
   };
 
   const prazdno = data.data?.nezmigrovano
-    ? <p className="t-meta">{t('Tabulky pro menu ještě nejsou v databázi.')}</p>
+    ? <p className="t-meta">{t('Menu se po aktualizaci aplikace ještě připravuje.')}</p>
     : data.data && desky.length === 0
       // v4 (V11, P5): prázdný stav na levé ose karty, ne na střed (v malé kartě zalomil větu do úzkého sloupce).
       ? <PrazdnoWidgetu titul={t('Zatím žádné menu')} text={t('Založ ho v editoru — z pokladny nebo z dnešní nabídky.')} />
@@ -227,7 +227,7 @@ function Vyprodano({ velikost, nahled }: WidgetProps) {
   };
 
   const prazdno = data.data?.nezmigrovano
-    ? <p className="t-meta">{t('Tabulky pro menu ještě nejsou v databázi.')}</p>
+    ? <p className="t-meta">{t('Menu se po aktualizaci aplikace ještě připravuje.')}</p>
     : zadneZapnute ? <p className="t-meta">{t('Žádné zveřejněné menu s položkami — není co označit.')}</p> : undefined;
 
   if (velikost === 'S') {

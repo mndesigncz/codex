@@ -1237,7 +1237,7 @@
   "Tablet": "Tablet",
   "Tablet si rozložení neupravuje — nastavuje ho vedení v Nastavení → Stránky.": "Das Tablet-Layout lässt sich hier nicht ändern — die Leitung legt es unter Einstellungen → Seiten fest.",
   "Tabule je zatím prázdná.": "Die Tafel ist noch leer.",
-  "Tabulky pro menu ještě nejsou v databázi.": "Die Tabellen für die Karte sind noch nicht in der Datenbank.",
+  "Menu se po aktualizaci aplikace ještě připravuje.": "Die Karte wird nach einem App-Update noch vorbereitet.",
   "Tahle stránka neexistuje": "Diese Seite gibt es nicht",
   "Tahouni": "Zugpferde",
   "Takový widget tu není. Zkus jiné slovo.": "Ein solches Widget gibt es hier nicht. Versuch ein anderes Wort.",
@@ -2694,5 +2694,13 @@
   "Pauza skončí a odchod se zapíše na {cas}. Dnes odpracováno {delka}.": "Die Pause endet und das Ausstempeln wird um {cas} erfasst. Heute gearbeitet: {delka}.",
   "Odchod se zapíše na {cas}. Na směně od {od}, to je {delka}.": "Das Ausstempeln wird um {cas} erfasst. Im Dienst seit {od}, das sind {delka}.",
   "Potvrdit odchod": "Ausstempeln bestätigen",
-  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Aus Versehen getippt? Tippe auf Zurück — es wird nichts erfasst."
+  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Aus Versehen getippt? Tippe auf Zurück — es wird nichts erfasst.",
+  "Nejsi připojený k internetu.": "Du bist offline.",
+  "Nejsme připojení k serveru.": "Wir erreichen den Server nicht.",
+  "{n, plural, one {# widget se nenačetl} few {# widgety se nenačetly} other {# widgetů se nenačetlo}} — zkusíme to znovu sami.": "{n, plural, one {# Widget wurde nicht geladen} other {# Widgets wurden nicht geladen}} — wir versuchen es automatisch erneut.",
+  "Nenačteno — čeká na spojení.": "Nicht geladen — wartet auf Verbindung.",
+  "vyřízeno": "erledigt",
+  "Všechno je vyřízené.": "Alles ist erledigt.",
+  "Vyřídit na jednom místě": "Alles an einem Ort erledigen",
+  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# Sache wartet} other {# Sachen warten}} auf deine Entscheidung — erledige sie hier, ohne zwischen Seiten zu wechseln."
 }

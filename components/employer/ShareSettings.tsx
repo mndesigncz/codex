@@ -24,7 +24,6 @@ import { flattenTree, pathOfId, type CategoryNode } from '@/lib/categoryTree';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
-import { sUzlem, VLOZ } from './jazyk';
 
 
 type GuideCat = { id: number; name: string };
@@ -135,7 +134,7 @@ export default function ShareSettings() {
   return (
     <div className="space-y-4">
       {notMigrated && (
-        <p className="note note-wait">{sUzlem(t('Sdílení zatím není v databázi připravené — spusť {cesta}.', { cesta: VLOZ }), <code>/api/init</code>)}</p>
+        <p className="note note-wait">{t('Sdílení se po aktualizaci aplikace ještě připravuje. Obnov stránku za chvíli.')}</p>
       )}
 
       {/* ---- Nový odkaz ---- */}

@@ -590,8 +590,8 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   } else if (neniMigrace) {
     nastroj = (
       <Card>
-        <EmptyState compact icon="warning" title={t('Tabulky pro menu ještě nejsou v databázi')}
-          hint={t('Otevři jednou /api/init a vrať se sem.')} />
+        <EmptyState compact icon="warning" title={t('Menu se ještě připravuje')}
+          hint={t('Aplikace se zrovna aktualizuje — obnov stránku za chvíli.')} />
       </Card>
     );
   } else if (!board) {

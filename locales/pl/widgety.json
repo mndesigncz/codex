@@ -1236,7 +1236,7 @@
   "Tablet": "Tablet",
   "Tablet si rozložení neupravuje — nastavuje ho vedení v Nastavení → Stránky.": "Układ tabletu nie jest tu edytowany — ustawia go kierownictwo w Ustawienia → Strony.",
   "Tabule je zatím prázdná.": "Tablica jest na razie pusta.",
-  "Tabulky pro menu ještě nejsou v databázi.": "Tabel menu nie ma jeszcze w bazie danych.",
+  "Menu se po aktualizaci aplikace ještě připravuje.": "Menu jest jeszcze przygotowywane po aktualizacji aplikacji.",
   "Tahle stránka neexistuje": "Ta strona nie istnieje",
   "Tahouni": "Konie pociągowe",
   "Takový widget tu není. Zkus jiné slovo.": "Nie ma tu takiego widżetu. Spróbuj innego słowa.",
@@ -2693,5 +2693,13 @@
   "Pauza skončí a odchod se zapíše na {cas}. Dnes odpracováno {delka}.": "Przerwa się skończy, a wyjście zostanie zapisane na {cas}. Dziś przepracowano {delka}.",
   "Odchod se zapíše na {cas}. Na směně od {od}, to je {delka}.": "Wyjście zostanie zapisane na {cas}. Na zmianie od {od}, to {delka}.",
   "Potvrdit odchod": "Potwierdź wyjście",
-  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Kliknięto przez pomyłkę? Wróć — nic nie zostanie zapisane."
+  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Kliknięto przez pomyłkę? Wróć — nic nie zostanie zapisane.",
+  "Nejsi připojený k internetu.": "Nie masz połączenia z internetem.",
+  "Nejsme připojení k serveru.": "Nie możemy połączyć się z serwerem.",
+  "{n, plural, one {# widget se nenačetl} few {# widgety se nenačetly} other {# widgetů se nenačetlo}} — zkusíme to znovu sami.": "{n, plural, one {# widżet się nie wczytał} few {# widżety się nie wczytały} many {# widżetów się nie wczytało} other {# widżetu się nie wczytało}} — spróbujemy ponownie sami.",
+  "Nenačteno — čeká na spojení.": "Nie wczytano — czeka na połączenie.",
+  "vyřízeno": "załatwione",
+  "Všechno je vyřízené.": "Wszystko załatwione.",
+  "Vyřídit na jednom místě": "Załatw w jednym miejscu",
+  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# sprawa czeka} few {# sprawy czekają} many {# spraw czeka} other {# sprawy czeka}} na twoją decyzję — załatwisz je tutaj, bez przechodzenia między stronami."
 }

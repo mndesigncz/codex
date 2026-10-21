@@ -1236,7 +1236,7 @@
   "Tablet": "Tablet",
   "Tablet si rozložení neupravuje — nastavuje ho vedení v Nastavení → Stránky.": "The tablet layout is not editable here — management sets it in Settings → Pages.",
   "Tabule je zatím prázdná.": "The board is empty for now.",
-  "Tabulky pro menu ještě nejsou v databázi.": "The menu tables aren't in the database yet.",
+  "Menu se po aktualizaci aplikace ještě připravuje.": "The menu is still being prepared after an app update.",
   "Tahle stránka neexistuje": "This page does not exist",
   "Tahouni": "Plowhorses",
   "Takový widget tu není. Zkus jiné slovo.": "There is no such widget. Try another word.",
@@ -2693,5 +2693,13 @@
   "Pauza skončí a odchod se zapíše na {cas}. Dnes odpracováno {delka}.": "Your break ends and clock-out is recorded at {cas}. Worked today: {delka}.",
   "Odchod se zapíše na {cas}. Na směně od {od}, to je {delka}.": "Clock-out will be recorded at {cas}. On shift since {od}, that is {delka}.",
   "Potvrdit odchod": "Confirm clock-out",
-  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Tapped by mistake? Go back — nothing will be recorded."
+  "Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.": "Tapped by mistake? Go back — nothing will be recorded.",
+  "Nejsi připojený k internetu.": "You're offline.",
+  "Nejsme připojení k serveru.": "We can't reach the server.",
+  "{n, plural, one {# widget se nenačetl} few {# widgety se nenačetly} other {# widgetů se nenačetlo}} — zkusíme to znovu sami.": "{n, plural, one {# widget didn't load} other {# widgets didn't load}} — we'll retry automatically.",
+  "Nenačteno — čeká na spojení.": "Not loaded — waiting for connection.",
+  "vyřízeno": "done",
+  "Všechno je vyřízené.": "Everything is handled.",
+  "Vyřídit na jednom místě": "Handle all in one place",
+  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# item is} other {# items are}} waiting for your decision — handle them here without switching pages."
 }
