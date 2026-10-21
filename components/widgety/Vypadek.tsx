@@ -8,8 +8,9 @@
 // jedna lišta nahoře („Nejsme připojení — zkusíme to znovu"), widgety bez dat jen
 // ztlumené s krátkou větou, opakování samo (návrat spojení, každých 30 s) i tlačítkem.
 //
-// Jedna chyba zůstává chybou toho widgetu (vlastní ErrorState) — lišta je až od dvou,
-// kdy je skoro jisté, že nejde o jeden rozbitý dotaz, ale o spojení.
+// Chyba jednoho dotazu zůstává chybou jeho widgetů (vlastní ErrorState se Zkusit znovu) —
+// jeden endpoint často krmí dva widgety (Tržba po dnech a Průměrná účtenka z /api/pos/daily).
+// Lišta je až od tří nenačtených widgetů, nebo hned, když prohlížeč hlásí offline.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui';
@@ -17,7 +18,7 @@ import { Icon } from '../Icons';
 import { useT } from '@/lib/i18n/client';
 
 /** Od kolika nenačtených widgetů je to „výpadek" (jedna lišta) místo chyby jednoho widgetu. */
-export const PRAH_VYPADKU = 2;
+export const PRAH_VYPADKU = 3;
 const OPAKOVAT_MS = 30_000;
 
 interface KontextVypadku {
@@ -44,7 +45,15 @@ export function VypadekProvider({ children }: { children: React.ReactNode }) {
     setPocet(m.size);
   }, []);
   const zkusitVse = useCallback(() => { for (const r of [...chyby.current.values()]) r(); }, []);
-  const hromadny = pocet >= PRAH_VYPADKU;
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    const f = () => setOffline(typeof navigator !== 'undefined' && navigator.onLine === false);
+    f();
+    window.addEventListener('online', f);
+    window.addEventListener('offline', f);
+    return () => { window.removeEventListener('online', f); window.removeEventListener('offline', f); };
+  }, []);
+  const hromadny = pocet >= PRAH_VYPADKU || (offline && pocet > 0);
 
   // Samo znovu: hned po návratu spojení a pak každých 30 s, dokud výpadek trvá.
   useEffect(() => {
