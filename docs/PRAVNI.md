@@ -221,6 +221,8 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
 5. Billing → Revenue recovery: po posledním neúspěšném pokusu **zrušit předplatné** (OP čl. 8 to tak popisuje).
 6. Kupon `MAX30`: nastavit `duration = once` (UI i OP čl. 11 slibují slevu 30 % „na první platbu“).
 7. Customer portal: zrušení „at period end" (kód to nastavuje u vlastní konfigurace).
+7a. Settings → Customer emails: zapnout posílání **faktur / potvrzení o platbě** zákazníkům
+   (OP čl. 7 slibuje, že fakturu „pošle e-mailem"; bez toho je jen v portálu).
 
 **Vercel**
 8. Přejít na **plán Pro** (Hobby zakazuje komerční provoz a DPA Vercelu platí jen pro Pro).
@@ -228,7 +230,8 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
    subzpracovatelů uvádí „serverové funkce ve Frankfurtu" — to zajišťuje `vercel.json` `regions: ["fra1"]`.
 10. Zapnout **`RETENCE_ZAPNUTA=1`** — zásady a DPA popisují lhůty retence jako platné; bez proměnné
    cron jen počítá náhled a nic nemaže.
-11. `FIRMA_*` proměnné nejsou potřeba (výchozí údaje jsou v kódu). Až bude DIČ: `FIRMA_DIC=CZ…`
+11. `FIRMA_*` proměnné nejsou potřeba (výchozí údaje jsou v kódu; od oponentury i pro e-mail moderace,
+   viz §6). Až bude DIČ: `FIRMA_DIC=CZ…`
    (DIČ identifikované osoby **neznamená** plátce). Při registraci k DPH navíc `FIRMA_PLATCE_DPH=1`
    a upravit texty ceníku/pokladny (dnes natvrdo „neplátce DPH").
 
@@ -286,8 +289,110 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
 - **Hromadný e-mail** vlastníkům o změně OP/DPA/subzpracovatelů (dnes ručně).
 - Identifikace provozovatele v **Nastavení → O aplikaci** a odkazy na obchodní podmínky v Nastavení →
   Předplatné (`components/Settings.tsx`, `components/Billing.tsx` patří jiným balíkům).
-- `components/CheckoutModal.tsx` ukazuje u ročního tarifu **přeškrtnutou „srovnávací" cenu**
-  (`PRICES.*.yearCompare` 4 990 / 9 988 Kč), která neodpovídá 12× měsíční ceně a nikdy se neúčtovala —
-  klamavá referenční cena; doporučeno nahradit spočtenou úsporou jako na landingu.
+- ~~Přeškrtnutá „srovnávací" cena v pokladně~~ — opraveno v oponentuře (§6). `PRICES.*.yearCompare`
+  v `lib/plan.ts` (a v `lib/demo/routy/zaklad.ts`) už UI nepoužívá; při příští úpravě `lib/plan.ts` smazat.
 - Texty ceníku a pokladny o DPH jsou psané pro neplátce natvrdo; při registraci k DPH přepsat.
 - Šablona „Informace pro hosty" pro podniky.
+
+## 6. Oponentura (21. 10. 2026)
+
+Nezávislá kontrola všech dokumentů (cs i en) proti checklistům podkladu, proti kódu a proti
+sobě navzájem. Závažnost: **blokující** (nesmí na ostrý provoz), **důležité** (právní riziko nebo
+nepravdivý slib), **drobné** (přesnost, čitelnost).
+
+### 6.1 Co jsem změnil
+
+Blokující:
+- **Klamavá referenční cena** (§ 4–5 ZOS): pokladna (`components/CheckoutModal.tsx`) i karta tarifu
+  v Nastavení → Předplatné (`components/Billing.tsx`) ukazovaly přeškrtnutou cenu 4 990 / 9 988 Kč,
+  která se nikdy neúčtovala. Nově spočtená úspora jako na landingu („Ušetříte 1 998 Kč oproti
+  měsíčnímu placení…"). Test `k88-pravni-souhlas` hlídá, že se `<s>` ani `pr.yearCompare` nevrátí.
+- **Nahlášení obsahu by provozovateli nechodila** (DSA čl. 16): `lib/moderace.ts → kontaktModerace`
+  četla jen proměnnou `FIRMA_EMAIL_PODPORY`, kterou balík právních stránek prohlásil za nepovinnou.
+  Bez ní by se nahlášení z chatu i oznámení z `/nahlasit` uložila, ale nikomu neohlásila. Teď
+  záloha na `firma().emailPodpory`; test `k88-obal` upraven.
+- **Landing sliboval „Po konci předplatného data nemažeme" a „nic nemizí"**, ačkoli OP čl. 19 a
+  zásady (a `lib/retence.ts`) mažou podnik po skončeném předplatném nebo zkoušce a 90 dnech bez
+  aktivity. Nově „data nemažeme, dokud podnik používáš" (cs, en, de, sk, pl).
+
+Důležité:
+- **Cesty ke smazání účtu a stažení dat** vedly na neexistující „Profil → Smazat účet" a
+  „Nastavení → Účet → Smazat účet" (Google Play chce přesné kroky). Správně: Managero →
+  Nastavení → Data a soukromí; Managero client → Moje. Opraveno v zásadách, podmínkách, podpoře,
+  smazání účtu a zrušení předplatného; test porovná cesty se `Settings.tsx` a `ClientShell.tsx`.
+- **OP čl. 19 a 20 — smazání podniku**: v aplikaci nejde smazat jen podnik; maže se účet vlastníka
+  i se všemi vlastněnými podniky (heslo + slovo SMAZAT) a předplatné se ruší okamžitě bez vrácení.
+  Texty to teď říkají (i `/smazat-ucet`).
+- **OP čl. 20 — export (Data Act čl. 25)**: CSV exporty jsou jen v Pro a Max; text sliboval
+  „kdykoli". Teď: JSON záloha + CSV v Pro/Max, ostatní data na požádání v každém tarifu.
+- **Zásady — úložiště v zařízení** (§ 89 odst. 3 ZEK, čl. 13 GDPR): chyběla offline kartička hosta
+  (localStorage / úložiště nativní aplikace), fronta příchodů a otisky PINů na sdíleném tabletu a
+  cache service workeru. Doplněno (vše nezbytné, lišta dál netřeba).
+- **Zásady — doba uložení** (čl. 13 odst. 2 písm. a)): chyběla u komunikace s podporou a technických
+  logů. Doplněno: podpora do vyřízení + nejvýš 3 roky (promlčení), logy hostingu dny.
+- **DPA čl. 9**: „soubory vydávané jen přihlášeným" neplatí pro obrázky veřejné stránky podniku
+  (`app/api/client/img`). Doplněna výjimka.
+- **OP čl. 14 — prémie** (§ 346b ZP, NS 21 Cdo 3471/2024): místo „krátit lze nenárokovou prémii"
+  nově „nepřiznat nebo snížit jen za nesplnění předem daných kritérií za období; přiznanou mzdu
+  nebo odměnu krátit nelze". Stejně šablona pro zaměstnance (+ fotka u napomenutí).
+- **/api/health** ukazuje `funkce.retenceOstra` — dokumenty popisují retenci jako platnou, cron je bez
+  `RETENCE_ZAPNUTA=1` jen náhled.
+
+Drobné:
+- „Databáze leží v Evropské unii (Evropská unie (…))" → „Kde data leží: …"; anglické znění bere
+  umístění z `lib/firma.ts` (`regionDatEn`), ne natvrdo (dřív by se po změně `FIRMA_REGION_DAT`
+  rozešlo s češtinou).
+- Podmínky užívání: smlouva na dobu neurčitou, „nejsme vázáni kodexem chování" (§ 1826 odst. 1
+  písm. e)), ADR ČOI srozumitelnou větou a s adresou (Štěpánská 15, Praha 2); zaměstnanec
+  nepotvrzuje věk (dřív „souhlas potvrdí stejně").
+- Zásady: IČO/DIČ podniku „pokud je vyplníte" (pokladna sbírá jen DIČ); telefon hosta vidí podnik
+  u rezervace; odhlášení novinek v Moje → Oznámení a soukromí.
+- Retence podniků popsaná přesně: i po skončené zkoušce, „nikdo nic nezměnil ani nezapsal docházku"
+  (tak to počítá `lib/retenceDb.ts`: `audit_log` + `time_entries`).
+- Pokladna odkazuje na obchodní podmínky a zrušení předplatného (nová záložka).
+
+Ověřeno v kódu a beze změny (sedí): DPH formulace všude „neplátce / ceny konečné", žádné ODR,
+ADR ČOI v podmínkách, ceny a zkušební doba z `lib/plan.ts`, zkouška jen jednou na podnik,
+`trial_will_end` → push + e-mail, `past_due` drží tarif, doporučení 3× za kalendářní měsíc
+(Praha), portál ruší „at period end", soukromé zprávy a sazby nejsou v záloze, záloha přes podepsaný
+odkaz 7 dní, soubory v privátním Blobu, HSTS a CSP v `next.config.js`, bcrypt, poloha jen jako
+vzdálenost (poloměry 100/200/500 m), DSA potvrzení a odůvodnění (`lib/dsaDb.ts`), jméno a e-mail
+oznamovatele povinné kromě ohrožení dětí, smazání vlastníka ruší Stripe předplatné i zákazníka,
+žádná analytika.
+
+### 6.2 Co zůstává a proč
+
+Na Martinovi před ostrým provozem (navíc k §3):
+- **`RETENCE_ZAPNUTA=1`** — bez ní zásady i DPA slibují lhůty, které se neplní. Ale pozor: zapnutím
+  se zároveň začnou **bez upozornění** mazat podniky po 90 dnech bez aktivity, a „aktivita" je jen
+  záznam v protokolu změn nebo docházka (tým, který jen chatuje nebo jen čte rozvrh, se počítá jako
+  neaktivní). Doporučení: před zapnutím doplnit do `lib/retenceDb.ts` (jiný balík) e-mail vlastníkovi
+  30 dní předem a širší kritérium aktivity (přihlášení, zprávy, směny). Do té doby text OP čl. 19
+  odpovídá kódu, ale je pro zákazníka tvrdý (§ 433 OZ, Data Act čl. 25).
+- **Přechodné období 30 dní po výpovědi e-mailem** (OP čl. 20) aplikace sama nedrží — po výpovědi je
+  potřeba podnik ručně nechat 30 dní běžet, pak 30 dní držet data k vyžádání a pak smazat. Zapsat si
+  postup.
+- **Komunikace s podporou nejvýš 3 roky** (zásady) — promazávat schránku podpora@managero.app.
+- Stripe: zasílání faktur e-mailem (§3 bod 7a), `MAX30` duration once, Revenue recovery → cancel.
+
+K ověření advokátem (navíc k §4):
+1. **IČO není povinné** ani při registraci, ani v pokladně — B2B povahu nese jen prohlášení v
+   zaškrtávátku. Pokud si tarif koupí člověk, který jedná mimo podnikání, hrozí spotřebitelský režim
+   (14denní odstoupení, § 1826a tlačítko, § 1814). Doporučuji povinné IČO v pokladně (Stripe
+   `custom_fields`) — kód mimo tento balík.
+2. **Vyloučení odpovědnosti za výpadky poskytovatelů infrastruktury** (OP čl. 12 a 17): Vercel, Neon a
+   další jsou subdodavatelé poskytovatele (§ 1935 OZ — za ně se odpovídá jako za sebe). Mezi podnikateli
+   to v mezích § 2898 jde, ale přiměřenost vůči malé kavárně (§ 433, § 1753) posoudit.
+3. **Prorogace** „soud podle sídla poskytovatele" (OP čl. 23): click-wrap jako písemná forma (§ 89a OSŘ,
+   § 562 OZ); u zákazníků z jiných států EU čl. 25 Brusel Ia. Doporučeno zatím prodávat jen v ČR.
+4. **DPA čl. 13** dává retenci neaktivního účtu hosta jako „pokyn správce" (podniku), zásady ale tvrdí,
+   že účet hosta spravuje Managero jako správce — souvisí s §4 bodem 1 (role u účtu hosta).
+5. **Moderace „zpravidla do 24 hodin v pracovní dny"** (podmínky) odpovídá lhůtě ve správě
+   (`LHUTA_NAHLASENI_HODIN = 24`), ale je to závazek jednoho člověka; zvážit „bez zbytečného odkladu".
+
+V kódu nezměněno (mimo balík nebo neověřitelné):
+- Okno pokladny se nedalo vyfotit (ukázka `/demo` nemá Předplatné a sondy běží bez databáze); změna je
+  pokrytá `tsc`, testem a čtením kódu.
+- Identifikace provozovatele v Nastavení → O aplikaci (beze změny, §5).
+- Text souhlasu při registraci podniku je dlouhý, ale přesný; nezkracoval jsem ho kvůli sondám a
+  překladům (k zvážení při příští úpravě registrace).
