@@ -40,7 +40,10 @@ export default function RazitkaClen({ customerId, oznam, onZmena }: { customerId
 
   const nacti = useCallback(() => {
     setChyba(false);
-    fetch(`/api/client/admin/stamps/member?customerId=${customerId}`).then(okJson).then(setD).catch(() => setChyba(true));
+    // Nečekaný tvar (starší server, ukázka) nesmí shodit profil hosta: bez pole karet = žádné karty.
+    fetch(`/api/client/admin/stamps/member?customerId=${customerId}`).then(okJson)
+      .then(x => setD({ ...x, karty: Array.isArray(x?.karty) ? x.karty : [], udalosti: Array.isArray(x?.udalosti) ? x.udalosti : [] }))
+      .catch(() => setChyba(true));
   }, [customerId]);
   useEffect(() => { nacti(); }, [nacti]);
 

@@ -157,9 +157,10 @@ for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
 // ---------------------------------------------------------------------------
 for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
   const { ctx, p, stav, chyby } = await kontext({ viewport: vp, mobil, fix: nacti('k69-b8-rozlozeni-zakaznici'), posunCasu: posunNa(20, 0), dalsi: podvrh });
-  await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
-  await p.locator('[data-plocha]').getByRole('tab', { name: 'Hodnocení' }).click();
-  const nastroj = widgetLi(p, 'nastroj');
+  // Kolo 92: Hodnocení je vlastní stránka v oblasti Hosté (dřív část Zákazníků za přepínačem) — bez plochy widgetů.
+  await p.goto(BASE + CLIENT('reviews'), { waitUntil: 'networkidle' });
+  await p.getByRole('heading', { level: 1, name: 'Hodnocení' }).waitFor({ timeout: 15000 });
+  const nastroj = p.locator('main');
   tvrdi(`H ${jmeno}: pilulky „Vše · 4", „1–2 ★ · 2", „S komentářem · 3", „Nevyřízené · 1"`, await dokud(() => nastroj.getByRole('button', { name: 'Vše · 4' }).isVisible(), 5000)
     && await nastroj.getByRole('button', { name: '1–2 ★ · 2' }).isVisible() && await nastroj.getByRole('button', { name: 'S komentářem · 3' }).isVisible() && await nastroj.getByRole('button', { name: 'Nevyřízené · 1' }).isVisible());
   tvrdi(`H ${jmeno}: Jana má Chip „odpovězeno · Martin" a text odpovědi, Ota „vyřízeno", Petr „nevyřízené"`,

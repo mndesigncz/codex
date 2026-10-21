@@ -3,6 +3,7 @@
 // Usazení s napojenou pokladnou otevře účet na stole (Reservations API).
 // Obsluha zapíše rezervaci i sama (POST, kolo 7): host z telefonu nebo od dveří
 // nemusí mít účet — customer_id je pak NULL a jméno s telefonem nese rezervace.
+import { narozeninyBlizko } from '@/lib/klientSprava/zdravi';
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, ensureProfile, stampVisit } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
@@ -134,6 +135,7 @@ export async function GET(req: NextRequest) {
   });
   const reservations = (rows as any[]).map(r => {
     const out: Record<string, any> = { ...r, ...(kontext.get(Number(r.customer_id)) ?? {}) };
+    if (out.__narozeniny !== undefined) { out.customer_birthday_soon = narozeninyBlizko(out.__narozeniny, String(r.date).slice(0, 10)); delete out.__narozeniny; }
     // Telefon ručně zapsaného hosta je kontakt stejně jako e-mail.
     delete out.guest_phone;
     if (!kontakty) { delete out.customer_email; delete out.customer_phone; }
@@ -233,6 +235,11 @@ async function kontextHostu(teamId: number, rows: any[], smi: { hoste: boolean; 
         pridej(Number(m.customer_id), { customer_visits: Number(m.visits) || 0, customer_spend: Number(m.spend) || 0, customer_level: t.id, customer_level_label: t.label });
       }
     } catch (e) { console.error('[rezervace] kontext hostů', e); }
+    // Kolo 92 (Před směnou): narozeniny hosta kolem dne rezervace. Ven jde jen příznak, ne datum narození.
+    try {
+      const nar = await sql`SELECT id, birthday FROM users WHERE id = ANY(${ids}) AND birthday IS NOT NULL` as any[];
+      for (const n of nar) pridej(Number(n.id), { __narozeniny: String(n.birthday).slice(0, 10) });
+    } catch (e) { console.error('[rezervace] narozeniny', e); }
     // Kolo 8 (R8-7): kolikrát host nedorazil a kolik rezervací celkem měl — „2× nedorazil" u další
     // rezervace, ať se host, který nepřišel potřetí, nepodobá štamgastovi.
     try {

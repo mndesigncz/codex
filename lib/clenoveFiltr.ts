@@ -6,6 +6,7 @@
 import { dnuOd } from './segmenty.ts';
 import { proHledani } from './hledani.ts';
 import { czCount } from './czech.ts';
+import { jeSegmentHostu, patriDoSegmentu, type SegmentHostu } from './klientSprava/segmentyHostu.ts';
 
 /** Člen tak, jak ho vrací dotaz (jen to, podle čeho se filtruje a řadí). */
 export interface ClenFiltrovany {
@@ -37,9 +38,11 @@ export interface FiltrClenu {
   openCoupon: boolean;
   /** Útrata aspoň X (celé jednotky měny), nebo 0 = bez omezení. */
   spendOver: number;
+  /** Segment z čipů nad seznamem hostů (kolo 92, lib/klientSprava/segmentyHostu.ts), nebo '' = bez omezení. */
+  segment: SegmentHostu | '';
 }
 
-export const PRAZDNY_FILTR: FiltrClenu = { q: '', level: '', group: 0, quietDays: 0, birthdayMonth: false, openCoupon: false, spendOver: 0 };
+export const PRAZDNY_FILTR: FiltrClenu = { q: '', level: '', group: 0, quietDays: 0, birthdayMonth: false, openCoupon: false, spendOver: 0, segment: '' };
 
 export const UROVNE_ID = ['bronze', 'silver', 'gold', 'platinum'] as const;
 export const MAX_NEAKTIVNI_DNI = 3650;
@@ -70,6 +73,7 @@ export function normalizujFiltr(z: Zdroj): FiltrClenu {
     birthdayMonth: jeAno(cti(z, 'birthdayMonth')),
     openCoupon: jeAno(cti(z, 'openCoupon')),
     spendOver: celeCislo(cti(z, 'spendOver'), MAX_UTRATA_FILTR),
+    segment: jeSegmentHostu(cti(z, 'segment')) ? cti(z, 'segment') as SegmentHostu : '',
   };
 }
 
@@ -83,6 +87,7 @@ export function filtrNaParametry(f: FiltrClenu): URLSearchParams {
   if (f.birthdayMonth) p.set('birthdayMonth', '1');
   if (f.openCoupon) p.set('openCoupon', '1');
   if (f.spendOver) p.set('spendOver', String(f.spendOver));
+  if (f.segment) p.set('segment', f.segment);
   return p;
 }
 
@@ -126,6 +131,7 @@ export function splnujeFiltr(c: ClenFiltrovany, f: FiltrClenu, k: KontextFiltru)
   if (f.birthdayMonth && !maNarozeninyVMesici(c.birthday, k.mesic)) return false;
   if (f.openCoupon && !(Number(c.open_coupons) > 0)) return false;
   if (f.spendOver && !(Number(c.spend) >= f.spendOver)) return false;
+  if (f.segment && !patriDoSegmentu({ ...c, narozeninyTentoMesic: maNarozeninyVMesici(c.birthday, k.mesic) }, f.segment, k.now)) return false;
   return true;
 }
 

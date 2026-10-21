@@ -182,7 +182,8 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   tvrdi('P4: bez zakaznici.recenze není Hodnocení a /api/client/admin/reviews se nevolá', await naPlose(p, 'klient.hodnoceni') === 0 && dotazyNa(stav, ['/api/client/admin/reviews']).length === 0);
   tvrdi('P4: bez vernost.zobrazit není Věrnost za 30 dní a /api/client/admin/loyalty se nevolá', await naPlose(p, 'klient.vernost_30dni') === 0 && dotazyNa(stav, ['/api/client/admin/loyalty']).length === 0);
   tvrdi('P4: Členové jen počtem — bez zakaznici.zobrazit se jména (customers) nenačítají', await naPlose(p, 'klient.clenove') === 1 && dotazyNa(stav, ['/api/client/admin/customers']).length === 0);
-  tvrdi('P4: záložky Zákazníci, Věrnost a Nastavení se nenabízejí', await zalozka(p, /Zákazníci/).count() === 0 && await zalozka(p, /Věrnost/).count() === 0 && await zalozka(p, /Nastavení/).count() === 0);
+  // Kolo 92: Zákazníci = „Hosté", Věrnost = „Program" (oblast Věrnost), plus Kampaně a Hodnocení za klíči zákazníků.
+  tvrdi('P4: záložky Hosté, Kampaně, Hodnocení, Program a Nastavení se nenabízejí', await zalozka(p, /^Hosté$/).count() === 0 && await zalozka(p, /^Kampaně$/).count() === 0 && await zalozka(p, /^Hodnocení$/).count() === 0 && await zalozka(p, /^Program$/).count() === 0 && await zalozka(p, /Nastavení/).count() === 0);
   await zalozka(p, /Rezervace/).click();
   await p.locator('[data-plocha="vedeni.klient_rezervace"] li[data-instance]').first().waitFor({ timeout: 10000 });
   await p.waitForTimeout(700);
@@ -199,7 +200,8 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   await otevri(p, CLIENT('overview'), 'vedeni.klient');
   tvrdi('P6: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
   const dok = p.getByRole('navigation', { name: 'Spodní navigace klienta' });
-  tvrdi('P6: spodní dok klienta s odznakem u Objednávek', await dok.isVisible() && await dok.getByRole('button', { name: /Objednávky/ }).locator('span').filter({ hasText: /^\d+$/ }).count() > 0);
+  // Kolo 92: dok je Přehled · Rezervace · Čtečka · Hosté · Více; odznak nových objednávek nese „Více".
+  tvrdi('P6: spodní dok klienta s odznakem nových objednávek u „Více"', await dok.isVisible() && await dok.getByRole('button', { name: /Více/ }).locator('span').filter({ hasText: /^\d+$/ }).count() > 0);
   await p.screenshot({ path: OUT + 'k69-b8-prehled-tel.png', fullPage: true });
   await ctx.close();
 }
@@ -375,11 +377,13 @@ for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'],
 {
   const { ctx, p, stav, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-zakaznici'), dalsi: podvrh });
   await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
-  tvrdi('Z1: h1 „Zákazníci", widgety Členové (se jmény) a Hodnocení nad nástrojem', (await h1(p)).text === 'Zákazníci'
+  // Kolo 92: stránka se jmenuje Hosté (CRM); úprava bodů je v profilu hosta (panel vedle seznamu).
+  tvrdi('Z1: h1 „Hosté", widgety Členové (se jmény) a Hodnocení nad nástrojem', (await h1(p)).text === 'Hosté'
     && (await widgetLi(p, 'klient.clenove').innerText()).includes('Tereza Málková') && (await widgetLi(p, 'klient.hodnoceni').innerText()).includes('4,6'));
   const nastroj = widgetLi(p, 'nastroj');
   let dialog = false;
   p.on('dialog', d => { dialog = true; void d.dismiss(); });
+  await nastroj.getByRole('button', { name: 'Profil hosta Jana Dvořáková' }).first().click();
   await nastroj.getByRole('button', { name: 'Upravit body a kredit: Jana Dvořáková' }).click();
   const okno = p.getByRole('dialog', { name: 'Body pro Jana Dvořáková' });
   tvrdi('Z-B: úprava bodů v okně (ne prompt())', await dokud(() => okno.isVisible(), 1500) && !dialog);
@@ -388,16 +392,13 @@ for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'],
   await okno.getByRole('button', { name: 'Uložit' }).click();
   tvrdi('Z-B: …a pošle POST { customerId: 101, delta: 50 }', await dokud(() => (stav.body ?? []).some(b => b.customerId === 101 && b.delta === 50 && b.note === 'Omluva za čekání'), 2000), JSON.stringify(stav.body));
 
-  // 7) Rozepsaná zpráva členům přežije vstup do úprav a výstup z nich.
-  await p.locator('[data-plocha]').getByRole('tab', { name: 'Zprávy členům' }).click();
-  await nastroj.getByLabel('Nadpis').waitFor({ timeout: 5000 });
-  await nastroj.getByLabel('Nadpis').fill('Degustace nových čajů');
+  // 7) Kolo 92: zprávy členům se přestěhovaly z Hostů do Kampaní (průvodce v okně, stránka bez plochy),
+  // takže „rozepsaná zpráva přežije úpravy plochy" tu už nemá co měřit. Úpravy plochy Hostů dál fungují:
   await upravit(p).click();
   tvrdi('Z2: vstup do úprav', await dokud(() => vUpravach(p), 1500));
   await p.waitForTimeout(400);
   await hotovo(p).click().catch(() => {});
-  await dokud(async () => !(await vUpravach(p)), 1500);
-  tvrdi('Z7: rozepsaný nadpis zprávy přežil úpravy', await nastroj.getByLabel('Nadpis').inputValue() === 'Degustace nových čajů');
+  tvrdi('Z2: výstup z úprav', await dokud(async () => !(await vUpravach(p)), 1500));
   tvrdi('Z: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }
@@ -409,10 +410,11 @@ for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'],
   const { ctx, p, stav } = await kontext({ fix: nacti('k69-b8-rozlozeni-zakaznici'), mineData: SKUPINY, dalsi: podvrh });
   await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
   const nastroj = widgetLi(p, 'nastroj');
-  const tlacitko = nastroj.getByRole('button', { name: 'Skupiny', exact: true }).first();
-  tvrdi('Z-S: bez vernost.zobrazit je u člena „Skupiny" (dřív „Deník" jen s věrností)', await dokud(() => tlacitko.isVisible(), 5000)
-    && await nastroj.getByRole('button', { name: 'Deník', exact: true }).count() === 0);
+  // Kolo 92: skupiny člena jsou v profilu hosta (klepnutí na jméno); bez vernost.zobrazit profil nemá historii.
+  const tlacitko = nastroj.getByRole('button', { name: /^Profil hosta/ }).first();
+  tvrdi('Z-S: bez vernost.zobrazit jde otevřít profil hosta', await dokud(() => tlacitko.isVisible(), 5000));
   await tlacitko.click();
+  tvrdi('Z-S: profil bez vernost.zobrazit nemá historii', await nastroj.getByRole('heading', { name: 'Historie' }).count() === 0);
   const stitek = nastroj.getByRole('button', { name: 'Stálí hosté' });
   tvrdi('Z-S: …rozbalí štítky skupin', await dokud(() => stitek.isVisible(), 2000));
   await stitek.click();
@@ -428,7 +430,7 @@ for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'],
 {
   const { ctx, p, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-vernost'), dalsi: podvrh });
   await otevri(p, CLIENT('loyalty'), 'vedeni.klient_vernost');
-  tvrdi('V1: h1 „Věrnost", widget Věrnost za 30 dní nad nástrojem', (await h1(p)).text === 'Věrnost' && cislo('2 310').test(await widgetLi(p, 'klient.vernost_30dni').innerText()));
+  tvrdi('V1: h1 „Věrnostní program", widget Věrnost za 30 dní na stránce', (await h1(p)).text === 'Věrnostní program' && cislo('2 310').test(await widgetLi(p, 'klient.vernost_30dni').innerText()));
   tvrdi('V-R: widget na stránce Věrnost nemá odkaz „Věrnost ›" (vedl by sem)', await widgetLi(p, 'klient.vernost_30dni').getByRole('button', { name: 'Věrnost', exact: true }).count() === 0);
   await p.locator('[data-plocha]').getByRole('tab', { name: 'Body a úrovně' }).click();
   await widgetLi(p, 'nastroj').getByText('Úrovně hostů a jejich sleva').waitFor({ timeout: 5000 });

@@ -27,6 +27,7 @@ import { formatujPriPsani } from '@/lib/poukazy';
 import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
 import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
 import CekaNaZaplaceni, { ParovaniHosta } from './CekaNaZaplaceni';
+import CteckaHost, { hlavniKampan, type ZamerCtecky } from './sprava/CteckaHost';
 import KartickaAktivace from './KartickaAktivace';
 import { ciziCislo } from '@/lib/kartyFyzicke';
 
@@ -314,8 +315,9 @@ export default function CteckaKasa() {
   };
 
   // ---- Akce u hosta ----
-  const akce = async (action: 'stamp' | 'points' | 'credit' | 'bill' | 'join' | 'undo' | 'items', extra: { amount?: number; billId?: string; items?: { itemId: number; qty: number }[] } = {}) => {
-    if (faze.druh !== 'host') return;
+  const akce = async (action: 'stamp' | 'points' | 'credit' | 'bill' | 'join' | 'undo' | 'items', extra: { amount?: number; billId?: string; items?: { itemId: number; qty: number }[] } = {}): Promise<boolean> => {
+    if (faze.druh !== 'host') return false;
+    let povedlo = false;
     const kod = faze.kod;
     setBusy(action + (extra.billId ?? ''));
     // Idempotency-Key: stejná akce při opakování po výpadku sítě = stejný klíč, server ji připíše jednou.
@@ -330,11 +332,43 @@ export default function CteckaKasa() {
       setUpoz({ expiredCount: x.expiredCount, lost: x.lost });
       ohlas(x.message, true); zapis(x.message, true, kod);
       if (action === 'bill') setObnovaParovani(n => n + 1);
+      povedlo = true;
     } catch (e) {
       klicAkce.pochybe(e instanceof ApiError ? e.status : null);
       ohlas(chyba(e, 'karta'), false);
     }
     setBusy('');
+    return povedlo;
+  };
+  // Kolo 92: razítko za návštěvu (+ razítka navíc ruční úpravou s důvodem) a volitelně uplatnění odměny,
+  // kterou si host vybral v aplikaci (záměr, kontrakt-ctecka.md §2b) — jedno klepnutí obsluhy.
+  const [pocetRazitek, setPocetRazitek] = useState(1);
+  const kodHosta = faze.druh === 'host' ? faze.kod : null;
+  useEffect(() => { setPocetRazitek(1); }, [kodHosta]);
+  const razitkaNavic = async (h: any, n: number) => {
+    const k = hlavniKampan(h);
+    if (n <= 1 || !k) return;
+    try {
+      await fetch('/api/client/admin/stamps/member', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: h.customer.id, campaignId: k.id, delta: n - 1, reason: `U kasy: ${n} razítka za jednu návštěvu` }) }).then(okJson);
+    } catch (e) { ohlas(chyba(e, 'karta'), false); }
+  };
+  const razitko = async () => {
+    if (faze.druh !== 'host') return;
+    const h = faze.data; const n = pocetRazitek;
+    if (await akce('stamp')) { await razitkaNavic(h, n); setPocetRazitek(1); }
+  };
+  const kombinace = async (zamer: ZamerCtecky) => {
+    if (faze.druh !== 'host') return;
+    const h = faze.data; const n = pocetRazitek;
+    const sRazitkem = smiKartu && !h.stampedToday && !!hlavniKampan(h);
+    setBusy('kombinace');
+    if (sRazitkem) {
+      if (!(await akce('stamp'))) { setBusy(''); return; }
+      await razitkaNavic(h, n);
+    }
+    await uplatniKupon(zamer.code);
+    setPocetRazitek(1);
   };
   const uplatniKupon = async (kod: string, jenPoukazanyKupon = false) => {
     setBusy('kupon:' + kod);
@@ -441,26 +475,9 @@ export default function CteckaKasa() {
 
         {faze.druh === 'host' && h && (
           <div className="space-y-4" data-testid="ctecka-host">
-            <div className="min-w-0">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xl font-bold leading-tight break-words text-[#16181A]">{h.customer.name}</p>
-                  <p className="t-meta tabular-nums mt-0.5">
-                    {h.member ? `${h.points} b. · ${czCount(h.visits, NAVSTEVA)} · naposledy ${poslediNavsteva(h.lastVisit)}` : 'Ještě není členem tohoto podniku.'}
-                  </p>
-                </div>
-                <Button size="sm" variant="ghost" onClick={dalsi}>Jiný host</Button>
-              </div>
-              {h.member && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  {h.levelLabel && <Chip tone={h.tier === 'silver' ? 'muted' : 'ink'} size="sm">{h.levelLabel}</Chip>}
-                  {h.discount > 0 && <Chip tone="ok" size="sm">Sleva {h.discount} %{h.discountSource === 'skupina' && h.discountName ? ` (${h.discountName})` : h.discountSource === 'uroven' ? ' (úroveň)' : ''}</Chip>}
-                  {h.credit > 0 && <Chip tone="ok" size="sm" icon="card">Kredit {money(h.credit)}</Chip>}
-                  {h.birthdayToday && <Chip tone="info" size="sm" icon="gift">Má dnes narozeniny</Chip>}
-                  {h.stampedToday && <Chip tone="muted" size="sm" icon="check">Dnes už razítko</Chip>}
-                </div>
-              )}
-            </div>
+            <CteckaHost h={h} nazevPodniku={h.podnik ?? 'Tvůj podnik'} busy={busy} pocet={pocetRazitek} setPocet={setPocetRazitek}
+              smiRazitko={smiKartu} smiKupon={smiKupon} smiNavic={op.ma('vernost.razitka_upravit')}
+              onRazitko={() => { void razitko(); }} onKombinace={z => { void kombinace(z); }} onJiny={dalsi} />
 
             {!h.member && (
               <div className="space-y-2">
@@ -472,13 +489,8 @@ export default function CteckaKasa() {
             {/* Pokladna Storyous: sken založil párování, body se připíšou samy po zaplacení. */}
             {h.parovani && <ParovaniHosta parovani={h.parovani} velke onZmena={() => setObnovaParovani(n => n + 1)} />}
 
-            {/* Nejčastější akce nahoře: razítko, účtenky, body z částky. */}
+            {/* Účtenky a body z částky pod hlavními akcemi. */}
             <div className="space-y-2">
-              <Button size="lg" variant="primary" icon="check" className="w-full" loading={busy === 'stamp'}
-                disabled={h.stampedToday || (!h.rules?.stampTarget && !h.campaigns?.some((c: any) => c.ruleType === 'visit')) || (h.campaigns?.some((c: any) => c.ruleType === 'visit') && !h.campaigns.some((c: any) => c.ruleType === 'visit' && c.platiTed !== false))}
-                onClick={() => akce('stamp')}>
-                {h.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
-              </Button>
               {h.bills?.length > 0 && h.parovani && <p className="t-label pt-1">Nebo vyber účet hned</p>}
               {h.bills?.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

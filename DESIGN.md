@@ -2144,6 +2144,31 @@ aplikace jede jako dřív.
   a sonda `scripts/sondy/k73-pruvodce.mjs` (1280 a 390 px, tmavý režim,
   omezený pohyb, klávesnice, výpadek sítě, přerušení a pokračování).
 
+## Správa Managero client (kolo 92)
+
+Čtyři oblasti místo jedenácti záložek: **Přehled** · **Provoz** (Rezervace, Objednávky,
+Stoly, Čtečka u kasy) · **Hosté** (Hosté, Kampaně, Hodnocení) · **Věrnost** (Program, Kupony
+a poukazy) · **Podnik** (Stránka podniku, Menu, Akce, Nastavení). Telefon: dok Přehled ·
+Rezervace · Čtečka · Hosté · Více. Id záložek (`tab=customers`…) zůstávají kvůli odkazům.
+
+- **Přehled jen o hostech.** Výchozí rozložení bez „Čeká na tebe" z Managera; nahoře průvodce
+  nastavením (N/7, jeden další krok), zdraví programu (čísla se srovnáním, bez dat „–"),
+  Před směnou (narozeniny, alergie z poznámek, štamgast, poprvé), razítka za 14 dní.
+- **Co vidí host, má vedle sebe náhled.** Program věrnosti a Stránka podniku: formulář
+  vlevo, `RamTelefonu` s kartou hosta vpravo (lg sticky); na telefonu náhled nahoře
+  a sbalený. Karta hosta je jedna komponenta (HOST `components/client/karta/*`, ve správě
+  přes `components/client/sprava/NahledKarty.tsx`). Barva podniku jen na kartě a v hlavičce
+  jeho stránky; hlavní akce hosta zůstává limetková.
+- **Hosté = CRM:** segmenty jako čipy s počty (`lib/klientSprava/segmentyHostu.ts`), tabulka
+  hodnoty na monitoru (čísla na R), řádky seznamu na telefonu, profil hosta jako panel vedle
+  seznamu (lg) / okno zdola (telefon) s jednou časovou osou.
+- **Kampaně ve třech krocích** (Komu · Co · Kontrola) v okně, živý počet „dostane N";
+  výsledek jen z dat, která máme (příjemci u kasy do 7 dní), nikdy otevření nebo tržba.
+- **Automatizace jsou recepty**: seznam s větou a stavem, výchozí vypnuté, editor až po
+  „Nastavit".
+- **Čtečka u kasy:** jedna obrazovka, dvě akce nad sebou — kombinovaná limetkou (uplatnit
+  vybranou odměnu + razítko), druhá šedá.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; název stránky

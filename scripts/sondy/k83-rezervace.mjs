@@ -158,7 +158,8 @@ for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'],
   const okno = p.getByRole('dialog', { name: 'Nová rezervace' });
   const novaTl = p.locator('[data-plocha]').getByRole('button', { name: 'Nová rezervace' });
   // Odchod z Rezervací s otevřeným oknem (dok pod oknem; záložka se odmontuje i s oknem).
-  const odejdi = () => p.evaluate(() => { const b = [...document.querySelectorAll('nav[aria-label="Spodní navigace klienta"] button')].find(x => /Objednávky/.test(x.textContent ?? '')); b?.click(); });
+  // Kolo 92: v doku jsou Přehled · Rezervace · Čtečka · Hosté · Více — odchází se na Hosty (dřív Objednávky).
+  const odejdi = () => p.evaluate(() => { const b = [...document.querySelectorAll('nav[aria-label="Spodní navigace klienta"] button')].find(x => /Hosté/.test(x.textContent ?? '')); b?.click(); });
   // Bez psaného textu se nic neukládá: okno samo předvybere čas, to není rozepsaná práce.
   await novaTl.click();
   await dokud(() => okno.isVisible(), 2000);
@@ -183,7 +184,7 @@ for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'],
   tvrdi('D2: …se jménem a poznámkou a přizná, že je obnovené', obnoveno.jmeno === 'Rozepsaný Host' && obnoveno.pozn === 'Volal v poledne' && obnoveno.veta, JSON.stringify(obnoveno));
   await okno.getByRole('button', { name: 'Zrušit', exact: true }).click();
   await p.waitForTimeout(400);
-  await zalozka('Objednávky').click();
+  await zalozka('Hosté').click();
   await p.waitForTimeout(800);
   await zalozka('Rezervace').click();
   await p.waitForTimeout(1200);

@@ -52,6 +52,8 @@ export async function GET() {
       pointsPer100: Number(p.points_per_100) || 0,
       stampTarget: Number(p.stamp_target) || 0,
       stampReward: p.stamp_reward ?? '',
+      // Kolo 92: průvodce nastavením — vzhled je hotový s logem nebo vlastní barvou.
+      brand: !!(p.logo_url || p.accent),
     },
   }, k => ctx.role.opravneni.has(k)));
 }

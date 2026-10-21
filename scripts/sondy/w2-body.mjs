@@ -113,6 +113,8 @@ const nastroj = (p) => p.locator('[data-plocha] li[data-widget="nastroj"]');
 {
   const { ctx, p, stav, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-vernost'), dalsi: podvrh });
   await otevri(p, CLIENT('loyalty'), 'vedeni.klient_vernost');
+  // Kolo 92: výchozí část Věrnosti je Program (živý náhled karty); statistiky jsou v části Přehled.
+  await p.locator('[data-plocha]').getByRole('tab', { name: 'Přehled' }).click();
   const n = nastroj(p);
   await n.getByText('Závazek vůči hostům').waitFor({ timeout: 8000 });
   const txt = (await n.innerText()).replace(/[\s  ]+/g, ' ');
@@ -137,6 +139,8 @@ const nastroj = (p) => p.locator('[data-plocha] li[data-widget="nastroj"]');
   const { ctx, p, stav, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-zakaznici'), dalsi: podvrh });
   await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
   const n = nastroj(p);
+  // Kolo 92: úprava bodů a kreditu je v profilu hosta (klepnutí na jméno), ne v řádku seznamu.
+  await n.getByRole('button', { name: 'Profil hosta Jana Dvořáková' }).first().click();
   await n.getByRole('button', { name: 'Upravit body a kredit: Jana Dvořáková' }).click();
   const okno = p.getByRole('dialog');   // název okna se mění podle záložky (Body / Kredit / Útrata)
   await okno.getByText('Body pro Jana Dvořáková').waitFor({ timeout: 3000 });

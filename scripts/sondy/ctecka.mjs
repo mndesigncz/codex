@@ -88,9 +88,10 @@ for (const [sirka, mobil] of [[390, true], [1280, false]]) {
   await sken(p, 'ABCD-EFGH');
   await p.locator('[data-testid="ctecka-host"]').waitFor({ timeout: 5000 });
   const host = await p.locator('[data-testid="ctecka-host"]').innerText();
+  // Kolo 92: postup razítek je na kartě hosta v barvě podniku („5 / 8 razítek"), body v řádku pod jménem.
   tvrdi(`${jm}: dotaz s kódem karty`, zaznam.some(z => z.m === 'GET' && z.code === 'ABCD-EFGH'));
   for (const [co, re] of [['jméno', /Klára Vojtíšková/], ['úroveň', /Stříbrný/], ['sleva se zdrojem', /Sleva 10 % \(Stálí hosté\)/], ['body', /240 b\./],
-    ['kredit', /Kredit/], ['postup razítek', /5\/8/], ['kupon k uplatnění', /Káva zdarma za plnou kartu/], ['druhý kupon', /Sleva 20 % na dort/],
+    ['kredit', /Kredit/], ['postup razítek', /5 ?\/ ?8/], ['kupon k uplatnění', /Káva zdarma za plnou kartu/], ['druhý kupon', /Sleva 20 % na dort/],
     ['kupon za body', /Čaj na památku/], ['narozeniny', /narozeniny/], ['poslední návštěva', /naposledy před 3 dny/], ['účtenka', /Připsat z účtenky/]]) {
     tvrdi(`${jm}: host ukazuje ${co}`, re.test(host), host.slice(0, 200));
   }
