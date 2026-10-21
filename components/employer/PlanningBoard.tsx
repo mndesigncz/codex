@@ -57,6 +57,7 @@ export default function PlanningBoard() {
   const t = useT('sprava');
   const { jazyk } = useJazyk();
   const nazvySloupcu: Record<IdSloupce, string> = { ideas: t('Nápady'), in_progress: t('Rozpracováno'), review: t('Ke schválení'), done: t('Hotovo') };
+  const kratkeNazvy: Record<IdSloupce, string> = { ideas: t('Nápady'), in_progress: t('V práci'), review: t('Schválit'), done: t('Hotovo') };
   const smi = useSmi();
   const nav = useNavigace();
   const upravuje = smi('planovani.upravit');
@@ -255,7 +256,9 @@ export default function PlanningBoard() {
       {(cards.length > 0 || newCard) && (
         <div className="sm:hidden">
           <Segmented size="sm" ariaLabel={t('Sloupec tabule')} value={sloupecTelefon} onChange={setSloupecTelefon}
-            options={COLUMNS.map(c => ({ id: c.id, label: nazvySloupcu[c.id], count: getColumnCards(c.id).length }))} />
+            // Audit 2026-10 (V31): s plnými názvy a počty se „Hotovo" na 390 px uřízlo za okraj. Na telefonu
+            // krátké názvy (V práci, Schválit) a počet číslem v textu místo odznaku — čtyři díly se vejdou.
+            options={COLUMNS.map(c => ({ id: c.id, label: `${kratkeNazvy[c.id]} ${getColumnCards(c.id).length}` }))} />
         </div>
       )}
       <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 ${cards.length === 0 && !newCard ? 'hidden' : ''}`}>

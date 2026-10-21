@@ -505,7 +505,8 @@ const FIX_PLAN = nacti('k69-b6a-rozlozeni-planovani');
   });
   tvrdi('P6 (V13): vidět je jeden sloupec přes celou šířku a tabule se neposouvá do strany', tabule.vidSloupcu === 1 && tabule.siroky && tabule.pas <= 1, JSON.stringify(tabule));
   tvrdi('P6 (V13): ze začátku Nápady (Nová sezónní káva)', await nastrojP.getByText('Nová sezónní káva').isVisible() && !(await nastrojP.getByText('Letní terasa').isVisible()));
-  await zalozky.getByRole('tab', { name: /^Ke schválení/ }).click();
+  // Audit 2026-10 (V31): na telefonu krátký název „Schválit 2" (s plnými názvy a odznaky se Hotovo uřízlo).
+  await zalozky.getByRole('tab', { name: /^Schválit/ }).click();
   tvrdi('P6 (V13): záložka Ke schválení ukáže svoje karty pod sebou', await dokud(async () => await nastrojP.getByText('Letní terasa').isVisible() && await nastrojP.getByText('Nový ceník').isVisible() && !(await nastrojP.getByText('Nová sezónní káva').isVisible()), 2000));
   const karty = await nastrojP.locator('section:visible ul > li.card').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
   tvrdi('P6 (V13): karty sloupce jsou svisle pod sebou', karty.length === 2 && karty[1] > karty[0], JSON.stringify(karty));
