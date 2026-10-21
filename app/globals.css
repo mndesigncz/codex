@@ -2091,3 +2091,15 @@ html[data-obal] .jen-web { display: none !important; }
 /* Limetkové plochy zůstávají limetkové i v tmavém (inkoust na limetce je správně). */
 :root[data-theme="dark"] .h-raz-odmena.h-raz-plne, :root[data-theme="dark"] .h-plus { color: #16181A; }
 :root[data-theme="dark"] .h-raz-odmena { color: #C8F542; }
+/* Audit 2026-10 (průřez 9): „Skrýt tenhle popis" u podtitulku PageHeader se ukazoval jen
+   na hover (opacity-0 → group-hover) — na telefonu a tabletu ho nikdo neviděl. Na
+   dotykových zařízeních je křížek vidět tlumeně pořád (cíl 44 drží .tap-target-sm). */
+@media (hover: none) {
+  .t-page + p.group > button.tap-target-sm { opacity: 0.5; }
+}
+
+/* Audit 2026-10 (K04/B12): záložky tabletu, jejichž obrazovka má vlastní kontejner stránky
+   (Postupy: p-6 + max-w-5xl na střed, Uzávěrka a Návody: p-6), sedí na stejné hraně L/R
+   jako Úkoly, Sklad a Objednávky — odsazení stránky dává obal tabletu, ne obrazovka. */
+.kiosk-zalozka > :first-child { padding: 0; max-width: none; margin-left: 0; margin-right: 0; }
+.kiosk-zalozka .plocha { padding-left: 0; padding-right: 0; padding-top: 0; }

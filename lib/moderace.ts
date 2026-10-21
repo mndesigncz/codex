@@ -35,7 +35,7 @@ export function platneNahlaseni(b: unknown): VstupNahlaseni {
   const refId = Number(x.refId);
   if (!Number.isInteger(refId) || refId <= 0) return { ok: false, error: 'Neplatný obsah.' };
   const reason = String(x.reason ?? '');
-  if (!DUVODY.some(d => d.id === reason)) return { ok: false, error: 'Vyberte důvod nahlášení.' };
+  if (!DUVODY.some(d => d.id === reason)) return { ok: false, error: 'Vyber důvod nahlášení.' };
   const detail = typeof x.detail === 'string' && x.detail.trim() ? x.detail.trim().slice(0, 500) : null;
   return { ok: true, kind, refId, reason, detail };
 }

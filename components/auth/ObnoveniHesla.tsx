@@ -47,14 +47,14 @@ export function ZapomenuteHesloForm({ klient }: { klient: boolean }) {
       if (!r.ok) setChyba(d.error ? tg(d.error) : t('Žádost se nepodařilo odeslat.'));
       else setHotovo(t('Pokud je e-mail v aplikaci, poslali jsme na něj odkaz pro nové heslo.'));
     } catch {
-      setChyba(t('Žádost se nepodařilo odeslat. Zkontrolujte připojení.'));
+      setChyba(t('Žádost se nepodařilo odeslat. Zkontroluj připojení.'));
     } finally { setBusy(false); }
   };
 
   return (
     <Obal klient={klient}>
       <h1 className="t-page">{t('Zapomenuté heslo')}</h1>
-      <p className="t-meta mt-2 text-pretty">{t('Napište e-mail účtu. Pošleme odkaz, kterým si nastavíte nové heslo.')}</p>
+      <p className="t-meta mt-2 text-pretty">{t('Napiš e-mail účtu. Pošleme odkaz, kterým si nastavíš nové heslo.')}</p>
       {hotovo ? (
         <p role="status" className="note note-ok mt-5">{hotovo}</p>
       ) : (
@@ -91,7 +91,7 @@ export function NoveHesloForm({ klient, token }: { klient: boolean; token: strin
       if (!r.ok) setChyba(d.error ? tg(d.error) : t('Heslo se nepodařilo změnit.'));
       else setHotovo(true);
     } catch {
-      setChyba(t('Heslo se nepodařilo změnit. Zkontrolujte připojení.'));
+      setChyba(t('Heslo se nepodařilo změnit. Zkontroluj připojení.'));
     } finally { setBusy(false); }
   };
 
@@ -100,7 +100,7 @@ export function NoveHesloForm({ klient, token }: { klient: boolean; token: strin
       <h1 className="t-page">{t('Nové heslo')}</h1>
       {hotovo ? (
         <>
-          <p role="status" className="note note-ok mt-5">{t('Heslo je změněné. Můžete se přihlásit.')}</p>
+          <p role="status" className="note note-ok mt-5">{t('Heslo je změněné. Můžeš se přihlásit.')}</p>
           <Link href={login} className={`${hlavniTlacitko(klient)} tap-target mt-5 w-full`}>{t('Přihlásit se')}</Link>
         </>
       ) : (

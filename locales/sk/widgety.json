@@ -1,11 +1,11 @@
 {
+  "3": "3",
   "+{castka} k výplatě": "+{castka} k výplate",
   "+{n} b každému": "+{n} b každému",
   "+{n} min po začátku": "+{n} min po začiatku",
   "+{n} za 30 dní": "+{n} za 30 dní",
   "1. návštěva": "1. návšteva",
   "14 dní": "14 dní",
-  "3": "3",
   "3 měsíce": "3 mesiace",
   "30 dní": "30 dní",
   "6 měsíců": "6 mesiacov",
@@ -1239,7 +1239,6 @@
   "Tablet": "Tablet",
   "Tablet si rozložení neupravuje — nastavuje ho vedení v Nastavení → Stránky.": "Tablet si rozloženie neupravuje — nastavuje ho vedenie v Nastaveniach → Stránky.",
   "Tabule je zatím prázdná.": "Tabuľa je zatiaľ prázdna.",
-  "Tabulky pro menu ještě nejsou v databázi.": "Tabuľky pre menu ešte nie sú v databáze.",
   "Tahle stránka neexistuje": "Táto stránka neexistuje",
   "Tahouni": "Ťahúni",
   "Takový widget tu není. Zkus jiné slovo.": "Taký widget tu nie je. Skús iné slovo.",
@@ -2752,5 +2751,9 @@
   "Kolik razítek hosté dostali po dnech a kolik bodů se rozdalo.": "Koľko pečiatok hostia dostali po dňoch a koľko bodov sa rozdalo.",
   "Automatizace": "Automatizácie",
   "Které zprávy odcházejí samy a kolik jich odešlo tento měsíc. Výchozí vypnuté.": "Ktoré správy odchádzajú samy a koľko ich odišlo tento mesiac. Predvolene vypnuté.",
-  "Věrnostní program": "Vernostný program"
+  "Věrnostní program": "Vernostný program",
+  "Menu se ještě připravuje. Zkus to za chvíli znovu.": "Menu sa ešte pripravuje. Skús to o chvíľu znova.",
+  "Zapsat hned": "Zapísať hneď",
+  "Odchod zapíšu za {n} s. Do té doby ho jde vrátit.": "Odchod zapíšem o {n} s. Dovtedy ho ide vrátiť.",
+  "Vrátit odchod": "Vrátiť odchod"
 }

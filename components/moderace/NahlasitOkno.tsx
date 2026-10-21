@@ -31,7 +31,7 @@ export default function NahlasitOkno({ kind, refId, onClose, onDone }: {
       if (!r.ok) { setChyba(d.error ? tg(d.error) : t('Nahlášení se nepodařilo odeslat.')); return; }
       onDone(t('Děkujeme, nahlášení uvidí vedení podniku.'));
     } catch {
-      setChyba(t('Nahlášení se nepodařilo odeslat. Zkontrolujte připojení.'));
+      setChyba(t('Nahlášení se nepodařilo odeslat. Zkontroluj připojení.'));
     } finally { setBezi(false); }
   };
 

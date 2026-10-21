@@ -187,7 +187,7 @@ export function MaxGate({ feature, children, benefit, employer = true }: {
         ) : (
           <p className="text-xs text-black/40">{t('Řekni vedení — Max se zapíná v Nastavení → Předplatné.')}</p>
         )}
-        <p className="text-[11px] text-black/35">{t('Max stojí {cena} {mena} měsíčně za podnik.', { cena: PRICES.max.month })}</p>
+        <p className="text-[11px] text-black/35">{t('Max stojí {cena} {mena} měsíčně za podnik.', { cena: PRICES.max.month, mena: PRO_PRICE.currency })}</p>
       </div>
     </div>
   );

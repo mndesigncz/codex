@@ -113,7 +113,7 @@ export async function POST(request: Request) {
   const remindAt = remindAnchor === 'time' ? parseRemindAt(body.remindAt) : null;
   const remindDays = parseRemindDays(body.remindDays);
 
-  if (!name) return NextResponse.json({ error: 'Zadejte název postupu' }, { status: 400 });
+  if (!name) return NextResponse.json({ error: 'Zadej název postupu' }, { status: 400 });
   if (items.length === 0) return NextResponse.json({ error: 'Přidejte alespoň jeden krok' }, { status: 400 });
 
   let created: any;

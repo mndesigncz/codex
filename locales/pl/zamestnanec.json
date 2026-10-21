@@ -447,5 +447,7 @@
   "Volitelné — kdo chce, vezme si. Body dostaneš po uznání.": "Dobrowolne — kto chce, ten bierze. Punkty dostaniesz po uznaniu.",
   "Za body navíc": "Ekstra za punkty",
   "Zapsat navíc": "Zapisz ekstra",
-  "strop {strop} b — nasbíral/a {nasbirano}": "limit {strop} pkt — zebrano {nasbirano}"
+  "strop {strop} b — nasbíral/a {nasbirano}": "limit {strop} pkt — zebrano {nasbirano}",
+  "Napiš částku pohybu.": "Wpisz kwotę.",
+  "Detail dne {den}": "Szczegóły dnia {den}"
 }

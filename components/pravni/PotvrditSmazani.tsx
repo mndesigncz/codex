@@ -30,7 +30,7 @@ export default function PotvrditSmazani({ token }: { token: string }) {
       setVarovani(Array.isArray(d.varovani) ? d.varovani : []);
       setStav('hotovo');
     } catch {
-      setChyba(t('Účet se nepodařilo smazat. Zkontrolujte připojení a zkuste to znovu.'));
+      setChyba(t('Účet se nepodařilo smazat. Zkontroluj připojení a zkus to znovu.'));
       setStav('cekam');
     }
   };
@@ -39,7 +39,7 @@ export default function PotvrditSmazani({ token }: { token: string }) {
     return (
       <div className="card p-6 max-w-md w-full text-center">
         <h1 className="t-page">{t('Účet je smazaný')}</h1>
-        <p className="t-meta mt-3 text-pretty">{t('Osobní údaje jsme odstranili. Děkujeme, že jste Managero používali.')}</p>
+        <p className="t-meta mt-3 text-pretty">{t('Osobní údaje jsme odstranili. Díky, že jsi Managero používal(a).')}</p>
         {varovani.map(v => <p key={v} role="status" className="note mt-3 text-pretty">{tg(v)}</p>)}
         <Link href="/" className="btn btn-secondary mt-6 tap-target">{t('Na úvod')}</Link>
       </div>
@@ -54,7 +54,7 @@ export default function PotvrditSmazani({ token }: { token: string }) {
           <div>
             <label htmlFor="sp-heslo" className="field-label">{t('Heslo')}</label>
             <input id="sp-heslo" type="password" autoComplete="current-password" value={heslo} onChange={e => setHeslo(e.target.value)} className="field" />
-            <p className="t-meta mt-1 text-pretty">{t('Heslo neznáte? Nejdřív si ho obnovte přes Zapomenuté heslo a pak se sem vraťte odkazem z nového e-mailu.')}</p>
+            <p className="t-meta mt-1 text-pretty">{t('Heslo neznáš? Nejdřív si ho obnov přes Zapomenuté heslo a pak se sem vrať odkazem z nového e-mailu.')}</p>
           </div>
           <div>
             <label htmlFor="sp-smazat" className="field-label">{t('Pro smazání podniku napište SMAZAT')}</label>
@@ -62,7 +62,7 @@ export default function PotvrditSmazani({ token }: { token: string }) {
           </div>
         </div>
       )}
-      <p className="t-meta mt-3 text-pretty">{t('Smaže se profil, věrnostní karta, členství, kupony a oznámení zařízení. Nejde to vrátit. Záznamy, které podnik vede ze zákona (směny, docházka), zůstanou bez vašeho jména.')}</p>
+      <p className="t-meta mt-3 text-pretty">{t('Smaže se profil, věrnostní karta, členství, kupony a oznámení zařízení. Nejde to vrátit. Záznamy, které podnik vede ze zákona (směny, docházka), zůstanou bez tvého jména.')}</p>
       {chyba && <p role="alert" className="note note-danger mt-4">{chyba}</p>}
       <div className="mt-6 flex flex-wrap gap-2.5">
         <button type="button" onClick={smazat} disabled={stav === 'bezi' || (podnik !== null && (!heslo || potvrzeni.trim() !== 'SMAZAT'))} className="btn btn-primary tap-target disabled:opacity-50">{stav === 'bezi' ? t('Mažu…') : podnik ? t('Smazat podnik i účet') : t('Ano, smazat účet')}</button>

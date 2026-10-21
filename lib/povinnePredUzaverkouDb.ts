@@ -121,7 +121,7 @@ export async function urciKontextUzaverky(c: Kontext, b: VstupUzaverky): Promise
         }
         eventId = wantEvent;
       } catch {
-        return NextResponse.json({ error: 'Akce nejsou dostupné — spusť /api/init.' }, { status: 400 });
+        return NextResponse.json({ error: 'Akce se ještě připravují. Zkus to za chvíli znovu.' }, { status: 400 });
       }
     }
   }

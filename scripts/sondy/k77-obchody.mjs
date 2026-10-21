@@ -177,7 +177,8 @@ console.log('O3 Platby');
   for (const [popis, ua, ma] of [['provoz', UA_PROVOZ, false], ['web', UA_WEB, true]]) {
     const { ctx, p } = await kontext(ua, 'employer', { width: 1280, height: 950 });
     await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
-    await p.getByText('Zabezpečení').first().waitFor({ timeout: 15000 });
+    // Viditelná položka nabídky (dřív se náhodou chytil podtitul „…oznámení a zabezpečení." — audit N: podtitul vedení je jiný).
+    await p.getByText('Zabezpečení', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
     const t = await text(p);
     tvrdi(`nastavení (${popis}): položka Předplatné ${ma ? 'je' : 'není'}`, /Předplatné/.test(t) === ma, t.slice(0, 200));
     if (!ma) tvrdi('nastavení (provoz): žádná cena a Stripe', !ZAKAZANO.test(t), t.slice(0, 200));
@@ -296,10 +297,10 @@ console.log('O5 Smazání účtu');
     const okno = p.getByRole('dialog');
     await okno.getByLabel('Heslo').fill('Moje-Heslo-123');
     await okno.getByRole('button', { name: 'Smazat účet' }).click();
-    await okno.getByText('Napište SMAZAT').waitFor({ timeout: 5000 });
+    await okno.getByText('Napiš SMAZAT').waitFor({ timeout: 5000 });
     tvrdi('vlastník: server vysvětlí, že podnik má další členy, a chce potvrzení', /další lidé/.test(await okno.innerText()) && smazani.length === 1 && !('smazatPodnik' in smazani[0]));
     tvrdi('vlastník: bez slova SMAZAT je potvrzení zamčené', await okno.getByRole('button', { name: 'Smazat podnik i účet' }).isDisabled());
-    await okno.getByLabel('Napište SMAZAT').fill('SMAZAT');
+    await okno.getByLabel('Napiš SMAZAT').fill('SMAZAT');
     await okno.getByRole('button', { name: 'Smazat podnik i účet' }).click();
     await p.waitForURL(/\/login/, { timeout: 15000 });
     tvrdi('vlastník: druhý DELETE nese volbu podniku a potvrzení, pak odhlášení na přihlášení', smazani.length === 2 && smazani[1].smazatPodnik === true && smazani[1].potvrzeni === 'SMAZAT', JSON.stringify(smazani));

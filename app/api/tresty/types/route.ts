@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     audit(c.teamId, c.meId, 'tresty.sazebnik.pridat', 'penalty_type', Number(row.id), `${d.title} · −${d.points} b${d.bonusCut ? ` · krácení ${mena.money(d.bonusCut)}` : ''}`);
     return NextResponse.json({ ok: true, type: tvarDruhu(row) }, { status: 201 });
   } catch (e) {
-    if (predMigraci(e)) return chyba('Sazebník ještě není připravený — spusť /api/init.', 503);
+    if (predMigraci(e)) return chyba('Sazebník se ještě připravuje. Zkus to za chvíli znovu.', 503);
     console.error('tresty/types POST', e);
     return chyba('Položka se neuložila.', 500);
   }

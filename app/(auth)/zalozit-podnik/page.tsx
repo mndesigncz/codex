@@ -23,8 +23,8 @@ export default async function ZalozitPodnikPage() {
         <LogoMark size={40} />
         <div className="space-y-2">
           <h1 className="t-page text-balance">{t('Účet podniku založíte na webu')}</h1>
-          <p className="t-meta text-pretty">{t('Nový podnik se zakládá na webu managero.app, v aplikaci se zakládat nedá. Potom se tu přihlásíte stejným e-mailem a heslem.')}</p>
-          <p className="t-meta text-pretty">{t('Máte od vedení kód týmu nebo pozvánku? Připojte se rovnou v aplikaci.')}</p>
+          <p className="t-meta text-pretty">{t('Nový podnik se zakládá na webu managero.app, v aplikaci se zakládat nedá. Potom se tu přihlásíš stejným e-mailem a heslem.')}</p>
+          <p className="t-meta text-pretty">{t('Máš od vedení kód týmu nebo pozvánku? Připoj se rovnou v aplikaci.')}</p>
         </div>
         <div className="flex flex-col gap-2">
           <Link href="/login" className="btn btn-accent btn-lg w-full justify-center">{t('Přihlásit se')}</Link>

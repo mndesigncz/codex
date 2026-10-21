@@ -91,24 +91,25 @@ export default function LoginForm() {
             <JazykMenu />
           </div>
 
-          <h1 className="t-page">{t('Přihlásit se')}</h1>
-          <p className="text-[15px] text-black/60 mt-2 mb-8">{t('Zadejte své údaje pro vstup do systému.')}</p>
+          {/* Audit L04: „Přihlásit se" byl nadpis i tlačítko pod ním; nadpis teď vítá. */}
+          <h1 className="t-page">{t('Vítej zpátky')}</h1>
+          <p className="text-[15px] text-black/60 mt-2 mb-8">{t('Přihlas se e-mailem a heslem.')}</p>
 
           {justRegistered && (
             <p role="status" className="note note-ok mb-6">
-              {t('Účet byl vytvořen. Nyní se můžete přihlásit.')}
+              {t('Účet je založený. Teď se můžeš přihlásit.')}
             </p>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="login-email" className="field-label">{t('Email')}</label>
-              <input id="login-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('vas@email.cz')} required className={inputClass} />
+              <label htmlFor="login-email" className="field-label">{t('E-mail')}</label>
+              <input id="login-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('jmeno@email.cz')} required className={inputClass} />
             </div>
             <div>
               <label htmlFor="login-heslo" className="field-label">{t('Heslo')}</label>
               <div className="relative">
-                <input id="login-heslo" autoComplete="current-password" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={t('Zadejte heslo')} required className={`${inputClass} pr-12`} />
+                <input id="login-heslo" autoComplete="current-password" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={t('Zadej heslo')} required className={`${inputClass} pr-12`} />
                 <button type="button" onClick={() => setShowPwd(v => !v)} aria-pressed={showPwd} className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-black/55 hover:text-[#16181A] text-sm font-medium">
                   {showPwd ? t('skrýt') : t('zobrazit')}
                 </button>
@@ -124,9 +125,10 @@ export default function LoginForm() {
           </form>
 
           <div className="mt-8 pt-6 border-t border-black/[0.07] space-y-2 text-center text-sm">
-            <p className="text-black/60">{t('Provozujete podnik?')} <Link href="/register" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Vytvořit účet')}</Link></p>
-            <PravniOdkazy jazyk={jazykPravni} className="justify-center text-xs text-black/55" />
-            <p className="text-black/60">{t('Máte kód týmu nebo pozvánku?')} <Link href="/join" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Připojit se')}</Link></p>
+            <p className="text-black/60">{t('Provozuješ podnik?')} <Link href="/register" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Vytvořit účet')}</Link></p>
+            <p className="text-black/60">{t('Máš kód týmu nebo pozvánku?')} <Link href="/join" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Připojit se')}</Link></p>
+            {/* Právní odkazy jako patička — dřív stály mezi „Vytvořit účet" a „Připojit se". */}
+            <PravniOdkazy jazyk={jazykPravni} className="justify-center text-xs text-black/55 pt-3" />
           </div>
         </div>
       </div>

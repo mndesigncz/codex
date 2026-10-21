@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       RETURNING *`;
     return NextResponse.json({ ok: true, link: mapRow(row) });
   } catch {
-    return NextResponse.json({ error: 'Sdílení není dostupné — spusť /api/init.' }, { status: 400 });
+    return NextResponse.json({ error: 'Sdílení se ještě připravuje. Zkus to za chvíli znovu.' }, { status: 400 });
   }
 }
 
@@ -110,7 +110,7 @@ export async function PATCH(request: Request) {
     await sql`UPDATE teams SET share_theme = ${JSON.stringify(theme)}::jsonb WHERE id = ${me.teamId}`;
     return NextResponse.json({ ok: true, theme });
   } catch {
-    return NextResponse.json({ error: 'Vzhled sdílení není dostupný — spusť /api/init.' }, { status: 400 });
+    return NextResponse.json({ error: 'Vzhled sdílení se ještě připravuje. Zkus to za chvíli znovu.' }, { status: 400 });
   }
 }
 

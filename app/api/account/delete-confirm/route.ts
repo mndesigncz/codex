@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const b = await request.json().catch(() => ({}));
   const token = b?.token;
   const ip = await hit(`smazani-potvrzeni-ip:${klientIp(request.headers)}`, 20, 15 * 60, { failClosed: true });
-  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkuste to později.' }, { status: 429 });
+  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkus to později.' }, { status: 429 });
   if (!vypadaJakoToken(token)) return NextResponse.json({ error: NEPLATNY }, { status: 400 });
 
   const sql = neon(process.env.DATABASE_URL!);
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       const gate = await hit(`smazani:${userId}`, 5, 60 * 60, { failClosed: true });
       if (!gate.ok || !(await hesloSedi(userId, String(b?.password ?? '')))) {
         try { await sql`UPDATE account_delete_requests SET used_at = NULL WHERE token_hash = ${hash}`; } catch { /* nevadí */ }
-        return NextResponse.json(gate.ok ? { error: 'Heslo není správné.', kod: 'HESLO' } : { error: 'Příliš mnoho pokusů. Zkuste to později.' }, { status: gate.ok ? 400 : 429 });
+        return NextResponse.json(gate.ok ? { error: 'Heslo není správné.', kod: 'HESLO' } : { error: 'Příliš mnoho pokusů. Zkus to později.' }, { status: gate.ok ? 400 : 429 });
       }
     }
     const r = await smazUcet(userId, { smazatPodnik, potvrzeni: b?.potvrzeni ?? null, zDuvodu: 'web' });
@@ -60,6 +60,6 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error('smazání účtu z webu selhalo', e);
     try { await sql`UPDATE account_delete_requests SET used_at = NULL WHERE token_hash = ${hash}`; } catch { /* nevadí */ }
-    return NextResponse.json({ error: 'Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.' }, { status: 500 });
+    return NextResponse.json({ error: 'Účet se nepodařilo smazat. Zkus to znovu, nebo napiš podpoře.' }, { status: 500 });
   }
 }

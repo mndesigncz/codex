@@ -31,7 +31,7 @@ const kontext = async (role) => {
   const p = await ctx.newPage();
   await p.goto('http://localhost:3000/employer/overview?view=chat', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1600);
-  // Na počítači chat neotevře konverzaci sám („Vyberte konverzaci").
+  // Na počítači chat neotevře konverzaci sám („Vyber konverzaci").
   await p.getByText('Týmový chat').first().click().catch(() => {}); await p.waitForTimeout(800);
   const okno = p.locator('textarea:visible').first();
   if (await okno.count()) {

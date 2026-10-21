@@ -25,7 +25,7 @@ export default function Zablokovani() {
       const r = await fetch('/api/blocks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: u.id }) });
       if (!r.ok) throw new Error();
       setRadky(prev => (prev ?? []).filter(x => x.id !== u.id));
-    } catch { setChyba(t('Odblokovat se nepodařilo. Zkuste to znovu.')); }
+    } catch { setChyba(t('Odblokovat se nepodařilo. Zkus to znovu.')); }
   };
 
   // Bez zablokovaných není co ukazovat: prázdná karta by jen přidávala šum.
@@ -34,7 +34,7 @@ export default function Zablokovani() {
     <section className="card p-6 space-y-3 mt-6" aria-labelledby="h-zablokovani">
       <div>
         <h2 id="h-zablokovani" className="t-section">{t('Zablokovaní uživatelé')}</h2>
-        <p className="t-meta mt-1">{t('Jejich zprávy v chatu nevidíte. Odblokováním se zase zobrazí.')}</p>
+        <p className="t-meta mt-1">{t('Jejich zprávy v chatu nevidíš. Odblokováním se zase zobrazí.')}</p>
       </div>
       {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
       <ul className="list">

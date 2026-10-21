@@ -110,7 +110,13 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
 
       {canCreate && (
         creating ? (
-          <form onSubmit={e => { e.preventDefault(); if (lzeZalozit) create(); }}
+          // Audit (průřez 3): „Založit anketu" je aktivní vždy — po klepnutí řekne, co chybí
+          // (vzor Stripe, Linear), místo zašedlého tlačítka bez vysvětlení.
+          <form onSubmit={e => {
+            e.preventDefault();
+            if (lzeZalozit) { create(); return; }
+            setErr(question.trim() === '' ? t('Napiš otázku ankety.') : t('Vyplň aspoň dvě možnosti.'));
+          }}
             className="well p-3.5 space-y-2">
             {err && <p role="alert" className="text-xs text-bad-ink">{err}</p>}
             {/* Viditelné popisky, ne jen placeholder: ten zmizí, jakmile se začne
@@ -135,7 +141,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
               )}
               <span className="flex-1" />
               <Button variant="ghost" size="sm" onClick={() => setCreating(false)}>{t('Zrušit')}</Button>
-              <Button type="submit" variant="primary" size="sm" disabled={!lzeZalozit}>{t('Založit anketu')}</Button>
+              <Button type="submit" variant="primary" size="sm">{t('Založit anketu')}</Button>
             </div>
           </form>
         ) : (

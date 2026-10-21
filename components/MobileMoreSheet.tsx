@@ -55,7 +55,8 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
           {/* Odznak jako v doku: chat vyřazený z doku (kolo 6, Z16) by jinak o nepřečtených mlčel. */}
           {!!item.badge && !active && <Badge count={item.badge} label={item.badgeLabel} className="absolute -top-1 -right-1" />}
         </span>
-        <span className={`text-xs text-center leading-tight truncate w-full ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
+        {/* Dva řádky místo „Dostupnost a vol…" (audit, Více na telefonu zaměstnance). */}
+        <span className={`text-xs text-center leading-tight line-clamp-2 break-words text-balance w-full ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
       </button>
     );
   };

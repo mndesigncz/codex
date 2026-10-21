@@ -78,7 +78,7 @@ export default function OrganizationSettings() {
     for (const k of kopie) {
       const nazev = CISELNIKY.find(c => c.klic === k.ciselnik)?.nazev ?? k.ciselnik;
       if (!k.ok) {
-        out.push({ chyba: true, text: t('{podnik}: {nazev} se nepodařilo {akce}. Zkuste to znovu, nebo spusťte /api/init.', { podnik: nazevPodniku(k.teamId), nazev: nazev.toLocaleLowerCase(t.jazyk), akce: k.akce === 'kopie' ? t('zkopírovat') : t('sloučit') }) });
+        out.push({ chyba: true, text: t('{podnik}: {nazev} se nepodařilo {akce}. Zkus to za chvíli znovu.', { podnik: nazevPodniku(k.teamId), nazev: nazev.toLocaleLowerCase(t.jazyk), akce: k.akce === 'kopie' ? t('zkopírovat') : t('sloučit') }) });
       } else if (k.pocet > 0) {
         const pocet = popisRadku(t, k.ciselnik, k.pocet);
         out.push({ chyba: false, text: t('{akce}: {podnik} ({pocet})', { akce: k.akce === 'kopie' ? t('Zkopírováno do') : t('Sloučeno v'), podnik: nazevPodniku(k.teamId), pocet }) });

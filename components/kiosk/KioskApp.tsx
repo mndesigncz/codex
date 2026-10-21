@@ -5,7 +5,7 @@ import { odhlasit } from '@/lib/odhlaseni';
 import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
 import StaffInbox, { useStaffInbox } from '../client/StaffInbox';
-import { Modal, Button, Badge } from '../ui';
+import { Modal, Button, Badge, PageHeader } from '../ui';
 import KioskInventory, { type PredaniSkladuTabletu } from './KioskInventory';
 import KioskNastaveni from './KioskNastaveni';
 import KioskTasks from './KioskTasks';
@@ -255,7 +255,8 @@ function KioskShell({ user }: { user: KioskUser }) {
         <div className="flex items-center gap-3 basis-full sm:basis-auto min-w-0">
           <span className="min-w-0 empty:hidden"><ActivePersonChip /></span>
           <span className="flex-1 sm:hidden" aria-hidden />
-          <p className="text-3xl font-bold tracking-tight text-[#16181A] tabular-nums leading-none">{clock}</p>
+          {/* Na telefonu má čas stavový řádek systému — velké hodiny by jménu u čipu nechaly „Eli…" (audit K01). */}
+          <p className="hidden sm:block shrink-0 text-3xl font-bold tracking-tight text-[#16181A] tabular-nums leading-none">{clock}</p>
           {/* Odhlášení tabletu je pro obsluhu slepá ulička: e-mail ani heslo
               zařízení nikdo z baru nezná, takže jedno ťuknutí znamená tablet
               mimo provoz do příchodu vedení. Proto se ptáme. */}
@@ -312,7 +313,7 @@ function KioskShell({ user }: { user: KioskUser }) {
           tablet sám jen čte (rezim jen-cteni, sdílené zařízení). Nástrojem
           plochy je „Kdo je na směně" — příchod, odchod a kdo u tabletu stojí. */}
       {tab === 'shift' && (
-        <main className="flex-1 mt-6">
+        <main className="flex-1 mt-5 kiosk-zalozka">
           <ZapisPodJmenem>
             {zamceno => (
               <PlochaWidgetu
@@ -335,27 +336,38 @@ function KioskShell({ user }: { user: KioskUser }) {
           the active person's account. Widgety na Směně hlídá ZapisPodJmenem. */}
       {tab !== 'shift' && (
         <KioskShiftGate>
+          {/* Audit K03/K04/B12: všechny záložky tabletu mají stejnou hlavičku (nadpis + věta)
+              a obsah na stejné hraně L/R. Úkoly, Sklad a Objednávky byly bez nadpisu; Postupy,
+              Uzávěrka a Návody měly vlastní kontejner (Postupy max-w-5xl na střed: hrana 102 px
+              proti 32 px) — `.kiosk-zalozka` v globals.css ho na tabletu srovná s ostatními. */}
           {tab === 'tasks' && (
-            <main className="flex-1 mt-5">
+            <main className="flex-1 mt-5 space-y-5">
+              <PageHeader title={nazevZalozky('tasks')} subtitle={t('Co je dnes potřeba udělat. Ťukni na úkol, až je hotový.')} />
               <KioskTasks onOpenGuide={id => { setWantGuide(id); setTab('guides'); }} />
             </main>
           )}
           {tab === 'procedures' && (
             <WhoFirst>
-              <main className="flex-1 mt-2 -mx-1"><Procedures user={actingUser} /></main>
+              <main className="flex-1 mt-5 kiosk-zalozka"><Procedures user={actingUser} /></main>
             </WhoFirst>
           )}
           {tab === 'inventory' && (
             <WhoFirst>
-              <main className="flex-1 mt-5">
+              <main className="flex-1 mt-5 space-y-5">
+                <PageHeader title={nazevZalozky('inventory')} subtitle={t('Co dochází a co jsi přivezl — zapiš to rovnou tady.')} />
                 <KioskInventory predani={skladPredani} />
               </main>
             </WhoFirst>
           )}
-          {tab === 'orders' && <main className="flex-1 mt-5"><StaffInbox /></main>}
-          {tab === 'closing' && <main className="flex-1 mt-2 -mx-1"><CashClosing user={kioskUser} /></main>}
+          {tab === 'orders' && (
+            <main className="flex-1 mt-5 space-y-5">
+              <PageHeader title={nazevZalozky('orders')} subtitle={t('Objednávky od stolu — přijmi je a dej vědět, až jsou hotové.')} />
+              <StaffInbox />
+            </main>
+          )}
+          {tab === 'closing' && <main className="flex-1 mt-5 kiosk-zalozka"><CashClosing user={kioskUser} /></main>}
           {tab === 'guides' && (
-            <main className="flex-1 mt-2 -mx-1">
+            <main className="flex-1 mt-5 kiosk-zalozka">
               {/* Čtení se potvrzuje za vybraného člověka; bez výběru se čtečka zeptá. */}
               <Guides user={kioskUser} ticksFor={active?.id ?? null} openGuideId={wantGuide}
                 zaKoho={cteniZa ?? (active ? { id: active.id, name: active.name } : null)} vyberKoho={requireActive} />

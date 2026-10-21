@@ -221,13 +221,13 @@ export default function Billing() {
           </div>
         )}
         {plan?.pastDue && (
-          <p className="note note-danger mt-4">{t('Poslední platba se nezdařila. Stripe ji zkusí znovu — zkontrolujte kartu přes „Spravovat předplatné“.')}</p>
+          <p className="note note-danger mt-4">{t('Poslední platba se nezdařila. Stripe ji zkusí znovu — zkontroluj kartu přes „Spravovat předplatné“.')}</p>
         )}
         {plan?.trialing && (
           <p className="note note-ok mt-4">
             {st?.subscription
               ? <VetaSTucnym tucne={zaDny(plan.trialDaysLeft)} veta={m => t('Zkušební období končí {tucne} — potom se z karty strhne první platba.', { tucne: m })} />
-              : <VetaSTucnym tucne={zaDny(plan.trialDaysLeft)} veta={m => t('Zkušební období končí {tucne} — potom se podnik přepne na plán Zdarma, o data nepřijdete.', { tucne: m })} />}
+              : <VetaSTucnym tucne={zaDny(plan.trialDaysLeft)} veta={m => t('Zkušební období končí {tucne} — potom se podnik přepne na plán Zdarma, o data nepřijdeš.', { tucne: m })} />}
           </p>
         )}
         {plan?.cancelAt && (
@@ -286,9 +286,9 @@ export default function Billing() {
 
       {/* Affiliate */}
       <div className="card p-6">
-        <h3 className="t-card">{t('Doporučte Managero a získejte měsíc zdarma')}</h3>
+        <h3 className="t-card">{t('Doporuč Managero a získej měsíc zdarma')}</h3>
         <p className="t-meta mt-1">
-          {t('Když se přes váš odkaz zaregistruje podnik a začne platit, odečteme vám cenu jednoho měsíce z další faktury.')}{' '}
+          {t('Když se přes tvůj odkaz zaregistruje podnik a začne platit, odečteme ti cenu jednoho měsíce z další faktury.')}{' '}
           {t('Nejvýš {n, plural, one {# podnik} few {# podniky} other {# podniků}} za měsíc, napořád.', { n: REFERRALS_PER_MONTH })}
         </p>
         {st?.referral.link ? (
@@ -346,7 +346,7 @@ export default function Billing() {
             ))}
           </tbody>
         </table>
-        <p className="mt-3 t-meta">{t('Ceny jsou konečné, provozovatel není plátcem DPH. Fakturu vystaví Stripe a najdete ji v portálu.')}</p>
+        <p className="mt-3 t-meta">{t('Ceny jsou konečné, provozovatel není plátcem DPH. Fakturu vystaví Stripe a najdeš ji v portálu.')}</p>
       </div>
     </div>
   );

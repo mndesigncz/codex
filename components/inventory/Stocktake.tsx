@@ -102,7 +102,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
       setOpen(d.open ?? null);
       setHistory(Array.isArray(d.history) ? d.history : []);
       setDesetinne(d.mnozstviDesetinne === true);
-      if (d.notMigrated) setErr(t('Inventura bude dostupná po dokončení migrace (/api/init).'));
+      if (d.notMigrated) setErr(t('Inventura se ještě připravuje. Zkus to za chvíli znovu.'));
     } catch { setErr(t('Inventuru se nepodařilo načíst.')); }
     setLoading(false);
   };

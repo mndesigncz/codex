@@ -147,7 +147,7 @@ export default function EventsView({ user, oznam }: { user: { id?: string }; ozn
     : !akce.data ? <div className="space-y-3"><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
     : (
       <div className="space-y-4">
-        {akce.data.notMigrated && <p className="note note-wait">{t('Akce budou dostupné po migraci (/api/init).')}</p>}
+        {akce.data.notMigrated && <p className="note note-wait">{t('Akce se ještě připravují. Zkus to za chvíli znovu.')}</p>}
         {upcoming.length === 0 ? (
           <Card>
             <EmptyState icon="calendarCheck" compact title={t('Žádná naplánovaná akce')}

@@ -129,6 +129,10 @@ export default function Cesta() {
   const zalozit = async (e: React.FormEvent) => {
     e.preventDefault();
     setChyba(''); setExistuje(false);
+    // Audit (průřez 3): „Založit podnik" je aktivní a po klepnutí řekne, co chybí — dřív
+    // bylo zašedlé, dokud nebylo vše vyplněné, a člověk nevěděl proč.
+    if (!jmeno.trim()) { setChyba(t('Napiš své jméno.')); return; }
+    if (!email.trim()) { setChyba(t('Napiš e-mail, na který ti pošleme přístup.')); return; }
     if (heslo.length < 8) { setChyba(t('Heslo musí mít alespoň 8 znaků.')); return; }
     if (!souhlas) { setChybaSouhlasu(t('Bez souhlasu s podmínkami účet založit nejde.')); return; }
     setOdesila(true);
@@ -152,7 +156,7 @@ export default function Cesta() {
       if (smiPlatby) jdi('tarif');
       else { router.push('/employer/start'); router.refresh(); }
     } catch {
-      setChyba(t('Chyba serveru. Zkuste to prosím znovu.'));
+      setChyba(t('Registrace se teď nepovedla. Zkus to prosím znovu.'));
       setOdesila(false);
     }
   };
@@ -282,7 +286,7 @@ export default function Cesta() {
                 </div>
                 <div>
                   <label htmlFor="cs-email" className="cs-popisek">{t('E-mail')}</label>
-                  <input id="cs-email" type="email" inputMode="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder={t('vas@email.cz')} className="cs-pole" />
+                  <input id="cs-email" type="email" inputMode="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder={t('jmeno@email.cz')} className="cs-pole" />
                 </div>
                 <div>
                   <label htmlFor="cs-heslo" className="cs-popisek">{t('Heslo')}</label>
@@ -304,7 +308,7 @@ export default function Cesta() {
                   {chyba}{existuje && <> <Link href="/login" className="font-semibold underline underline-offset-2">{t('Přihlásit se')}</Link></>}
                 </p>
               )}
-              <button type="submit" disabled={odesila || prihlaseniSelhalo || !jmeno.trim() || !email.trim() || heslo.length < 8} className="cs-dal mt-6">
+              <button type="submit" disabled={odesila || prihlaseniSelhalo} className="cs-dal mt-6">
                 {odesila ? t('Zakládám podnik…') : t('Založit podnik')}
               </button>
             </form>

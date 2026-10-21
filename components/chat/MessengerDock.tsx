@@ -166,7 +166,7 @@ function ConversationPopover({
       <div className="overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
         {conversations.length === 0 && (
           <div className="p-2"><EmptyState icon="chat" compact title={t('Žádné konverzace')}
-            hint={t('Vyberte kolegu a napište mu — vlákno vznikne samo.')}
+            hint={t('Vyber kolegu a napiš mu — vlákno vznikne samo.')}
             action={<Button icon="plus" onClick={onNew}>{t('Nová zpráva')}</Button>} /></div>
         )}
         {conversations.map((c) => (

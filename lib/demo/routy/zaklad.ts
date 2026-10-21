@@ -68,6 +68,8 @@ const TYM = {
   low_stock_default: 5, critical_stock_default: 2, business_type: 'kavarna', pay_daily_cash: false,
   closing_requires_shift: true, show_team_schedule: true, payout_from_register: true, tips_in_drawer: false,
   drawer_float: null, dashboard_config: {}, levels_config: [], points_config: {}, currency: 'CZK', locale: 'cs-CZ',
+  // Profil podniku v ukázce (Nastavení › Profil podniku): adresa a IČO/DIČ jako u skutečného API.
+  address: 'Lipová 12, 602 00 Brno', ico: null, dic: null, ico_dic_ok: true,
 };
 
 /** Adresa právě běžící ukázky bez #fragmentu (next-auth při fragmentu načítá znovu). */
@@ -128,9 +130,14 @@ export const zaklad: Obsluha = (p, k) => {
     });
   }
   if (cesta.startsWith('/api/billing/')) return chyba('V ukázce se nic neplatí.', 400);
-  if (cesta === '/api/account') return metoda === 'GET'
-    ? ok({ id: KDO_JSEM[s.role], name: clen(KDO_JSEM[s.role]).name, email: clen(KDO_JSEM[s.role]).email, theme: 'light' })
-    : ok({ ok: true });
+  if (cesta === '/api/account') {
+    if (metoda !== 'GET') return ok({ ok: true });
+    const ja = clen(KDO_JSEM[s.role]);
+    // Skutečné API vrací `{ user }` (Nastavení › Účet čte jen to) — dřív tu byl holý objekt
+    // a Účet v ukázce ukazoval prázdné jméno i e-mail (audit N01). Holá pole zůstávají.
+    const user = { id: ja.id, name: ja.name, email: ja.email, avatar: ja.avatar, phone: ja.phone, jobTitle: ja.jobTitle, shiftPreference: 'flexible', theme: 'light', role: ja.role, lang: null };
+    return ok({ id: ja.id, name: ja.name, email: ja.email, theme: 'light', user });
+  }
   // Brána nové verze podmínek (spuštění, balík P) se v ukázce nemontuje; kdyby se zeptala, souhlas je aktuální.
   if (cesta === '/api/account/souhlas') return metoda === 'GET' ? ok({ potreba: false }) : ok({ ok: true });
   // Ověření e-mailu (spuštění, balík S): ukázka nic neposílá, banner se neukáže.

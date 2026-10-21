@@ -41,7 +41,7 @@ export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
       if (r.status === 409 && (d.kod === 'VLASTNIK_S_CLENY' || d.kod === 'VLASTNIK_PODNIKU')) { setDopad({ kod: d.kod, zprava: vetaDopadu(t, d.kod, d.vlastnene as VlastnenyPodnik[] | undefined, String(d.error ?? '')) }); return; }
       setChyba(d.error ? tg(d.error) : t('Účet se nepodařilo smazat.'));
     } catch {
-      setChyba(t('Účet se nepodařilo smazat. Zkontrolujte připojení a zkuste to znovu.'));
+      setChyba(t('Účet se nepodařilo smazat. Zkontroluj připojení a zkus to znovu.'));
     } finally { setBezi(false); }
   };
 
@@ -52,14 +52,14 @@ export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
       <h2 id="h-smazat-ucet" className="t-section">{t('Smazat účet')}</h2>
       <p className="t-meta mt-1.5 max-w-[60ch] text-pretty">
         {jeHost
-          ? t('Smaže se profil, věrnostní karta, členství, body, razítka, kupony a hodnocení. Nejde to vrátit. Budoucí rezervace se zruší, vyřízené objednávky zůstanou u podniku bez vašeho jména.')
-          : t('Smaže se váš přístup, osobní údaje a členství v podnicích. Směny, docházka a uzávěrky zůstanou podniku bez vašeho jména. Nejde to vrátit.')}
+          ? t('Smaže se profil, věrnostní karta, členství, body, razítka, kupony a hodnocení. Nejde to vrátit. Budoucí rezervace se zruší, vyřízené objednávky zůstanou u podniku bez tvého jména.')
+          : t('Smaže se tvůj přístup, osobní údaje a členství v podnicích. Směny, docházka a uzávěrky zůstanou podniku bez tvého jména. Nejde to vrátit.')}
       </p>
       {/* v4 (V5): destruktivní akce jako řádkové tlačítko 44 přes celou šířku, červený text — ne osamělé vlevo. */}
       <Button variant="danger" icon="trash" className="mt-4 w-full bg-black/[0.04]" onClick={() => setOtevreno(true)}>{t('Smazat účet')}</Button>
 
       <Modal open={otevreno} onClose={zavrit} size="sm" title={dopad ? t('Smazat i podnik?') : t('Opravdu smazat účet?')}
-        subtitle={dopad ? undefined : t('Potvrďte to svým heslem. Nejde to vrátit.')}
+        subtitle={dopad ? undefined : t('Potvrď to svým heslem. Nejde to vrátit.')}
         footer={<>
           <Button variant="secondary" onClick={zavrit}>{t('Ne, nechat')}</Button>
           <Button variant="danger-solid" loading={bezi} disabled={!kSmazani} onClick={smazat}>{dopad ? t('Smazat podnik i účet') : t('Smazat účet')}</Button>
@@ -72,9 +72,9 @@ export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
           </div>
           {dopad && (
             <div>
-              <label htmlFor="sm-potvrzeni" className="field-label">{t('Napište SMAZAT')}</label>
+              <label htmlFor="sm-potvrzeni" className="field-label">{t('Napiš SMAZAT')}</label>
               <input id="sm-potvrzeni" autoComplete="off" autoCapitalize="characters" value={potvrzeni} onChange={e => setPotvrzeni(e.target.value)} className="field" />
-              <p className="mt-1.5 t-meta">{t('Zruší se předplatné a smažou se všechna data podniku. Zálohu si stáhněte předem.')}</p>
+              <p className="mt-1.5 t-meta">{t('Zruší se předplatné a smažou se všechna data podniku. Zálohu si stáhni předem.')}</p>
             </div>
           )}
           {chyba && <p role="alert" className="note note-danger">{chyba}</p>}

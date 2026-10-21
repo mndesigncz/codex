@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
   // Zahlcení hlášením je taky zneužití; dvacet za hodinu poctivému stačí.
   const gate = await hit(`report:${c.meId}`, 20, 60 * 60);
-  if (!gate.ok) return NextResponse.json({ error: 'Příliš mnoho hlášení. Zkuste to později.' }, { status: 429 });
+  if (!gate.ok) return NextResponse.json({ error: 'Příliš mnoho hlášení. Zkus to později.' }, { status: 429 });
 
   let teamId: number; let autorId: number | null; let opis: string;
   try {
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('nahlášení selhalo', e);
-    return NextResponse.json({ error: 'Nahlášení se zatím nepodařilo uložit. Zkuste to znovu.' }, { status: 503 });
+    return NextResponse.json({ error: 'Nahlášení se zatím nepodařilo uložit. Zkus to znovu.' }, { status: 503 });
   }
 }
 

@@ -32,7 +32,7 @@ export default function PravniStranka({ klic, jazyk, dodatek }: {
             <LogoMark size={32} />
             <span className="font-bold tracking-tight">Managero</span>
           </Link>
-          <Link href={jinyJazyk.href} hrefLang={jazyk === 'cs' ? 'en' : 'cs'} className="tap-target-sm ml-auto inline-flex items-center t-meta underline-offset-2 hover:underline">{jinyJazyk.text}</Link>
+          <Link href={jinyJazyk.href} hrefLang={jazyk === 'cs' ? 'en' : 'cs'} className="btn btn-secondary btn-sm ml-auto" /* audit L08: pilulka 36 místo odkazu 18 px */>{jinyJazyk.text}</Link>
         </header>
 
         {chybi.length > 0 && (

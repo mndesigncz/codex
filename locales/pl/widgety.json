@@ -1,11 +1,11 @@
 {
+  "3": "3",
   "+{castka} k výplatě": "+{castka} do wypłaty",
   "+{n} b každému": "+{n} pkt dla każdego",
   "+{n} min po začátku": "+{n} min po rozpoczęciu",
   "+{n} za 30 dní": "+{n} w ciągu 30 dni",
   "1. návštěva": "Pierwsza wizyta",
   "14 dní": "14 dni",
-  "3": "3",
   "3 měsíce": "3 miesiące",
   "30 dní": "30 dni",
   "6 měsíců": "6 miesięcy",
@@ -1236,7 +1236,6 @@
   "Tablet": "Tablet",
   "Tablet si rozložení neupravuje — nastavuje ho vedení v Nastavení → Stránky.": "Układ tabletu nie jest tu edytowany — ustawia go kierownictwo w Ustawienia → Strony.",
   "Tabule je zatím prázdná.": "Tablica jest na razie pusta.",
-  "Tabulky pro menu ještě nejsou v databázi.": "Tabel menu nie ma jeszcze w bazie danych.",
   "Tahle stránka neexistuje": "Ta strona nie istnieje",
   "Tahouni": "Konie pociągowe",
   "Takový widget tu není. Zkus jiné slovo.": "Nie ma tu takiego widżetu. Spróbuj innego słowa.",
@@ -2749,5 +2748,9 @@
   "Kolik razítek hosté dostali po dnech a kolik bodů se rozdalo.": "Ile pieczątek goście dostali dziennie i ile punktów przyznano.",
   "Automatizace": "Automatyzacje",
   "Které zprávy odcházejí samy a kolik jich odešlo tento měsíc. Výchozí vypnuté.": "Które wiadomości wysyłają się same i ile wyszło w tym miesiącu. Domyślnie wyłączone.",
-  "Věrnostní program": "Program lojalnościowy"
+  "Věrnostní program": "Program lojalnościowy",
+  "Menu se ještě připravuje. Zkus to za chvíli znovu.": "Menu jest jeszcze przygotowywane. Spróbuj za chwilę ponownie.",
+  "Zapsat hned": "Zapisz teraz",
+  "Odchod zapíšu za {n} s. Do té doby ho jde vrátit.": "Wyjście zapiszę za {n} s. Do tego czasu można je cofnąć.",
+  "Vrátit odchod": "Cofnij wyjście"
 }

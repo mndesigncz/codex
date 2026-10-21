@@ -340,7 +340,7 @@ export default function SuggestionsBoard() {
                     {/* Vlákno pod podnětem (kolo 7): odpověď vedení, důvod zamítnutí, doplnění od autora. */}
                     <div className="-mt-3 -mb-1 flex">
                       <Button variant="ghost" size="sm" icon="chat" className="-ml-3"
-                        aria-expanded={poznamkyOtevrene} aria-controls={`${id}-pozn-${s.id}`} onClick={() => prepniPoznamky(s.id)}>
+                        aria-expanded={poznamkyOtevrene} aria-controls={poznamkyOtevrene ? `${id}-pozn-${s.id}` : undefined} onClick={() => prepniPoznamky(s.id)}>
                         {pocetPoznamek ? t('Poznámky ({n})', { n: pocetPoznamek }) : t('Poznámky')}
                       </Button>
                     </div>

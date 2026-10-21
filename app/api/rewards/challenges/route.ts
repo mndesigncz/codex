@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
       VALUES (${c.teamId}, ${n.nazev}, ${n.metrika}, ${n.cil}, ${n.od}, ${n.do}, ${n.odmenaText}, ${n.odmenaBody}, ${c.meId})
       RETURNING id, nazev, metrika, cil, od, do_dne, odmena_text, odmena_body, splneno_at`;
   } catch {
-    return NextResponse.json({ error: 'Výzvu se nepodařilo uložit — databáze ji ještě nezná (spusť /api/init).' }, { status: 503 });
+    return NextResponse.json({ error: 'Výzvu se teď nepodařilo uložit. Zkus to za chvíli znovu.' }, { status: 503 });
   }
   audit(c.teamId, c.meId, 'vyzva.vyhlasit', 'reward_challenge', Number(row.id), `${n.nazev} · ${n.metrika} ${n.cil} · ${n.od}–${n.do}`);
   // Tým se o výzvě dozví hned — cíl bez publika nikoho nerozhýbe.

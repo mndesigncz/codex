@@ -1,11 +1,11 @@
 {
+  "3": "3",
   "+{castka} k výplatě": "+{castka} zur Auszahlung",
   "+{n} b každému": "+{n} Pkt. für alle",
   "+{n} min po začátku": "+{n} Min. nach Beginn",
   "+{n} za 30 dní": "+{n} in 30 Tagen",
   "1. návštěva": "Erster Besuch",
   "14 dní": "14 Tage",
-  "3": "3",
   "3 měsíce": "3 Monate",
   "30 dní": "30 Tage",
   "6 měsíců": "6 Monate",
@@ -1237,7 +1237,6 @@
   "Tablet": "Tablet",
   "Tablet si rozložení neupravuje — nastavuje ho vedení v Nastavení → Stránky.": "Das Tablet-Layout lässt sich hier nicht ändern — die Leitung legt es unter Einstellungen → Seiten fest.",
   "Tabule je zatím prázdná.": "Die Tafel ist noch leer.",
-  "Tabulky pro menu ještě nejsou v databázi.": "Die Tabellen für die Karte sind noch nicht in der Datenbank.",
   "Tahle stránka neexistuje": "Diese Seite gibt es nicht",
   "Tahouni": "Zugpferde",
   "Takový widget tu není. Zkus jiné slovo.": "Ein solches Widget gibt es hier nicht. Versuch ein anderes Wort.",
@@ -2750,5 +2749,9 @@
   "Kolik razítek hosté dostali po dnech a kolik bodů se rozdalo.": "Wie viele Stempel Gäste pro Tag bekamen und wie viele Punkte vergeben wurden.",
   "Automatizace": "Automatisierungen",
   "Které zprávy odcházejí samy a kolik jich odešlo tento měsíc. Výchozí vypnuté.": "Welche Nachrichten automatisch rausgehen und wie viele diesen Monat. Standardmäßig aus.",
-  "Věrnostní program": "Treueprogramm"
+  "Věrnostní program": "Treueprogramm",
+  "Menu se ještě připravuje. Zkus to za chvíli znovu.": "Die Karte wird noch vorbereitet. Versuch es gleich noch einmal.",
+  "Zapsat hned": "Jetzt ausstempeln",
+  "Odchod zapíšu za {n} s. Do té doby ho jde vrátit.": "Ausstempeln in {n} s. Bis dahin kannst du es rückgängig machen.",
+  "Vrátit odchod": "Rückgängig"
 }

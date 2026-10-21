@@ -100,7 +100,7 @@
   "Směny|nav": "Shifts",
   "Současné heslo": "Current password",
   "Spodní navigace": "Bottom navigation",
-  "Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.": "Manage your profile, language, appearance, notifications and security.",
+  "Tvůj profil, jazyk, vzhled, oznámení a zabezpečení.": "Your profile, language, appearance, notifications and security.",
   "Starší oznámení se nepodařilo načíst.": "Older notifications couldn't be loaded.",
   "Stažení dat a smazání účtu": "Download your data and delete your account",
   "Strojový překlad": "Machine translation",
@@ -114,7 +114,7 @@
   "Upozornění|druh": "Alerts",
   "Uzávěrka|nav": "Closing",
   "Uzávěrky|nav": "Closings",
-  "Vyplňte všechna pole.": "Fill in all fields.",
+  "Vyplň všechna pole.": "Fill in all fields.",
   "Vzhled": "Appearance",
   "Více": "More",
   "Výchozí jazyk aplikace": "Default app language",
@@ -183,5 +183,12 @@
   "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "+1 pt for each step done, +2 for a key one (a step's own points win), a missed step takes nothing away.",
   "Za splněný úkol {z} b, položky checklistu se nepočítají.": "{z} pts for a completed task, checklist items don't count.",
   "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "{z} pts for the closing, the day's required items don't count.",
-  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} pts for the closing, −{s} pts for each required item of the day left undone."
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} pts for the closing, −{s} pts for each required item of the day left undone.",
+  "Tvůj účet a nastavení podniku.": "Your account and business settings.",
+  "Dnes": "Today",
+  "Včera": "Yesterday",
+  "Dříve": "Earlier",
+  "Nepřečtené · {n}": "Unread · {n}",
+  "Všechno máš přečtené.": "You've read everything.",
+  "Výchozí plocha, zámky a navigace": "Default pages, locks and navigation"
 }

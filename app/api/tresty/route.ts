@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     await oznamTrest(item, c.meId, mena.money);
     return NextResponse.json({ ok: true, item }, { status: 201 });
   } catch (e) {
-    if (predMigraci(e)) return chyba('Tresty ještě nejsou připravené — spusť /api/init.', 503);
+    if (predMigraci(e)) return chyba('Tresty se ještě připravují. Zkus to za chvíli znovu.', 503);
     console.error('tresty POST', e);
     return chyba('Trest se neuložil.', 500);
   }

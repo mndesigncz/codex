@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const heslo = b?.password;
   // Hádání tokenů přes tenhle endpoint: 256 bitů je nehádatelných, ale ať se za to neplatí bcryptem.
   const ip = await hit(`reset-potvrzeni-ip:${klientIp(request.headers)}`, 20, 15 * 60, { failClosed: true });
-  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkuste to později.' }, { status: 429 });
+  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkus to později.' }, { status: 429 });
   if (!vypadaJakoToken(token)) return NextResponse.json({ error: NEPLATNY }, { status: 400 });
   if (!hesloStaci(heslo)) return NextResponse.json({ error: 'Heslo musí mít alespoň 8 znaků.' }, { status: 400 });
 
