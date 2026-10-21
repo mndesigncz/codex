@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
 import { Badge } from './ui/Badge';
-import { dbTimeHM, parseDbTime } from '@/lib/pragueTime';
+import { dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { usePopover } from '@/lib/usePopover';
 import { useVejdiSe } from '@/lib/useVejdiSe';
 import { okJson } from '@/lib/api';
@@ -31,6 +31,8 @@ export default function NotificationBell() {
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
   const [flaggedFeedback, setFlaggedFeedback] = useState(0);
+  // Audit V04 (vzor GitHub / Linear inbox): filtr „Nepřečtené" a skupiny Dnes / Včera / Dříve.
+  const [jenNeprectene, setJenNeprectene] = useState(false);
 
   const load = async () => {
     try {
@@ -107,6 +109,20 @@ export default function NotificationBell() {
   });
   /** „12. 9. 14:30" v jazyce a formátu člověka (čas z databáze přes parseDbTime). */
   const kdy = (iso: string) => { const d = parseDbTime(iso); return d ? `${fmtDatum(d, { jazyk, styl: 'kratce' })} ${dbTimeHM(d)}` : ''; };
+  /** Dnes a včera jen časem (den nese nadpis skupiny), starší s datem. */
+  const kdyVeSkupine = (iso: string, skupina: 'dnes' | 'vcera' | 'drive') => (skupina === 'drive' ? kdy(iso) : dbTimeHM(parseDbTime(iso)));
+  const dnes = pragueToday();
+  const vcera = pragueToday(-1);
+  const skupinaOf = (iso: string): 'dnes' | 'vcera' | 'drive' => {
+    const d = parseDbTime(iso);
+    const den = d ? pragueDayOf(d) : '';
+    return den === dnes ? 'dnes' : den === vcera ? 'vcera' : 'drive';
+  };
+  const neprectenych = notifs.filter(n => !n.is_read).length;
+  const viditelne = jenNeprectene ? notifs.filter(n => !n.is_read) : notifs;
+  const skupiny = (['dnes', 'vcera', 'drive'] as const)
+    .map(id => ({ id, nazev: id === 'dnes' ? t('Dnes') : id === 'vcera' ? t('Včera') : t('Dříve'), polozky: viditelne.filter(n => skupinaOf(n.created_at) === id) }))
+    .filter(g => g.polozky.length > 0);
 
   // The flagged feedback stays on the badge until it is acknowledged in Odměny,
   // so "přečíst vše" here can't hide it.
@@ -141,9 +157,17 @@ export default function NotificationBell() {
           className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] glass-strong rounded-3xl overflow-hidden z-50 shadow-[0_16px_44px_rgba(25,35,15,0.18)]">
           <div className="px-4 py-3 border-b border-black/[0.07] flex items-center justify-between">
             <span className="font-bold text-[#16181A] text-sm">{t('Notifikace')}</span>
-            {notifs.some(n => !n.is_read) && (
-              <button type="button" onClick={markAllRead} className="tap-target-sm text-xs text-[#5B7A08] hover:underline">{t('Přečíst vše')}</button>
-            )}
+            <span className="flex items-center gap-3">
+              {(neprectenych > 0 || jenNeprectene) && (
+                <button type="button" onClick={() => setJenNeprectene(v => !v)} aria-pressed={jenNeprectene}
+                  className={`tap-target-sm rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${jenNeprectene ? 'chip-ink' : 'bg-black/[0.05] text-black/70 hover:bg-black/[0.08]'}`}>
+                  {t('Nepřečtené · {n}', { n: neprectenych })}
+                </button>
+              )}
+              {neprectenych > 0 && (
+                <button type="button" onClick={markAllRead} className="tap-target-sm text-xs text-[#5B7A08] hover:underline">{t('Přečíst vše')}</button>
+              )}
+            </span>
           </div>
           <div className="max-h-96 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
             {flaggedFeedback > 0 && (
@@ -161,7 +185,12 @@ export default function NotificationBell() {
             )}
             {notifs.length === 0 && flaggedFeedback === 0 ? (
               <div className="p-8 text-center text-black/40 text-sm">{t('Žádné notifikace')}</div>
-            ) : notifs.map(n => (
+            ) : viditelne.length === 0 && flaggedFeedback === 0 ? (
+              <div className="p-8 text-center text-black/40 text-sm">{t('Všechno máš přečtené.')}</div>
+            ) : skupiny.map(g => (
+              <div key={g.id} role="group" aria-label={g.nazev}>
+                <p className="px-4 pt-3 pb-1 t-label">{g.nazev}</p>
+                {g.polozky.map(n => (
               <button key={n.id} onClick={() => openNotif(n)}
                 className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-black/[0.03] transition-colors ${!n.is_read ? 'bg-[#C8F542]/[0.04]' : ''}`}>
                 <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#C8F542]/15 text-[#5B7A08]">
@@ -170,10 +199,12 @@ export default function NotificationBell() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[#16181A] truncate">{n.title}</p>
                   {n.body && <p className="text-xs text-black/50 mt-0.5 line-clamp-2">{n.body}</p>}
-                  <p className="text-[11px] text-black/35 mt-1 tabular-nums">{kdy(n.created_at)}</p>
+                  <p className="text-[11px] text-black/35 mt-1 tabular-nums">{kdyVeSkupine(n.created_at, g.id)}</p>
                 </div>
                 {!n.is_read && <span className="mt-1.5 h-2 w-2 rounded-full bg-[#C8F542] flex-shrink-0" />}
               </button>
+                ))}
+              </div>
             ))}
           </div>
         </div>

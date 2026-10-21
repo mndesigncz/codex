@@ -184,5 +184,10 @@
   "Za splněný úkol {z} b, položky checklistu se nepočítají.": "Za wykonane zadanie {z} pkt, punkty listy się nie liczą.",
   "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "Za zamknięcie {z} pkt, obowiązkowe rzeczy dnia się nie liczą.",
   "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "Za zamknięcie {z} pkt, za każdą niewykonaną obowiązkową rzecz dnia −{s} pkt.",
-  "Tvůj účet a nastavení podniku.": "Twoje konto i ustawienia lokalu."
+  "Tvůj účet a nastavení podniku.": "Twoje konto i ustawienia lokalu.",
+  "Dnes": "Dziś",
+  "Včera": "Wczoraj",
+  "Dříve": "Wcześniej",
+  "Nepřečtené · {n}": "Nieprzeczytane · {n}",
+  "Všechno máš přečtené.": "Wszystko masz przeczytane."
 }

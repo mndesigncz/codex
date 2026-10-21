@@ -184,5 +184,10 @@
   "Za splněný úkol {z} b, položky checklistu se nepočítají.": "{z} pts for a completed task, checklist items don't count.",
   "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "{z} pts for the closing, the day's required items don't count.",
   "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} pts for the closing, −{s} pts for each required item of the day left undone.",
-  "Tvůj účet a nastavení podniku.": "Your account and business settings."
+  "Tvůj účet a nastavení podniku.": "Your account and business settings.",
+  "Dnes": "Today",
+  "Včera": "Yesterday",
+  "Dříve": "Earlier",
+  "Nepřečtené · {n}": "Unread · {n}",
+  "Všechno máš přečtené.": "You've read everything."
 }
