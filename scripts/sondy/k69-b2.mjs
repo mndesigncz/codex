@@ -313,13 +313,12 @@ const doporucene = async (p) => {
   await okno.getByRole('button', { name: 'Zrušit' }).click();
   await dokud(async () => !(await okno.isVisible()), 2000);
 
-  // Kolo 7: záznamy s plánem a chipem na 390 — nic nepřeteče, akce řádku má dotykovou plochu 44 px.
-  // v4 (V4): akce řádku je jedno „···" (kruh 36 na R) s dotykovou plochou 44 (`tap-target`, pseudoprvek).
+  // Kolo 7: záznamy s plánem a chipem na 390 — nic nepřeteče. v4 (V4): tužka a koš (44 na telefonu) jsou teď
+  // jedno „···" — kruh 36 na R jako akce řádku všude v aplikaci (pseudoprvek 44 u pravé hrany karty nafukoval scrollWidth).
   const nastrojT = widgetLi(p, 'nastroj');
   const cile = await nastrojT.evaluate(el => [...el.querySelectorAll('button[aria-label^="Upravit nebo smazat záznam:"], button[aria-label^="Upravit čas:"], button[aria-label^="Smazat záznam:"]')]
-    .slice(0, 6).map(b => { const r = b.getBoundingClientRect(); const pr = getComputedStyle(b, '::before'); const tap = b.classList.contains('tap-target') && pr.content !== 'none';
-      return [Math.round(r.width), Math.round(r.height), tap]; }));
-  tvrdi('K7 (390): akce řádku v záznamech má dotykovou plochu aspoň 44 × 44 px', cile.length > 0 && cile.every(([w, h, tap]) => (w >= 44 && h >= 44) || (tap && w >= 36 && h >= 36)), JSON.stringify(cile));
+    .slice(0, 6).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
+  tvrdi('K7 (390): akce řádku v záznamech má aspoň 36 × 36 px (V4: „···" 36 na R)', cile.length > 0 && cile.every(([w, h]) => w >= 36 && h >= 36), JSON.stringify(cile));
   const tPetra = (await nastrojT.locator('li.list-row').filter({ hasText: 'Petra Malá' }).filter({ hasText: '08:12' }).first().innerText()).replace(/\u00a0/g, ' ');
   tvrdi('K7 (390): řádek Petry ukazuje „+12 min pozdě" (chip pod názvem)', /\+12 min pozdě/.test(tPetra), tPetra);
   // Okno Upravit čas: vyjede zdola, Důvod je Textarea s 16 px (žádný zoom) a PATCH nese note.

@@ -401,19 +401,23 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         <>
           <div>
             {/* Legenda je zároveň štětec: vybraný stav nastaví klepnutý den, „Přepínat" cyklí. */}
-            {/* v4 (P2, DESIGN „jedna vodorovná řada čipů"): jeden posuvný pás mezi L a R karty — dřív se
+            {/* v4 (P2, P3): volby štětce jsou mřížka rovných dílů — řady po třech (⅓), poslední řada se rozdělí
+                na ½ + ½ nebo jde přes celou šířku, takže každá řada končí na R a žádná buňka neosiří. Dřív se
                 pět pilulek zalomilo do dvou řad se dvěma různými pravými hranami. */}
-            <div className="flex flex-nowrap items-center gap-1.5 mb-2 overflow-x-auto scroll-fade-x scrollbar-none py-0.5" role="radiogroup" aria-label={t('Co nastaví klepnutí na den')}>
-              <button type="button" role="radio" aria-checked={stetec === null} onClick={() => setStetec(null)}
-                className={`filter-pill tap-target-sm shrink-0 ${stetec === null ? 'seg-on' : 'seg-off glass'}`}>
-                {t('Přepínat')}
-              </button>
-              {stateList.map((st) => (
-                <button key={st} type="button" role="radio" aria-checked={stetec === st} onClick={() => setStetec(st)}
-                  className={`filter-pill tap-target-sm shrink-0 inline-flex items-center gap-1.5 ${stetec === st ? 'seg-on' : 'seg-off glass'}`}>
-                  <span aria-hidden className={`h-2.5 w-2.5 rounded-full shrink-0 ${metaOf(st).dot}`} /> {metaOf(st).label}
-                </button>
-              ))}
+            <div className="grid grid-cols-6 gap-1.5 mb-2" role="radiogroup" aria-label={t('Co nastaví klepnutí na den')}>
+              {[null, ...stateList].map((st, i, vse) => {
+                const zbytek = vse.length % 3;
+                const vPosledni = i >= vse.length - zbytek;
+                const span = !zbytek || !vPosledni ? 'col-span-2' : zbytek === 2 ? 'col-span-3' : 'col-span-6';
+                const label = st === null ? t('Přepínat') : metaOf(st).label;
+                return (
+                  <button key={st ?? 'prepinat'} type="button" role="radio" aria-checked={stetec === st} onClick={() => setStetec(st)} title={label}
+                    className={`filter-pill tap-target-sm ${span} min-w-0 !px-2 inline-flex items-center justify-center gap-1.5 ${stetec === st ? 'seg-on' : 'seg-off glass'}`}>
+                    {st !== null && <span aria-hidden className={`h-2.5 w-2.5 rounded-full shrink-0 ${metaOf(st).dot}`} />}
+                    <span className="min-w-0 truncate">{label}</span>
+                  </button>
+                );
+              })}
             </div>
             <p className="t-meta mb-3 text-pretty">
               {stetec === null

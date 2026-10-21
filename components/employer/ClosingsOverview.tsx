@@ -390,12 +390,11 @@ export default function ClosingsOverview() {
                     // Posádka na vlastním řádku, nejvýš na dva (V04): v jednom řádku s tržbou se utínala
                     // na „Směna: Jakub Kolář + Petra Mar…". Tržba je číslo řádku — pevný sloupec
                     // s tabulkovými číslicemi na monitoru, na telefonu vlevo pod jménem a rozdíl kasy vedle ní.
-                    // v4: stavové chipy (rozdíl kasy, čeká na schválení, akce) na ose textu pod posádkou — dřív
-                    // v ocasu řádku, který je na telefonu pod avatarem na L (druhá levá hrana v řádku).
-                    detail={<>
-                      <span className="line-clamp-2 break-words">{t('Směna: {crew}', { crew })}</span>
-                      {(c.event_title || covered.length > 0 || c.approved === false || d != null) && (
-                        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    detail={<span className="line-clamp-2 break-words">{t('Směna: {crew}', { crew })}</span>}
+                    // v4: stavové chipy (rozdíl kasy, čeká na schválení, akce) jsou doplněk řádku — na telefonu druhý
+                    // řádek na ose textu pod tržbou (ListRow „OSA TEXTU"), na monitoru sloupec před tržbou.
+                    right={(c.event_title || covered.length > 0 || c.approved === false || d != null) ? (
+                        <span className="flex flex-wrap items-center gap-1.5">
                           {c.event_title && <Chip tone="info" size="sm" icon="calendarCheck" className="hidden sm:inline-flex">{c.event_title}</Chip>}
                           {covered.length > 0 && <Chip tone="muted" size="sm" icon="users" className="hidden sm:inline-flex">+{covered.length}</Chip>}
                           {c.approved === false && <Chip tone="wait" size="sm">{t('Čeká na schválení')}</Chip>}
@@ -406,8 +405,7 @@ export default function ClosingsOverview() {
                             </Chip>
                           )}
                         </span>
-                      )}
-                    </>}
+                      ) : undefined}
                     value={trzba != null ? <><span className="sr-only">{t('tržba {castka}', { castka: money(trzba) })}</span><span aria-hidden>{money(trzba)}</span></> : undefined}
                     // Hosté, když je tým v uzávěrce vyplnil — pod tržbou ve stejném sloupci (číslo k číslu),
                     // ne za posádkou, kde by je dlouhá směna uřízla na druhém řádku.
