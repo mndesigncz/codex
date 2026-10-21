@@ -166,8 +166,8 @@ export default function ProgramVernosti({ otevri, bonusy }: {
             )}
             {zebricek.length > 0 && (
               <div className="rounded-[var(--r-md)] bg-white shadow-[0_0_0_1px_var(--surface-line)]">
-                <p className="t-label px-3 pt-2.5">Co za to dostaneš</p>
-                <ul className="list px-3">
+                <p className="t-label px-4 sm:px-5 pt-3">Co za to dostaneš</p>
+                <ul className="list px-4 sm:px-5">
                   {zebricek.slice(0, 4).map((o, i) => <li key={i} className="flex items-center gap-3 py-2 text-[13px] min-w-0"><span className="w-[4.5rem] shrink-0 font-semibold tabular-nums whitespace-nowrap">{o.kde}</span><span className="truncate">{o.co}</span></li>)}
                 </ul>
               </div>
