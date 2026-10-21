@@ -105,7 +105,7 @@ export function obchodniPodminkyCs(f: Firma): Dokument {
       { id: 'pracovni-pravo', h: '14. Nástroje pro práci s týmem a zákoník práce', p: [
         'Rozvrh směn, docházka, kontrola polohy při píchání, odměny, body, prémie, tresty a napomenutí, mzdové podklady a hodnocení jsou nástroje. O jejich použití rozhoduje zákazník jako zaměstnavatel a odpovídá za soulad se zákoníkem práce a ochranou osobních údajů. Zejména:',
       ], li: [
-        'zaměstnancům se nesmějí ukládat peněžní postihy (pokuty) za porušení povinností (§ 346b zákoníku práce); krátit lze jen nenárokovou prémii, a to podle kritérií stanovených předem pro dané období;',
+        'zaměstnancům se nesmějí ukládat peněžní postihy (pokuty) za porušení povinností (§ 346b zákoníku práce); nenárokovou prémii lze nepřiznat nebo snížit jen proto, že zaměstnanec nesplnil kritéria stanovená předem pro dané období, a už přiznanou mzdu nebo odměnu krátit nelze;',
         'srážky ze mzdy jsou možné jen podle zákona nebo na základě dohody o srážkách ze mzdy (§ 146 a 147 zákoníku práce); náhradu škody a schodku lze požadovat jen podle § 250 a násl., u schodku na svěřených hodnotách jen s dohodou o odpovědnosti (§ 252);',
         'napomenutí v aplikaci není výtkou podle § 52 písm. g) zákoníku práce;',
         'kontrolu zaměstnanců, včetně ověření polohy při příchodu, smí zaměstnavatel zavést jen v souladu s § 316 zákoníku práce a o jejím rozsahu a způsobu musí zaměstnance předem informovat;',
@@ -136,15 +136,15 @@ export function obchodniPodminkyCs(f: Firma): Dokument {
         'Změna ceny se nedotkne již zaplaceného období. Kratší lhůtu můžeme použít jen u změn, které zákazníkovi neubírají práva, nebo u změn vynucených zákonem či rozhodnutím úřadu; i ty oznámíme.',
       ] },
       { id: 'ukonceni', h: '19. Trvání a ukončení smlouvy', li: [
-        'Zákazník může smlouvu kdykoli vypovědět e-mailem na podporu nebo smazáním podniku v aplikaci. Zaplacené předplatné tím nevrací (s výjimkami podle článku 10).',
+        'Zákazník může smlouvu kdykoli vypovědět e-mailem na podporu, nebo tím, že v aplikaci smaže svůj účet vlastníka i s podnikem (Nastavení → Data a soukromí → Smazat účet). Zaplacené předplatné se tím nevrací (s výjimkami podle článku 10).',
         `Poskytovatel může smlouvu vypovědět s výpovědní dobou ${L.vypovedProvozovateleMesicu} měsíce; nevyčerpanou část předplatného poměrně vrátí.`,
         'Poskytovatel může smlouvu vypovědět s okamžitou účinností nebo omezit přístup, pokud zákazník podstatně porušuje tyto podmínky (například nezákonný obsah, útoky na službu, zneužití cizích údajů) a nápravu nezjedná ani po výzvě, nebo bez výzvy, pokud porušení nelze napravit nebo hrozí vážná škoda.',
-        `Podnik, jehož placené předplatné skončilo a ve kterém od té doby ${RETENCE_TEXT.zrusenyPodnikDni} dní nikdo nebyl aktivní (žádná změna ani docházka), smažeme včetně dat, protože ho zákazník zjevně přestal používat.`,
+        `Podnik, jehož placené předplatné (nebo zkušební doba) skončilo a ve kterém od té doby ${RETENCE_TEXT.zrusenyPodnikDni} dní nikdo nic nezměnil ani nezapsal docházku, smažeme včetně dat, protože ho zákazník zjevně přestal používat.`,
       ] },
       { id: 'po-ukonceni', h: '20. Data po ukončení a přechod k jinému poskytovateli', li: [
-        'Během trvání smlouvy si zákazník může data kdykoli stáhnout: denní zálohu podniku ve formátu JSON (obsah podniku kromě soukromých zpráv a mzdových údajů, které záloha z důvodu ochrany soukromí nenese) a exporty CSV v jednotlivých modulech (například docházka, rozvrh, věrnostní program, kupony a poukazy). Na požádání vydáme bezplatně i další data podniku ve strojově čitelném formátu (JSON nebo CSV).',
+        'Během trvání smlouvy si zákazník může data kdykoli stáhnout: denní zálohu podniku ve formátu JSON (obsah podniku kromě soukromých zpráv a mzdových údajů, které záloha z důvodu ochrany soukromí nenese) a v tarifech Pro a Max také exporty CSV v jednotlivých modulech (například docházka, rozvrh, věrnostní program, kupony a poukazy). Na požádání vydáme bezplatně i další data podniku ve strojově čitelném formátu (JSON nebo CSV), a to v každém tarifu.',
         `Když smlouva skončí výpovědí, zůstane podnik ještě ${L.prechodneObdobiDni} dní (přechodné období) přístupný ke stažení dat a na požádání poskytneme součinnost s přechodem k jinému poskytovateli. Po přechodném období data uchováme ještě nejméně ${L.vyzvednutiDatDni} dní, během nichž si je zákazník může vyžádat. Potom je smažeme; ze záloh u poskytovatelů zmizí nejpozději do dalších ${L.zalohyDni} dnů. Ponecháme jen to, co nám ukládá zákon (například účetní doklady).`,
-        'Smaže-li zákazník podnik sám v aplikaci, je to jeho pokyn k okamžitému výmazu: aplikace na to předem upozorní, smazání se potvrzuje heslem a data se smažou ihned.',
+        'Smaže-li zákazník svůj účet i s podnikem sám v aplikaci, je to jeho pokyn k okamžitému výmazu: aplikace na to předem upozorní, smazání se potvrzuje heslem a slovem SMAZAT a data všech podniků, které vlastní, se smažou ihned.',
         'Za přechod k jinému poskytovateli ani za export dat nic neúčtujeme.',
       ] },
       { id: 'postoupeni', h: '21. Postoupení smlouvy', p: [
@@ -244,7 +244,7 @@ export function obchodniPodminkyEn(f: Firma): Dokument {
       { id: 'pracovni-pravo', h: '14. Team tools and Czech labour law', p: [
         'Rotas, attendance, location checks at clock-in, rewards, points, bonuses, penalties and warnings, payroll data and reviews are tools. The customer as employer decides how to use them and is responsible for compliance with the Labour Code and data protection law. In particular:',
       ], li: [
-        'employees must not be fined for breaching their duties (section 346b of the Labour Code); only a discretionary bonus may be reduced, according to criteria set in advance for the period;',
+        'employees must not be fined for breaching their duties (section 346b of the Labour Code); a discretionary bonus may be withheld or reduced only because the employee did not meet criteria set in advance for the period, and pay or rewards already granted must not be cut;',
         'deductions from wages are allowed only by law or under a wage deduction agreement (sections 146 and 147); damages and shortfalls only under section 250 et seq., shortfalls in entrusted assets only with a liability agreement (section 252);',
         'a warning in the app is not a formal reprimand under section 52(g) of the Labour Code;',
         'monitoring of employees, including location checks at clock-in, may be introduced only in line with section 316 of the Labour Code and employees must be informed in advance of its scope and method;',
@@ -275,15 +275,15 @@ export function obchodniPodminkyEn(f: Firma): Dokument {
         'A price change does not affect an already paid period. A shorter period may be used only for changes that do not reduce the customer\'s rights or that are required by law or an authority; these are announced too.',
       ] },
       { id: 'ukonceni', h: '19. Term and termination', li: [
-        'The customer may terminate at any time by email to support or by deleting the business in the app. Paid subscription fees are not refunded (with the exceptions in section 10).',
+        'The customer may terminate at any time by email to support, or by deleting its owner account together with the business in the app (Settings → Data and privacy → Delete account). Paid subscription fees are not refunded (with the exceptions in section 10).',
         `The provider may terminate with ${L.vypovedProvozovateleMesicu} months' notice and refunds the unused part of the subscription pro rata.`,
         'The provider may terminate with immediate effect or restrict access if the customer materially breaches these terms (for example unlawful content, attacks on the service, misuse of others\' data) and does not remedy it after a request, or without a request if the breach cannot be remedied or serious harm is imminent.',
-        `A business whose paid subscription has ended and in which nobody has been active (no change, no attendance) for ${RETENCE_TEXT.zrusenyPodnikDni} days since then is deleted including its data, as the customer has evidently stopped using it.`,
+        `A business whose paid subscription (or trial) has ended and in which nobody has changed anything or recorded attendance for ${RETENCE_TEXT.zrusenyPodnikDni} days since then is deleted including its data, as the customer has evidently stopped using it.`,
       ] },
       { id: 'po-ukonceni', h: '20. Data after termination and switching providers', li: [
-        'During the contract the customer can download data at any time: the daily business backup in JSON (business content except private messages and payroll data, which the backup leaves out for privacy) and CSV exports in individual modules (for example attendance, rota, loyalty programme, coupons and vouchers). On request we provide other business data in a machine-readable format (JSON or CSV) free of charge.',
+        'During the contract the customer can download data at any time: the daily business backup in JSON (business content except private messages and payroll data, which the backup leaves out for privacy) and, on the Pro and Max plans, CSV exports in individual modules (for example attendance, rota, loyalty programme, coupons and vouchers). On request we provide other business data in a machine-readable format (JSON or CSV) free of charge, on any plan.',
         `When the contract ends by termination, the business stays accessible for downloading data for another ${L.prechodneObdobiDni} days (transition period) and on request we assist with switching to another provider. After the transition period we keep the data for at least ${L.vyzvednutiDatDni} more days, during which the customer can request it. Then we delete it; it disappears from provider backups within another ${L.zalohyDni} days. We keep only what the law requires (for example accounting records).`,
-        'If the customer deletes the business in the app, that is an instruction for immediate erasure: the app warns beforehand, deletion is confirmed with the password and data is deleted immediately.',
+        'If the customer deletes its account together with the business in the app, that is an instruction for immediate erasure: the app warns beforehand, deletion is confirmed with the password and the word SMAZAT, and the data of all businesses it owns is deleted immediately.',
         'We charge nothing for switching or for data export.',
       ] },
       { id: 'postoupeni', h: '21. Assignment', p: [

@@ -12,6 +12,9 @@ import { RETENCE } from '../../lib/retence.ts';
 import { LHUTY, RETENCE_TEXT, TARIFY } from '../../lib/pravni/lhuty.ts';
 import { PRICES, TRIAL_DAYS } from '../../lib/plan.ts';
 import { PLATNOST_ODKAZU_DNI } from '../../lib/pravni/zalohaOdkaz.ts';
+import { dokument, KLICE_DOKUMENTU } from '../../lib/pravni/texty.ts';
+import { firma } from '../../lib/firma.ts';
+import { POLOMERY_M } from '../../lib/geoPichani.ts';
 
 const cti = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 
@@ -88,4 +91,16 @@ export default function ({ eq, ok }: Testy) {
 
   // ---- export ----
   ok('export dat: verze souhlasu v profilu', ['terms_version', 'privacy_version', 'terms_accepted_at'].every(k => (POLE_PROFILU as readonly string[]).includes(k)));
+
+  // ---- oponentura 2026-10-21: dokumenty popisují cesty a čísla, které aplikace opravdu má ----
+  const f = firma({});
+  const vse = (j: 'cs' | 'en') => KLICE_DOKUMENTU.map(k => JSON.stringify(dokument(k, j, f))).join('\n');
+  const cs = vse('cs'), en = vse('en');
+  ok('cesty v dokumentech: smazání a stažení dat tam, kde v aplikaci jsou (Nastavení → Data a soukromí, Moje)',
+    /sekce\('privacy', t\('Data a soukromí'\)/.test(cti('components/Settings.tsx')) && /t\('Moje'\)/.test(cti('components/client/ClientShell.tsx'))
+    && cs.includes('Nastavení → Data a soukromí → Smazat účet') && cs.includes('Moje → Smazat účet') && en.includes('Settings → Data and privacy → Delete account'));
+  ok('cesty v dokumentech: žádné neexistující „Profil → …“ ani „Nastavení → Účet → Smazat účet“', !/Profil → |Nastavení → Účet → Smazat|Profile → |Settings → Account → Delete/.test(cs + en));
+  ok('šablona pro zaměstnance: poloměry jako v aplikaci', cs.includes(`[${POLOMERY_M.join('/')}] m`));
+  ok('žádná zdvojená „Evropská unie (Evropská unie …)“ v umístění dat', !/Evropské unii \(Evropská unie|European Union \(European Union/.test(cs + en));
+  ok('pokladna a předplatné: žádná přeškrtnutá „srovnávací“ cena', !/<s>|pr\.yearCompare/.test(cti('components/CheckoutModal.tsx') + cti('components/Billing.tsx')));
 }

@@ -34,8 +34,10 @@ export interface Firma {
   /** Plátce DPH? Výchozí ne. */
   platceDph: boolean;
   typ: TypProvozovatele;
-  /** Kde leží databáze a soubory. */
+  /** Kde leží databáze a soubory (česky). */
   regionDat: string;
+  /** Tentýž údaj anglicky (vlastní FIRMA_REGION_DAT anglicky neznáme — pak se ukáže česky). */
+  regionDatEn: string;
   web: string;
 }
 
@@ -49,6 +51,7 @@ export const VYCHOZI = {
   zapis: 'zapsán v živnostenském rejstříku vedeném Městským úřadem Jeseník',
   zapisEn: 'registered in the Trade Register kept by the Municipal Office of Jeseník',
   regionDat: 'Evropská unie (databáze Neon v AWS eu-central-1, Frankfurt)',
+  regionDatEn: 'European Union (Neon database in AWS eu-central-1, Frankfurt)',
 } as const;
 
 const hodnota = (env: string | undefined, vychozi: string) => (env ?? '').trim() || vychozi;
@@ -70,6 +73,7 @@ export function firma(env: Record<string, string | undefined> = process.env): Fi
     platceDph: (env.FIRMA_PLATCE_DPH ?? '').trim() === '1',
     typ,
     regionDat: hodnota(env.FIRMA_REGION_DAT, VYCHOZI.regionDat),
+    regionDatEn: (env.FIRMA_REGION_DAT ?? '').trim() || VYCHOZI.regionDatEn,
     web: 'https://www.managero.app',
   };
 }

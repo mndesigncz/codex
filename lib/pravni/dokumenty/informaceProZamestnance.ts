@@ -21,7 +21,7 @@ export function informaceCs(f: Firma): Dokument {
         'Směny, dostupnost, žádosti o volno a docházka (příchody, odchody, přestávky): plánování práce a evidence pracovní doby, kterou nám ukládá zákoník práce (právní povinnost).',
         '[Jen pokud zapnete píchání u podniku:] Při příchodu z telefonu aplikace ověří, že jste do [100/200/500] m od podniku. Ukládá se jen výsledek a vzdálenost v metrech, ne vaše souřadnice; poloha se nesleduje průběžně ani na pozadí. Důvod: [například ověření, že příchod zapisuje člověk na pracovišti] (oprávněný zájem a § 316 zákoníku práce).',
         'Hodinová sazba, odpracované hodiny, prémie a výplatní podklady: výpočet mzdy (plnění smlouvy a právní povinnost). Vidí je jen vedení.',
-        '[Jen pokud používáte:] Body, odměny, hodnocení směn, napomenutí a krácení nenárokové prémie podle kritérií, která jsme stanovili předem v [mzdovém výměru nebo vnitřním předpisu]. Pokuty neukládáme. O odměnách a krácení rozhoduje vždy člověk ve vedení, aplikace jen počítá a navrhuje.',
+        '[Jen pokud používáte:] Body, odměny, hodnocení směn a napomenutí (případně s fotkou, kterou přiloží vedení, a s vaším vyjádřením). Nenárokovou prémii můžeme nepřiznat nebo snížit jen tehdy, když nesplníte kritéria, která jsme předem stanovili v [mzdovém výměru nebo vnitřním předpisu] pro daný měsíc. Pokuty neukládáme. O odměnách a prémiích rozhoduje vždy člověk ve vedení, aplikace jen počítá a navrhuje.',
         'Zprávy v týmovém chatu, fotky, úkoly, uzávěrky a nápady: komunikace a organizace provozu (oprávněný zájem). Soukromé zprávy mezi kolegy vedení nevidí.',
       ] },
       { id: 'komu', h: 'Komu údaje předáváme', p: [
@@ -51,7 +51,7 @@ export function informaceEn(f: Firma): Dokument {
         'Shifts, availability, time-off requests and attendance (clock-in, clock-out, breaks): planning work and recording working time required by the Labour Code (legal obligation).',
         '[Only if you enable clock-in at the venue:] When clocking in from a phone, the app checks that you are within [100/200/500] m of the venue. Only the result and the distance in metres are stored, not your coordinates; location is never tracked continuously or in the background. Reason: [for example verifying that the clock-in is made by a person at the workplace] (legitimate interest and section 316 of the Labour Code).',
         'Hourly rate, hours worked, bonuses and payroll data: calculating pay (contract and legal obligation). Visible to management only.',
-        '[Only if you use them:] Points, rewards, shift reviews, warnings and reductions of a discretionary bonus according to criteria we set in advance in [pay statement or internal rules]. We do not impose fines. Decisions on rewards and reductions are always made by a person in management; the app only calculates and suggests.',
+        '[Only if you use them:] Points, rewards, shift reviews and warnings (possibly with a photo attached by management, and with your response). We may withhold or reduce a discretionary bonus only if you do not meet the criteria we set in advance in [pay statement or internal rules] for the month. We do not impose fines. Decisions on rewards and bonuses are always made by a person in management; the app only calculates and suggests.',
         'Team chat messages, photos, tasks, closings and ideas: communication and organising operations (legitimate interest). Management cannot see private messages between colleagues.',
       ] },
       { id: 'komu', h: 'Who receives the data', p: [

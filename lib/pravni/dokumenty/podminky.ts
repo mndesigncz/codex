@@ -26,9 +26,9 @@ export function podminkyCs(f: Firma): Dokument {
         'Pro uživatele jsou obě aplikace zdarma. Platíte jen připojení k internetu podle svého operátora. Objednávky a služby podniku platí hosté přímo v podniku; aplikace platby hostů nezpracovává a v mobilních aplikacích se nic nekupuje.',
       ] },
       { id: 'uzavreni', h: 'Založení účtu a uzavření smlouvy', li: [
-        'Host si účet založí v Managero client zadáním jména, e-mailu a hesla, zaškrtnutím souhlasu s těmito podmínkami a potvrzením, že mu je aspoň 15 let. Člen týmu se připojí pozvánkou nebo kódem podniku a souhlas potvrdí stejně.',
-        'Smlouva o užívání aplikace vzniká založením účtu. Před odesláním formuláře můžete údaje zkontrolovat a opravit. Smlouva se uzavírá v češtině (anglický překlad podmínek je informativní). Verzi podmínek, se kterou jste souhlasili, ukládáme u účtu a platné znění je vždy na této stránce, kde si ho můžete uložit nebo vytisknout.',
-        'Technické požadavky: aktuální verze běžných prohlížečů (Safari, Chrome, Firefox, Edge) nebo mobilní aplikace pro iOS a Android podle požadavků v App Store a Google Play, a připojení k internetu. Údaje účtu si můžete kdykoli stáhnout ve strojově čitelném formátu (Nastavení → Data a soukromí).',
+        'Host si účet založí v Managero client: zadá jméno, e-mail a heslo, zaškrtne souhlas s těmito podmínkami a potvrdí, že mu je aspoň 15 let. Člen týmu se připojí pozvánkou nebo kódem podniku a zaškrtne souhlas s těmito podmínkami.',
+        'Smlouva o užívání aplikace vzniká založením účtu a platí na dobu neurčitou. Před odesláním formuláře můžete údaje zkontrolovat a opravit. Smlouva se uzavírá v češtině (anglický překlad podmínek je informativní). Verzi podmínek, se kterou jste souhlasili, ukládáme u účtu a platné znění je vždy na této stránce, kde si ho můžete uložit nebo vytisknout. Nejsme vázáni žádným kodexem chování.',
+        'Technické požadavky: aktuální verze běžných prohlížečů (Safari, Chrome, Firefox, Edge) nebo mobilní aplikace pro iOS a Android podle požadavků v App Store a Google Play, a připojení k internetu. Údaje účtu si můžete kdykoli stáhnout ve strojově čitelném formátu (Managero: Nastavení → Data a soukromí; Managero client: Moje → Stáhnout moje data).',
       ] },
       { id: 'ucet', h: 'Pravidla účtu', li: [
         'Uveďte pravdivé údaje a chraňte své heslo. Za činnost pod svým účtem odpovídáte.',
@@ -60,7 +60,7 @@ export function podminkyCs(f: Firma): Dokument {
         `Jednotné kontaktní místo podle Aktu o digitálních službách (čl. 11 a 12) pro orgány členských států, Evropskou komisi, Evropský sbor pro digitální služby i uživatele: ${f.emailPodpory}, telefon ${f.telefon}. Komunikujeme česky a anglicky.`,
       ] },
       { id: 'novinky', h: 'Novinky a obchodní sdělení', p: [
-        'Novinky a akce od podniků vám chodí jen s vaším výslovným souhlasem. Odesílatelem je podnik, který je ve zprávě uvedený. Souhlas odvoláte v profilu nebo odkazem v každém e-mailu. Provozní zprávy (potvrzení rezervace, obnovení hesla, oznámení o směnách) nejsou obchodní sdělení a chodí bez ohledu na tento souhlas.',
+        'Novinky a akce od podniků vám chodí jen s vaším výslovným souhlasem. Odesílatelem je podnik, který je ve zprávě uvedený. Souhlas odvoláte v aplikaci (Moje → Oznámení a soukromí) nebo odkazem v každém e-mailu. Provozní zprávy (potvrzení rezervace, obnovení hesla, oznámení o směnách) nejsou obchodní sdělení a chodí bez ohledu na tento souhlas.',
       ] },
       { id: 'dostupnost', h: 'Dostupnost, vady a změny', li: [
         'Aplikace provozujeme s odbornou péčí a snažíme se o nepřetržitý provoz, ale výpadky a údržba se mohou stát. Funkce můžeme vyvíjet a měnit.',
@@ -75,7 +75,7 @@ export function podminkyCs(f: Firma): Dokument {
         'Za škodu odpovídáme podle zákona. Neodpovídáme za plnění podniků (výhody, rezervace, objednávky) ani za obsah, který vložili jiní uživatelé, ani za to, jak podnik naloží s údaji svého týmu a hostů, kde je jejich správcem. Tím nejsou omezena práva, která vám dává zákon.',
       ] },
       { id: 'spory', h: 'Stížnosti a spory', p: [
-        `Stížnosti posílejte na ${f.emailPodpory}. K mimosoudnímu řešení spotřebitelských sporů je příslušná Česká obchodní inspekce (adr.coi.gov.cz). Dozor nad ochranou spotřebitele vykonává Česká obchodní inspekce, nad ochranou osobních údajů Úřad pro ochranu osobních údajů. Smlouva se řídí českým právem; ochrana, kterou vám dávají předpisy státu vašeho bydliště, tím není dotčena.`,
+        `Stížnosti posílejte na ${f.emailPodpory}. Pokud se s námi nedohodnete, můžete se jako spotřebitel obrátit na Českou obchodní inspekci, která řeší spotřebitelské spory mimosoudně (Štěpánská 15, 120 00 Praha 2, adr.coi.gov.cz). Dozor nad ochranou spotřebitele vykonává Česká obchodní inspekce, nad ochranou osobních údajů Úřad pro ochranu osobních údajů. Smlouva se řídí českým právem; ochrana, kterou vám dávají předpisy státu vašeho bydliště, tím není dotčena.`,
       ] },
     ],
   };
@@ -95,9 +95,9 @@ export function podminkyEn(f: Firma): Dokument {
         'Both apps are free for users. You only pay for your internet connection. Guests pay the venue directly for orders and services; the app does not process guests\' payments and nothing is sold in the mobile apps.',
       ] },
       { id: 'uzavreni', h: 'Creating an account and concluding the contract', li: [
-        'A guest creates an account in Managero client by entering name, email and password, agreeing to these terms and confirming they are at least 15. A team member joins via an invitation or business code and agrees the same way.',
-        'The contract for using the app is concluded by creating the account. You can check and correct details before submitting. The contract is concluded in Czech (the English translation is informative). We store the version of the terms you agreed to with your account; the current version is always on this page, where you can save or print it.',
-        'Technical requirements: current versions of common browsers (Safari, Chrome, Firefox, Edge) or the iOS and Android apps per the App Store and Google Play requirements, and an internet connection. You can download your account data in a machine-readable format at any time (Settings → Data and privacy).',
+        'A guest creates an account in Managero client: enters name, email and password, ticks agreement to these terms and confirms they are at least 15. A team member joins via an invitation or business code and ticks agreement to these terms.',
+        'The contract for using the app is concluded by creating the account, for an indefinite period. You can check and correct details before submitting. The contract is concluded in Czech (the English translation is informative). We store the version of the terms you agreed to with your account; the current version is always on this page, where you can save or print it. We are not bound by any code of conduct.',
+        'Technical requirements: current versions of common browsers (Safari, Chrome, Firefox, Edge) or the iOS and Android apps per the App Store and Google Play requirements, and an internet connection. You can download your account data in a machine-readable format at any time (Managero: Settings → Data and privacy; Managero client: My page → Download my data).',
       ] },
       { id: 'ucet', h: 'Account rules', li: [
         'Give truthful details and protect your password. You are responsible for activity under your account.',
@@ -129,7 +129,7 @@ export function podminkyEn(f: Firma): Dokument {
         `Single point of contact under the Digital Services Act (Articles 11 and 12) for Member State authorities, the European Commission, the European Board for Digital Services and users: ${f.emailPodpory}, phone ${f.telefon}. We communicate in Czech and English.`,
       ] },
       { id: 'novinky', h: 'News and commercial communications', p: [
-        'News and offers from venues are sent only with your explicit consent. The sender is the venue named in the message. Withdraw consent in your profile or via the link in every email. Service messages (booking confirmations, password reset, shift notices) are not commercial communications and are sent regardless of this consent.',
+        'News and offers from venues are sent only with your explicit consent. The sender is the venue named in the message. Withdraw consent in the app (My page → Notifications and privacy) or via the link in every email. Service messages (booking confirmations, password reset, shift notices) are not commercial communications and are sent regardless of this consent.',
       ] },
       { id: 'dostupnost', h: 'Availability, defects and changes', li: [
         'We operate the apps with professional care and aim for continuous operation, but outages and maintenance can happen. We may develop and change features.',
@@ -144,7 +144,7 @@ export function podminkyEn(f: Firma): Dokument {
         'We are liable for damage as provided by law. We are not responsible for the venues\' performance (benefits, bookings, orders), for content added by other users, or for how a business handles data of its team and guests where it is the controller. This does not limit your statutory rights.',
       ] },
       { id: 'spory', h: 'Complaints and disputes', p: [
-        `Send complaints to ${f.emailPodpory}. The Czech Trade Inspection Authority is competent for out-of-court resolution of consumer disputes (adr.coi.gov.cz). Consumer protection is supervised by the Czech Trade Inspection Authority and data protection by the Office for Personal Data Protection. Czech law applies; the protection given to you by the law of your country of residence is not affected.`,
+        `Send complaints to ${f.emailPodpory}. If we cannot agree, as a consumer you can turn to the Czech Trade Inspection Authority, which resolves consumer disputes out of court (Štěpánská 15, 120 00 Praha 2, adr.coi.gov.cz). Consumer protection is supervised by the Czech Trade Inspection Authority and data protection by the Office for Personal Data Protection. Czech law applies; the protection given to you by the law of your country of residence is not affected.`,
       ] },
     ],
   };

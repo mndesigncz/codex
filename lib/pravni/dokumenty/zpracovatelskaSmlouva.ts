@@ -71,7 +71,7 @@ export function zpracovatelskaSmlouvaCs(f: Firma): Dokument {
         'šifrovaný přenos (HTTPS/TLS s vynuceným HSTS) mezi zařízeními a službou i mezi službou a jejími poskytovateli; databáze a úložiště souborů jsou u poskytovatelů šifrované i v klidu;',
         'hesla a PINy jen jako jednosměrný otisk (bcrypt), nikdy v čitelné podobě; omezení počtu pokusů o přihlášení; přihlášení v zabezpečené cookie (httpOnly) s omezenou platností; změna hesla odhlásí ostatní zařízení;',
         'oddělení dat podniků: každý dotaz je omezený na podnik, ve kterém je uživatel členem; přístup uvnitř podniku řídí role a oprávnění (například hodinové sazby vidí jen vedení, soukromé zprávy nevidí ani vlastník podniku);',
-        'soubory (fotky, účtenky, přílohy) v neveřejném úložišti, vydávané jen přihlášeným oprávněným uživatelům;',
+        'soubory (fotky, účtenky, přílohy) v neveřejném úložišti, vydávané jen přihlášeným oprávněným uživatelům; bez přihlášení se zobrazí jen obrázky, které podnik sám zveřejní na své stránce pro hosty (logo, fotky podniku, veřejné akce, bannery);',
         'protokol změn podniku a samostatný protokol zásahů správy platformy;',
         `zálohy: databáze s obnovou k bodu v čase u poskytovatele databáze a denní záloha podniku pro správce přes podepsaný odkaz, který platí ${L.odkazZalohyDni} dní a funguje jen po přihlášení oprávněného člověka;`,
         'minimalizace: poloha se neukládá, jen vzdálenost a výsledek kontroly; staré údaje se mažou podle lhůt v článku 13;',
@@ -86,7 +86,7 @@ export function zpracovatelskaSmlouvaCs(f: Firma): Dokument {
         'Zpracovatel ukládá subzpracovatelům smluvně stejné povinnosti ochrany údajů, jaké má sám, a za jejich plnění správci odpovídá.',
       ] },
       { id: 'predavani', h: '11. Předávání mimo EU', p: [
-        `Databáze leží v Evropské unii (${f.regionDat}). Někteří subzpracovatelé jsou usazeni v USA. Údaje jim zpracovatel předává jen na základě rozhodnutí Komise o odpovídající ochraně (EU–US Data Privacy Framework, prováděcí rozhodnutí (EU) 2023/1795) u certifikovaných příjemců, nebo standardních smluvních doložek podle prováděcího rozhodnutí (EU) 2021/914, které jsou součástí jejich zpracovatelských smluv. Konkrétní záruka u každého je v seznamu subzpracovatelů.`,
+        `Kde data leží: ${f.regionDat}. Někteří subzpracovatelé jsou usazeni v USA. Údaje jim zpracovatel předává jen na základě rozhodnutí Komise o odpovídající ochraně (EU–US Data Privacy Framework, prováděcí rozhodnutí (EU) 2023/1795) u certifikovaných příjemců, nebo standardních smluvních doložek podle prováděcího rozhodnutí (EU) 2021/914, které jsou součástí jejich zpracovatelských smluv. Konkrétní záruka u každého je v seznamu subzpracovatelů.`,
       ] },
       { id: 'soucinnost', h: '12. Práva subjektů, součinnost a porušení zabezpečení', li: [
         'Zpracovatel pomáhá správci plnit žádosti subjektů údajů. Aplikace k tomu má nástroje: stažení údajů účtu, opravu v profilu, smazání účtu, export členů věrnostního programu a smazání nebo anonymizaci hosta.',
@@ -165,7 +165,7 @@ export function zpracovatelskaSmlouvaEn(f: Firma): Dokument {
         'encrypted transfer (HTTPS/TLS with enforced HSTS) between devices and the service and between the service and its providers; the database and file storage are also encrypted at rest at the providers;',
         'passwords and PINs only as one-way hashes (bcrypt), never readable; rate-limited sign-in; sign-in in a secure (httpOnly) cookie with limited validity; changing the password signs out other devices;',
         'separation of businesses: every query is limited to the business the user is a member of; access within a business is governed by roles and permissions (for example only management sees hourly rates, not even the owner sees private messages);',
-        'files (photos, receipts, attachments) in non-public storage, served only to signed-in authorised users;',
+        'files (photos, receipts, attachments) in non-public storage, served only to signed-in authorised users; without sign-in only images the business itself publishes on its guest page are shown (logo, venue photos, public events, banners);',
         'a business change log and a separate log of platform administration actions;',
         `backups: point-in-time recovery of the database at the database provider and a daily business backup for the controller via a signed link valid ${L.odkazZalohyDni} days that works only after an authorised person signs in;`,
         'minimisation: location is not stored, only the distance and the result of the check; old data is deleted according to section 13;',
@@ -180,7 +180,7 @@ export function zpracovatelskaSmlouvaEn(f: Firma): Dokument {
         'The processor imposes the same data protection obligations on subprocessors by contract and remains liable to the controller for their performance.',
       ] },
       { id: 'predavani', h: '11. Transfers outside the EU', p: [
-        `The database is located in the European Union (Neon database in AWS eu-central-1, Frankfurt). Some subprocessors are established in the USA. Data is transferred to them only on the basis of the Commission adequacy decision (EU–US Data Privacy Framework, Implementing Decision (EU) 2023/1795) for certified recipients, or of standard contractual clauses under Implementing Decision (EU) 2021/914 included in their data processing agreements. The safeguard for each is stated in the list of subprocessors.`,
+        `Where data is stored: ${f.regionDatEn}. Some subprocessors are established in the USA. Data is transferred to them only on the basis of the Commission adequacy decision (EU–US Data Privacy Framework, Implementing Decision (EU) 2023/1795) for certified recipients, or of standard contractual clauses under Implementing Decision (EU) 2021/914 included in their data processing agreements. The safeguard for each is stated in the list of subprocessors.`,
       ] },
       { id: 'soucinnost', h: '12. Data subject rights, assistance and breaches', li: [
         'The processor helps the controller respond to data subject requests. The app provides tools for this: downloading account data, correcting the profile, deleting an account, exporting loyalty members and deleting or anonymising a guest.',

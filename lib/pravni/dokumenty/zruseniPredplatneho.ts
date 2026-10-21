@@ -35,7 +35,7 @@ export function zruseniPredplatnehoCs(f: Firma): Dokument {
         `O vrácení požádejte na ${f.emailPodpory}. Peníze vracíme na kartu, ze které platba proběhla, zpravidla do ${LHUTY.vraceniDni} dnů.`,
       ] },
       { id: 'smazani', h: 'Smazání podniku', p: [
-        'Zrušení předplatného podnik ani data nemaže. Pokud chcete Managero opustit úplně, stáhněte si zálohu a smažte podnik v Nastavení, nebo nám napište; postup a lhůty pro vyzvednutí dat jsou v článku 20 [[obchodni-podminky|obchodních podmínek]]. Viz také [[smazat-ucet|Smazání účtu]].',
+        'Zrušení předplatného podnik ani data nemaže. Pokud chcete Managero opustit úplně, stáhněte si zálohu a smažte svůj účet i s podnikem (Nastavení → Data a soukromí → Smazat účet), nebo nám napište; postup a lhůty pro vyzvednutí dat jsou v článku 20 [[obchodni-podminky|obchodních podmínek]]. Viz také [[smazat-ucet|Smazání účtu]].',
       ] },
     ],
   };
@@ -69,7 +69,7 @@ export function zruseniPredplatnehoEn(f: Firma): Dokument {
         `Request a refund at ${f.emailPodpory}. Refunds go to the card used for the payment, usually within ${LHUTY.vraceniDni} days.`,
       ] },
       { id: 'smazani', h: 'Deleting the business', p: [
-        'Cancelling the subscription does not delete the business or data. To leave Managero completely, download a backup and delete the business in Settings, or write to us; the procedure and data retrieval periods are in section 20 of the [[obchodni-podminky|business terms]]. See also [[smazat-ucet|Delete account]].',
+        'Cancelling the subscription does not delete the business or data. To leave Managero completely, download a backup and delete your account together with the business (Settings → Data and privacy → Delete account), or write to us; the procedure and data retrieval periods are in section 20 of the [[obchodni-podminky|business terms]]. See also [[smazat-ucet|Delete account]].',
       ] },
     ],
   };
