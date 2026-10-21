@@ -122,7 +122,9 @@ for (const sirka of [1280, 390]) {
     return undefined;
   };
   const { ctx, p, chyby } = await kontext({ viewport: { width: sirka, height: 950 }, mobil: sirka < 500, fix: nacti('k69-b8-rozlozeni-klient'), dalsi });
-  await p.goto(BASE + '/employer/overview?mode=client&tab=brand', { waitUntil: 'networkidle' });
+  // Kolo 92: bannery jsou kanál kampaně — Kampaně → Bannery (dřív Vzhled).
+  await p.goto(BASE + '/employer/overview?mode=client&tab=campaigns', { waitUntil: 'networkidle' });
+  await p.getByRole('tab', { name: 'Bannery' }).click();
   await p.getByRole('heading', { name: 'Bannery' }).waitFor({ timeout: 15000 });
   await p.waitForTimeout(500);
   tvrdi(`${L}: v seznamu jsou dva aktivní, archivovaný zvlášť`, await p.locator('ul[aria-label="Seznam bannerů"] [data-banner-row]').count() === 2 && await p.locator('[data-banner-row="3"]').count() === 1);

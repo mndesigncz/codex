@@ -146,8 +146,8 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
                       meta={`odejde ${dbTimeDayHM(h.scheduled_at)} · ${komu(String(h.audience ?? ''))} · ${kanalText(String(h.channels ?? 'push'))}`}
                       right={<Chip tone="wait" size="sm">{poCase ? 'Čeká na limit' : 'Naplánováno'}</Chip>}
                       actions={<>
-                        <Button size="sm" variant="secondary" onClick={() => upravit(h)}>Upravit</Button>
-                        <Button size="sm" variant="ghost" onClick={() => setRusim(h)}>Zrušit</Button>
+                        <Button size="sm" variant="secondary" aria-label={`Upravit kampaň ${h.title}`} onClick={() => upravit(h)}>Upravit</Button>
+                        <Button size="sm" variant="ghost" aria-label={`Zrušit kampaň ${h.title}`} onClick={() => setRusim(h)}>Zrušit</Button>
                       </>} />
                   );
                 })}

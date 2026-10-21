@@ -18,11 +18,12 @@ mkdirSync(SNIMKY, { recursive: true });
 const casti = process.argv[2] ? process.argv[2].split(',') : ['A', 'B', 'C', 'D', 'E', 'F'];
 
 // Fixtury s relativními časy: "@<min>" = ISO před tolika minutami, "@HM±<min>" = pražské HH:MM,
-// "DNES" = dnešní pražský den. Hodiny v prohlížeči se posunou na aspoň 13:00, ať „před 8 h" je dnes.
+// "DNES" = dnešní pražský den. Hodiny v prohlížeči se posunou přesně na 13:00 (i dozadu), ať „před 8 h" je dnes
+// a plán „do konce" (+7 h) nepřeteče přes půlnoc — večer sonda dřív počítala jen zbytek běžící směny.
 const POSUN = (() => {
   const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
   const min = h * 60 + m;
-  return min < 13 * 60 ? (13 * 60 - min) * 60000 : 0;
+  return (13 * 60 - min) * 60000;
 })();
 const ted = () => Date.now() + POSUN;
 const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(ted() + o * 86400000));

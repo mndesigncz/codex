@@ -81,11 +81,11 @@ export default function ProgramVernosti({ otevri, bonusy }: {
               meta={aktivni.length
                 ? aktivni.map(c => `${c.name}: ${czCount(Number(c.required_stamps) || 0, RAZITKO)} ${popisPravidla(c, money)}`).join(' · ')
                 : 'Žádná razítková karta neběží.'}
-              actions={<Button size="sm" variant="secondary" onClick={() => otevri('stamps')}>{aktivni.length ? 'Upravit' : 'Založit'}</Button>} />
+              actions={<Button size="sm" variant="secondary" aria-label={aktivni.length ? 'Upravit razítka' : 'Založit razítkovou kartu'} onClick={() => otevri('stamps')}>{aktivni.length ? 'Upravit' : 'Založit'}</Button>} />
             <ListRow lead={<span className="h-10 w-10 rounded-full bg-black/[0.045] grid place-items-center"><Icon name="coins" size={18} /></span>}
               title="Body"
               meta={bodyZa100 > 0 ? `${bodyZa100} b. za každých ${money(100)} útraty${Number(p.cashback_pct) > 0 ? ` · ${p.cashback_pct} % zpět jako kredit` : ''}` : 'Body se nesbírají.'}
-              actions={<Button size="sm" variant="secondary" onClick={() => otevri('points')}>Upravit</Button>} />
+              actions={<Button size="sm" variant="secondary" aria-label="Upravit body" onClick={() => otevri('points')}>Upravit</Button>} />
           </ul>
         </Card>
 
@@ -111,7 +111,7 @@ export default function ProgramVernosti({ otevri, bonusy }: {
               <h2 id="pv-urovne" className="t-card">Úrovně</h2>
               <p className="t-meta mt-0.5">{podleUtraty ? 'Podle útraty.' : 'Podle počtu návštěv.'} Host vidí, kolik mu chybí do další.</p>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => otevri('points')}>Upravit</Button>
+            <Button size="sm" variant="secondary" aria-label="Upravit úrovně" onClick={() => otevri('points')}>Upravit</Button>
           </div>
           {urovne.length === 0 ? <p className="t-meta px-4 sm:px-5 pb-4 pt-2">Úrovně nejsou nastavené.</p> : (
             <ul className="list px-4 sm:px-5">
