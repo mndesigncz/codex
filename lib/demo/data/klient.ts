@@ -93,9 +93,10 @@ export const STOLY = [
   { id: 7, name: 'Stůl 7', seats: 2, storyous_desk_id: '17', active: true },
 ];
 
+/** Otevírací doba ve tvaru teams.opening_hours: klíč dne „0" = pondělí … „6" = neděle. */
 export const OTEVIRACI_DOBA: Record<string, { open: string; close: string; closed?: boolean }> = {
-  mon: { open: '07:30', close: '21:00' }, tue: { open: '07:30', close: '21:00' }, wed: { open: '07:30', close: '21:00' },
-  thu: { open: '07:30', close: '22:00' }, fri: { open: '07:30', close: '22:00' }, sat: { open: '09:00', close: '22:00' }, sun: { open: '09:00', close: '18:00' },
+  0: { open: '07:30', close: '21:00' }, 1: { open: '07:30', close: '21:00' }, 2: { open: '07:30', close: '21:00' },
+  3: { open: '07:30', close: '22:00' }, 4: { open: '07:30', close: '22:00' }, 5: { open: '09:00', close: '22:00' }, 6: { open: '09:00', close: '18:00' },
 };
 
 const hostPodleJmena = (jmeno: string) => HOSTE.find(h => h.name === jmeno)!;
