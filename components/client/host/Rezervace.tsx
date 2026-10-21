@@ -6,7 +6,7 @@
 // příležitost (nepovinné čipy) a poznámka. Tlačítko opakuje volbu („Rezervovat 19:30 · 2 osoby“).
 // Po odeslání potvrzení s „Přidat do kalendáře“.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '../../Icons';
 import { Modal } from '../../ui';
 import { useJazyk, useT } from '@/lib/i18n/client';
@@ -41,17 +41,6 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
   const [busy, setBusy] = useState(false);
   const [hotovo, setHotovo] = useState<{ potvrzeno: boolean } | null>(null);
 
-  // Večer (nebo v zavírací den) dnešek nemá žádný čas: první otevření rovnou ukáže nejbližší
-  // otevřený den, ať host nezačíná prázdným „Dnes už se nedá rezervovat". Jen jednou — vlastní
-  // volbu dne už nepřepisujeme.
-  const prvniNacteni = useRef(true);
-  const posunNaDalsiDen = (x: Sloty, zaDen: string) => {
-    if (!prvniNacteni.current) return;
-    prvniNacteni.current = false;
-    if (zaDen !== dnes || (x.sloty ?? []).some(s => s.volno)) return;
-    const dalsi = (x.dny ?? []).find(d => d.den > dnes && d.otevreno);
-    if (dalsi) setDen(dalsi.den);
-  };
   useEffect(() => {
     let zivy = true;
     setNacitam(true); setChyba('');
@@ -65,14 +54,12 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
       if (!zivy) return;
       const x = Array.isArray(odpoved?.sloty) ? odpoved : zHodin();
       setSloty(x);
-      posunNaDalsiDen(x, den);
       // Vybraný čas zůstane, jen když je pořád volný; jinak první volný.
       setCas(c => (x.sloty ?? []).some(s => s.cas === c && s.volno) ? c : ((x.sloty ?? []).find(s => s.volno)?.cas ?? ''));
     }).catch(() => {
       if (!zivy) return;
       const x = zHodin();
       setSloty(x);
-      posunNaDalsiDen(x, den);
       setCas(c => x.sloty.some(s => s.cas === c) ? c : (x.sloty[0]?.cas ?? ''));
     }).finally(() => { if (zivy) setNacitam(false); });
     return () => { zivy = false; };
