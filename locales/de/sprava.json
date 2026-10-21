@@ -1871,5 +1871,8 @@
   "Další možnosti": "Weitere Optionen",
   "Upravit nebo smazat záznam: {jmeno}": "Eintrag bearbeiten oder löschen: {jmeno}",
   "Upravit čas…": "Zeit bearbeiten…",
-  "Smazat záznam…": "Eintrag löschen…"
+  "Smazat záznam…": "Eintrag löschen…",
+  "Napiš název karty.": "Gib einen Kartentitel ein.",
+  "Napiš název akce.": "Gib den Namen der Veranstaltung ein.",
+  "Vyber datum akce.": "Wähle das Datum der Veranstaltung."
 }

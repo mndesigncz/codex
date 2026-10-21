@@ -98,8 +98,13 @@ export default function PlanningBoard() {
     setPublishing(null);
   };
 
+  // Neaktivní „Přidat" bez vysvětlení (audit 2026-10 V31): tlačítko je aktivní a prázdný
+  // název řekne hláška u pole (vzor Stripe / Linear forms).
+  const [chybiNazev, setChybiNazev] = useState(false);
   const handleAddCard = async () => {
-    if (!newCard || !newCard.title.trim() || adding) return;
+    if (!newCard || adding) return;
+    if (!newCard.title.trim()) { setChybiNazev(true); return; }
+    setChybiNazev(false);
     setAdding(true);
     setChybaFormulare(null);
     try {
@@ -132,7 +137,9 @@ export default function PlanningBoard() {
   };
 
   const saveEdit = async () => {
-    if (!editCard || !editCard.title.trim()) return;
+    if (!editCard) return;
+    if (!editCard.title.trim()) { setChybiNazev(true); return; }
+    setChybiNazev(false);
     setSavingEdit(true);
     try {
       await fetch(`${URL_PLANOVANI}/${editCard.id}`, {
@@ -308,12 +315,14 @@ export default function PlanningBoard() {
               {upravuje && (newCard?.column === col.id ? (
                 <form onSubmit={e => { e.preventDefault(); void handleAddCard(); }} className="card p-3 space-y-2" aria-label={t('Nová karta do sloupce {sloupec}', { sloupec: nazvySloupcu[col.id] })}>
                   <Input autoFocus value={newCard.title} aria-label={t('Název karty')} placeholder={t('Název karty')} maxLength={200}
-                    onChange={e => setNewCard(prev => (prev ? { ...prev, title: e.target.value } : null))} />
+                    aria-invalid={chybiNazev || undefined}
+                    onChange={e => { if (e.target.value.trim()) setChybiNazev(false); setNewCard(prev => (prev ? { ...prev, title: e.target.value } : null)); }} />
+                  {chybiNazev && <p className="text-xs text-[var(--bad-ink)]" role="alert">{t('Napiš název karty.')}</p>}
                   <Textarea value={newCard.description} aria-label={t('Popis karty')} placeholder={t('Popis (nepovinný)')} rows={2} maxLength={2000}
                     onChange={e => setNewCard(prev => (prev ? { ...prev, description: e.target.value } : null))} />
                   {chybaFormulare && <p className="note note-danger text-sm" role="alert">{chybaFormulare}</p>}
                   <div className="flex gap-2">
-                    <Button type="submit" variant="primary" size="sm" loading={adding} disabled={!newCard.title.trim()}>{t('Přidat')}</Button>
+                    <Button type="submit" variant="primary" size="sm" loading={adding}>{t('Přidat')}</Button>
                     <Button variant="ghost" size="sm" onClick={() => setNewCard(null)}>{t('Zrušit')}</Button>
                   </div>
                 </form>
@@ -349,11 +358,11 @@ export default function PlanningBoard() {
         <Modal open onClose={() => setEditCard(null)} title={t('Upravit kartu')} size="sm"
           footer={<>
             <Button variant="secondary" onClick={() => setEditCard(null)}>{t('Zrušit')}</Button>
-            <Button variant="primary" icon="check" loading={savingEdit} disabled={!editCard.title.trim()} onClick={saveEdit}>{t('Uložit')}</Button>
+            <Button variant="primary" icon="check" loading={savingEdit} onClick={saveEdit}>{t('Uložit')}</Button>
           </>}>
           <div className="space-y-3">
-            <Field id={`${idForm}-e-nazev`} label={t('Název')}>
-              <Input id={`${idForm}-e-nazev`} value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })} maxLength={200} />
+            <Field id={`${idForm}-e-nazev`} label={t('Název')} error={chybiNazev && !editCard.title.trim() ? t('Napiš název karty.') : undefined}>
+              <Input id={`${idForm}-e-nazev`} value={editCard.title} aria-invalid={(chybiNazev && !editCard.title.trim()) || undefined} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })} maxLength={200} />
             </Field>
             <Field id={`${idForm}-e-popis`} label={t('Popis')} hint={t('Nepovinné.')}>
               <Textarea id={`${idForm}-e-popis`} value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })} rows={3} maxLength={2000} />

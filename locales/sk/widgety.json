@@ -2704,5 +2704,14 @@
   "vyřízeno": "vybavené",
   "Všechno je vyřízené.": "Všetko je vybavené.",
   "Vyřídit na jednom místě": "Vybaviť na jednom mieste",
-  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# vec čaká} few {# veci čakajú} other {# vecí čaká}} na tvoje rozhodnutie — vybavíš ich tu, bez prechádzania medzi stránkami."
+  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# vec čaká} few {# veci čakajú} other {# vecí čaká}} na tvoje rozhodnutie — vybavíš ich tu, bez prechádzania medzi stránkami.",
+  "Vyber, komu zápis patří.": "Vyber, komu zápis patrí.",
+  "Napiš, co bylo navíc — aspoň pár slov.": "Napíš, čo bolo navyše — aspoň pár slov.",
+  "Napiš název odměny.": "Napíš názov odmeny.",
+  "Cena musí být aspoň 1 bod.": "Cena musí byť aspoň 1 bod.",
+  "Vyber, komu body dáváš.": "Vyber, komu body dávaš.",
+  "Body můžou být 1 až 500.": "Body môžu byť 1 až 500.",
+  "Vyber, komu děkuješ.": "Vyber, komu ďakuješ.",
+  "Tento měsíc už nemáš body k rozdání.": "Tento mesiac už nemáš body na rozdanie.",
+  "Můžeš poslat 1 až {n} b.": "Môžeš poslať 1 až {n} b."
 }

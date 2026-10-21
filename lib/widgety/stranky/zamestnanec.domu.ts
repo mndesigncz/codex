@@ -44,9 +44,10 @@ export const STRANKA: DefiniceStranky = {
     // konec směny → pomalejší věci (výdělek, zpětná vazba). Dvě malé dlaždice vedle sebe, ne dvacet
     // karet pod sebou; situační widgety (akce, sdílená nabídka) jsou v galerii, ne v základu.
     'typ:zamestnanec': [
-      // Kolo 10 (balík Z): „Moje tresty" úplně nahoře jako malá karta — v klidu se kreslí, jen když
-      // je co potvrdit (bez nepotvrzeného trestu ji plocha vyřadí z mřížky, žádná díra).
-      { w: 'moje-smeny.tresty', s: 'S' },
+      // Audit 2026-10 (Z01, vzor Homebase „Clock in" nahoře): první je píchnutí a dnešní směna —
+      // to je důvod, proč člověk aplikaci na začátku směny otevírá. „Moje tresty" (kolo 10) stály
+      // úplně nahoře, takže první věc dne byla „trest", ne „příchod"; teď jsou za Navíc (malá karta,
+      // v klidu se kreslí, jen když je co potvrdit — bez nepotvrzeného trestu ji plocha vyřadí).
       { w: 'dochazka.moje_pichacky', s: 'M' },
       { w: 'moje.nejblizsi_smena', s: 'M' },
       // Kolo 11: „Úkoly za body" hned za směnou — kdo otevře aplikaci, bez posouvání vidí, co si může vzít
@@ -54,6 +55,7 @@ export const STRANKA: DefiniceStranky = {
       { w: 'ukoly.za_body', s: 'M' },
       // Kolo 9 (N1): „Navíc" hned potom — zapsat, co bylo nad rámec, je věc konce směny, ne konce měsíce.
       { w: 'moje-smeny.navic', s: 'M' },
+      { w: 'moje-smeny.tresty', s: 'S' },
       { w: 'rozvrh.tym_nahled', s: 'M' },
       { w: 'ukoly.dnes', s: 'M' },
       { w: 'postupy.povinne_dnes', s: 'M' },

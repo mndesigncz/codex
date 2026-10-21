@@ -2701,5 +2701,14 @@
   "vyřízeno": "done",
   "Všechno je vyřízené.": "Everything is handled.",
   "Vyřídit na jednom místě": "Handle all in one place",
-  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# item is} other {# items are}} waiting for your decision — handle them here without switching pages."
+  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# item is} other {# items are}} waiting for your decision — handle them here without switching pages.",
+  "Vyber, komu zápis patří.": "Choose who the entry belongs to.",
+  "Napiš, co bylo navíc — aspoň pár slov.": "Describe the extra work — at least a few words.",
+  "Napiš název odměny.": "Enter a reward name.",
+  "Cena musí být aspoň 1 bod.": "The price must be at least 1 point.",
+  "Vyber, komu body dáváš.": "Choose who gets the points.",
+  "Body můžou být 1 až 500.": "Points can be 1 to 500.",
+  "Vyber, komu děkuješ.": "Choose who you're thanking.",
+  "Tento měsíc už nemáš body k rozdání.": "You have no points left to give this month.",
+  "Můžeš poslat 1 až {n} b.": "You can send 1 to {n} pts."
 }

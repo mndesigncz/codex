@@ -56,8 +56,14 @@ export function ZapsatZaClena({ nabidka, clovek, onClose, onHotovo }: {
     setBody(String(n.points));
     setPremie(n.bonusCzk ? String(n.bonusCzk) : '');
   };
+  // Neaktivní „Zapsat a uznat" bez vysvětlení (audit 2026-10 V37): tlačítko je aktivní
+  // a co chybí, řekne hláška u pole.
+  const [zkouseno, setZkouseno] = useState(false);
+  const chybiKdo = zkouseno && kdo === '';
+  const chybiText = zkouseno && text.trim().length < 2;
   const uloz = async () => {
-    if (!jde || ukladam) return;
+    if (ukladam) return;
+    if (!jde) { setZkouseno(true); return; }
     const v = validujZapis({ text, day: den, offerId }, dnes, true);
     if (!v.ok) { setChyba(prelozHlaskuNavic(t, v.chyba)); return; }
     setUkladam(true); setChyba(null);
@@ -83,12 +89,12 @@ export function ZapsatZaClena({ nabidka, clovek, onClose, onHotovo }: {
     <Modal open onClose={onClose} size="md" title={t('Zapsat navíc za člena')} subtitle={clovek?.jmeno ?? t('Zapíše se a rovnou uzná — bez fronty.')}
       footer={<>
         <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
-        <Button type="submit" form="zapsat-za-clena" variant="primary" icon="check" loading={ukladam} disabled={!jde}>{t('Zapsat a uznat')}</Button>
+        <Button type="submit" form="zapsat-za-clena" variant="primary" icon="check" loading={ukladam}>{t('Zapsat a uznat')}</Button>
       </>}>
       <form id="zapsat-za-clena" className="sloupec sloupec-4" data-zapsat-za-clena onSubmit={e => { e.preventDefault(); void uloz(); }}>
         {!clovek && (
-          <Field id="navic-kdo" label={t('Komu')}>
-            <Select id="navic-kdo" value={kdo} onChange={e => setKdo(e.target.value)} autoFocus>
+          <Field id="navic-kdo" label={t('Komu')} error={chybiKdo ? t('Vyber, komu zápis patří.') : undefined}>
+            <Select id="navic-kdo" value={kdo} aria-invalid={chybiKdo || undefined} onChange={e => setKdo(e.target.value)} autoFocus>
               <option value="">{lide.loading ? t('Načítám členy…') : t('Vyber člena…')}</option>
               {(lide.data ?? []).map(m => <option key={m.id} value={m.id}>{m.jmeno}</option>)}
             </Select>
@@ -102,8 +108,9 @@ export function ZapsatZaClena({ nabidka, clovek, onClose, onHotovo }: {
             ))}
           </VolbyRadky>
         )}
-        <Field id="navic-text" label={t('Co bylo navíc?')} hint={t('{n} / {max}', { n: text.length, max: MAX_DELKA_TEXTU })}>
-          <Textarea id="navic-text" rows={3} value={text} onChange={e => setText(e.target.value)} maxLength={MAX_DELKA_TEXTU}
+        <Field id="navic-text" label={t('Co bylo navíc?')} hint={t('{n} / {max}', { n: text.length, max: MAX_DELKA_TEXTU })}
+          error={chybiText ? t('Napiš, co bylo navíc — aspoň pár slov.') : undefined}>
+          <Textarea id="navic-text" rows={3} value={text} aria-invalid={chybiText || undefined} onChange={e => setText(e.target.value)} maxLength={MAX_DELKA_TEXTU}
             placeholder={t('Např. zaskočil za nemocného kolegu')} autoFocus={!!clovek} />
         </Field>
         <div className="grid grid-cols-2 gap-3">

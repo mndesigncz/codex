@@ -2701,5 +2701,14 @@
   "vyřízeno": "załatwione",
   "Všechno je vyřízené.": "Wszystko załatwione.",
   "Vyřídit na jednom místě": "Załatw w jednym miejscu",
-  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# sprawa czeka} few {# sprawy czekają} many {# spraw czeka} other {# sprawy czeka}} na twoją decyzję — załatwisz je tutaj, bez przechodzenia między stronami."
+  "{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.": "{n, plural, one {# sprawa czeka} few {# sprawy czekają} many {# spraw czeka} other {# sprawy czeka}} na twoją decyzję — załatwisz je tutaj, bez przechodzenia między stronami.",
+  "Vyber, komu zápis patří.": "Wybierz, do kogo należy wpis.",
+  "Napiš, co bylo navíc — aspoň pár slov.": "Opisz, co było ekstra — choć kilka słów.",
+  "Napiš název odměny.": "Wpisz nazwę nagrody.",
+  "Cena musí být aspoň 1 bod.": "Cena musi wynosić co najmniej 1 punkt.",
+  "Vyber, komu body dáváš.": "Wybierz, komu dajesz punkty.",
+  "Body můžou být 1 až 500.": "Punkty mogą wynosić od 1 do 500.",
+  "Vyber, komu děkuješ.": "Wybierz, komu dziękujesz.",
+  "Tento měsíc už nemáš body k rozdání.": "W tym miesiącu nie masz już punktów do rozdania.",
+  "Můžeš poslat 1 až {n} b.": "Możesz wysłać od 1 do {n} pkt."
 }
