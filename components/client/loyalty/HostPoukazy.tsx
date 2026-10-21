@@ -77,7 +77,7 @@ function Karta({ p, onOdebrano }: { p: Poukaz; onOdebrano: (id: number) => void 
       {chyba && <p role="alert" className="mt-2 text-sm text-bad-ink">{chyba}</p>}
       <div className="mt-2 flex items-center gap-2 flex-wrap">
         {!ptam ? (
-          <button type="button" onClick={() => setPtam(true)} className="tap-target-sm text-sm font-semibold text-black/55 hover:text-black px-1">{t('Odebrat z aplikace')}</button>
+          <button type="button" onClick={() => setPtam(true)} className="tap-target-sm text-sm font-semibold text-black/55 hover:text-black">{t('Odebrat z aplikace')}</button>
         ) : (
           <div role="group" aria-label={t('Odebrat poukaz z aplikace?')} className="flex items-center gap-2 flex-wrap">
             <p className="text-sm text-black/70">{t('Poukaz zůstane platný, jen ho tu přestaneš vidět. Znovu ho přidáš kódem.')}</p>
