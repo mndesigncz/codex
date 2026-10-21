@@ -394,8 +394,8 @@ function PrehledClientu({ zapnuto, slug, clenu, prejdi, oznam, onZmena }: {
         hintId: 'clientadmin-4',
         subtitle: vypnuto
           ? 'Managero client je pro hosty vypnutý. Nastav profil podniku a zapni ho — hosté pak podnik najdou, rezervují a objednají od stolu.'
-          : slug ? `Hosté tě najdou na /client/${slug}. Rezervace, objednávky, členové a věrnost na jednom místě.`
-          : 'Rezervace, objednávky, členové a věrnost na jednom místě.',
+          : slug ? `Hosté tě najdou na /client/${slug}.`
+          : 'Co se dnes děje s hosty a jak si vede věrnostní program.',
         primary: vypnuto && ma('klient.nastaveni')
           ? <Button variant="accent" icon="settings" onClick={() => prejdi('settings')}>Nastavit a zapnout</Button>
           : undefined,

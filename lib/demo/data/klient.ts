@@ -7,9 +7,10 @@
 // utracené, razítka 0–9 z desetipolíčkové karty, segmenty (štamgasti, noví, chybí 45+ dní) vychází
 // z dat posledních návštěv. Dny se počítají od dnešního dne v Praze (posunDen), žádné pevné datum.
 
-import { posunDen } from '../cas';
+import { dnes, posunDen } from '../cas';
 import { MENU } from './menu';
 import { VYCHOZI_THEME } from '@/lib/menuTheme';
+import { narozeninyBlizko } from '@/lib/klientSprava/zdravi';
 
 export const SLUG = 'kavarna-u-lipy';
 export const NAZEV = 'Kavárna U Lípy (ukázka)';
@@ -22,32 +23,32 @@ export interface HostDema {
   reservations: number; poznamka?: string;
 }
 
-// [jméno, návštěvy, Ø účet, razítka, přidán (dní zpět), naposledy (dní zpět), narozeniny MM-DD, skupiny, kupony, poznámka]
-const SUROVA: [string, number, number, number, number, number | null, string | null, number[], number, string?][] = [
+// [jméno, návštěvy, Ø účet, razítka, přidán (dní zpět), naposledy (dní zpět), narozeniny (za kolik dní), skupiny, kupony, poznámka]
+const SUROVA: [string, number, number, number, number, number | null, number | null, number[], number, string?][] = [
   ['Jana N.', 41, 212, 9, 420, 0, null, [1], 1, 'Pije ovesné flat white, sedí u okna.'],
-  ['Tereza M.', 38, 236, 7, 610, 2, '11-03', [1, 2], 2, 'Bez lepku — celiakie, pozor na koláče.'],
+  ['Tereza M.', 38, 236, 7, 610, 2, 13, [1, 2], 2, 'Bez lepku — celiakie, pozor na koláče.'],
   ['Petr N.', 22, 188, 4, 300, 6, null, [1], 0],
   ['Klára Š.', 26, 174, 6, 365, 1, null, [1], 1],
   ['Ondřej B.', 4, 165, 4, 18, 9, null, [], 0],
-  ['Marek S.', 17, 310, 7, 280, 12, '10-29', [], 0],
+  ['Marek S.', 17, 310, 7, 280, 12, 8, [], 0],
   ['Lucie K.', 33, 198, 3, 540, 3, null, [1], 1, 'Alergie na ořechy.'],
   ['Eva H.', 12, 142, 2, 200, 52, null, [], 0],
   ['David P.', 9, 260, 9, 150, 4, null, [], 1],
   ['Barbora V.', 3, 120, 3, 9, 3, null, [], 0],
-  ['Tomáš R.', 28, 221, 8, 470, 1, '10-24', [1], 0],
+  ['Tomáš R.', 28, 221, 8, 470, 1, 3, [1], 0],
   ['Anna L.', 6, 205, 6, 62, 47, null, [], 0],
   ['Jakub Č.', 2, 98, 2, 6, 6, null, [], 0],
   ['Veronika D.', 14, 189, 4, 230, 66, null, [], 0],
   ['Martin K.', 19, 256, 9, 330, 5, null, [2], 1],
   ['Kristýna P.', 1, 135, 1, 2, 2, null, [], 0],
   ['Filip M.', 7, 178, 7, 95, 58, null, [], 0],
-  ['Adéla R.', 11, 166, 1, 180, 8, '10-30', [], 0],
+  ['Adéla R.', 11, 166, 1, 180, 8, 9, [], 0],
   ['Lukáš V.', 24, 284, 4, 400, 14, null, [1], 0],
   ['Hana B.', 5, 150, 5, 40, 21, null, [], 1],
   ['Michal Z.', 16, 199, 6, 260, 91, null, [], 0],
   ['Pavla S.', 31, 176, 1, 590, 2, null, [1], 0, 'Laktóza — dává si rostlinné mléko.'],
   ['Jiří H.', 8, 342, 8, 120, 11, null, [2], 0],
-  ['Nikola F.', 2, 110, 2, 14, 14, '10-12', [], 0],
+  ['Nikola F.', 2, 110, 2, 14, 14, -9, [], 0],
   ['Simona T.', 20, 205, 0, 350, 3, null, [1], 1],
   ['Radek M.', 3, 230, 3, 25, 25, null, [], 0],
   ['Zuzana K.', 13, 158, 3, 210, 49, null, [], 0],
@@ -55,10 +56,10 @@ const SUROVA: [string, number, number, number, number, number | null, string | n
   ['Monika J.', 18, 224, 8, 300, 7, null, [], 0],
   ['Štěpán L.', 10, 196, 0, 160, 10, null, [], 0],
   ['Alžběta G.', 4, 172, 4, 30, 30, null, [], 0],
-  ['Daniel O.', 27, 238, 7, 500, 4, null, [1, 2], 1],
+  ['Daniel O.', 27, 238, 7, 500, 4, 1, [1, 2], 1],
   ['Gabriela Ř.', 6, 160, 6, 75, 75, null, [], 0],
   ['Roman Š.', 15, 265, 5, 240, 18, null, [], 0],
-  ['Ivana Z.', 9, 140, 9, 110, 6, '10-08', [], 0],
+  ['Ivana Z.', 9, 140, 9, 110, 6, -13, [], 0],
   ['Patrik B.', 2, 125, 2, 11, 11, null, [], 0],
 ];
 
@@ -70,7 +71,7 @@ export const HOSTE: HostDema[] = SUROVA.map(([name, visits, avg, stamps, joined,
     id: 101 + i, name, email: `${prijmeni}.${101 + i}@ukazka.example`, visits, avg, stamps,
     // 10 b. za 100 Kč, část už utracená za kupony.
     points: Math.max(0, Math.round(spend / 10) - Math.round(visits * 9.5)),
-    joined: -joined, last: last == null ? null : -last, birthday: bday ? `1990-${bday}` : null, groups, coupons, level,
+    joined: -joined, last: last == null ? null : -last, birthday: bday == null ? null : `1990-${posunDen(dnes(), bday).slice(5)}`, groups, coupons, level,
     reservations: Math.round(visits / 6), poznamka,
   };
 });
@@ -113,7 +114,7 @@ export function rezervaceDne(dnes: string, d: number): any[] {
       customer_visits: h?.visits ?? null, customer_level: h?.level ?? null, customer_level_label: h ? UROVNE[h.level] : null,
       customer_spend: h ? h.visits * h.avg : null, customer_reservations: h?.reservations ?? null, customer_no_shows: h ? (h.id === 108 ? 2 : 0) : null,
       staff_notes: h?.poznamka ? [h.poznamka] : [], customer_groups: h ? SKUPINY.filter(g => h.groups.includes(g.id)).map(g => ({ name: g.name, color: g.color })) : [],
-      customer_birthday: h?.birthday ?? null, created_by: h ? null : 1,
+      customer_birthday_soon: h?.birthday ? narozeninyBlizko(h.birthday, den, 3) : false, created_by: h ? null : 1,
     };
   };
   if (d === 0) return [

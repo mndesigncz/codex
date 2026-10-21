@@ -47,8 +47,9 @@ import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import {
   RAZENI_CLENU, TON_REZERVACE, hlavniKrok, klicPrechodu, krokyPropojeni, muzeDo, nejvernejsi, odkazTel, prumerCesky, seradDnes, souhrnDne,
-  vyberCleny, vyberHodnoceni, vyberRezervace, vyberVernost, type RazeniClenu, type Rezervace, type StavRezervace, type KrokPropojeni,
+  vyberCleny, vyberHodnoceni, vyberRezervace, vyberVernost, varovaniHosta, type RazeniClenu, type Rezervace, type StavRezervace, type KrokPropojeni,
 } from '@/lib/klientPrehled';
+import { krokyPruvodce, procento } from '@/lib/klientSprava/zdravi';
 import { RES_STATUS, czDay } from '@/lib/clientSlots';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { Icon } from '../../Icons';
@@ -875,6 +876,203 @@ function Propojeni(_: WidgetProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Kolo 92: Přehled správy jen o hostech (audit C §7, koncept B „A")
+// ---------------------------------------------------------------------------
+//
+// Průvodce nastavením (sedm kroků, jeden další krok s tlačítkem), zdraví programu (čtyři čísla se
+// srovnáním — jen z dat, která máme, /api/client/admin/zdravi), „před směnou" (kdo dnes přijde
+// a co o něm má obsluha vědět), razítka a body za 14 dní a automatizace jako řádek receptů.
+
+const ID_PRUVODCE = 'klient.pruvodce';
+
+function popisekKrokuPruvodce(id: string, t: PrekladFn): { hotovo: string; dalsi: string; akce: string } {
+  switch (id) {
+    case 'zapnuto': return { hotovo: t('Stránka pro hosty je zapnutá'), dalsi: t('Zapni stránku pro hosty, ať tě najdou.'), akce: t('Zapnout') };
+    case 'vzhled': return { hotovo: t('Logo a barva podniku'), dalsi: t('Nahraj logo a vyber barvu, ať karta hosta vypadá jako tvoje.'), akce: t('Nastavit vzhled') };
+    case 'menu': return { hotovo: t('Menu pro hosty'), dalsi: t('Vyber menu, které hosté uvidí na tvé stránce.'), akce: t('Otevřít menu') };
+    case 'stoly': return { hotovo: t('Stoly s QR kódem'), dalsi: t('Přidej stoly a vytiskni QR, ať hosté rezervují a objednávají od stolu.'), akce: t('Přidat stoly') };
+    case 'vernost': return { hotovo: t('Věrnostní program běží'), dalsi: t('Zapni věrnost: razítka nebo body za návštěvu.'), akce: t('Nastavit program') };
+    case 'pokladna': return { hotovo: t('Pokladna napojená'), dalsi: t('Napoj pokladnu, ať se body připisují z účtenek samy.'), akce: t('Napojit pokladnu') };
+    default: return { hotovo: t('Poloha podniku'), dalsi: t('Nastav polohu podniku, ať objednávky od stolu přijdou jen z podniku.'), akce: t('Nastavit polohu') };
+  }
+}
+
+function Pruvodce(_: WidgetProps) {
+  const t = useT('widgety');
+  const smi = useSmi();
+  const nav = useNavigace();
+  const { nahled } = useWidget();
+  const { ok, ceka } = useBrana(widget(ID_PRUVODCE)?.opravneni.vse ?? ['klient.prehled']);
+  const data = useDataWidgetu(ok ? '/api/client/admin/summary' : null, (raw: any) => krokyPruvodce(raw?.setup));
+  const kroky = data.data ?? [];
+  const hotovo = kroky.filter(k => k.hotovo).length;
+  const dalsi = kroky.find(k => !k.hotovo) ?? null;
+  const pohled = dalsi ? `klient:${dalsi.zalozka}` : null;
+  const vede = !!dalsi && !!pohled && !nahled && smi(dalsi.klic) && nav.smiPohled(pohled);
+  const p = dalsi ? popisekKrokuPruvodce(dalsi.id, t) : null;
+  return (
+    <Widget nacteni={ceka ? CEKA : data}
+      doplnek={kroky.length ? <Chip tone={hotovo === kroky.length ? 'ok' : 'muted'} size="sm">{`${hotovo}/${kroky.length}`}</Chip> : undefined}
+      patka={vede && p ? <Button variant="primary" onClick={() => nav.onNavigate(pohled!)}>{p.akce}</Button> : undefined}>
+      <div className="space-y-3">
+        <div className="flex gap-1" aria-hidden>
+          {kroky.map(k => <span key={k.id} className={`h-1.5 flex-1 rounded-full ${k.hotovo ? 'bg-[#16181A]' : 'bg-black/10'}`} />)}
+        </div>
+        {p ? (
+          <p className="text-[15px] leading-snug text-pretty"><span className="t-meta block mb-0.5">{t('Další krok')}</span>{p.dalsi}</p>
+        ) : (
+          <p className="t-meta">{t('Všechno je nastavené. Hosté tě najdou, rezervují, objednají a sbírají body.')}</p>
+        )}
+      </div>
+    </Widget>
+  );
+}
+
+const ID_ZDRAVI = 'klient.zdravi';
+
+interface Zdravi { noviClenove: { n30: number; predtim30: number }; odmeny: { uplatneno30: number; vydano30: number }; navrat: { vratilo: number; z: number } | null; dny: { den: string; razitek: number; body: number; uplatneno: number }[] }
+const vyberZdravi = (raw: any): Zdravi => ({
+  noviClenove: { n30: Number(raw?.noviClenove?.n30) || 0, predtim30: Number(raw?.noviClenove?.predtim30) || 0 },
+  odmeny: { uplatneno30: Number(raw?.odmeny?.uplatneno30) || 0, vydano30: Number(raw?.odmeny?.vydano30) || 0 },
+  navrat: raw?.navrat && Number(raw.navrat.z) > 0 ? { vratilo: Number(raw.navrat.vratilo) || 0, z: Number(raw.navrat.z) } : null,
+  dny: seznam(raw?.dny).map((d: any) => ({ den: String(d.den), razitek: Number(d.razitek) || 0, body: Number(d.body) || 0, uplatneno: Number(d.uplatneno) || 0 })),
+});
+
+function rozdil(n: number, t: PrekladFn): string {
+  return n > 0 ? t('o {n} víc než minulých 30 dní', { n }) : n < 0 ? t('o {n} míň než minulých 30 dní', { n: -n }) : t('stejně jako minulých 30 dní');
+}
+
+function ZdraviProgramu({ velikost }: WidgetProps) {
+  const t = useT('widgety');
+  const { ok, ceka } = useBrana(widget(ID_ZDRAVI)?.opravneni.vse ?? ['vernost.zobrazit']);
+  const rez = useBrana(klicCasti(ID_ZDRAVI, 'rezervace') ?? 'rezervace.zobrazit');
+  const data = useDataWidgetu(ok ? '/api/client/admin/zdravi' : null, vyberZdravi);
+  // Dnešní rezervace ze stejného seznamu (a mezipaměti) jako Před směnou a Dnešní rezervace — čísla se shodují.
+  const dnes = useDataWidgetu(rez.ok ? URL_REZERVACE_DNES : null, (raw: any) => souhrnDne(vyberRezervace(raw).rezervace));
+  const z = data.data;
+  const s = dnes.data;
+  const navrat = z?.navrat ? procento(z.navrat.vratilo, z.navrat.z) : null;
+  const L = velikost === 'L';
+  return (
+    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: t('Program'), pohled: 'klient:loyalty' }}>
+      {z && (
+        <StatRow>
+          {rez.ok && s && <Stat label={t('Rezervace dnes')} value={cislo(s.dnes)} note={s.ceka ? cekajiciRezervace(s.ceka, t) : t('vše potvrzené')} tone={s.ceka ? 'wait' : 'muted'} />}
+          <Stat label={t('Noví členové · 30 dní')} value={cislo(z.noviClenove.n30)} note={rozdil(z.noviClenove.n30 - z.noviClenove.predtim30, t)} />
+          {(L || !rez.ok) && <Stat label={t('Odměny uplatněné · 30 dní')} value={cislo(z.odmeny.uplatneno30)} note={z.odmeny.vydano30 ? t('z {n} vydaných', { n: z.odmeny.vydano30 }) : t('zatím žádná vydaná')} />}
+          {L && <Stat label={t('Vrátili se do 30 dní')} value={navrat == null ? '–' : `${navrat} %`} note={z.navrat ? t('{vratilo} z {z} hostů', { vratilo: z.navrat.vratilo, z: z.navrat.z }) : t('zatím málo návštěv')} />}
+        </StatRow>
+      )}
+    </Widget>
+  );
+}
+
+const ID_PRED_SMENOU = 'klient.pred_smenou';
+
+interface HostDnes { id: number; cas: string; host: string; osob: number; stav: StavRezervace; navstev: number | null; narozeniny: boolean; varovani: string | null; skupina: string | null }
+function vyberPredSmenou(raw: any): HostDnes[] {
+  const r = vyberRezervace(raw).rezervace;
+  const narozeniny = new Map<number, boolean>(seznam(raw?.reservations).map((x: any) => [Number(x.id), x.customer_birthday_soon === true]));
+  // Před směnou čte obsluha jako den: podle času, ne podle toho, co čeká na potvrzení.
+  return [...r].sort((a, b) => a.cas.localeCompare(b.cas))
+    .filter(x => x.stav !== 'declined' && x.stav !== 'cancelled' && x.stav !== 'no_show')
+    .map(x => ({ id: x.id, cas: x.cas, host: x.host, osob: x.osob, stav: x.stav, navstev: x.navstev, narozeniny: narozeniny.get(x.id) === true || /narozenin/i.test(x.poznamka ?? ''), varovani: varovaniHosta(x.poznamky), skupina: x.skupiny[0]?.nazev ?? null }));
+}
+
+function PredSmenou({ velikost }: WidgetProps) {
+  const t = useT('widgety');
+  const { ok, ceka } = useBrana(widget(ID_PRED_SMENOU)?.opravneni.vse ?? ['rezervace.zobrazit']);
+  const data = useDataWidgetu(ok ? URL_REZERVACE_DNES : null, vyberPredSmenou);
+  const hoste = data.data ?? [];
+  const L = velikost === 'L';
+  const vidno = hoste.slice(0, L ? 10 : 5);
+  const hostu = hoste.reduce((a, h) => a + h.osob, 0);
+  return (
+    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: t('Rezervace'), pohled: 'klient:reservations' }}
+      souhrn={hoste.length ? t('Dnes {n, plural, one {# rezervace} few {# rezervace} other {# rezervací}}, {osob, plural, one {# host} few {# hosté} other {# hostů}}.', { n: hoste.length, osob: hostu }) : undefined}
+      prazdno={data.data && hoste.length === 0 ? <p className="t-meta">{t('Dnes nikdo s rezervací. Hosté bez rezervace se ukážou u kasy.')}</p> : undefined}>
+      <ul className="list">
+        {vidno.map(h => (
+          <ListRow key={h.id}
+            lead={<span className="w-12 shrink-0 text-[15px] font-semibold tabular-nums">{h.cas}</span>}
+            title={<span className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0"><span className="truncate">{h.host}</span><span className="t-meta shrink-0">{osoby(h.osob, t)}</span></span>}
+            meta={<span className="flex flex-wrap items-center gap-1 mt-0.5">
+              {h.stav === 'requested' && <Chip tone="wait" size="sm">{t('Čeká na potvrzení')}</Chip>}
+              {h.narozeniny && <Chip tone="info" size="sm" icon="gift">{t('Narozeniny')}</Chip>}
+              {h.varovani && <Chip tone="bad" size="sm" icon="warning">{h.varovani.length > 24 ? `${h.varovani.slice(0, 22)}…` : h.varovani}</Chip>}
+              {h.navstev != null && h.navstev >= 10 && <Chip tone="ok" size="sm">{t('Štamgast · {n}. návštěva', { n: h.navstev + 1 })}</Chip>}
+              {h.navstev === 0 && <Chip tone="muted" size="sm">{t('Poprvé u nás')}</Chip>}
+              {h.skupina && L && <Chip tone="muted" size="sm">{h.skupina}</Chip>}
+            </span>} />
+        ))}
+      </ul>
+      {hoste.length > vidno.length && <p className="t-meta mt-2">{aDalsich(hoste.length - vidno.length, t)}</p>}
+    </Widget>
+  );
+}
+
+const ID_RAZITKA = 'klient.razitka_14';
+
+function Razitka14({ velikost }: WidgetProps) {
+  const t = useT('widgety');
+  const { ok, ceka } = useBrana(widget(ID_RAZITKA)?.opravneni.vse ?? ['vernost.zobrazit']);
+  const data = useDataWidgetu(ok ? '/api/client/admin/zdravi' : null, vyberZdravi);
+  const dny = data.data?.dny ?? [];
+  const razitek = dny.reduce((a, d) => a + d.razitek, 0);
+  const bodu = dny.reduce((a, d) => a + d.body, 0);
+  const nic = data.data && razitek === 0 && bodu === 0;
+  return (
+    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: t('Program'), pohled: 'klient:loyalty' }}
+      prazdno={nic ? <p className="t-meta">{t('Za posledních 14 dní žádná razítka ani body.')}</p> : undefined}>
+      <div className="space-y-4">
+        <StatRow>
+          <Stat label={t('Razítka')} value={cislo(razitek)} />
+          <Stat label={t('Rozdané body')} value={cislo(bodu)} unit={t('b.')} />
+        </StatRow>
+        <BarSpark height={velikost === 'L' ? 120 : 96} label={t('Razítka po dnech za posledních 14 dní')} highlight={dny.length - 1}
+          data={dny.map(d => ({ value: d.razitek, tip: `${czDay(d.den)}: ${cislo(d.razitek)}` }))} />
+      </div>
+    </Widget>
+  );
+}
+
+const ID_AUTOMATIZACE = 'klient.automatizace';
+
+function nazevReceptu(druh: string, t: PrekladFn): string {
+  switch (druh) {
+    case 'uvitani': return t('Uvítání');
+    case 'prvni_navsteva': return t('Po první návštěvě');
+    case 'dokoncena_karta': return t('Plná karta');
+    case 'narozeniny_kupon': return t('Narozeniny');
+    default: return t('Chybíš nám');
+  }
+}
+
+function AutomatizaceRecepty(_: WidgetProps) {
+  const t = useT('widgety');
+  const { ok, ceka } = useBrana(widget(ID_AUTOMATIZACE)?.opravneni.vse ?? ['zakaznici.zpravy']);
+  const data = useDataWidgetu(ok ? '/api/client/admin/automatizace' : null, (raw: any) => ({
+    pravidla: seznam(raw?.pravidla).map((p: any) => ({ druh: String(p.druh), zapnuto: p.enabled === true, mesic: Number(raw?.pocty?.[p.druh]?.mesic) || 0 })),
+  }));
+  const pravidla = data.data?.pravidla ?? [];
+  const zapnutych = pravidla.filter(p => p.zapnuto).length;
+  return (
+    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: t('Kampaně'), pohled: 'klient:campaigns', arg: 'automatizace' }}
+      doplnek={pravidla.length ? <Chip tone={zapnutych ? 'ok' : 'muted'} size="sm">{t('{n} zapnuto', { n: zapnutych })}</Chip> : undefined}>
+      <ul className="flex flex-wrap gap-1.5" aria-label={t('Recepty automatizací')}>
+        {pravidla.map(p => (
+          <li key={p.druh}>
+            <Chip tone={p.zapnuto ? 'ok' : 'muted'} size="sm" icon={p.zapnuto ? 'check' : undefined}>
+              {p.zapnuto ? t('{nazev} · tento měsíc {n}', { nazev: nazevReceptu(p.druh, t), n: p.mesic }) : t('{nazev} · vypnuto', { nazev: nazevReceptu(p.druh, t) })}
+            </Chip>
+          </li>
+        ))}
+      </ul>
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'klient.hoste_vernost': HosteAVernost,
   'klient.objednavky_od_stolu': ObjednavkyOdStolu,
@@ -883,4 +1081,9 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'klient.clenove': ClenoveKlubu,
   'klient.vernost_30dni': Vernost30,
   'klient.propojeni': Propojeni,
+  'klient.pruvodce': Pruvodce,
+  'klient.zdravi': ZdraviProgramu,
+  'klient.pred_smenou': PredSmenou,
+  'klient.razitka_14': Razitka14,
+  'klient.automatizace': AutomatizaceRecepty,
 };

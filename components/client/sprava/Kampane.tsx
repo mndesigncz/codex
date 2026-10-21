@@ -84,7 +84,9 @@ export default function Kampane({ oznam, otevritNovou }: { oznam: Hlaska; otevri
 
   const komu = (a: string) => {
     const k = ctiKombinaci(a, { skupiny: true });
-    return k ? stitekKombinace(k, Object.fromEntries((d.groups ?? []).map((x: any) => [x.id, x.name]))) : (stitekPublika(a) ?? 'všichni členové');
+    const skupina = /^group:(\d+)$/.exec(a);
+    const nazev = skupina ? (d.groups ?? []).find((x: any) => String(x.id) === skupina[1])?.name ?? null : null;
+    return k ? stitekKombinace(k, Object.fromEntries((d.groups ?? []).map((x: any) => [x.id, x.name]))) : (stitekPublika(a, nazev) ?? 'všichni členové');
   };
   const upravit = (h: any) => {
     const aud = String(h.audience ?? 'all');
@@ -287,7 +289,6 @@ function Pruvodce({ d, publika, start, editId, oznam, onZavrit, onHotovo }: {
   return (
     <Modal open onClose={onZavrit} size="lg"
       title={editId !== null ? 'Upravit kampaň' : KROKY[krok] === 'Komu' ? 'Komu to pošleme' : KROKY[krok] === 'Co' ? 'Co jim napíšeme' : 'Zkontroluj a pošli'}
-      subtitle={`Krok ${krok + 1} ze 3`}
       footer={<>
         {krok === 0 ? <Button variant="secondary" onClick={onZavrit}>Zrušit</Button> : <Button variant="secondary" icon="arrowLeft" onClick={() => setKrok(k => k - 1)}>Zpět</Button>}
         {krok < 2

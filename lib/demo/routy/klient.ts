@@ -70,10 +70,10 @@ export const klient: Obsluha = (p, k) => {
   if (cesta === '/api/client/admin/summary') {
     const dnesni = rezervaceDne(dnes, 0);
     return ok({
-      enabled: true, slug: SLUG, reservations: { requested: dnesni.filter(r => r.status === 'requested').length + 1, today: dnesni.filter(r => r.status !== 'requested').length },
+      enabled: true, slug: SLUG, reservations: { requested: dnesni.filter(r => r.status === 'requested').length + 2, today: dnesni.filter(r => r.status !== 'requested').length },
       orders: { new: 1, today: 9 }, members: HOSTE.length, newMembers30: HOSTE.filter(h => h.joined > -30).length, attention: 3,
       reviews: { count: 61, avg: 4.7, new7: 5, low7: 1 },
-      setup: { enabled: true, menu: true, tables: STOLY.length, tablesPaired: STOLY.filter(t => t.storyous_desk_id).length, pos: true, location: true, reservationsOn: true, orderingOn: true, loyaltyOn: true, pointsPer100: 10, stampTarget: 10, stampReward: 'Káva podle výběru', brand: true, qrPult: false },
+      setup: { enabled: true, menu: true, tables: STOLY.length, tablesPaired: STOLY.filter(t => t.storyous_desk_id).length, pos: false, location: true, reservationsOn: true, orderingOn: true, loyaltyOn: true, pointsPer100: 10, stampTarget: 10, stampReward: 'Káva podle výběru', brand: true, qrPult: false },
     });
   }
   if (cesta === '/api/client/admin/zdravi') {
