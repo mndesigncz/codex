@@ -507,8 +507,6 @@
   "{h} h směna (nejvýš {limit})": "{h} h Schicht (höchstens {limit})",
   "{h} h týdně (nejvýš {limit})": "{h} h pro Woche (höchstens {limit})",
   "{n, plural, one {# varování} few {# varování} other {# varování}} k limitům rozvrhu": "{n, plural, one {# Warnung} other {# Warnungen}} zu Dienstplan-Limits",
-  "Počet lidí podle tržeb se neuložil — aplikace se zrovna aktualizuje. Ostatní pravidla jsou uložená, tohle zkus za chvíli znovu.": "Personal nach Umsatz wurde nicht gespeichert — die App wird gerade aktualisiert. Die anderen Regeln sind gespeichert; versuch es gleich noch einmal.",
-  "Limity rozvrhu se neuložily — aplikace se zrovna aktualizuje. Ostatní pravidla jsou uložená, limity zkus uložit za chvíli znovu.": "Die Dienstplan-Limits wurden nicht gespeichert — die App wird gerade aktualisiert. Die anderen Regeln sind gespeichert; speichere die Limits gleich noch einmal.",
   "Dřívější dny ({n})": "Frühere Tage ({n})",
   "Dnes": "Heute",
   "Bez směn": "Keine Schichten",

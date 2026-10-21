@@ -327,6 +327,5 @@
   "Zobrazit": "Ansehen",
   "Vrátit na tuto verzi": "Auf diese Version zurücksetzen",
   "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# Notiz} other {# Notizen}}",
-  "nová": "neu",
-  "Inventura se po aktualizaci aplikace ještě připravuje. Obnov stránku za chvíli.": "Die Inventur wird nach einem App-Update noch vorbereitet. Lade die Seite gleich neu."
+  "nová": "neu"
 }
