@@ -338,7 +338,6 @@
   "Bez souhlasu s podmínkami účet založit nejde.": "Ohne Zustimmung zu den Nutzungsbedingungen kann kein Konto angelegt werden.",
   "Aktualizovali jsme podmínky": "Wir haben die Bedingungen aktualisiert",
   "Platí od {datum}. Než budeš pokračovat, potvrď je prosím.": "Gültig ab {datum}. Bitte bestätige sie, bevor du weitermachst.",
-  "Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.": "Die Änderungen betreffen, welche Daten die App verarbeitet und wie sie damit umgeht. Den vollen Wortlaut findest du unter den Links unten.",
   "Souhlasím a pokračovat": "Zustimmen und weiter",
   "Souhlas se nepodařilo uložit. Zkus to znovu.": "Die Zustimmung konnte nicht gespeichert werden. Versuch es noch einmal.",
   "E-mail se nepodařilo potvrdit.": "Die E-Mail konnte nicht bestätigt werden.",
@@ -363,5 +362,9 @@
   "Zámek se nezapnul — ověření Face ID nebo otiskem neproběhlo.": "Die Sperre wurde nicht aktiviert — die Prüfung per Face ID oder Fingerabdruck ist nicht erfolgt.",
   "Zamykat aplikaci Face ID / otiskem": "App mit Face ID / Fingerabdruck sperren",
   "Po návratu do aplikace se nejdřív ověříš. Platí jen na tomhle telefonu.": "Wenn du in die App zurückkehrst, bestätigst du dich zuerst. Gilt nur auf diesem Telefon.",
-  "Zámek aplikace": "App-Sperre"
+  "Zámek aplikace": "App-Sperre",
+  "Jednám jako podnikatel v rámci své podnikatelské činnosti, souhlasím s obchodními podmínkami, zpracovatelskou smlouvou a podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.": "Ich handle als Unternehmer im Rahmen meiner gewerblichen Tätigkeit, stimme den Geschäftsbedingungen, dem Auftragsverarbeitungsvertrag und den Nutzungsbedingungen zu und nehme die Datenschutzerklärung zur Kenntnis.",
+  "Obchodní podmínky": "Geschäftsbedingungen",
+  "Zpracovatelská smlouva": "Auftragsverarbeitungsvertrag",
+  "Doplnili jsme obchodní podmínky pro podniky, zpracovatelskou smlouvu a seznam subzpracovatelů a zpřesnili podmínky užívání a zásady ochrany osobních údajů. Celé znění najdeš v odkazech níž.": "Wir haben Geschäftsbedingungen für Betriebe, einen Auftragsverarbeitungsvertrag und eine Liste der Unterauftragsverarbeiter ergänzt und die Nutzungsbedingungen und die Datenschutzerklärung präzisiert. Die vollständigen Texte findest du unten."
 }

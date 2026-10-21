@@ -75,7 +75,7 @@ export default function ({ eq, ok }: Testy) {
   const tym = zdroj('components/TeamManagement.tsx');
   ok('Tým: docházku čte jen s dochazka.zobrazit (URL null bez oprávnění)', /useDataWidgetu<DataDochazky>\(smiHodiny \? `\/api\/attendance\?days=\$\{dniKNacteni\(/.test(tym));
   ok('Tým: období volí ObdobiLista s měsícem, minulým měsícem a 30 dny', /<ObdobiLista value=\{obdobi\}/.test(tym) && /'30_dni', 'mesic', 'minuly_mesic'/.test(tym));
-  ok('Tým: řazení Jméno / Hodiny / Výdělek (výdělek jen s finance.mzdy)', /id: 'hodiny' as const/.test(tym) && /smiVidetSazby \? \[\{ id: 'vydelek' as const/.test(tym));
+  ok('Tým: řazení Jméno / Hodiny / Výdělek (výdělek jen s finance.mzdy)', /<option value="hodiny">/.test(tym) && /smiVidetSazby && <option value="vydelek">/.test(tym));
   ok('Tým: odkaz „Rozpad v Docházce" jen na pohled, kam divák smí', /nav\.smiPohled\('attendance'\)/.test(tym) && /t\('Rozpad v Docházce'\)/.test(tym));
   ok('Tým: stránka doporučuje Souhrn hodin', TYM.doporucene.includes('dochazka.souhrn_hodin'));
 

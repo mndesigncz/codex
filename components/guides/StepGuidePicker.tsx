@@ -35,13 +35,14 @@ export default function StepGuidePicker({ guides, value, onChange, stepNumber }:
   if (value != null) {
     return (
       // Kolo 69 (B6b): vybraný návod byl limetková pilulka — teď neutrální chip (limetka je akce).
-      <span className="chip chip-muted inline-flex min-w-0 items-center gap-1.5 !pr-1">
-        <Icon name="book" size={12} className="shrink-0" />
-        <span className="truncate max-w-[10rem]">{vybrany?.title ?? t('Návod #{id}', { id: value })}</span>
+      // v4 (P7): v řadě kroku stejná výška a šířka dílu jako vedlejší tlačítko (44, ½).
+      <span className="chip chip-muted inline-flex w-full min-w-0 !h-11 items-center gap-1.5 !pl-3.5 !pr-1.5">
+        <Icon name="book" size={14} className="shrink-0" />
+        <span className="truncate min-w-0 flex-1">{vybrany?.title ?? t('Návod #{id}', { id: value })}</span>
         <button type="button" onClick={() => onChange(null)}
           aria-label={t('Zrušit návod u kroku {n}', { n: stepNumber })} title={t('Zrušit návod')}
-          className="btn-icon btn-icon-danger shrink-0 !h-6 !w-6">
-          <Icon name="close" size={11} />
+          className="btn-icon btn-icon-danger shrink-0 !h-8 !w-8">
+          <Icon name="close" size={12} />
         </button>
       </span>
     );
@@ -51,8 +52,8 @@ export default function StepGuidePicker({ guides, value, onChange, stepNumber }:
     return (
       <button type="button" onClick={() => setOpen(true)}
         title={t('Připojit ke kroku návod')}
-        className="btn btn-secondary btn-sm">
-        <Icon name="book" size={12} />  {t('Návod')}
+        className="btn btn-secondary w-full">
+        <Icon name="book" size={15} />  {t('Návod')}
       </button>
     );
   }
@@ -80,7 +81,7 @@ export default function StepGuidePicker({ guides, value, onChange, stepNumber }:
         </div>
       )}
       <button type="button" onClick={() => { setOpen(false); setQuery(''); }}
-        className="btn btn-ghost btn-sm">{t('Zrušit')}</button>
+        className="btn btn-ghost w-full">{t('Zrušit')}</button>
     </div>
   );
 }

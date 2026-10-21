@@ -48,12 +48,13 @@ export default function CategoryNav<T extends CategoryNode>({
   // the toolbar stays a single row no matter how deep the tree goes.
   if (condensed) {
     return (
+      // v4: všechny pilulky pásu 36 (filter-pill) — dřív „Vše" a cesta 28 vedle kategorií 36 (audit V19).
       // Posuvný pás: bez posuvníku, s vyblednutým pravým okrajem, dokud je co
       // posouvat (at-end ho vypne), a se zarážkou na hraně pilulky.
       <div onScroll={e => { const el = e.currentTarget; el.classList.toggle('at-end', el.scrollLeft + el.clientWidth >= el.scrollWidth - 2); }}
         className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain snap-x snap-proximity scrollbar-none scroll-fade-x -mx-1 px-1 py-0.5">
         <button type="button" onClick={() => onNavigate(null)}
-          className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
+          className={`filter-pill tap-target-sm shrink-0 ${
             current === null ? 'seg-on' : 'seg-off glass'
           }`}>
           {rootLabel}
@@ -62,7 +63,7 @@ export default function CategoryNav<T extends CategoryNode>({
           <span key={c.id} className="flex items-center gap-1 shrink-0">
             <Icon name="chevron" size={12} className="text-black/20 -rotate-90 shrink-0" />
             <button type="button" onClick={() => onNavigate(c.id)}
-              className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
+              className={`filter-pill tap-target-sm ${
                 c.id === current ? 'seg-on' : 'seg-off glass'
               }`}>
               {c.name}
@@ -84,7 +85,7 @@ export default function CategoryNav<T extends CategoryNode>({
         })}
         {current === null && extraRoots.map(name => (
           <button key={name} onClick={() => onNavigateOrphan?.(name)}
-            className="tap-target-sm shrink-0 rounded-full glass px-3 py-1.5 text-xs font-medium whitespace-nowrap text-black/50 hover:text-black transition">
+            className="filter-pill tap-target-sm shrink-0 glass text-black/50 hover:text-black">
             {name}
           </button>
         ))}
@@ -99,7 +100,7 @@ export default function CategoryNav<T extends CategoryNode>({
           a zabíralo řádek, tak se ukáže až uvnitř kategorie. */}
       <div className={`flex items-center gap-1 flex-wrap text-sm ${current === null && !touch && level.length > 0 ? 'hidden' : ''}`}>
         <button type="button" onClick={() => onNavigate(null)}
-          className={`tap-target-sm rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
+          className={`tap-target-sm rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5 min-h-[var(--h-s)]'} ${
             current === null ? 'seg-on' : 'seg-off glass'
           }`}>
           {rootLabel}
@@ -108,7 +109,7 @@ export default function CategoryNav<T extends CategoryNode>({
           <span key={c.id} className="flex items-center gap-1">
             <Icon name="chevron" size={13} className="text-black/20 -rotate-90 shrink-0" />
             <button type="button" onClick={() => onNavigate(c.id)}
-              className={`tap-target-sm rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
+              className={`tap-target-sm rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5 min-h-[var(--h-s)]'} ${
                 i === trail.length - 1 ? 'seg-on' : 'seg-off glass'
               }`}>
               {c.name}

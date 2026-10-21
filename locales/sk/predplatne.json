@@ -3,8 +3,8 @@
   "Až 3": "Až 3",
   "CSV exporty": "CSV exporty",
   "CSV exporty a měsíční přehled": "CSV exporty a mesačný prehľad",
-  "Ceny bez DPH, fakturu pošle Stripe.": "Ceny bez DPH, faktúru pošle Stripe.",
-  "Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.": "Ceny sú bez DPH. Faktúru so všetkými náležitosťami vystaví Stripe a nájdete ju v portáli.",
+  "Ceny jsou konečné (neplátce DPH), předplatné se obnovuje automaticky, fakturu pošle Stripe.": "Ceny sú konečné (neplatiteľ DPH), predplatné sa obnovuje automaticky, faktúru pošle Stripe.",
+  "Ceny jsou konečné, provozovatel není plátcem DPH. Fakturu vystaví Stripe a najdete ji v portálu.": "Ceny sú konečné, prevádzkovateľ nie je platiteľom DPH. Faktúru vystaví Stripe a nájdete ju v portáli.",
   "Co je v jakém plánu": "Čo je v ktorom pláne",
   "Co váš podnik v Managero aktuálně má.": "Čo váš podnik v Managero momentálne má.",
   "Doporučeno": "Odporúčané",
@@ -83,7 +83,6 @@
   "měsíčně": "mesačne",
   "ne": "nie",
   "ročně": "ročne",
-  "ušetříte {castka}": "ušetríte {castka}",
   "váš plán": "váš plán",
   "za podnik, kdykoli zrušit": "za podnik, kedykoľvek zrušiť",
   "za {n, plural, one {# den} few {# dny} other {# dní}}": "za {n, plural, one {# deň} few {# dni} other {# dní}}",
@@ -122,7 +121,7 @@
   "Ušetříš {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "Ušetríš {castka} oproti mesačnému plateniu, vychádza na {mesicne} mesačne.",
   "Čím se tarify liší": "Čím sa tarify líšia",
   "Celé srovnání, {n, plural, one {# řádek} few {# řádky} other {# řádků}}": "Celé porovnanie, {n, plural, one {# riadok} few {# riadky} other {# riadkov}}",
-  "Ceny jsou bez DPH. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.": "Ceny sú bez DPH. Odporuč Managero ďalšiemu podniku a dostaneš mesiac zadarmo, najviac tri za mesiac.",
+  "Ceny jsou konečné, provozovatel není plátcem DPH. Předplatné se automaticky obnovuje, dokud ho nezrušíš. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.": "Ceny sú konečné, prevádzkovateľ nie je platiteľom DPH. Predplatné sa automaticky obnovuje, kým ho nezrušíš. Odporuč Managero ďalšiemu podniku a dostaneš mesiac zadarmo, najviac tri za mesiac.",
   "Lidé v týmu": "Ľudia v tíme",
   "Sdílené odkazy": "Zdieľané odkazy",
   "Podniky v organizaci": "Podniky v organizácii",
@@ -130,5 +129,8 @@
   "Plno": "Plno",
   "bez limitu": "bez limitu",
   "Zbývá {n, plural, one {# místo} few {# místa} other {# míst}}": "Zostáva {n, plural, one {# miesto} few {# miesta} other {# miest}}",
-  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "Zostáva {n, plural, one {# odkaz} few {# odkazy} other {# odkazov}}"
+  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "Zostáva {n, plural, one {# odkaz} few {# odkazy} other {# odkazov}}",
+  "Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "Ušetríte {castka} oproti mesačnému plateniu, vychádza na {mesicne} mesačne.",
+  "Obchodní podmínky": "Obchodné podmienky",
+  "Zrušení předplatného a vrácení peněz": "Zrušenie predplatného a vrátenie peňazí"
 }

@@ -494,10 +494,13 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               onToggleAll={smiSplnit(uk) ? d => toggleChecklistAll(uk, d) : undefined} />
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {smiUpravit(uk) && <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={t('Upravit úkol {nazev}', { nazev: uk.title })} onClick={() => openEdit(uk)} />}
-          {smiSmazat(uk) && <Button variant="ghost" size="sm" iconOnly icon="trash" className="hover:!text-[var(--bad-ink)]" aria-label={t('Smazat úkol {nazev}', { nazev: uk.title })} onClick={() => setMazani(uk)} />}
-        </div>
+        {/* Jedna akce řádku na R (V4): tužka. Smazání je v detailu úkolu (klepnutí na název) — dvě holé
+            ikony tužka + koš uprostřed každé karty dělaly sloupec ikon mimo pravou hranu. */}
+        {smiUpravit(uk) && (
+          <span className="shrink-0 -my-2">
+            <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={t('Upravit úkol {nazev}', { nazev: uk.title })} onClick={() => openEdit(uk)} />
+          </span>
+        )}
       </li>
     );
   };
@@ -765,7 +768,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             { label: t('Nový úkol'), icon: 'plus', onClick: novyUkol },
             ...(smiZaBody ? [{ label: t('Nový úkol za body'), icon: 'tag', onClick: () => { setView('zabody'); setZaBodyOkno({}); } }] : []),
           ],
-          aside: <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
+          aside: <Segmented ariaLabel={t('Zobrazení')} value={view} onChange={setView}
             options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }, { id: 'prehled', label: t('Přehled') },
               ...(vidiZaBody ? [{ id: 'zabody' as const, label: t('Za body') }] : [])]} />,
         }}

@@ -255,7 +255,8 @@ const SOUHRN = '4 úkoly · 3 volné · 1 vzato · 2 hotovo · až +75 b';
   await otevri(p, ODMENY, 'vedeni.odmeny');
   const w = widgetLi(p, 'odmeny.za_body_tymu');
   tvrdi('W1: souhrn „' + SOUHRN + '" a chip „1 čeká"', await dokud(async () => (await text(w.locator('[data-za-body-souhrn]'))) === SOUHRN, 8000) && /1 čeká/.test(await text(w)), await text(w.locator('[data-za-body-souhrn]')));
-  const nazvy = await w.locator('[data-za-body-seznam] > li').evaluateAll(els => els.map(e => e.querySelector('.truncate')?.textContent ?? ''));
+  // v4: titul řádku ListRow smí na dva řádky (line-clamp, ne truncate) — hledá se třídou `list-titul`.
+  const nazvy = await w.locator('[data-za-body-seznam] > li').evaluateAll(els => els.map(e => (e.querySelector('.list-titul') ?? e.querySelector('.truncate'))?.textContent ?? ''));
   tvrdi('W1: pořadí — rozdělané nahoře (Rozvézt letáky, Umýt výlohu), volné, plné dole', JSON.stringify(nazvy) === JSON.stringify(['Rozvézt letáky po okolí', 'Umýt výlohu zvenku', 'Odvézt sklo do sběru', 'Vytřít sklad a chodbu']), JSON.stringify(nazvy));
   tvrdi('W1: lidé a místa — „Tereza Malá hotovo", „Eva Testová vzato", „Kdokoli", „Obsazeno", „2 z 2 volné"', /Tereza Malá\s*hotovo/.test(await text(w)) && /Eva Testová\s*vzato/.test(await text(w))
     && /Kdokoli/.test(await text(w)) && /Obsazeno/.test(await text(w)) && /2 z 2 volné/.test(await text(w)) && /Zatím si ho nikdo nevzal\./.test(await text(w)));

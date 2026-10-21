@@ -49,7 +49,8 @@ export default function JazykMenu({ nabizet = JAZYKY, align = 'right', className
         aria-expanded={open}
         aria-label={`${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`}
         // Vizuálně malá pilulka, dotyková plocha 44 px: `before` ji roztahuje, rozvržení se nehýbe.
-        className="chip chip-muted relative inline-flex items-center gap-1.5 cursor-pointer select-none before:absolute before:-inset-x-1.5 before:-inset-y-2.5 before:content-['']"
+        // v4 (P18, audit V13): v liště vedle kruhů 40 má pilulka jazyka jejich výšku (dřív 24 vedle 36 a 40).
+        className="chip chip-muted relative inline-flex h-10 items-center gap-1.5 cursor-pointer select-none before:absolute before:-inset-x-1 before:-inset-y-0.5 before:content-['']"
       >
         <Icon name="globe" size={13} className="shrink-0" />
         <span className="tabular-nums font-semibold tracking-wide">{JAZYK_KOD[jazyk]}</span>

@@ -21,7 +21,7 @@ export function VolbaRezimu({ druh, nazev, pravidlo, zaklad, onZmena }: {
   const uid = useId();
   const polozky = druh !== 'postupy';
   return (
-    <div className="py-3 space-y-2.5" data-volba-rezimu={druh}>
+    <div className="py-3 sloupec sloupec-3" data-volba-rezimu={druh}>
       <p id={`${uid}-n`} className="text-sm font-semibold text-[#16181A]">{nazev}</p>
       <Segmented size="sm" ariaLabel={t('Způsob počítání: {co}', { co: nazev })} value={pravidlo.rezim}
         onChange={r => onZmena({ ...pravidlo, rezim: r })} options={REZIMY.map(r => ({ id: r, label: nazevRezimu(t, r) }))} />
@@ -33,7 +33,7 @@ export function VolbaRezimu({ druh, nazev, pravidlo, zaklad, onZmena }: {
         <Field id={`${uid}-pol`} label={pravidlo.rezim === 'kroky'
           ? (druh === 'ukoly' ? t('Body za splněnou položku checklistu') : t('Body za splněnou povinnou věc'))
           : (druh === 'ukoly' ? t('Srážka za nesplněnou položku checklistu') : t('Srážka za nesplněnou povinnou věc'))}>
-          <Input id={`${uid}-pol`} type="text" inputMode="numeric" className="!w-24 tabular-nums"
+          <Input id={`${uid}-pol`} type="text" inputMode="numeric" className="tabular-nums"
             value={String(pravidlo.rezim === 'kroky' ? pravidlo.zaPolozku : pravidlo.srazka)}
             onChange={e => onZmena(pravidlo.rezim === 'kroky' ? { ...pravidlo, zaPolozku: cele(e.target.value) } : { ...pravidlo, srazka: cele(e.target.value) })} />
         </Field>
@@ -62,7 +62,7 @@ export function VolbaRezimuPolozky({ druh, prepis, vychozi, onZmena, smiZaklad =
   const ucinne = vychozi ? ucinnePravidlo(vychozi, prepis, vychozi.zaklad) : null;
   const zakladPopis = druh === 'postupy' ? t('Body za celý postup') : t('Body za celý úkol');
   return (
-    <div className="space-y-2.5" data-volba-rezimu-polozky={druh}>
+    <div className="sloupec sloupec-3" data-volba-rezimu-polozky={druh}>
       <Segmented size="sm" ariaLabel={t('Způsob počítání bodů')} value={volba}
         onChange={r => nastav(r === 'podnik' ? { rezim: null, bonus: null } : { rezim: r })}
         options={(['podnik', ...REZIMY] as const).map(r => ({ id: r, label: nazevRezimu(t, r) }))} />
@@ -72,7 +72,7 @@ export function VolbaRezimuPolozky({ druh, prepis, vychozi, onZmena, smiZaklad =
       )}
       {smiZaklad && (
         <Field id={`${uid}-z`} label={zakladPopis} hint={vychozi ? t('Prázdné = podle podniku ({z} b).', { z: vychozi.zaklad }) : undefined}>
-          <Input id={`${uid}-z`} type="text" inputMode="numeric" className="!w-24 tabular-nums" placeholder={vychozi ? String(vychozi.zaklad) : ''}
+          <Input id={`${uid}-z`} type="text" inputMode="numeric" className="tabular-nums" placeholder={vychozi ? String(vychozi.zaklad) : ''}
             value={prepis?.zaklad == null ? '' : String(prepis.zaklad)}
             onChange={e => nastav({ zaklad: e.target.value.trim() === '' ? null : cele(e.target.value, 500) })} />
         </Field>

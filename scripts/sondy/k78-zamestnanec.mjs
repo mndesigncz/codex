@@ -260,7 +260,7 @@ for (const o of [OBRAZOVKY[0], OBRAZOVKY[3], OBRAZOVKY[6]]) {
     await k.ctx.close();
   }
 
-  // b) Úkoly: první úkol nad dokem, ovládání v jednom řádku.
+  // b) Úkoly: první úkol nad dokem, segment nahoře a toolbar pod ním (v4 P10).
   {
     const k = await kontext({ role: 'employee', viewport: TEL, mobil: true, mineData: BARISTA, fix: FIX6['zamestnanec.ukoly'],
       dalsi: (req, json, stav) => (new URL(req.url()).pathname === '/api/tasks' && req.method() === 'GET' ? json(sDaty('k69-b6a-tasks')) : podvrh(req, json, stav)) });
@@ -270,7 +270,16 @@ for (const o of [OBRAZOVKY[0], OBRAZOVKY[3], OBRAZOVKY[6]]) {
     tvrdi(`B5 úkoly 390: první úkol je celý nad dokem (spodek ${prvni && Math.round(prvni.y + prvni.height)}, dok ${dok && Math.round(dok.y)})`, !!prvni && !!dok && prvni.y + prvni.height <= dok.y, JSON.stringify({ prvni, dok }));
     const filtry = await k.p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('button', { name: /^Filtry/ }).boundingBox();
     const tyden = await k.p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('radio', { name: 'Týden' }).or(k.p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('tab', { name: 'Týden' })).first().boundingBox();
-    tvrdi('B5 úkoly 390: přepínač pohledu a „Filtry" jsou v jednom řádku', !!filtry && !!tyden && Math.abs((filtry.y + filtry.height / 2) - (tyden.y + tyden.height / 2)) < 12, JSON.stringify({ filtry, tyden }));
+    // v4 (P10, P11): segment pohledu stojí nahoře přes celou šířku (44) a pod ním toolbar [hledání][Filtry]
+    // jedné výšky, „Filtry" končí na R. Dřív segment + lupa + Filtry v jednom řádku — na 390 se nevešly
+    // a „Filtry" padalo samo na druhý řádek vlevo.
+    const nastroj = k.p.locator('[data-plocha] li[data-widget="nastroj"]');
+    const segment = await nastroj.getByRole('tablist', { name: 'Zobrazení' }).first().boundingBox();
+    const hledat = await nastroj.getByRole('combobox', { name: 'Hledat v úkolech' }).or(nastroj.getByRole('textbox', { name: 'Hledat v úkolech' })).first().evaluate(e => { const r = (e.closest('.field, [class*="field"]') ?? e).getBoundingClientRect(); return { y: r.top, height: r.height }; }).catch(() => null);
+    tvrdi('B5 úkoly 390: segment pohledu přes celou šířku nad toolbarem, „Filtry" v řadě s hledáním na R', !!filtry && !!tyden && !!segment && !!hledat
+      && segment.width >= 340 && segment.y + segment.height <= filtry.y + 1
+      && Math.abs((filtry.y + filtry.height / 2) - (hledat.y + hledat.height / 2)) < 6 && Math.abs(filtry.x + filtry.width - 370) <= 2,
+      JSON.stringify({ filtry, tyden, segment, hledat }));
     await k.p.screenshot({ path: `${OUT}k78-b5-ukoly-390.png` });
     await k.ctx.close();
   }

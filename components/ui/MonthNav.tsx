@@ -34,11 +34,13 @@ export function nazevMesice(mesic: string, jazyk: Jazyk): string {
  * `min`/`max` zamknou šipku na kraji (třeba budoucí měsíce, kde nic není).
  * Rychlé skoky („Tento měsíc") patří vedle, ne dovnitř.
  */
-export function MonthNav({ value, onChange, min, max, className = '' }: {
+export function MonthNav({ value, onChange, min, max, velikost = 'm', className = '' }: {
   value: string;
   onChange: (mesic: string) => void;
   min?: string;
   max?: string;
+  /** m = 44 (stránka, toolbar vedle „Filtry"), s = 36 (v kartě — P6: MonthNav v kartě je stupeň S). */
+  velikost?: 's' | 'm';
   className?: string;
 }) {
   const t = useT('spolecne');
@@ -52,7 +54,9 @@ export function MonthNav({ value, onChange, min, max, className = '' }: {
   const zamcena = 'aria-disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:active:scale-100';
   return (
     <div role="group" aria-label={t('Měsíc')}
-      className={`flex items-center gap-1 glass rounded-full p-1 min-w-0 w-full sm:w-fit ${className}`}>
+      // v4 (P6/P7): celková výška 44 (stupeň M) — šipky 36 v dráze s odsazením 3 + linkou 1;
+      // dřív 46 a vedle tlačítka „Filtry" 36 tři výšky v jedné řadě.
+      className={`flex items-center gap-1 glass rounded-full ${velikost === 's' ? 'h-9 p-[2px] [&>button]:!h-[1.875rem] [&>button]:!w-[1.875rem]' : 'h-11 p-[3px]'} min-w-0 w-full sm:w-fit ${className}`}>
       <button type="button" onClick={() => { if (!naZacatku) onChange(posunMesic(value, -1)); }}
         aria-disabled={naZacatku || undefined}
         aria-label={t('Předchozí měsíc')} className={`tap-target btn-icon ${zamcena}`}>

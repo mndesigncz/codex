@@ -250,8 +250,11 @@ function KioskShell({ user }: { user: KioskUser }) {
             <p className="text-sm text-black/45 cz-sentence truncate">{dateStr}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap justify-end">
-          <ActivePersonChip />
+        {/* v4 (P2, P18): druhá řada hlavičky nezalamuje — na telefonu přes celou šířku (čip a hodiny vlevo,
+            ikonová tlačítka na pravé hraně), dřív „Odhlásit" spadl sám na další řádek. */}
+        <div className="flex items-center gap-3 basis-full sm:basis-auto min-w-0">
+          <span className="min-w-0 empty:hidden"><ActivePersonChip /></span>
+          <span className="flex-1 sm:hidden" aria-hidden />
           <p className="text-3xl font-bold tracking-tight text-[#16181A] tabular-nums leading-none">{clock}</p>
           {/* Odhlášení tabletu je pro obsluhu slepá ulička: e-mail ani heslo
               zařízení nikdo z baru nezná, takže jedno ťuknutí znamená tablet
@@ -279,7 +282,9 @@ function KioskShell({ user }: { user: KioskUser }) {
           // třída seg-on je jen pro oko (v tmavém režimu ji odliší světlý okraj v globals.css).
           <button key={t.id} type="button" onClick={() => setTab(t.id)}
             aria-current={tab === t.id ? 'page' : undefined}
-            className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
+            // v4 (P2, P11): na tabletu záložky rostou rovným dílem a vyplní řadu L→R — dřív se
+            // poslední („Návody") zalomila sama na další řádek k levému okraji.
+            className={`inline-flex items-center justify-center gap-2 px-5 sm:px-3.5 sm:flex-1 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
               tab === t.id ? 'seg-on' : 'btn-secondary'
             }`}>
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}

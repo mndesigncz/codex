@@ -21,11 +21,17 @@ export const RETENCE = {
   auditLogLet: 3,
   /** Oznámení v aplikaci (notifications) starší než tolik dní se mažou. */
   oznameniDni: 365,
-  /** Podnik se zrušeným předplatným a bez aktivity se smaže tolik dní po konci předplatného. */
+  /** Podnik se zrušeným předplatným a bez aktivity se smaže tolik dní po konci předplatného (nebo po poslední aktivitě). */
   zrusenyPodnikDni: 90,
+  /** První e-mail vlastníkovi a správcům předplatného před smazáním podniku (dny předem). */
+  podnikUpozorneniDni: 30,
+  /** Druhý e-mail před smazáním podniku (dny předem). */
+  podnikDruheUpozorneniDni: 7,
   /** Strop na jeden běh cronu (ať se vejde do časového limitu funkce); zbytek dojede příště. */
   davkaHostu: 200,
   davkaPodniku: 5,
+  /** Kolika podnikům jeden běh nejvýš pošle upozornění. */
+  davkaUpozorneniPodniku: 50,
   davkaRadku: 5000,
 } as const;
 
@@ -54,8 +60,10 @@ export interface HraniceRetence {
   upozornitPred: Date;
   auditPred: Date;
   oznameniPred: Date;
-  /** Podnik, jehož předplatné skončilo před tímto okamžikem. */
+  /** Podnik, jehož předplatné skončilo (a poslední aktivita proběhla) před tímto okamžikem, je po celé lhůtě. */
   podnikKonecPred: Date;
+  /** Podnik s koncem i poslední aktivitou před tímto okamžikem má dostat první upozornění (90 − 30 dní). */
+  podnikUpozornitPred: Date;
 }
 
 export function hraniceRetence(ted: Date, r: typeof RETENCE = RETENCE): HraniceRetence {
@@ -66,6 +74,7 @@ export function hraniceRetence(ted: Date, r: typeof RETENCE = RETENCE): HraniceR
     auditPred: minusMesice(ted, r.auditLogLet * 12),
     oznameniPred: new Date(ted.getTime() - r.oznameniDni * DEN),
     podnikKonecPred: new Date(ted.getTime() - r.zrusenyPodnikDni * DEN),
+    podnikUpozornitPred: new Date(ted.getTime() - (r.zrusenyPodnikDni - r.podnikUpozorneniDni) * DEN),
   };
 }
 
@@ -89,6 +98,69 @@ export function rozhodniHosta(v: { posledniAktivita: Date | null; upozornenoAt: 
 /** Den anonymizace pro text upozornění: upozornění + lhůta. */
 export function denAnonymizace(upozorneno: Date, r: typeof RETENCE = RETENCE): Date {
   return new Date(upozorneno.getTime() + r.upozorneniPredemDni * DEN);
+}
+
+// ---- Zrušený podnik bez aktivity ----------------------------------------------------------
+
+export type KrokPodniku = 'nic' | 'upozornit30' | 'upozornit7' | 'cekat' | 'smazat';
+
+const pozdejsi = (...d: (Date | null | undefined)[]): Date | null =>
+  d.reduce<Date | null>((a, b) => (b && (!a || b.getTime() > a.getTime()) ? b : a), null);
+
+/**
+ * Co se zrušeným podnikem (předplatné nebo zkouška skončila a nikdo ho neobnovil).
+ *
+ * Lhůta 90 dní běží od pozdějšího z: konec předplatného, poslední aktivita kohokoli z podniku
+ * (přihlášení nebo otevření aplikace, zprávy, úkoly, směny, docházka, uzávěrky, změny…).
+ * Smazat jde jen když:
+ *  - první upozornění odešlo po poslední aktivitě a aspoň 30 dní předem,
+ *  - druhé upozornění odešlo po prvním a aspoň 7 dní předem,
+ *  - a celá lhůta neaktivity uplynula.
+ * Jakákoli aktivita po upozornění ho zneplatní (počítá se znovu od začátku). Bez konce
+ * předplatného v datech se nic nedělá — nemazat naslepo.
+ */
+export function rozhodniPodnik(
+  v: { konec: Date | null; posledniAktivita: Date | null; upozorneno30At: Date | null; upozorneno7At: Date | null; ted: Date },
+  r: typeof RETENCE = RETENCE,
+): { krok: KrokPodniku; smazatOd: Date | null } {
+  if (!v.konec) return { krok: 'nic', smazatOd: null };
+  const od = pozdejsi(v.konec, v.posledniAktivita)!;
+  const lhuta = new Date(od.getTime() + r.zrusenyPodnikDni * DEN);
+  const ted = v.ted.getTime();
+  if (ted < lhuta.getTime() - r.podnikUpozorneniDni * DEN) return { krok: 'nic', smazatOd: null };
+  const u30 = v.upozorneno30At && v.upozorneno30At.getTime() >= od.getTime() ? v.upozorneno30At : null;
+  if (!u30) return { krok: 'upozornit30', smazatOd: pozdejsi(lhuta, new Date(ted + r.podnikUpozorneniDni * DEN)) };
+  const zaklad = pozdejsi(lhuta, new Date(u30.getTime() + r.podnikUpozorneniDni * DEN))!;
+  const u7 = v.upozorneno7At && v.upozorneno7At.getTime() >= u30.getTime() ? v.upozorneno7At : null;
+  if (!u7) {
+    return ted >= zaklad.getTime() - r.podnikDruheUpozorneniDni * DEN
+      ? { krok: 'upozornit7', smazatOd: pozdejsi(zaklad, new Date(ted + r.podnikDruheUpozorneniDni * DEN)) }
+      : { krok: 'cekat', smazatOd: zaklad };
+  }
+  const smazatOd = pozdejsi(zaklad, new Date(u7.getTime() + r.podnikDruheUpozorneniDni * DEN))!;
+  return { krok: ted >= smazatOd.getTime() ? 'smazat' : 'cekat', smazatOd };
+}
+
+/**
+ * E-mail vlastníkovi a správcům předplatného před smazáním neaktivního zrušeného podniku
+ * (30 a 7 dní předem). `datum` je už naformátovaný den smazání. Patičku s provozovatelem
+ * přidá lib/email.ts (sPatickouProvozovatele) ke každému e-mailu sama.
+ */
+export function emailUpozorneniPodniku(v: { podnik: string; jmeno: string; datum: string; druhe: boolean; odkazPrihlaseni: string; odkazData: string }, r: typeof RETENCE = RETENCE): { subject: string; html: string } {
+  const p = v.podnik || 'podnik';
+  return {
+    subject: v.druhe ? `Za ${r.podnikDruheUpozorneniDni} dní smažeme podnik ${p}` : `Podnik ${p} nikdo nepoužívá — ${v.datum} ho smažeme`,
+    html: `
+      <div style="font-family:-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:28px;background:#F1F4EC;color:#16181A;border-radius:20px;">
+        <h1 style="font-size:20px;margin:0 0 8px;">${v.druhe ? 'Poslední upozornění před smazáním' : 'Chcete si podnik ponechat?'}</h1>
+        <p style="color:#5c6353;font-size:14px;">Dobrý den${v.jmeno ? `, ${esc(v.jmeno)}` : ''}. Předplatné podniku ${esc(p)} v Manageru skončilo a od té doby se do podniku nikdo nepřihlásil ani v něm nic nezapsal. Podle obchodních podmínek (čl. 19) podnik, který nikdo nepoužívá, ${r.zrusenyPodnikDni} dní po skončení předplatného smažeme i se všemi daty.</p>
+        <p style="color:#16181A;font-size:15px;font-weight:bold;">Podnik smažeme nejdříve ${esc(v.datum)}.</p>
+        <p style="color:#5c6353;font-size:14px;">Chcete-li podnik zachovat, stačí se do Manageru přihlásit (nebo ať aplikaci otevře kdokoli z týmu). Smazání se tím zruší. Data si předem můžete stáhnout v Nastavení → Data a soukromí (záloha ve formátu JSON); další data vám na požádání pošle podpora.</p>
+        <a href="${esc(v.odkazPrihlaseni)}" style="display:inline-block;margin-top:8px;background:#C8F542;color:#16181A;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:bold;">Přihlásit se</a>
+        <p style="color:#5c6353;font-size:13px;margin-top:16px;"><a href="${esc(v.odkazData)}" style="color:#16181A;">Stáhnout data podniku</a></p>
+        <p style="color:#8a917f;font-size:12px;margin-top:22px;">Pokud tlačítko nefunguje, otevřete: ${esc(v.odkazPrihlaseni)}</p>
+      </div>`,
+  };
 }
 
 // ---- Odkaz „Ponechat účet“ ----------------------------------------------------------------
@@ -129,7 +201,7 @@ export interface SouhrnRetence {
   hoste: { poLhute: number; upozornit: number; anonymizovat: number; cekat: number; upozorneno: number; anonymizovano: number; chyb: number; ukazkaId: number[] };
   auditLog: { kSmazani: number; smazano: number };
   oznameni: { kSmazani: number; smazano: number };
-  podniky: { kSmazani: number; smazano: number; ukazkaId: number[] };
+  podniky: { kSmazani: number; smazano: number; ukazkaId: number[]; upozornit30?: number; upozornit7?: number; cekat?: number; upozorneno?: number; chyb?: number };
   chyby: string[];
 }
 
@@ -140,7 +212,7 @@ export function prazdnySouhrn(rezim: 'nahled' | 'ostry', h: HraniceRetence): Sou
     hoste: { poLhute: 0, upozornit: 0, anonymizovat: 0, cekat: 0, upozorneno: 0, anonymizovano: 0, chyb: 0, ukazkaId: [] },
     auditLog: { kSmazani: 0, smazano: 0 },
     oznameni: { kSmazani: 0, smazano: 0 },
-    podniky: { kSmazani: 0, smazano: 0, ukazkaId: [] },
+    podniky: { kSmazani: 0, smazano: 0, ukazkaId: [], upozornit30: 0, upozornit7: 0, cekat: 0, upozorneno: 0, chyb: 0 },
     chyby: [],
   };
 }

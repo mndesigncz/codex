@@ -74,7 +74,8 @@ function Pocet({ n, on }: { n: number; on: boolean }) {
   );
 }
 
-const pilulka = (on: boolean) => `filter-pill tap-target snap-start ${on ? 'seg-on' : 'seg-off glass'}`;
+// v4 (P6): pilulka pásu přesně 36 — s avatarem xs vycházela 38 (mimo stupně, sonda skladba).
+const pilulka = (on: boolean) => `filter-pill tap-target snap-start !h-9 !py-0 ${on ? 'seg-on' : 'seg-off glass'}`;
 
 /** Pás lidí: „Všichni" + člověk s počtem směn. Víc lidí najednou, druhý klik výběr zruší. */
 export function PasLidi({ lide, vybrani, celkem, navrh, onPrepni, onVsichni }: {

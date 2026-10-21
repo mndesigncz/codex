@@ -17,7 +17,8 @@ import { MAX_BODU, MAX_DELKA_NAZVU, MAX_DELKA_POZNAMKY, MAX_PREMIE, URL_NABIDKA_
 import { apiMessage, okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 import { pragueToday } from '@/lib/pragueTime';
-import { Button, Field, Input, Modal, Segmented, Select, SwitchRow, Textarea } from '../ui';
+import { Button, Field, Input, Modal, Rada, Select, SwitchRow, Textarea } from '../ui';
+import { VolbaDil } from '../ui/Volby';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { obnovNavic } from './data';
@@ -110,23 +111,24 @@ export function NabidkaNavicOkno({ polozka, predvyplneno, onClose, onHotovo, nad
           <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
           <Button type="submit" form="nabidka-navic" variant="primary" icon="check" loading={ukladam} disabled={!f.nazev.trim()}>{nova ? t('Vypsat úkol') : t('Uložit')}</Button>
         </>}>
-        <form id="nabidka-navic" className="space-y-4" data-nabidka-navic-okno onSubmit={e => { e.preventDefault(); void uloz(); }}>
+        <form id="nabidka-navic" className="sloupec sloupec-4" data-nabidka-navic-okno onSubmit={e => { e.preventDefault(); void uloz(); }}>
           <Field id="nabidka-nazev" label={t('Co se má udělat')}>
             <Input id="nabidka-nazev" value={f.nazev} onChange={e => zmen({ nazev: e.target.value })} maxLength={MAX_DELKA_NAZVU} placeholder={t('Např. vytřít sklad a chodbu')} autoFocus={!f.nazev} />
           </Field>
           <Field id="nabidka-popis" label={t('Popis (nepovinný)')} hint={t('Co přesně to znamená — člověk to uvidí u úkolu.')}>
-            <Textarea id="nabidka-popis" rows={2} value={f.popis} onChange={e => zmen({ popis: e.target.value })} maxLength={MAX_DELKA_POZNAMKY} />
+            <Textarea id="nabidka-popis" rows={3} value={f.popis} onChange={e => zmen({ popis: e.target.value })} maxLength={MAX_DELKA_POZNAMKY} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field id="nabidka-body" label={t('Body')} hint={t('0–{max}', { max: MAX_BODU })}>
-              <div className="flex items-center gap-1.5">
-                <Button variant="secondary" size="sm" iconOnly icon="minus" className="tap-target shrink-0" aria-label={t('Méně bodů')} disabled={bodyCislo <= 0}
+              {/* Krokovač = řada 52 jako pole vedle (V6): − | číslo | + rovným dílem. */}
+              <Rada vyska="l" className="[&>input]:!px-1">
+                <Button variant="secondary" size="lg" iconOnly icon="minus" className="tap-target !w-auto" aria-label={t('Méně bodů')} disabled={bodyCislo <= 0}
                   onClick={() => zmen({ body: String(krokBoduUkolu(f.body, -1, MAX_BODU)) })} />
                 <Input id="nabidka-body" type="number" inputMode="numeric" min={0} max={MAX_BODU} step={1} value={f.body}
-                  onChange={e => zmen({ body: e.target.value.replace(/\D/g, '') })} className="min-w-0 text-center tabular-nums" />
-                <Button variant="secondary" size="sm" iconOnly icon="plus" className="tap-target shrink-0" aria-label={t('Víc bodů')} disabled={bodyCislo >= MAX_BODU}
+                  onChange={e => zmen({ body: e.target.value.replace(/\D/g, '') })} className="text-center tabular-nums" />
+                <Button variant="secondary" size="lg" iconOnly icon="plus" className="tap-target !w-auto" aria-label={t('Víc bodů')} disabled={bodyCislo >= MAX_BODU}
                   onClick={() => zmen({ body: String(krokBoduUkolu(f.body, 1, MAX_BODU)) })} />
-              </div>
+              </Rada>
             </Field>
             <Field id="nabidka-premie" label={t('Prémie')} hint={t('Nepovinná; jde do výplaty.')}>
               <div className="relative">
@@ -145,15 +147,12 @@ export function NabidkaNavicOkno({ polozka, predvyplneno, onClose, onHotovo, nad
           {f.opakovani === 'dny' && (
             <fieldset className="min-w-0" data-nabidka-dny>
               <legend className="field-label">{t('Které dny')}</legend>
-              <div className="flex flex-wrap gap-1.5">
-                {DNY_TYDNE.map(d => {
-                  const on = f.dny.includes(d);
-                  return (
-                    <button key={d} type="button" aria-pressed={on} onClick={() => zmen({ dny: prepniDen(f.dny, d) })}
-                      className={`filter-pill tap-target min-w-[2.75rem] justify-center ${on ? 'seg-on' : 'seg-off glass'}`}>{denKratce(t, d)}</button>
-                  );
-                })}
-              </div>
+              {/* Sedm dní rovným dílem L→R (dřív pilulky s flex-wrap, na 320 px zalomené). */}
+              <Rada vyska="l" className="!gap-1.5">
+                {DNY_TYDNE.map(d => (
+                  <VolbaDil key={d} vybrano={f.dny.includes(d)} onClick={() => zmen({ dny: prepniDen(f.dny, d) })} className="!px-0">{denKratce(t, d)}</VolbaDil>
+                ))}
+              </Rada>
             </fieldset>
           )}
           {f.opakovani === 'interval' ? (
@@ -194,19 +193,20 @@ export function NabidkaNavicOkno({ polozka, predvyplneno, onClose, onHotovo, nad
 
           <fieldset className="min-w-0" data-nabidka-komu>
             <legend className="field-label">{t('Komu')}</legend>
-            <Segmented size="sm" ariaLabel={t('Komu')} value={f.jenVybranym ? 'vybrani' : 'vsichni'}
-              onChange={v => zmen({ jenVybranym: v === 'vybrani' })}
-              options={[{ id: 'vsichni', label: t('Všem') }, { id: 'vybrani', label: t('Vybraným lidem') }]} />
+            {/* Dvě volby ½ + ½ ve výšce pole okna (dřív segment 36 mezi poli 52 — třetí výška, audit V04). */}
+            <Rada vyska="l" role="tablist" aria-label={t('Komu')}>
+              <VolbaDil role="tab" vybrano={!f.jenVybranym} onClick={() => zmen({ jenVybranym: false })}>{t('Všem')}</VolbaDil>
+              <VolbaDil role="tab" vybrano={f.jenVybranym} onClick={() => zmen({ jenVybranym: true })}>{t('Vybraným lidem')}</VolbaDil>
+            </Rada>
             {f.jenVybranym && (
-              <div className="mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label={t('Vybraní lidé')}>
-                {lide.loading && !lide.data ? <p className="t-meta">{t('Načítám členy…')}</p>
-                  : lide.error ? <p className="note note-wait text-sm">{lide.error}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2" role="group" aria-label={t('Vybraní lidé')}>
+                {lide.loading && !lide.data ? <p className="t-meta col-span-2">{t('Načítám členy…')}</p>
+                  : lide.error ? <p className="note note-wait text-sm col-span-2">{lide.error}</p>
                   : (lide.data ?? []).map(m => {
                     const on = f.komu.includes(m.id);
                     return (
-                      <button key={m.id} type="button" aria-pressed={on}
-                        onClick={() => zmen({ komu: on ? f.komu.filter(x => x !== m.id) : [...f.komu, m.id] })}
-                        className={`filter-pill tap-target max-w-full ${on ? 'seg-on' : 'seg-off glass'}`}><span className="truncate">{m.jmeno}</span></button>
+                      <VolbaDil key={m.id} vybrano={on}
+                        onClick={() => zmen({ komu: on ? f.komu.filter(x => x !== m.id) : [...f.komu, m.id] })}>{m.jmeno}</VolbaDil>
                     );
                   })}
               </div>

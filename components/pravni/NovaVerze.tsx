@@ -38,6 +38,8 @@ export default function NovaVerze() {
   const [souhlas, setSouhlas] = useState(false);
   const [ukladam, setUkladam] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
+  // Vlastník podniku souhlasí i s obchodními podmínkami a zpracovatelskou smlouvou (GET vrací `vlastnik`).
+  const [vlastnik, setVlastnik] = useState(false);
 
   const bezi = status === 'authenticated' && !!id && role !== 'kiosk' && cestaSBranou(cesta) && !jeCestaDema(cesta);
 
@@ -48,8 +50,9 @@ export default function NovaVerze() {
     let zruseno = false;
     fetch('/api/account/souhlas', { cache: 'no-store' })
       .then(okJson)
-      .then((d: { potreba?: unknown }) => {
+      .then((d: { potreba?: unknown; vlastnik?: unknown }) => {
         if (zruseno) return;
+        setVlastnik(d?.vlastnik === true);
         if (d?.potreba === true) setUkaz(true);
         else zapis(klic, 'ok');
       })
@@ -84,8 +87,8 @@ export default function NovaVerze() {
         <Button variant="primary" icon="check" loading={ukladam} onClick={() => { void potvrdit(); }}>{t('Souhlasím a pokračovat')}</Button>
       </>}>
       <div className="space-y-3" data-nova-verze>
-        <p className="text-sm text-black/70 text-pretty">{t('Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.')}</p>
-        <SouhlasPodminek id="nova-verze-souhlas" checked={souhlas} chyba={chyba}
+        <p className="text-sm text-black/70 text-pretty">{t('Doplnili jsme obchodní podmínky pro podniky, zpracovatelskou smlouvu a seznam subzpracovatelů a zpřesnili podmínky užívání a zásady ochrany osobních údajů. Celé znění najdeš v odkazech níž.')}</p>
+        <SouhlasPodminek id="nova-verze-souhlas" podnik={vlastnik} checked={souhlas} chyba={chyba}
           onChange={v => { setSouhlas(v); if (v) setChyba(null); }} />
       </div>
     </Modal>

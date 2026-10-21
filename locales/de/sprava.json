@@ -896,7 +896,6 @@
   "Smazat záznam?": "Eintrag löschen?",
   "Smazat {n, plural, one {# položka} few {# položky} other {# položek}}?": "{n, plural, one {# Artikel} other {# Artikel}} löschen?",
   "Smazat {nazev}": "{nazev} löschen",
-  "Smazat úkol {nazev}": "Aufgabe {nazev} löschen",
   "Smazat úkol?": "Aufgabe löschen?",
   "Smazat účtenku {dodavatel}": "Beleg {dodavatel} löschen",
   "Smazat účtenku?": "Beleg löschen?",
@@ -1869,5 +1868,8 @@
   "Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop (když je zapnutý) začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Automatische Punkte für Abläufe, Aufgaben und Abschlüsse folgen der Zählweise oben und das Limit (wenn an) gilt auch für vergangene Tage — als wäre es immer so gewesen. Manuelle Änderungen der Leitung bleiben. Vor dem Speichern siehst du die Auswirkung.",
   "I starší ruční hodnocení směn považovat za nahrazující": "Auch ältere manuelle Schichtbewertungen als ersetzend behandeln",
   "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Vor dieser Version gespeicherte Schichtbewertungen kamen zu den automatischen Punkten dazu. Angehakt = auch sie ersetzen die automatischen Punkte ihres Tages (rückgängig machbar).",
-  "Další možnosti": "Weitere Optionen"
+  "Další možnosti": "Weitere Optionen",
+  "Upravit nebo smazat záznam: {jmeno}": "Eintrag bearbeiten oder löschen: {jmeno}",
+  "Upravit čas…": "Zeit bearbeiten…",
+  "Smazat záznam…": "Eintrag löschen…"
 }

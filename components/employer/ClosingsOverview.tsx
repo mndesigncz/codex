@@ -274,7 +274,7 @@ export default function ClosingsOverview() {
               <span className="font-normal text-black/55"> · {topLevel.length === 0 ? t('bez uzávěrky') : t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n: topLevel.length })}</span>
             </p>
             <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="secondary" size="sm" icon="calendar" onClick={() => otevriDen(selectedDate, 'uzaverky')}>{t('Celý den')}</Button>
+              <Button variant="secondary" size="sm" icon="calendar" aria-label={t('Celý den {den}', { den: denKratce(selectedDate, loc) })} onClick={() => otevriDen(selectedDate, 'uzaverky')}>{t('Celý den')}</Button>
               {topLevel.length === 0 && smiVytvorit && (
                 <Button variant="secondary" size="sm" icon="plus" onClick={() => openCreate(selectedDate)}>{t('Vyplnit')}</Button>
               )}
@@ -295,7 +295,8 @@ export default function ClosingsOverview() {
                   ...jmena.map(j => ({ label: j, hint: t('na směně') })),
                   ...stitky.map(x => ({ label: x, hint: t('směna') })),
                 ]} />
-              <Button variant="secondary" size="sm" aria-expanded={dalsiFiltry} onClick={() => setDalsiFiltry(v => !v)}
+              {/* Toolbar 44 (P10): hledání i „Filtry" stejně vysoké (dřív 48 / 36). */}
+              <Button variant="secondary" aria-expanded={dalsiFiltry} onClick={() => setDalsiFiltry(v => !v)}
                 className="shrink-0">
                 {t('Filtry')}{nFiltru > 0 ? ` · ${nFiltru}` : ''}
               </Button>
@@ -379,38 +380,37 @@ export default function ClosingsOverview() {
               const trzba = c.trzbaSkryta ? null : (Number(c.cash_revenue) || 0) + (Number(c.card_revenue) || 0);
               const duvod = d != null && d !== 0 ? diffReasonLabel(c.diff_reason) : null;
               return (
-                <li key={c.id} className="flex items-center gap-1">
-                  <div className="min-w-0 flex-1">
+                // v4 (P15, V4): tržba a › jsou svislý sloupec na pravé hraně. „Celý den" (dřív ikonové tlačítko
+                // za šipkou každého řádku — › stála na 300 a kalendář na 331 o řádek níž) je v detailu uzávěrky
+                // a ve výběru dne nad seznamem.
+                <li key={c.id}>
                   <ListRow as="div"
                     lead={<Avatar emoji={c.author_avatar} size="sm" />}
-                    title={<span className="cz-sentence">{denKratce(denUzaverky(c), loc)}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
+                    title={<span className="cz-sentence">{denKratce(denUzaverky(c), loc)}{c.shift_label ? <> · <span className="whitespace-nowrap">{c.shift_label}</span></> : ''}</span>}
                     // Posádka na vlastním řádku, nejvýš na dva (V04): v jednom řádku s tržbou se utínala
                     // na „Směna: Jakub Kolář + Petra Mar…". Tržba je číslo řádku — pevný sloupec
                     // s tabulkovými číslicemi na monitoru, na telefonu vlevo pod jménem a rozdíl kasy vedle ní.
                     detail={<span className="line-clamp-2 break-words">{t('Směna: {crew}', { crew })}</span>}
+                    // v4: stavové chipy (rozdíl kasy, čeká na schválení, akce) jsou doplněk řádku — na telefonu druhý
+                    // řádek na ose textu pod tržbou (ListRow „OSA TEXTU"), na monitoru sloupec před tržbou.
+                    right={(c.event_title || covered.length > 0 || c.approved === false || d != null) ? (
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          {c.event_title && <Chip tone="info" size="sm" icon="calendarCheck" className="hidden sm:inline-flex">{c.event_title}</Chip>}
+                          {covered.length > 0 && <Chip tone="muted" size="sm" icon="users" className="hidden sm:inline-flex">+{covered.length}</Chip>}
+                          {c.approved === false && <Chip tone="wait" size="sm">{t('Čeká na schválení')}</Chip>}
+                          {d != null && (
+                            <Chip tone={d === 0 ? 'ok' : d > 0 ? 'info' : 'bad'} size="sm">
+                              {d === 0 ? t('Sedí') : `${d > 0 ? '+' : ''}${money(d)}`}
+                              {duvod && <span className="hidden sm:inline font-normal"> · {duvod}</span>}
+                            </Chip>
+                          )}
+                        </span>
+                      ) : undefined}
                     value={trzba != null ? <><span className="sr-only">{t('tržba {castka}', { castka: money(trzba) })}</span><span aria-hidden>{money(trzba)}</span></> : undefined}
                     // Hosté, když je tým v uzávěrce vyplnil — pod tržbou ve stejném sloupci (číslo k číslu),
                     // ne za posádkou, kde by je dlouhá směna uřízla na druhém řádku.
                     valueMeta={hosteUzaverky(c) != null ? t('{n, plural, one {# host} few {# hosté} other {# hostů}}', { n: hosteUzaverky(c)! }) : undefined}
-                    // Štítky mají na monitoru jednotnou minimální šířku, ať tržby vlevo od nich stojí v jednom
-                    // svislém sloupci (jinak „Sedí" a „Čeká na schválení −200 Kč" posouvaly číslo o 150 px).
-                    right={<span className="flex flex-wrap items-center justify-end gap-2 lg:min-w-[16rem]">
-                      {c.event_title && <Chip tone="info" size="sm" icon="calendarCheck" className="hidden sm:inline-flex">{c.event_title}</Chip>}
-                      {covered.length > 0 && <Chip tone="muted" size="sm" icon="users" className="hidden sm:inline-flex">+{covered.length}</Chip>}
-                      {c.approved === false && <Chip tone="wait" size="sm">{t('Čeká na schválení')}</Chip>}
-                      {d != null && (
-                        <Chip tone={d === 0 ? 'ok' : d > 0 ? 'info' : 'bad'} size="sm">
-                          {d === 0 ? t('Sedí') : `${d > 0 ? '+' : ''}${money(d)}`}
-                          {duvod && <span className="hidden sm:inline font-normal"> · {duvod}</span>}
-                        </Chip>
-                      )}
-                    </span>}
                     onClick={() => setDetailId(c.id)} />
-                  </div>
-                  {/* Celý den: tržba, otevřené účty, výdaje, směny — vedle řádku, ne v něm (v klikacím řádku už je tlačítko). */}
-                  <Button variant="ghost" size="sm" iconOnly icon="calendar" className="shrink-0"
-                    aria-label={t('Celý den {den}', { den: denKratce(denUzaverky(c), loc) })}
-                    onClick={() => otevriDen(denUzaverky(c), 'uzaverky')} />
                 </li>
               );
             })}

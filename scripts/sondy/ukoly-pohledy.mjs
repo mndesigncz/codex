@@ -75,9 +75,12 @@ for (const w of [1280, 390]) {
     // Panel Filtry se právě zavírá: na pomalém runneru (CI) by klepnutí na lupu mohlo
     // přijít během animace. Počkat na doběhnutí animací a pole případně otevřít znovu.
     await p.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+    // v4 (P10): kde je nad seznamem přepínač pohledu, je pole hledání vidět rovnou (toolbar pod segmentem) — lupa tam není.
     const lupa = nastroj.getByRole('button', { name: 'Hledat v úkolech' });
-    await lupa.click();
-    if (!(await dokud(() => hledat.isVisible().catch(() => false), 3000))) await lupa.click();
+    if (await lupa.count()) {
+      await lupa.click();
+      if (!(await dokud(() => hledat.isVisible().catch(() => false), 3000))) await lupa.click();
+    }
   }
   await hledat.waitFor({ timeout: 10000 });
   await hledat.fill('mleko');

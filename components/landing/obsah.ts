@@ -161,7 +161,7 @@ export const JISTOTY_NADPIS = {
 };
 
 export const JISTOTY: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'archive', title: 'Data jsou tvoje', text: 'Rozvrh, docházku i finance stáhneš v CSV, které účetní otevře (tarif Pro a Max). Po konci předplatného data nemažeme.' },
+  { icon: 'archive', title: 'Data jsou tvoje', text: 'Rozvrh, docházku i finance stáhneš v CSV, které účetní otevře (tarif Pro a Max). Po konci předplatného data nemažeme, dokud podnik používáš.' },
   { icon: 'lock', title: 'Každý vidí jen své', text: 'Vlastník, manažer, brigádník. Kdo nemá vidět mzdy, ten je neuvidí, ani omylem přes odkaz.' },
   { icon: 'key', title: 'Tablet u baru bez hesel', text: 'Klepnutí na jméno místo přihlašování. Sdílený tablet nemá komu vyzradit heslo, když žádné nemá.' },
   { icon: 'warning', title: 'Výpadek wifi nelže', text: 'Aplikace řekne, co neprošlo, a rozepsané nezahodí. Tablet u baru zapíše příchody i bez internetu. Starý stav nevydává za nový.' },
@@ -202,7 +202,7 @@ export const FAQ: { q: string; a: string }[] = [
   { q: 'Jak se připojí zaměstnanci?', a: 'Jedním kódem nebo pozvánkou e-mailem. Připojí se z telefonu a hned vidí svůj rozvrh. Nic se neinstaluje, je to webová aplikace, kterou si jde připnout na plochu.' },
   { q: 'Funguje to na telefonu?', a: 'Ano, celá aplikace je stavěná pro telefon, tablet i počítač. Na tablet u baru je zvláštní režim s velkými tlačítky.' },
   { q: 'Máme ceny v eurech.', a: 'Měnu podniku si zvolíš a všechno (menu, uzávěrky, přehledy) počítá v ní. Host vidí ceny v měně podniku.' },
-  { q: 'Co se stane po zkušební době?', a: 'Předplatné se samo spustí, nebo ho zrušíš a zůstaneš na tarifu Zdarma s menším týmem. Data zůstávají tvoje, nic nemizí.' },
+  { q: 'Co se stane po zkušební době?', a: 'Předplatné se samo spustí, nebo ho zrušíš a zůstaneš na tarifu Zdarma s menším týmem. Data zůstávají tvoje.' },
   { q: 'Máme víc poboček.', a: 'Každá pobočka má vlastní rozvrh, sklad i uzávěrky a vedení vidí všechny pohromadě. Člověk může patřit do víc poboček a přepíná se mezi nimi.' },
   { q: 'Nahradí to pokladnu?', a: 'Ne a nechce. Managero řeší provoz kolem pokladny: lidi, sklad, receptury, uzávěrky a hosty. Tržby z pokladny Storyous se načtou samy (tarif Max), samotné účtování zůstává na pokladně.' },
   { q: 'Kolik to zabere času na začátku?', a: 'Podnik založíš za pár minut a tým se připojí kódem. Sklad a receptury můžeš doplňovat postupně, rozvrh a docházka fungují hned.' },

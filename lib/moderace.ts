@@ -1,6 +1,6 @@
 // Moderace uživatelského obsahu (Apple 1.2, Google Play UGC): nahlášení,
-// blokace uživatele, skrytí blokovaných. Čisté, bez databáze a bez importů
-// (testy: scripts/testy/k77-ucet.ts).
+// blokace uživatele, skrytí blokovaných. Čisté, bez databáze
+// (testy: scripts/testy/k77-ucet.ts). Jediný import: čistý lib/firma.ts (e-mail provozovatele).
 //
 // Kde uživatelský obsah vzniká: chat (zprávy, přílohy) a nápady týmu. Je to
 // uzavřená pracovní skupina jednoho podniku (členy přidává vedení), ne veřejná
@@ -8,6 +8,8 @@
 // smazání zprávy a pohled vedení na nahlášené. Hostovský obsah (poznámka
 // k rezervaci, hodnocení) vidí jen podnik, žádný host-host obsah není.
 // Nové nahlášení jde navíc provozovateli platformy (eskalace níž, /admin/nahlaseni).
+
+import { firma } from './firma.ts';
 
 export type DruhObsahu = 'zprava' | 'napad';
 
@@ -84,12 +86,15 @@ export const LHUTA_NAHLASENI_HODIN = 24;
 const JE_EMAIL = /^[^@\s{}<>,;]+@[^@\s{}<>,;]+\.[^@\s{}<>,;]+$/;
 
 /**
- * Kam poslat upozornění provozovateli: `MODERACE_EMAIL`, jinak e-mail podpory `FIRMA_EMAIL_PODPORY`.
- * Zástupné pole (`{{EMAIL_PODPORY}}`) ani nesmysl se nepoužije; bez adresy vrací null.
+ * Kam poslat upozornění provozovateli: `MODERACE_EMAIL`, jinak e-mail podpory provozovatele
+ * z lib/firma.ts (výchozí podpora@managero.app, přebíjí ho `FIRMA_EMAIL_PODPORY`).
+ * Dřív se četla jen proměnná `FIRMA_EMAIL_PODPORY` — od 2026-10-21 má firma.ts výchozí údaje
+ * a proměnná není povinná, takže bez ní by nahlášení z chatu i oznámení podle DSA (čl. 16)
+ * provozovateli potichu nechodila. Zástupné pole (`{{EMAIL_PODPORY}}`) ani nesmysl se nepoužije.
  */
 export function kontaktModerace(env: Record<string, string | undefined>): string | null {
-  for (const k of ['MODERACE_EMAIL', 'FIRMA_EMAIL_PODPORY']) {
-    const v = String(env[k] ?? '').trim();
+  for (const kandidat of [env.MODERACE_EMAIL, firma(env).emailPodpory]) {
+    const v = String(kandidat ?? '').trim();
     if (JE_EMAIL.test(v)) return v;
   }
   return null;

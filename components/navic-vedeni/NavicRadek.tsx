@@ -9,7 +9,7 @@ import React from 'react';
 import { odmenaText, type Navic, type StavNavic } from '@/lib/navic';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
-import { Avatar, Button, Chip, ListRow } from '../ui';
+import { Avatar, Button, Chip, ListRow, Rada } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 
 /** Tón a text chipu stavu — texty jako klíče t() (lib/navic stavNavic je nese česky). */
@@ -46,6 +46,25 @@ export function NavicRadek({ z, smiUznat, onUznat, onOdmitnout, pracuji = false,
   ].filter(Boolean).join(' · ');
   const poznamka = z.status === 'odmitnuto' && z.decisionNote ? t('Důvod: {text}', { text: z.decisionNote })
     : z.status === 'uznano' && z.decisionNote ? z.decisionNote : null;
+  const ceka = z.status === 'ceka';
+  const stavRadku = (
+    <span className="flex flex-wrap items-center justify-end gap-1.5">
+      <Chip tone={stav.tone} size="sm">{stav.text}</Chip>
+      {z.status === 'uznano' && <span className="text-[13px] font-semibold tabular-nums text-[#16181A] whitespace-nowrap">{textOdmeny(t, z, money)}</span>}
+      {ceka && z.pointsProposed != null && z.pointsProposed > 0 && <span className="t-meta whitespace-nowrap">{t('návrh +{n} b', { n: z.pointsProposed })}</span>}
+    </span>
+  );
+  const rozhodnuti = ceka && smiUznat && onUznat && onOdmitnout;
+  const tlacitka = rozhodnuti ? (
+    <>
+      {/* Jméno v přístupném názvu: v seznamu je víc stejných tlačítek za sebou. */}
+      {/* `tap-target`: malé tlačítko (36 px) dostane na telefonu dotykovou plochu 44 px. */}
+      <Button variant="primary" size="sm" icon="check" loading={pracuji} disabled={pracuji} className="tap-target"
+        aria-label={t('Uznat: {jmeno}', { jmeno: z.userName })} onClick={() => onUznat(z)}>{t('Uznat')}</Button>
+      <Button variant="danger" size="sm" disabled={pracuji} className="tap-target"
+        aria-label={t('Odmítnout: {jmeno}', { jmeno: z.userName })} onClick={() => onOdmitnout(z)}>{t('Odmítnout')}</Button>
+    </>
+  ) : null;
   const detail = (
     <>
       {bezJmena ? null : <span className="block text-[#16181A]">{z.text}</span>}
@@ -53,32 +72,21 @@ export function NavicRadek({ z, smiUznat, onUznat, onOdmitnout, pracuji = false,
       {z.photoUrl && (
         <a href={z.photoUrl} target="_blank" rel="noreferrer" className="inline-block underline underline-offset-2 tap-target-sm">{t('Fotka')}</a>
       )}
+      {/* Pár akcí ½ + ½ (P12) pod textem — na všech šířkách, jako u sporného trestu (TrestRadek): ve střední
+          kartě na monitoru (~470 px) stav + Uznat + Odmítnout v řádku smáčkly jméno i text na nulovou šířku. */}
+      {tlacitka && <span className="mt-1.5 flex [&>span]:justify-start">{stavRadku}</span>}
+      {tlacitka && <Rada vyska="s" className="mt-2 sm:max-w-[24rem]">{tlacitka}</Rada>}
     </>
   );
-  const ceka = z.status === 'ceka';
+
   return (
     <ListRow as={as}
       lead={bezJmena ? undefined : <Avatar emoji={z.userAvatar} name={z.userName} size="sm" />}
       title={bezJmena ? z.text : z.userName || t('Člen týmu')}
       meta={meta}
-      detail={bezJmena && !poznamka && !z.photoUrl ? undefined : detail}
-      right={(
-        <span className="flex flex-wrap items-center justify-end gap-1.5">
-          <Chip tone={stav.tone} size="sm">{stav.text}</Chip>
-          {z.status === 'uznano' && <span className="text-[13px] font-semibold tabular-nums text-[#16181A] whitespace-nowrap">{textOdmeny(t, z, money)}</span>}
-          {ceka && z.pointsProposed != null && z.pointsProposed > 0 && <span className="t-meta whitespace-nowrap">{t('návrh +{n} b', { n: z.pointsProposed })}</span>}
-        </span>
-      )}
-      actions={ceka && smiUznat && onUznat && onOdmitnout ? (
-        <>
-          {/* Jméno v přístupném názvu: v seznamu je víc stejných tlačítek za sebou. */}
-          {/* `tap-target`: malé tlačítko (36 px) dostane na telefonu dotykovou plochu 44 px. */}
-          <Button variant="primary" size="sm" icon="check" loading={pracuji} disabled={pracuji} className="tap-target"
-            aria-label={t('Uznat: {jmeno}', { jmeno: z.userName })} onClick={() => onUznat(z)}>{t('Uznat')}</Button>
-          <Button variant="danger" size="sm" disabled={pracuji} className="tap-target"
-            aria-label={t('Odmítnout: {jmeno}', { jmeno: z.userName })} onClick={() => onOdmitnout(z)}>{t('Odmítnout')}</Button>
-        </>
-      ) : undefined} />
+      detail={bezJmena && !poznamka && !z.photoUrl && !tlacitka ? undefined : detail}
+      // v4: na telefonu jde stav do druhého řádku na OSE TEXTU — ListRow to dělá sám.
+      right={tlacitka ? undefined : stavRadku} />
   );
 }
 

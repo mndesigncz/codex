@@ -113,7 +113,6 @@
   "Tým teď vidí, kdo má kdy směnu.": "Tím teraz vidí, kto má kedy zmenu.",
   "Tým vidí rozvrh ostatních": "Tím vidí rozvrh ostatných",
   "Uložit": "Uložiť",
-  "Upravit": "Upraviť",
   "Upravit člena": "Upraviť člena",
   "Uzávěrka": "Uzávierka",
   "Uzávěrka je vázaná na směnu.": "Uzávierka je viazaná na zmenu.",
@@ -177,5 +176,6 @@
   "bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}": "bez sadzby: {n, plural, one {# človek} few {# ľudia} other {# ľudí}}",
   "dovolená {zbyva}/{dni}": "dovolenka {zbyva}/{dni}",
   "právě běží": "práve beží",
-  "Řadit lidi": "Zoradiť ľudí"
+  "Řadit lidi": "Zoradiť ľudí",
+  "Upravit…": "Upraviť…"
 }

@@ -113,7 +113,6 @@
   "Tým teď vidí, kdo má kdy směnu.": "Das Team sieht jetzt, wer wann Schicht hat.",
   "Tým vidí rozvrh ostatních": "Team sieht den Dienstplan der anderen",
   "Uložit": "Speichern",
-  "Upravit": "Bearbeiten",
   "Upravit člena": "Mitglied bearbeiten",
   "Uzávěrka": "Kassenabschluss",
   "Uzávěrka je vázaná na směnu.": "Der Kassenabschluss ist an eine Schicht gebunden.",
@@ -177,5 +176,6 @@
   "bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}": "ohne Stundensatz: {n, plural, one {# Person} other {# Personen}}",
   "dovolená {zbyva}/{dni}": "Urlaub {zbyva}/{dni}",
   "právě běží": "läuft gerade",
-  "Řadit lidi": "Personen sortieren"
+  "Řadit lidi": "Personen sortieren",
+  "Upravit…": "Bearbeiten…"
 }

@@ -25,7 +25,7 @@ import { fmtDatum } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
 import { apiMessage, okJson } from '@/lib/api';
 import { bezSazby, cekajiciPozvanky, hodinyMinuty, roleSPocty, type ClenTymu, type Pozvanka } from '@/lib/dochazkaPrehled';
-import { Avatar, Button, Chip, Field, Input, ListRow, Modal, Stat, StatRow, Well } from '../../ui';
+import { Avatar, Button, Chip, Field, Input, ListRow, Modal, Sloupec, Stat, StatRow, Well } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { useMoney, useSymbol } from '../../CurrencyProvider';
@@ -204,47 +204,48 @@ function Pozvanky({ velikost, nahled }: WidgetProps) {
     if (!kod || nahled) return;
     try { await navigator.clipboard.writeText(kod); setZkopirovano(true); } catch { /* schránka zakázaná — kód je vidět */ }
   };
-  const tlacitko = kod && !nahled ? (
-    <Button variant="secondary" size="sm" icon={zkopirovano ? 'check' : 'copy'} onClick={kopiruj} aria-label={t('Kopírovat kód {kod}', { kod })}>
+  const tlacitko = (size: 'sm' | 'md') => kod && !nahled ? (
+    <Button variant="secondary" size={size} icon={zkopirovano ? 'check' : 'copy'} onClick={kopiruj} aria-label={t('Kopírovat kód {kod}', { kod })}>
       {zkopirovano ? t('Zkopírováno') : t('Kopírovat')}
     </Button>
   ) : null;
 
   if (velikost === 'S') {
     return (
-      <Widget nacteni={ceka ? CEKA : [tym, poz]}>
-        <div className="space-y-2.5">
-          <Stat label={t('Kód pro připojení')} value={<span className="font-mono tracking-[0.12em]">{kod ?? '—'}</span>}
-            note={cekajici.length > 0 ? t('{n, plural, one {# čekající pozvánka} few {# čekající pozvánky} other {# čekajících pozvánek}}', { n: cekajici.length }) : t('nikdo nečeká')} />
-          {tlacitko}
-        </div>
+      // v4 (V16): „Kopírovat" je akce malé karty — v patce L→R × 44, ne obsahová pilulka pod číslem.
+      <Widget nacteni={ceka ? CEKA : [tym, poz]} patka={tlacitko('md') ?? undefined}>
+        <Stat label={t('Kód pro připojení')} value={<span className="font-mono tracking-[0.12em]">{kod ?? '—'}</span>}
+          note={cekajici.length > 0 ? t('{n, plural, one {# čekající pozvánka} few {# čekající pozvánky} other {# čekajících pozvánek}}', { n: cekajici.length }) : t('nikdo nečeká')} />
       </Widget>
     );
   }
   return (
     <Widget nacteni={ceka ? CEKA : [tym, poz]} odkaz={{ popisek: t('Lidé'), pohled: 'team-settings' }}
       doplnek={cekajici.length > 0 ? <Chip tone="info" size="sm">{cekajici.length.toLocaleString('cs-CZ')}</Chip> : undefined}>
-      <Well className="flex items-center justify-between gap-3 flex-wrap">
+      <Sloupec mezera={3}>
+      {/* v4 (P2): kód vlevo, „Kopírovat" vpravo v jedné řadě (akce u toho, co kopíruje), bez zalomení pod kód. */}
+      <Well className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="t-label">{t('Kód pro připojení')}</p>
           <p className="mt-1 font-mono text-[1.75rem] leading-none font-bold tracking-[0.12em] text-[#16181A] break-all">{kod ?? '—'}</p>
         </div>
-        {tlacitko}
+        {tlacitko('sm') && <span className="flex shrink-0">{tlacitko('sm')}</span>}
       </Well>
       {cekajici.length === 0 ? (
-        <p className="t-meta mt-3">{t('Žádná pozvánka nečeká na přijetí.')}</p>
+        <p className="t-meta">{t('Žádná pozvánka nečeká na přijetí.')}</p>
       ) : (
-        <>
-          <ul className="list mt-2">
+        <Sloupec mezera={2}>
+          <ul className="list">
             {cekajici.slice(0, 4).map(p => (
               <ListRow key={p.id} title={<span className="break-all sm:break-normal">{p.email}</span>}
                 meta={[p.job_title, stari(t, p.created_at)].filter(Boolean).join(' · ')}
                 right={<Chip tone="info" size="sm">{t('Čeká')}</Chip>} />
             ))}
           </ul>
-          {cekajici.length > 4 && <p className="t-meta mt-2">{aDalsich(t, cekajici.length - 4)}</p>}
-        </>
+          {cekajici.length > 4 && <p className="t-meta">{aDalsich(t, cekajici.length - 4)}</p>}
+        </Sloupec>
       )}
+      </Sloupec>
     </Widget>
   );
 }
@@ -278,7 +279,7 @@ function Role(_: WidgetProps) {
         ))}
       </ul>
       {radky.length > 6 && <p className="t-meta mt-2">{aDalsich(t, radky.length - 6)}</p>}
-      {prazdnych > 0 && <p className="t-meta mt-2">{t('{n, plural, one {# role zatím nemá} few {# role zatím nemají} other {# rolí zatím nemá}} nikoho.', { n: prazdnych })}</p>}
+      {prazdnych > 0 && <p className="t-meta mt-1">{t('{n, plural, one {# role zatím nemá} few {# role zatím nemají} other {# rolí zatím nemá}} nikoho.', { n: prazdnych })}</p>}
     </Widget>
   );
 }
@@ -420,7 +421,7 @@ function ProfilClena({ velikost, nastaveni, nahled }: WidgetProps<{ clen?: numbe
   return (
     <Widget nacteni={ceka ? CEKA : data} titulek={e?.name ?? undefined}>
       {p && e && (
-        <div className="space-y-3">
+        <Sloupec mezera={4}>
           <div className="flex items-center gap-3 min-w-0">
             <Avatar emoji={e.avatar} size="md" />
             <div className="min-w-0 flex-1">
@@ -452,7 +453,7 @@ function ProfilClena({ velikost, nastaveni, nahled }: WidgetProps<{ clen?: numbe
               </div>
             )
           )}
-        </div>
+        </Sloupec>
       )}
     </Widget>
   );

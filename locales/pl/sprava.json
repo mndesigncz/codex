@@ -896,7 +896,6 @@
   "Smazat záznam?": "Usunąć wpis?",
   "Smazat {n, plural, one {# položka} few {# položky} other {# položek}}?": "Usunąć {n, plural, one {# pozycję} few {# pozycje} many {# pozycji} other {# pozycji}}?",
   "Smazat {nazev}": "Usuń {nazev}",
-  "Smazat úkol {nazev}": "Usuń zadanie {nazev}",
   "Smazat úkol?": "Usunąć zadanie?",
   "Smazat účtenku {dodavatel}": "Usuń paragon {dodavatel}",
   "Smazat účtenku?": "Usunąć paragon?",
@@ -1869,5 +1868,8 @@
   "Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop (když je zapnutý) začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Automatyczne punkty procedur, zadań i zamknięć ustawią się według sposobu powyżej, a limit (gdy włączony) zacznie obowiązywać też dla minionych dni — jakby tak było od zawsze. Ręczne zmiany kierownictwa zostaną. Przed zapisaniem zobaczysz skutek.",
   "I starší ruční hodnocení směn považovat za nahrazující": "Traktuj też starsze ręczne oceny zmian jako zastępujące",
   "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Oceny zmian zapisane przed tą wersją doliczały się do automatycznych punktów. Zaznaczone = one też zastąpią automatyczne punkty swojego dnia (można cofnąć).",
-  "Další možnosti": "Więcej opcji"
+  "Další možnosti": "Więcej opcji",
+  "Upravit nebo smazat záznam: {jmeno}": "Edytuj lub usuń wpis: {jmeno}",
+  "Upravit čas…": "Edytuj czas…",
+  "Smazat záznam…": "Usuń wpis…"
 }

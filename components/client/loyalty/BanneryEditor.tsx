@@ -191,12 +191,13 @@ export default function BanneryEditor({ toast, upload, accent }: { toast: (m: st
 
   return (
     <Card className="space-y-4" aria-labelledby="h-bannery">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+      {/* v4 (P2): „Nový banner" vpravo v řádku s titulem; na telefonu pod titulem přes celou šířku. */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
           <h2 id="h-bannery" className="t-card">Bannery</h2>
           <p className="t-meta mt-0.5">Akce a oznámení nahoře na stránce podniku. Host uvidí nejvýš {MAX_AKTIVNICH} aktivních, v zadaném pořadí, a jen ty, které jsou pro něj (podle cílení).</p>
         </div>
-        <Button type="button" size="sm" variant="secondary" icon="plus" className="whitespace-nowrap" disabled={aktivni.length >= MAX_BANNERU || !!edit}
+        <Button type="button" size="sm" variant="secondary" icon="plus" className="whitespace-nowrap w-full sm:w-auto" disabled={aktivni.length >= MAX_BANNERU || !!edit}
           onClick={() => setEdit({ id: null, d: { ...PRAZDNY } })}>Nový banner</Button>
       </div>
 

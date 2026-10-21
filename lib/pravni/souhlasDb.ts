@@ -39,3 +39,13 @@ export async function nactiSouhlas(userId: number): Promise<{ terms_version: str
     return null;
   }
 }
+
+/** Vlastní člověk aspoň jeden podnik? (Brána nové verze mu ukáže i obchodní podmínky a DPA.) Chyba = ne. */
+export async function jeVlastnikPodniku(userId: number): Promise<boolean> {
+  try {
+    const r = await sql`SELECT 1 FROM teams WHERE owner_id = ${userId} LIMIT 1`;
+    return r.length > 0;
+  } catch {
+    return false;
+  }
+}

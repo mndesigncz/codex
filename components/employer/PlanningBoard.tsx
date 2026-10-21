@@ -264,7 +264,8 @@ export default function PlanningBoard() {
               className={`well min-w-0 p-3 flex flex-col gap-3 transition-shadow ${col.id === sloupecTelefon ? '' : 'max-sm:hidden'} ${dragOverCol === col.id ? 'ring-2 ring-black/15' : ''}`}
             >
               {/* Na telefonu název i počet nesou záložky nad sloupcem — nadpis zůstává jen pro odečítač. */}
-              <div className="flex items-center justify-between gap-2 px-1 max-sm:sr-only">
+              {/* Hlavička na téže levé ose jako karty pod ní (P5; dřív px-1 → o 4 px dovnitř). */}
+              <div className="flex items-center justify-between gap-2 max-sm:sr-only">
                 <h3 id={`${idForm}-${col.id}`} className="t-card flex items-center gap-2 min-w-0">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot}`} aria-hidden />
                   <span className="truncate">{nazvySloupcu[col.id]}</span>

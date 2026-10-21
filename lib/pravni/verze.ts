@@ -12,12 +12,15 @@
 //    přihlášenému okno se souhlasem (POST /api/account/souhlas).
 //
 // Verze je datum „RRRR-MM-DD" — porovnává se jako text. Při věcné změně textu v
-// lib/pravni/texty.ts zvyš verzi (a datum AKTUALIZACE tam).
+// lib/pravni/dokumenty zvyš verzi (a UCINNOST v lib/pravni/lhuty.ts).
 //
 // Čistý modul bez databáze (testy: scripts/testy/k88-pravni-souhlas.ts).
 
-export const VERZE_PODMINEK = '2026-10-14';
-export const VERZE_ZASAD = '2026-10-14';
+// 2026-10-21: provozovatel Martin Nemeškal (IČO 17944953), nové obchodní podmínky pro podniky,
+// zpracovatelská smlouva, seznam subzpracovatelů, přepracované podmínky užívání a zásady.
+// U vlastníka podniku pokrývá terms_version i obchodní podmínky a zpracovatelskou smlouvu.
+export const VERZE_PODMINEK = '2026-10-21';
+export const VERZE_ZASAD = '2026-10-21';
 
 /** Nejmladší věk hosta, který si smí sám založit účet (souhlas se zpracováním v ČR od 15 let). */
 export const MIN_VEK_HOSTA = 15;
@@ -50,9 +53,9 @@ export const HLASKA_BEZ_SOUHLASU = 'Bez souhlasu s podmínkami účet založit n
 export const HLASKA_BEZ_VEKU = 'Účet hosta si můžeš založit od 15 let.';
 
 /** Kam vedou odkazy na podmínky a zásady: česky české stránky, ostatní jazyky anglické. */
-export function odkazyPravni(jazyk: string): { podminky: string; soukromi: string } {
+export function odkazyPravni(jazyk: string): { podminky: string; soukromi: string; obchodniPodminky: string; zpracovatelskaSmlouva: string } {
   const p = jazyk === 'cs' ? '' : '/en';
-  return { podminky: `${p}/podminky`, soukromi: `${p}/soukromi` };
+  return { podminky: `${p}/podminky`, soukromi: `${p}/soukromi`, obchodniPodminky: `${p}/obchodni-podminky`, zpracovatelskaSmlouva: `${p}/zpracovatelska-smlouva` };
 }
 
 /** Klíč v sessionStorage: v tomhle prohlížeči a relaci je souhlas ověřený (brána se znovu neptá serveru). */

@@ -75,7 +75,8 @@ export default function ToGoMode({ user, onExit, onOpenView, dok }: {
         <PodnikSwitcher compact jenPrepinani onOverview={() => onOpenView('org')} />
         <div className="flex-1 min-w-0" />
         <NotificationBell />
-        <Button variant="secondary" size="sm" icon="swap" onClick={onExit} className="shrink-0 ml-1">{t('Administrace')}</Button>
+        {/* Pilulka vedle kruhů v liště má jejich výšku 40 (dřív 36 vedle zvonku 40). */}
+        <Button variant="secondary" size="sm" icon="swap" onClick={onExit} className="shrink-0 ml-1 !h-10 !px-4">{t('Administrace')}</Button>
       </header>
       <div className="max-w-lg mx-auto w-full">
         <PlochaWidgetu stranka="vedeni.togo" hlavicka={{ title, subtitle: `TO GO · ${subtitle}` }} />

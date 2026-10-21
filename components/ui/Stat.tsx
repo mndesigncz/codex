@@ -21,6 +21,14 @@ const STUPNE = ['1', '2'] as const;
 function srovnejCisla(obal: HTMLElement) {
   const cisla = Array.from(obal.querySelectorAll<HTMLElement>('.stat-hodnota'));
   obal.removeAttribute('data-tesne');
+  // Štítky v řadě (tři sloupce na telefonu): když se jeden zalomí na dva řádky, dostanou všechny
+  // jeho výšku — čísla zůstanou na jedné y (P14), místo aby jedno sedělo o řádek níž.
+  const stitky = Array.from(obal.querySelectorAll<HTMLElement>('.stat-stitek'));
+  if (stitky.length > 1) {
+    obal.style.removeProperty('--stitek-v');
+    const vysky = stitky.map(s => s.getBoundingClientRect().height);
+    if (Math.max(...vysky) - Math.min(...vysky) > 2) obal.style.setProperty('--stitek-v', `${Math.max(...vysky)}px`);
+  }
   for (const stupen of STUPNE) {
     // Čtení scrollWidth po změně atributu vynutí nové rozvržení — měří se už zmenšené písmo.
     if (!cisla.some(c => c.scrollWidth > c.clientWidth + 1)) return;
@@ -62,42 +70,47 @@ export function Stat({ label, value, unit, note, icon, tone = 'muted', className
   return (
     <div ref={ref} className={`min-w-0 ${className}`}>
       <div className="flex items-start justify-between gap-2">
-        <p className="t-label truncate">{label}</p>
+        <p className="stat-stitek t-label">{label}</p>
         {icon && <span className={`chip chip-${tone} !rounded-full !px-0 h-8 w-8 justify-center shrink-0`}><Icon name={icon} size={15} /></span>}
       </div>
-      <p className="stat-hodnota mt-1.5 leading-none font-bold tracking-tight tabular-nums text-[#16181A]">
+      {/* v4 (V3): štítek → 4 → číslo → 4 → meta. */}
+      <p className="stat-hodnota mt-1 leading-none font-bold tracking-tight tabular-nums text-[#16181A]">
         {value}{unit && <span className="stat-jednotka ml-1 font-medium text-black/45">{unit}</span>}
       </p>
-      {note && <p className="mt-1.5 text-[13px] text-black/50 truncate">{note}</p>}
+      {note && <p className="mt-1 text-[13px] text-black/50 truncate">{note}</p>}
     </div>
   );
 }
 
 /**
- * Řada statistik oddělených linkou — bez karet v kartě. Patří do jedné karty
+ * Řada statistik — bez karet v kartě. Patří do jedné karty
  * (`<Card><StatRow>…</StatRow></Card>`); víc čísel vedle sebe, ne dlaždice
  * na každé číslo.
  *
- * Na telefonu nejvýš dva sloupce a mezi řadami vodorovná linka, od `sm`
- * jedna řada se svislými linkami. Dřív byla řada vždycky jedna
- * (`grid-flow-col`), takže šest čísel na 390 px dostalo po šedesáti pixelech
- * a zbyla z nich jen kolečka ikon (superadmin → Podniky). Lichý poslední
- * údaj se na telefonu roztáhne přes oba sloupce, ať linka nad ním nekončí
- * v půlce karty.
+ * Na telefonu nejvýš dva sloupce, od `sm` jedna řada. Dřív byla řada vždycky
+ * jedna (`grid-flow-col`), takže šest čísel na 390 px dostalo po šedesáti
+ * pixelech a zbyla z nich jen kolečka ikon (superadmin → Podniky).
+ *
+ * v4 (V3, audit V10): rovné sloupce `repeat(n, 1fr)` s mezerou 16, první sloupec
+ * začíná na L karty (pod ikonou titulku). Dřív záporný okraj −8 a odsazení buněk
+ * 16 posouvaly čísla o 8 px proti hlavičce a svislé linky dělily řadu na kostky.
  *
  * `data-statrow`: čísla v řadě se při nedostatku místa zmenšují společně (viz Stat).
  */
 export function StatRow({ children, className = '', podleKarty = false }: { children: React.ReactNode; className?: string; podleKarty?: boolean }) {
   // Widget bývá na tabletu a počítači jen v půlce řádku: okno je široké, ale karta ne, a tři čísla vedle sebe
   // („12 400 Kč  850 Kč") se pak dotýkala. `podleKarty` skládá sloupce podle šířky karty, ne okna (container query).
-  if (podleKarty) return <div data-statrow className={`statrow-karta ${className}`}><div className="statrow-karta-v">{children}</div></div>;
+  // v4 (DESIGN „Mřížka nesmí nechat osiřelou buňku"): TŘI čísla jsou tři sloupce i na telefonu —
+  // ve dvou sloupcích zůstalo třetí samo vlevo pod prvním („Ve skladu 16", „Průměr hodnocení 4,5").
+  // Co se do třetiny nevejde, zmenší Stat o stupeň (data-tesne), dlouhý štítek se zalomí a ostatní
+  // štítky v řadě drží jeho výšku (--stitek-v).
+  const tri = React.Children.toArray(children).length === 3;
+  if (podleKarty) return <div data-statrow className={`statrow-karta ${className}`}><div className={`statrow-karta-v ${tri ? 'statrow-tri' : ''}`}>{children}</div></div>;
   return (
     <div data-statrow className={[
-      'grid -mx-2 [&>*]:px-4',
-      'max-sm:grid-cols-2 max-sm:gap-y-4',
-      'max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(n+3)]:border-[var(--surface-line)] max-sm:[&>*:nth-child(n+3)]:pt-4',
-      'max-sm:[&>*:last-child:nth-child(odd)]:col-span-2',
-      'sm:grid-flow-col sm:auto-cols-fr sm:divide-x sm:divide-[var(--surface-line)]',
+      'grid gap-x-4 [&>*]:min-w-0',
+      tri ? 'max-sm:grid-cols-3 max-sm:gap-x-3' : 'max-sm:grid-cols-2 max-sm:gap-y-4',
+      'sm:grid-flow-col sm:auto-cols-fr',
       className,
     ].join(' ')}>{children}</div>
   );

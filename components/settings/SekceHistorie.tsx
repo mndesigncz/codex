@@ -90,7 +90,7 @@ export default function SekceHistorie() {
     : t('{n, plural, one {Celkem # záznam} few {Celkem # záznamy} other {Celkem # záznamů}}.', { n: vse.length });
 
   return (
-    <section className="card p-6" aria-labelledby="nast-historie-t" data-historie>
+    <section className="card p-5" aria-labelledby="nast-historie-t" data-historie>
       <h2 id="nast-historie-t" className="t-card">{t('Historie změn')}</h2>
       <p className="t-meta mt-1 text-pretty">
         {t('Důležité zásahy v týmu — mazání, nastavení, odměny.')}
@@ -139,7 +139,7 @@ export default function SekceHistorie() {
           )}
           {chybaStarsich && <p role="alert" className="note note-danger text-sm">{chybaStarsich}</p>}
           {nextBefore != null && (
-            <Button variant="secondary" block icon="refresh" loading={nacitamStarsi} onClick={nactiStarsi}>{t('Načíst starší')}</Button>
+            <Button variant="secondary" icon="refresh" className="w-full" loading={nacitamStarsi} onClick={nactiStarsi}>{t('Načíst starší')}</Button>
           )}
           {filtruje && vysledek.length > 0 && (
             <p className="t-meta tabular-nums">{t('{n} z {celkem} načtených záznamů odpovídá filtru.', { n: vysledek.length, celkem: vse.length })}</p>

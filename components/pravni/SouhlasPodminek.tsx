@@ -1,7 +1,7 @@
 'use client';
 
 // Zaškrtávátko souhlasu s podmínkami (click-wrap, spuštění, balík P) — jedno pro registraci
-// podniku, připojení zaměstnance (kód i pozvánka), registraci hosta a bránu nové verze.
+// podniku (`podnik`: B2B prohlášení + obchodní podmínky a zpracovatelská smlouva, 2026-10-21), připojení zaměstnance (kód i pozvánka), registraci hosta a bránu nové verze.
 //
 // Dřív stála pod tlačítkem pasivní věta „Založením účtu souhlasíš…" a server souhlas
 // nevyžadoval. Teď je souhlas výslovný: bez zaškrtnutí formulář neodejde (volající ukáže
@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { MIN_VEK_HOSTA, odkazyPravni } from '@/lib/pravni/verze';
 
-export default function SouhlasPodminek({ id, checked, onChange, chyba, vek, className = '' }: {
+export default function SouhlasPodminek({ id, checked, onChange, chyba, vek, podnik = false, className = '' }: {
   id: string;
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -22,6 +22,11 @@ export default function SouhlasPodminek({ id, checked, onChange, chyba, vek, cla
   chyba?: string | null;
   /** Host: druhé zaškrtávátko „Je mi aspoň 15 let". */
   vek?: { checked: boolean; onChange: (v: boolean) => void };
+  /**
+   * Podnik (registrace podniku, vlastník v bráně nové verze): B2B prohlášení „jednám jako podnikatel“
+   * a souhlas s obchodními podmínkami a zpracovatelskou smlouvou (vyloučí spotřebitelský režim).
+   */
+  podnik?: boolean;
   className?: string;
 }) {
   const t = useT('spolecne');
@@ -34,10 +39,14 @@ export default function SouhlasPodminek({ id, checked, onChange, chyba, vek, cla
         <input id={id} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
           aria-invalid={chyba ? true : undefined} aria-describedby={chyba ? idChyby : undefined}
           className="mt-0.5 h-5 w-5 shrink-0 accent-[#16181A]" />
-        <span className="text-pretty">{t('Souhlasím s podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.')}</span>
+        <span className="text-pretty">{podnik
+          ? t('Jednám jako podnikatel v rámci své podnikatelské činnosti, souhlasím s obchodními podmínkami, zpracovatelskou smlouvou a podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.')
+          : t('Souhlasím s podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.')}</span>
       </label>
       {/* Bez oddělovače: v úzké kartě se odkazy zalomí pod sebe a tečka by visela na konci řádku. */}
       <p className="flex flex-wrap items-center gap-x-4 pl-8 text-xs text-black/55">
+        {podnik && <Link href={odkazy.obchodniPodminky} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center font-medium underline underline-offset-2">{t('Obchodní podmínky')}</Link>}
+        {podnik && <Link href={odkazy.zpracovatelskaSmlouva} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center font-medium underline underline-offset-2">{t('Zpracovatelská smlouva')}</Link>}
         <Link href={odkazy.podminky} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center font-medium underline underline-offset-2">{t('Podmínky užívání')}</Link>
         <Link href={odkazy.soukromi} target="_blank" rel="noopener noreferrer" className="tap-target-sm inline-flex items-center font-medium underline underline-offset-2">{t('Zásady ochrany osobních údajů')}</Link>
       </p>

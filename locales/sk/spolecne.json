@@ -338,7 +338,6 @@
   "Bez souhlasu s podmínkami účet založit nejde.": "Bez súhlasu s podmienkami sa účet založiť nedá.",
   "Aktualizovali jsme podmínky": "Aktualizovali sme podmienky",
   "Platí od {datum}. Než budeš pokračovat, potvrď je prosím.": "Platia od {datum}. Kým budeš pokračovať, potvrď ich, prosím.",
-  "Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.": "Zmeny sa týkajú toho, aké údaje aplikácia spracúva a ako s nimi zaobchádza. Celé znenie nájdeš v odkazoch nižšie.",
   "Souhlasím a pokračovat": "Súhlasím a pokračovať",
   "Souhlas se nepodařilo uložit. Zkus to znovu.": "Súhlas sa nepodarilo uložiť. Skús to znova.",
   "E-mail se nepodařilo potvrdit.": "E-mail sa nepodarilo potvrdiť.",
@@ -363,5 +362,9 @@
   "Zámek se nezapnul — ověření Face ID nebo otiskem neproběhlo.": "Zámok sa nezapol — overenie Face ID alebo odtlačkom neprebehlo.",
   "Zamykat aplikaci Face ID / otiskem": "Zamykať aplikáciu Face ID / odtlačkom",
   "Po návratu do aplikace se nejdřív ověříš. Platí jen na tomhle telefonu.": "Po návrate do aplikácie sa najprv overíš. Platí len na tomto telefóne.",
-  "Zámek aplikace": "Zámok aplikácie"
+  "Zámek aplikace": "Zámok aplikácie",
+  "Jednám jako podnikatel v rámci své podnikatelské činnosti, souhlasím s obchodními podmínkami, zpracovatelskou smlouvou a podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.": "Konám ako podnikateľ v rámci svojej podnikateľskej činnosti, súhlasím s obchodnými podmienkami, zmluvou o spracúvaní osobných údajov a podmienkami používania a beriem na vedomie zásady ochrany osobných údajov.",
+  "Obchodní podmínky": "Obchodné podmienky",
+  "Zpracovatelská smlouva": "Zmluva o spracúvaní osobných údajov",
+  "Doplnili jsme obchodní podmínky pro podniky, zpracovatelskou smlouvu a seznam subzpracovatelů a zpřesnili podmínky užívání a zásady ochrany osobních údajů. Celé znění najdeš v odkazech níž.": "Doplnili sme obchodné podmienky pre podniky, zmluvu o spracúvaní osobných údajov a zoznam subdodávateľov a spresnili podmienky používania a zásady ochrany osobných údajov. Celé znenie nájdeš v odkazoch nižšie."
 }

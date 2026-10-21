@@ -3,8 +3,8 @@
   "Až 3": "Do 3",
   "CSV exporty": "Eksporty CSV",
   "CSV exporty a měsíční přehled": "Eksporty CSV i miesięczny przegląd",
-  "Ceny bez DPH, fakturu pošle Stripe.": "Ceny bez VAT, fakturę wyśle Stripe.",
-  "Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.": "Ceny bez VAT. Pełną fakturę wystawia Stripe, znajdziesz ją w portalu.",
+  "Ceny jsou konečné (neplátce DPH), předplatné se obnovuje automaticky, fakturu pošle Stripe.": "Ceny są ostateczne (nie jest płatnikiem VAT), subskrypcja odnawia się automatycznie, fakturę wyśle Stripe.",
+  "Ceny jsou konečné, provozovatel není plátcem DPH. Fakturu vystaví Stripe a najdete ji v portálu.": "Ceny są ostateczne, operator nie jest płatnikiem VAT. Fakturę wystawi Stripe, znajdziesz ją w portalu.",
   "Co je v jakém plánu": "Co zawiera który plan",
   "Co váš podnik v Managero aktuálně má.": "Co Twój lokal ma obecnie w Managero.",
   "Doporučeno": "Polecany",
@@ -83,7 +83,6 @@
   "měsíčně": "miesięcznie",
   "ne": "nie",
   "ročně": "rocznie",
-  "ušetříte {castka}": "oszczędzasz {castka}",
   "váš plán": "Twój plan",
   "za podnik, kdykoli zrušit": "za lokal, rezygnacja w każdej chwili",
   "za {n, plural, one {# den} few {# dny} other {# dní}}": "za {n, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}}",
@@ -122,7 +121,7 @@
   "Ušetříš {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "Oszczędzasz {castka} w porównaniu z płatnością miesięczną, co daje {mesicne} miesięcznie.",
   "Čím se tarify liší": "Czym różnią się plany",
   "Celé srovnání, {n, plural, one {# řádek} few {# řádky} other {# řádků}}": "Pełne porównanie, {n, plural, one {# wiersz} few {# wiersze} many {# wierszy} other {# wiersza}}",
-  "Ceny jsou bez DPH. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.": "Ceny nie zawierają VAT. Poleć Managero innemu lokalowi, a dostaniesz miesiąc za darmo, maksymalnie trzy w miesiącu.",
+  "Ceny jsou konečné, provozovatel není plátcem DPH. Předplatné se automaticky obnovuje, dokud ho nezrušíš. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.": "Ceny są ostateczne, operator nie jest płatnikiem VAT. Subskrypcja odnawia się automatycznie, dopóki jej nie anulujesz. Poleć Managero innej firmie, a dostaniesz miesiąc za darmo, maksymalnie trzy w miesiącu.",
   "Lidé v týmu": "Osoby w zespole",
   "Sdílené odkazy": "Udostępnione linki",
   "Podniky v organizaci": "Lokale w organizacji",
@@ -130,5 +129,8 @@
   "Plno": "Pełne",
   "bez limitu": "bez limitu",
   "Zbývá {n, plural, one {# místo} few {# místa} other {# míst}}": "{n, plural, one {Zostało # miejsce} few {Zostały # miejsca} many {Zostało # miejsc} other {Zostało # miejsca}}",
-  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {Został # link} few {Zostały # linki} many {Zostało # linków} other {Zostało # linku}}"
+  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {Został # link} few {Zostały # linki} many {Zostało # linków} other {Zostało # linku}}",
+  "Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "Oszczędzasz {castka} w porównaniu z płatnością miesięczną, co daje {mesicne} miesięcznie.",
+  "Obchodní podmínky": "Warunki handlowe",
+  "Zrušení předplatného a vrácení peněz": "Anulowanie subskrypcji i zwroty"
 }

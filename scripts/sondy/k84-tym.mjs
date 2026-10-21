@@ -143,16 +143,18 @@ const ROZVRH = '/employer/overview?view=shifts';
   tvrdi('T1: součet nad seznamem „Celkem 46 h 58 min · 6 44x Kč · bez sazby: 1 člověk"', /Celkem 46 h 58 min/.test(soucet) && /6\s?44\d/.test(soucet) && /bez sazby: 1 člověk/.test(soucet), soucet);
   tvrdi('T1: /api/attendance se ptá na dny od 1. do 20. (days=20)', (stav.dochazka ?? []).some(s => s === '?days=20'), JSON.stringify(stav.dochazka));
   // Řazení: Hodiny → Eva první; Výdělek → Eva, Jakub, Tereza, pak bez výdělku.
-  const razeni = nastroj.getByRole('tablist', { name: 'Řadit lidi' });
-  tvrdi('T1: řazení Jméno / Hodiny / Výdělek', /Jméno/.test(await text(razeni)) && /Hodiny/.test(await text(razeni)) && /Výdělek/.test(await text(razeni)), await text(razeni));
-  await razeni.getByRole('tab', { name: 'Hodiny' }).click();
+  // v4 (P10): řazení je výběr „Řadit lidi" na R toolbaru vedle hledání (dřív segment jako třetí řada).
+  const razeni = nastroj.getByRole('combobox', { name: 'Řadit lidi' });
+  const volbyRazeni = (await razeni.locator('option').allTextContents()).join(' / ');
+  tvrdi('T1: řazení Jméno / Hodiny / Výdělek', /Jméno/.test(volbyRazeni) && /Hodiny/.test(volbyRazeni) && /Výdělek/.test(volbyRazeni), volbyRazeni);
+  await razeni.selectOption('hodiny');
   await p.waitForTimeout(300);
   // Obecná fixtura má dva členy s id 17 (React je se stejným klíčem i zdvojí) — pořadí se bere bez opakování.
   // Kdo nic neodpíchl, je dole v abecedě: Adam (23), Klára (24), Lukáš (21), Martin (15), Nikola (22), Petra (20).
   const jmena = async () => [...new Set(await nastroj.locator('[data-tym-hodiny]').evaluateAll(els => els.map(e => e.getAttribute('data-tym-hodiny'))))];
   const poHodinach = await jmena();
   tvrdi('T1: podle hodin Eva, Jakub, Ondřej (4 h), Tereza (2 h), pak bez záznamu v abecedě', poHodinach.join(',') === '16,17,19,18,23,24,21,15,22,20', poHodinach.join(','));
-  await razeni.getByRole('tab', { name: 'Výdělek' }).click();
+  await razeni.selectOption('vydelek');
   await p.waitForTimeout(300);
   const poVydelku = await jmena();
   tvrdi('T1: podle výdělku Eva, Jakub, Tereza; bez sazby (Ondřej) až za nimi', poVydelku.slice(0, 4).join(',') === '16,17,18,19', poVydelku.join(','));
@@ -161,7 +163,9 @@ const ROZVRH = '/employer/overview?view=shifts';
   await p.screenshot({ path: OUT + 'k84-tym-tym-1280.png', fullPage: false });
   // Nárok na dovolenou (kolo 8): v řádku „dovolená 6/20", v okně Upravit pole Dovolená na rok → PUT /api/timeoff.
   tvrdi('T1: u Evy je „dovolená 6/20"', /dovolená 6\/20/.test(await text(nastroj.locator('[data-tym-dovolena="16"]'))));
-  await nastroj.getByRole('button', { name: 'Upravit: Eva Testová' }).click();
+  // v4 (V4): jedna akce řádku „···" na R; „Upravit…" je v ní první.
+  await nastroj.getByRole('button', { name: 'Další akce: Eva Testová' }).click();
+  await p.getByRole('menuitem', { name: 'Upravit…' }).click();
   const okno = p.getByRole('dialog');
   await okno.waitFor({ timeout: 5000 });
   const pole = okno.locator('#clen-dovolena');

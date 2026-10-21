@@ -28,7 +28,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
-import { Chip, ListRow, Stat } from '../../ui';
+import { Chip, ListRow, Sloupec, Stat } from '../../ui';
 import { Icon } from '../../Icons';
 import TaskWeekBoard from '../../TaskWeekBoard';
 import { UkolyZaBodyWidget } from '../../navic/UkolyZaBodyWidget';
@@ -263,7 +263,8 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
         <Stat label={t('Zbývá')} value={cislo(zbyva)}
           note={poTerminuN > 0 ? <span className="text-bad-ink">{t('{n} po termínu', { n: cislo(poTerminuN) })}</span> : t('na dnešek')} />
       ) : (
-        <>
+        <Sloupec mezera={2}>
+          {/* v4 (V4): štítky (Po termínu, Před uzávěrkou) na ose textu pod titulkem, ne pod zaškrtávátkem. */}
           <ul className="list">
             {zobrazene.map(t => {
               const hotovo = t.status === 'done';
@@ -299,10 +300,10 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
               );
             })}
           </ul>
-          {!L && radky.length > 5 && <p className="t-meta mt-2">{aDalsich(radky.length - 5, t)}</p>}
-          {o.chyba && <p className="note note-danger mt-3" role="alert">{o.chyba}</p>}
+          {!L && radky.length > 5 && <p className="t-meta">{aDalsich(radky.length - 5, t)}</p>}
+          {o.chyba && <p className="note note-danger" role="alert">{o.chyba}</p>}
           {o.okno}
-        </>
+        </Sloupec>
       )}
     </Widget>
   );
@@ -437,6 +438,9 @@ function Tyden({ nahled }: WidgetProps) {
   const podle = (t: { id: number }) => ukoly.find(x => x.id === t.id);
   return (
     <Widget nacteni={ja.stav ?? data} kostra="graf" odkaz={{ popisek: t('Úkoly'), pohled: 'tasks' }}>
+      {/* v4 (P5): ve widgetu sedí název dne na téže levé ose jako karty úkolů pod ním (tabule mu dává
+          px-1 navíc — ve widgetu 4 px vedle osy). Tabule patří jiné oblasti, proto obal. */}
+      <div className="[&_.well>div.px-1]:px-0 [&_.well_p.px-1]:px-0">
       <TaskWeekBoard tasks={ukoly} weekStart={weekStart}
         // Budoucí úkol se odškrtnout nedá — v nástroji by se ptal „Tohle není dnešní úkol",
         // widget okno nemá, tak ho radši nepustí (splní se v den termínu nebo v Úkolech).
@@ -445,6 +449,7 @@ function Tyden({ nahled }: WidgetProps) {
         labelFor={t => { const u = podle(t); return !u ? '' : u.assignedTo == null ? proKohokoli : celyTym && u.assignedTo !== ja.id ? (u.assigneeName ?? '') : ''; }}
         onMove={nahled ? undefined : (t, datum) => { const u = podle(t); if (u) void presun(u, datum); }}
         canMove={t => { const u = podle(t); return !!u && (u.createdBy === ja.id || presunCizi); }} />
+      </div>
       {(o.chyba || chybaPresunu) && <p className="note note-danger mt-3" role="alert">{o.chyba ?? chybaPresunu}</p>}
       {o.okno}
     </Widget>

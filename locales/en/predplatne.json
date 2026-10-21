@@ -3,8 +3,8 @@
   "Až 3": "Up to 3",
   "CSV exporty": "CSV exports",
   "CSV exporty a měsíční přehled": "CSV exports and monthly overview",
-  "Ceny bez DPH, fakturu pošle Stripe.": "Prices exclude VAT; Stripe sends the invoice.",
-  "Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.": "Prices exclude VAT. Stripe issues a full invoice, which you'll find in the portal.",
+  "Ceny jsou konečné (neplátce DPH), předplatné se obnovuje automaticky, fakturu pošle Stripe.": "Prices are final (not a VAT payer), the subscription renews automatically, Stripe sends the invoice.",
+  "Ceny jsou konečné, provozovatel není plátcem DPH. Fakturu vystaví Stripe a najdete ji v portálu.": "Prices are final; the operator is not a VAT payer. Stripe issues the invoice and you will find it in the portal.",
   "Co je v jakém plánu": "What's in each plan",
   "Co váš podnik v Managero aktuálně má.": "What your business currently has in Managero.",
   "Doporučeno": "Recommended",
@@ -83,7 +83,6 @@
   "měsíčně": "per month",
   "ne": "no",
   "ročně": "per year",
-  "ušetříte {castka}": "you save {castka}",
   "váš plán": "your plan",
   "za podnik, kdykoli zrušit": "per business, cancel any time",
   "za {n, plural, one {# den} few {# dny} other {# dní}}": "in {n, plural, one {# day} other {# days}}",
@@ -122,7 +121,7 @@
   "Ušetříš {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "You save {castka} compared to paying monthly, which works out at {mesicne} a month.",
   "Čím se tarify liší": "How the plans differ",
   "Celé srovnání, {n, plural, one {# řádek} few {# řádky} other {# řádků}}": "Full comparison, {n, plural, one {# row} other {# rows}}",
-  "Ceny jsou bez DPH. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.": "Prices exclude VAT. Recommend Managero to another business and get a month free, up to three per month.",
+  "Ceny jsou konečné, provozovatel není plátcem DPH. Předplatné se automaticky obnovuje, dokud ho nezrušíš. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.": "Prices are final; the operator is not a VAT payer. The subscription renews automatically until you cancel it. Recommend Managero to another business and get a month free, up to three a month.",
   "Lidé v týmu": "Team members",
   "Sdílené odkazy": "Shared links",
   "Podniky v organizaci": "Businesses in the organisation",
@@ -130,5 +129,8 @@
   "Plno": "Full",
   "bez limitu": "no limit",
   "Zbývá {n, plural, one {# místo} few {# místa} other {# míst}}": "{n, plural, one {# place} other {# places}} left",
-  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {# link} other {# links}} left"
+  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {# link} other {# links}} left",
+  "Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "You save {castka} compared to paying monthly, which works out at {mesicne} a month.",
+  "Obchodní podmínky": "Business terms",
+  "Zrušení předplatného a vrácení peněz": "Cancellation and refunds"
 }

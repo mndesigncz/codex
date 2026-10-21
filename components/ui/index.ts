@@ -36,3 +36,9 @@ export { MonthNav, posunMesic, nazevMesice } from './MonthNav';
 export { BarSpark, type BarSparkPoint } from './BarSpark';
 export { CasovyGraf, hezkyStrop, type CasovyGrafProps } from './CasovyGraf';
 export { ObdobiLista } from './ObdobiLista';
+// Skladba v4 (spec-skladba): řady L→R s jednou výškou, skupiny s mezerou ze škály,
+// stavová karta (V8) a „···" stránky v liště (V0).
+export { Rada, Sloupec, type VyskaRady } from './Rada';
+export { VolbaRadek, VolbaDil, VolbyRadky } from './Volby';
+export { StavovaKarta, StavovyKruh } from './StavovaKarta';
+export { MenuListy, MenuStrankyProvider, usePrevzitMenuListy } from './MenuStranky';

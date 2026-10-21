@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { LogoMark } from '@/components/Icons';
-import PravniOdkazy from '@/components/pravni/PravniOdkazy';
-import { chybejiciUdaje, firma, jeEmail } from '@/lib/firma';
+import PravniPaticka from '@/components/pravni/PravniPaticka';
+import { firma, jeEmail, telOdkaz } from '@/lib/firma';
 import Formular from './Formular';
 
 // Oznámení nezákonného obsahu (DSA čl. 16) — veřejná stránka, funguje i bez účtu a v obou
-// aplikacích. Oznámení jde provozovateli platformy (app/api/nahlasit). Texty schvaluje právník.
+// aplikacích. Oznámení jde provozovateli platformy (app/api/nahlasit). Pravidla moderace: /podminky#moderace.
 export const metadata: Metadata = {
   title: 'Nahlásit nezákonný obsah · Managero',
   description: 'Oznámení nezákonného obsahu v aplikacích Managero a Managero client podle Aktu o digitálních službách.',
@@ -15,7 +15,6 @@ export const metadata: Metadata = {
 
 export default function Stranka() {
   const f = firma();
-  const chybi = chybejiciUdaje(f);
   return (
     <main className="min-h-[100dvh] px-4 sm:px-6 py-6 sm:py-10 pb-[max(env(safe-area-inset-bottom),24px)]" lang="cs">
       <div className="mx-auto w-full max-w-2xl">
@@ -25,10 +24,6 @@ export default function Stranka() {
             <span className="font-bold tracking-tight">Managero</span>
           </Link>
         </header>
-
-        {chybi.length > 0 && (
-          <p role="note" className="note note-wait mb-6">Návrh: údaje provozovatele zatím nejsou vyplněné ({chybi.join(', ')}). Text musí před zveřejněním schválit právník.</p>
-        )}
 
         <h1 className="t-page text-balance">Nahlásit nezákonný obsah</h1>
         <p className="mt-3 text-[15px] leading-relaxed text-black/70 text-pretty">
@@ -48,14 +43,12 @@ export default function Stranka() {
           <p className="mt-2 text-[15px] leading-relaxed text-black/70 text-pretty">
             Pro úřady, Evropskou komisi i uživatele (Akt o digitálních službách, čl. 11 a 12):{' '}
             {jeEmail(f.emailPodpory) ? <a className="underline underline-offset-2" href={`mailto:${f.emailPodpory}`}>{f.emailPodpory}</a> : f.emailPodpory}.
-            Komunikujeme česky a anglicky. Provozovatel: {f.nazev}, IČO {f.ico}, {f.adresa}.
+            Telefon <a className="underline underline-offset-2 whitespace-nowrap" href={telOdkaz(f.telefon)}>{f.telefon}</a>. Komunikujeme česky a anglicky.
+            Jak obsah moderujeme a jak se proti rozhodnutí ohradit, popisují <Link className="underline underline-offset-2" href="/podminky#moderace">podmínky užívání</Link>.
           </p>
         </section>
 
-        <footer className="mt-12 pt-6 border-t border-black/[0.08] t-meta grid gap-2">
-          <PravniOdkazy jazyk="cs" />
-          <p>{f.nazev} · IČO {f.ico}</p>
-        </footer>
+        <PravniPaticka jazyk="cs" f={f} />
       </div>
     </main>
   );

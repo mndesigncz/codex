@@ -46,7 +46,7 @@ import { DLOUHO_OTEVRENY_MIN, zmenaOprotiMinulemuTydnu, nactiKalendareUzaverek, 
 import { useMoney } from '../../CurrencyProvider';
 import { Icon } from '../../Icons';
 import { otevriDen } from '@/lib/denUdalost';
-import { BarSpark, Button, CasovyGraf, Chip, ListRow, Modal, ObdobiLista, Segmented, Stat, StatRow } from '../../ui';
+import { BarSpark, Button, CasovyGraf, Chip, ListRow, Modal, ObdobiLista, Segmented, Sloupec, Stat, StatRow } from '../../ui';
 import { fmtDenVTydnu } from '@/lib/i18n/format';
 import { agreguj, hrubostProRozmezi, type HodnotaDne, jeVybranyDen, obdobiZPresetu, pocetDni, platneRozmezi, predchoziRozmezi, souhrn as souhrnObdobi, zmenaPct, type Obdobi, type Slot } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
@@ -96,10 +96,11 @@ function NepropojenaPokladna({ kratce = false }: { kratce?: boolean }) {
   const { nahled } = useWidget();
   const muze = !kratce && !nahled && smi('pokladna.nastavit') && nav.smiPohled('settings');
   return (
-    <div className="space-y-3">
+    // v4 (V16): akce prázdného stavu přes celou šířku (L→R × 44) pod větou, ne obsahová pilulka vlevo.
+    <Sloupec mezera={4}>
       <p className="t-meta text-pretty">{kratce ? t('Pokladna není propojená.') : t('Pokladna není propojená — tržby se ukážou po propojení se Storyous.')}</p>
-      {muze && <Button variant="secondary" size="sm" icon="settings" onClick={() => nav.onNavigate('settings', 'pos')}>{t('Propojit pokladnu')}</Button>}
-    </div>
+      {muze && <div className="rada rada-rovne rada-m"><Button variant="secondary" icon="settings" onClick={() => nav.onNavigate('settings', 'pos')}>{t('Propojit pokladnu')}</Button></div>}
+    </Sloupec>
   );
 }
 
@@ -191,10 +192,11 @@ function PokladnaDnes({ velikost, nahled }: WidgetProps) {
         // stavba v bílé: štítek white/55, číslo 40 tučně, poznámka white/60.
         <div className="min-w-0">
           <p className="t-label !text-white/55">{t('Tržba')}</p>
-          <p className="mt-1.5 text-[2.5rem] leading-none font-bold tracking-tight tabular-nums text-white">{money(s.celkem)}</p>
-          {poznamka && <p className="mt-1.5 text-[13px] text-white/60 truncate">{poznamka}</p>}
+          <p className="mt-1 text-[2.5rem] leading-none font-bold tracking-tight tabular-nums text-white">{money(s.celkem)}</p>
+          {poznamka && <p className="mt-1 text-[13px] text-white/60 truncate">{poznamka}</p>}
           {zmenaTydne && <p className={`mt-1 text-[13px] font-medium truncate ${zmenaTydne.pct >= 0 ? 'text-[#C8F542]' : 'text-bad-lift'}`}>{zmenaText}</p>}
-          <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-white/10 pt-3">
+          {/* v4 (V3): dělicí linka nad řadou statů 16 nad i pod, sloupce 16 od sebe. */}
+          <dl className="mt-4 grid grid-cols-3 gap-4 border-t border-white/10 pt-4">
             {([[t('Hotově'), s.hotove], [t('Kartou'), s.kartou], [t('Spropitné'), s.spropitne]] as const).map(([stitek, castka]) => (
               <div key={stitek} className="min-w-0">
                 <dt className="t-label !text-white/55 truncate">{stitek}</dt>
@@ -347,16 +349,16 @@ function PrehledDnu({ dny, dnes, rekord, onDen }: { dny: DenTrzby[]; dnes: strin
   );
 
   return (
-    <div className="space-y-3">
+    <Sloupec mezera={3}>
       <Segmented size="sm" ariaLabel={t('Přehled tržby')} value={pohled} onChange={zvol}
         options={[
           { id: 'dny', label: t('Dny') }, { id: 'kalendar', label: t('Kalendář') },
           { id: 'tydny', label: t('Týdny') }, { id: 'dnyvt', label: t('Dny v týdnu') },
         ]} />
       {pohled === 'dny' && (
-        <div>
+        <div className="sloupec sloupec-1">
           <ul className="list" aria-label={t('Tržba po jednotlivých dnech')}>{[...sTrzbou].reverse().map(radekDne)}</ul>
-          {bezTrzby > 0 && <p className="t-meta mt-1">{t('{n, plural, one {# den bez tržby} few {# dny bez tržby} other {# dní bez tržby}}', { n: bezTrzby })}</p>}
+          {bezTrzby > 0 && <p className="t-meta">{t('{n, plural, one {# den bez tržby} few {# dny bez tržby} other {# dní bez tržby}}', { n: bezTrzby })}</p>}
         </div>
       )}
       {pohled === 'kalendar' && (
@@ -388,7 +390,7 @@ function PrehledDnu({ dny, dnes, rekord, onDen }: { dny: DenTrzby[]; dnes: strin
         </ul>
       )}
       {pohled === 'dnyvt' && (
-        <div>
+        <div className="sloupec sloupec-1">
           <ul className="list" aria-label={t('Průměrná tržba podle dne v týdnu')}>
             {dnyVt.map(d => (
               <li key={d.poradi} className="flex items-center gap-3 py-2 text-[14px]">
@@ -398,10 +400,10 @@ function PrehledDnu({ dny, dnes, rekord, onDen }: { dny: DenTrzby[]; dnes: strin
               </li>
             ))}
           </ul>
-          <p className="t-meta mt-1">{t('Průměr ze dnů, kdy byla tržba.')}</p>
+          <p className="t-meta">{t('Průměr ze dnů, kdy byla tržba.')}</p>
         </div>
       )}
-    </div>
+    </Sloupec>
   );
 }
 
@@ -538,35 +540,37 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
     <Widget bezZkraceni={L} nacteni={nacteni} kostra="graf" prazdno={prazdno}
       odkaz={nastaveni.zdroj === 'uzaverky' || zUzaverek ? { popisek: t('Uzávěrky'), pohled: 'reports' } : naFinancich ? undefined : { popisek: t('Finance'), pohled: 'finance' }}>
       {hodnoty && sum && (
-        <div className={`space-y-4 transition-opacity ${cekaNaNova ? 'opacity-60' : ''}`} aria-busy={cekaNaNova || undefined}>
+        // v4 (V14, P13): skupiny (období → číslo → graf → přehled dnů) pod sebou 24, uvnitř skupiny 8 —
+        // dřív jedna mezera 16 všude a k tomu mt-2 / mt-1 v obsahu (4 různé mezery, žádné skupiny).
+        <Sloupec mezera={L ? 6 : 4} className={`transition-opacity ${cekaNaNova ? 'opacity-60' : ''}`} aria-busy={cekaNaNova || undefined}>
           {L && !nahled && <ObdobiLista value={obdobi} onChange={nastav} porovnat={porovnat} onPorovnat={setPorovnat} />}
-          <div>
+          <Sloupec mezera={2}>
             <Stat label={L ? t('Tržba za období') : popisObdobi} value={money(sum.soucet)}
               note={[zUzaverek ? t('z uzávěrek') : t('z pokladny'), sum.prumer > 0 ? t('průměr {castka} za den', { castka: money(sum.prumer) }) : ''].filter(Boolean).join(' · ')} />
             {L && zmena != null && (
-              <p className="t-meta mt-2 text-pretty">
+              <p className="t-meta text-pretty">
                 <Chip tone={zmena >= 0 ? 'ok' : 'wait'} size="sm">{zmena > 0 ? '+' : ''}{zmena} %</Chip>{' '}
                 {t('proti předchozím {n, plural, one {# dni} other {# dnům}}', { n: nDniV })} ({money(sumPred!.soucet)})
               </p>
             )}
-          </div>
+          </Sloupec>
           {L ? (
-            <div className="space-y-2">
+            <Sloupec mezera={2}>
               <CasovyGraf sloty={sloty} porovnani={porovnat ? slotyPred : null} druh="sloupce" vyska={190}
                 format={money} kratce={kratce} jmenoSlotu={jmenoSlotu} popisekOsy={popisekOsy} zvyraznit={dnesKlic}
                 popisekPorovnani={t('předchozí období')} onVyber={nahled ? undefined : vyber}
                 label={t('Tržba po dnech: {obdobi}', { obdobi: popisObdobi })} />
               <p className="t-meta">{hr === 'den' ? t('Klepnutím na den otevřeš jeho detail.') : t('Klepnutím na sloupec se přiblížíš na jeho období.')}</p>
-            </div>
+              {sum.nejlepsi && (
+                <p className="t-meta">{t('Nejsilnější den {den} {datum} · {castka}', { den: pismenoDne(sum.nejlepsi.den), datum: kratkeDatum(sum.nejlepsi.den), castka: money(sum.nejlepsi.hodnota) })}
+                  {sum.dnuSHodnotou > 0 && <> · {t('{n, plural, one {# den s tržbou} few {# dny s tržbou} other {# dní s tržbou}}', { n: sum.dnuSHodnotou })}</>}</p>
+              )}
+            </Sloupec>
           ) : (
             <BarSpark height={56} showLabels={sloty.length <= 14}
               highlight={sloty.findIndex(x => x.klic === dnesKlic) >= 0 ? sloty.findIndex(x => x.klic === dnesKlic) : undefined}
               label={t('Tržba po dnech: {obdobi}', { obdobi: popisObdobi })}
               data={sloty.map(x => ({ value: x.od > dnes ? null : x.hodnota, label: hr === 'den' ? pismenoDne(x.klic) : popisekOsy(x), tip: `${jmenoSlotu(x)}: ${money(x.hodnota)}` }))} />
-          )}
-          {L && sum.nejlepsi && (
-            <p className="t-meta">{t('Nejsilnější den {den} {datum} · {castka}', { den: pismenoDne(sum.nejlepsi.den), datum: kratkeDatum(sum.nejlepsi.den), castka: money(sum.nejlepsi.hodnota) })}
-              {sum.dnuSHodnotou > 0 && <> · {t('{n, plural, one {# den s tržbou} few {# dny s tržbou} other {# dní s tržbou}}', { n: sum.dnuSHodnotou })}</>}</p>
           )}
           {/* Graf s lištou zůstává celý; zkracuje se jen dlouhý přehled dnů pod ním („Zobrazit vše"). */}
           {L && dnyPrehled.some(x => x.trzba > 0) && !nahled && (
@@ -574,7 +578,7 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
               <PrehledDnu dny={dnyPrehled} dnes={dnes} rekord={sum.nejlepsi ? { den: sum.nejlepsi.den, trzba: sum.nejlepsi.hodnota } : null} onDen={d => otevriDen(d, 'finance')} />
             </Zkratitelne>
           )}
-        </div>
+        </Sloupec>
       )}
     </Widget>
   );
@@ -1068,9 +1072,13 @@ function StavPokladny({ velikost, nahled }: WidgetProps) {
   const S = velikost === 'S';
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra={S ? 'cislo' : 'text'}
-      prazdno={s && !s.propojeno ? <NepropojenaPokladna kratce={S} /> : undefined}>
+      prazdno={s && !s.propojeno ? <NepropojenaPokladna kratce={S} /> : undefined}
+      // v4 (V16): „Synchronizovat teď" je akce widgetu — patka L→R × 44, ne pilulka pod hlášením.
+      patka={!S && s?.propojeno && smiSynchronizovat ? (
+        <Button variant="secondary" icon="refresh" loading={bezi} onClick={synchronizuj}>{t('Synchronizovat teď')}</Button>
+      ) : undefined}>
       {s?.propojeno && (
-        <div className="space-y-3">
+        <Sloupec mezera={2}>
           <div className="flex flex-wrap items-center gap-2">
             {s.chyba
               ? <Chip tone="bad" size={S ? 'sm' : 'md'} icon="warning">{t('Chyba synchronizace')}</Chip>
@@ -1087,12 +1095,9 @@ function StavPokladny({ velikost, nahled }: WidgetProps) {
               {s.cekaNaPolozky > 0 && <p className="t-meta">{t('{n, plural, one {# účtenka čeká} few {# účtenky čekají} other {# účtenek čeká}} na položky.', { n: s.cekaNaPolozky })}</p>}
               {s.chyba && <p className="note note-danger text-[13px]">{s.chyba}</p>}
               {hlaska && <p role="status" className={`note ${hlaska.ton === 'ok' ? 'note-ok' : 'note-danger'} text-[13px]`}>{hlaska.text}</p>}
-              {smiSynchronizovat && (
-                <Button variant="secondary" size="sm" icon="refresh" loading={bezi} onClick={synchronizuj}>{t('Synchronizovat teď')}</Button>
-              )}
             </>
           )}
-        </div>
+        </Sloupec>
       )}
     </Widget>
   );

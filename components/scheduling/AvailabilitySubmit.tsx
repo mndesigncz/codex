@@ -368,7 +368,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         {/* Do minulosti nejde — dostupnost na uplynulý měsíc nemá smysl. Tichá akce „Jako minulý měsíc"
             se na telefonu zalomí pod přepínač a drží se levého okraje. */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <MonthNav value={month} onChange={setMonth} min={currentMonth} />
+          <MonthNav velikost="s" value={month} onChange={setMonth} min={currentMonth} className="sm:!w-full" />
           {ukazJakoMinule && !loading && !loadFailed && (
             <Button variant="ghost" size="sm" icon="copy" onClick={() => { void jakoMinule(); }} className="tap-target"
               title={t('Převezme z minulého měsíce, co se opakovalo podle dne v týdnu — jen do dnů, které ještě nemají vlastní stav.')}>
@@ -401,17 +401,23 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         <>
           <div>
             {/* Legenda je zároveň štětec: vybraný stav nastaví klepnutý den, „Přepínat" cyklí. */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-2" role="radiogroup" aria-label={t('Co nastaví klepnutí na den')}>
-              <button type="button" role="radio" aria-checked={stetec === null} onClick={() => setStetec(null)}
-                className={`filter-pill tap-target-sm ${stetec === null ? 'seg-on' : 'seg-off glass'}`}>
-                {t('Přepínat')}
-              </button>
-              {stateList.map((st) => (
-                <button key={st} type="button" role="radio" aria-checked={stetec === st} onClick={() => setStetec(st)}
-                  className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 ${stetec === st ? 'seg-on' : 'seg-off glass'}`}>
-                  <span aria-hidden className={`h-2.5 w-2.5 rounded-full shrink-0 ${metaOf(st).dot}`} /> {metaOf(st).label}
-                </button>
-              ))}
+            {/* v4 (P2, P3): volby štětce jsou mřížka rovných dílů — řady po třech (⅓), poslední řada se rozdělí
+                na ½ + ½ nebo jde přes celou šířku, takže každá řada končí na R a žádná buňka neosiří. Dřív se
+                pět pilulek zalomilo do dvou řad se dvěma různými pravými hranami. */}
+            <div className="grid grid-cols-6 gap-1.5 mb-2" role="radiogroup" aria-label={t('Co nastaví klepnutí na den')}>
+              {[null, ...stateList].map((st, i, vse) => {
+                const zbytek = vse.length % 3;
+                const vPosledni = i >= vse.length - zbytek;
+                const span = !zbytek || !vPosledni ? 'col-span-2' : zbytek === 2 ? 'col-span-3' : 'col-span-6';
+                const label = st === null ? t('Přepínat') : metaOf(st).label;
+                return (
+                  <button key={st ?? 'prepinat'} type="button" role="radio" aria-checked={stetec === st} onClick={() => setStetec(st)} title={label}
+                    className={`filter-pill tap-target-sm ${span} min-w-0 !px-2 inline-flex items-center justify-center gap-1.5 ${stetec === st ? 'seg-on' : 'seg-off glass'}`}>
+                    {st !== null && <span aria-hidden className={`h-2.5 w-2.5 rounded-full shrink-0 ${metaOf(st).dot}`} />}
+                    <span className="min-w-0 truncate">{label}</span>
+                  </button>
+                );
+              })}
             </div>
             <p className="t-meta mb-3 text-pretty">
               {stetec === null
@@ -484,7 +490,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
                 min={1}
                 value={maxShifts}
                 onChange={(e) => { setMaxShifts(e.target.value); zmena(); }}
-                className="!w-full sm:!w-40"
+                className="!w-full"
               />
             </Field>
 
@@ -504,7 +510,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
             {/* Jako sekce pod plochou Mých směn vedení (h2) není hlavní akcí
                 obrazovky — limetku tam má „Hotovo“ v úpravách. Tmavá. Tmavá
                 je i tehdy, když limetku nese plovoucí lišta s rozepsanou změnou. */}
-            <Button variant={headingLevel === 'h2' || listaOdeslani ? 'primary' : 'accent'} icon="send" block loading={saving} disabled={loadFailed} onClick={submit}
+            <Button variant={headingLevel === 'h2' || listaOdeslani ? 'primary' : 'accent'} icon="send" className="w-full" loading={saving} disabled={loadFailed} onClick={submit}
               title={loadFailed ? t('Nejdřív je potřeba načíst, co jsi poslal/a dřív.') : undefined}>
               {existing ? t('Aktualizovat dostupnost') : t('Odeslat dostupnost')}
             </Button>

@@ -218,7 +218,9 @@ const doporucene = async (p) => {
   // Mazání: potvrzení v okně, ne confirm().
   let dialogProhlizece = false;
   p.on('dialog', d => { dialogProhlizece = true; d.dismiss().catch(() => {}); });
-  await widgetLi(p, 'nastroj').getByRole('button', { name: /^Smazat záznam: / }).first().click();
+  // v4 (V4): úprava a smazání řádku jsou v jednom „···" (dřív tužka a koš jako dvě holé ikony).
+  await widgetLi(p, 'nastroj').getByRole('button', { name: /^Upravit nebo smazat záznam: / }).first().click();
+  await p.getByRole('menuitem', { name: 'Smazat záznam…' }).click();
   const smazat = p.getByRole('dialog', { name: 'Smazat záznam?' });
   tvrdi('U2: Smazat otevře potvrzovací okno (Modal), ne confirm()', await dokud(() => smazat.isVisible(), 2000) && !dialogProhlizece);
   tvrdi('U2: …s červeným „Smazat" vpravo a „Zrušit"', await smazat.getByRole('button', { name: 'Smazat' }).isVisible() && await smazat.getByRole('button', { name: 'Zrušit' }).isVisible());
@@ -311,15 +313,17 @@ const doporucene = async (p) => {
   await okno.getByRole('button', { name: 'Zrušit' }).click();
   await dokud(async () => !(await okno.isVisible()), 2000);
 
-  // Kolo 7: záznamy s plánem a chipem na 390 — nic nepřeteče, tužka a koš mají 44 px.
+  // Kolo 7: záznamy s plánem a chipem na 390 — nic nepřeteče. v4 (V4): tužka a koš (44 na telefonu) jsou teď
+  // jedno „···" — kruh 36 na R jako akce řádku všude v aplikaci (pseudoprvek 44 u pravé hrany karty nafukoval scrollWidth).
   const nastrojT = widgetLi(p, 'nastroj');
-  const cile = await nastrojT.evaluate(el => [...el.querySelectorAll('button[aria-label^="Upravit čas:"], button[aria-label^="Smazat záznam:"]')]
+  const cile = await nastrojT.evaluate(el => [...el.querySelectorAll('button[aria-label^="Upravit nebo smazat záznam:"], button[aria-label^="Upravit čas:"], button[aria-label^="Smazat záznam:"]')]
     .slice(0, 6).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
-  tvrdi('K7 (390): tužka a koš v záznamech mají aspoň 44 × 44 px', cile.length > 0 && cile.every(([w, h]) => w >= 44 && h >= 44), JSON.stringify(cile));
+  tvrdi('K7 (390): akce řádku v záznamech má aspoň 36 × 36 px (V4: „···" 36 na R)', cile.length > 0 && cile.every(([w, h]) => w >= 36 && h >= 36), JSON.stringify(cile));
   const tPetra = (await nastrojT.locator('li.list-row').filter({ hasText: 'Petra Malá' }).filter({ hasText: '08:12' }).first().innerText()).replace(/\u00a0/g, ' ');
   tvrdi('K7 (390): řádek Petry ukazuje „+12 min pozdě" (chip pod názvem)', /\+12 min pozdě/.test(tPetra), tPetra);
   // Okno Upravit čas: vyjede zdola, Důvod je Textarea s 16 px (žádný zoom) a PATCH nese note.
-  await nastrojT.getByRole('button', { name: 'Upravit čas: Petra Malá' }).first().click();
+  await nastrojT.getByRole('button', { name: 'Upravit nebo smazat záznam: Petra Malá' }).first().click();
+  await p.getByRole('menuitem', { name: 'Upravit čas…' }).click();
   const upr = p.getByRole('dialog', { name: 'Upravit čas na směně' });
   tvrdi('K7 (390): Upravit čas otevře okno s polem Důvod', await dokud(() => upr.isVisible(), 2000) && await upr.getByLabel('Důvod (nepovinné)').isVisible());
   await p.waitForTimeout(450);
@@ -488,7 +492,18 @@ const doporucene = async (p) => {
   await p.waitForTimeout(600);
   for (const w of ['tym.pozvanky', 'tym.bez_sazby']) tvrdi(`MO1: Provozní nevidí ${w}`, await naPlose(p, w) === 0);
   tvrdi('MO1: …a na /api/invitations neodešel dotaz', dotazyNa(stav, ['/api/invitations']).length === 0);
-  tvrdi('MO1: bez „Pozvat člena" a bez „Upravit" u lidí', await p.getByRole('button', { name: 'Pozvat člena' }).count() === 0 && await widgetLi(p, 'nastroj').getByRole('button', { name: /^Upravit: / }).count() === 0);
+  // v4 (V4): akce řádku člena jsou v „···" (Další akce: jméno) — tlačítko „Upravit: …" už neexistuje, takže
+  // dřívější kontrola byla vždy prázdná. Teď: otevřít „···" každého člena a v nabídce nesmí být „Upravit…".
+  const menuClenu = widgetLi(p, 'nastroj').getByRole('button', { name: /^Další akce: / });
+  let upravitVMenu = 0;
+  for (let i = 0; i < await menuClenu.count(); i++) {
+    await menuClenu.nth(i).click();
+    await p.waitForTimeout(150);
+    upravitVMenu += await p.getByRole('menuitem', { name: /^Upravit…/ }).count();
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(100);
+  }
+  tvrdi('MO1: bez „Pozvat člena" a bez „Upravit…" v „···" u lidí', await p.getByRole('button', { name: 'Pozvat člena' }).count() === 0 && upravitVMenu === 0, `Upravit… v nabídce ${upravitVMenu}×`);
   tvrdi('MO1: Role v podniku vidí (tym.zobrazit)', await naPlose(p, 'tym.role') === 1);
   await ctx.close();
 }

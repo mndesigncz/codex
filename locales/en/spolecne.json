@@ -338,7 +338,6 @@
   "Bez souhlasu s podmínkami účet založit nejde.": "You can't create an account without agreeing to the terms.",
   "Aktualizovali jsme podmínky": "We've updated our terms",
   "Platí od {datum}. Než budeš pokračovat, potvrď je prosím.": "In effect from {datum}. Please confirm them before you continue.",
-  "Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.": "The changes concern what data the app processes and how it handles it. The full text is in the links below.",
   "Souhlasím a pokračovat": "Agree and continue",
   "Souhlas se nepodařilo uložit. Zkus to znovu.": "Your consent couldn't be saved. Try again.",
   "E-mail se nepodařilo potvrdit.": "We could not confirm the email.",
@@ -363,5 +362,9 @@
   "Zámek se nezapnul — ověření Face ID nebo otiskem neproběhlo.": "The lock was not turned on — Face ID or fingerprint verification did not complete.",
   "Zamykat aplikaci Face ID / otiskem": "Lock the app with Face ID / fingerprint",
   "Po návratu do aplikace se nejdřív ověříš. Platí jen na tomhle telefonu.": "When you return to the app, you verify first. Applies only to this phone.",
-  "Zámek aplikace": "App lock"
+  "Zámek aplikace": "App lock",
+  "Jednám jako podnikatel v rámci své podnikatelské činnosti, souhlasím s obchodními podmínkami, zpracovatelskou smlouvou a podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.": "I act as an entrepreneur in the course of my business, agree to the business terms, the data processing agreement and the terms of use, and acknowledge the privacy policy.",
+  "Obchodní podmínky": "Business terms",
+  "Zpracovatelská smlouva": "Data processing agreement",
+  "Doplnili jsme obchodní podmínky pro podniky, zpracovatelskou smlouvu a seznam subzpracovatelů a zpřesnili podmínky užívání a zásady ochrany osobních údajů. Celé znění najdeš v odkazech níž.": "We added business terms, a data processing agreement and a list of subprocessors, and clarified the terms of use and privacy policy. The full texts are linked below."
 }

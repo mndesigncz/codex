@@ -197,7 +197,7 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
           <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
           <Button variant="primary" icon="check" loading={ukladam} disabled={nahravam} onClick={() => void uloz()}>{upravit ? t('Uložit') : t('Zapsat')}</Button>
         </>}>
-        <div className="space-y-4" data-zapsat-navic>
+        <div className="sloupec sloupec-4" data-zapsat-navic>
           {zUkolu && vybrana ? (
             // Z „Hotovo" u úkolu za body: úkol je vybraný, pilulky celé nabídky by na telefonu odsunuly
             // text a fotku pod ohyb — místo nich jen ten jeden úkol a co za něj bude.
@@ -209,7 +209,7 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
           ) : nabidka.length > 0 && (
             <div>
               <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} vybrane={offerId} onVyber={vyberNabidku} money={money}
-                obsazene={obsazene} label={t('Co se dá udělat navíc')} />
+                obsazene={obsazene} label={t('Co se dá udělat navíc')} vOkne />
               {popisVybrane}
             </div>
           )}
@@ -228,14 +228,15 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
               <input ref={vstup} type="file" accept="image/*" capture="environment" className="hidden" aria-hidden tabIndex={-1}
                 onChange={e => void nahraj(e.target.files?.[0] ?? null)} />
               {fotka ? (
+                // Řada 52 jako pole vedle: náhled, „Jinou" pružně do R, odebrat (V6, P7).
                 <div className="flex items-center gap-2 min-w-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={fotka} alt={t('Náhled fotky')} className="block h-11 w-11 shrink-0 rounded-xl object-cover" />
-                  <Button variant="ghost" size="sm" icon="camera" loading={nahravam} onClick={() => vstup.current?.click()}>{t('Jinou')}</Button>
-                  <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat fotku')} onClick={() => setFotka(null)} />
+                  <img src={fotka} alt={t('Náhled fotky')} className="block h-[3.25rem] w-[3.25rem] shrink-0 rounded-[var(--r-md)] object-cover" />
+                  <Button variant="secondary" size="lg" icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="flex-1 min-w-0 !px-4">{t('Jinou')}</Button>
+                  <Button variant="secondary" size="lg" iconOnly icon="close" aria-label={t('Odebrat fotku')} onClick={() => setFotka(null)} />
                 </div>
               ) : (
-                <Button variant="secondary" block icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="w-full"
+                <Button variant="secondary" size="lg" icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="w-full"
                   aria-describedby={chybaFotky ? 'navic-fotka-chyba' : undefined}>
                   {t('Vyfotit / nahrát')}
                 </Button>

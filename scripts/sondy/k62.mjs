@@ -33,6 +33,9 @@ const chip = p.locator('main span.chip', { hasText: 'právě v jiném podniku' }
 tvrdi('tým: má chip „právě v jiném podniku" s vysvětlením', (await chip.count()) === 1 && /členem i jiného podniku/.test(await chip.first().evaluate(el => el.closest('[title]')?.getAttribute('title') ?? '')), `chipů ${await chip.count()}`);
 tvrdi('tým: chip jen u něj, ne u ostatních', (await p.locator('main span.chip', { hasText: 'právě v jiném podniku' }).count()) === 1, '');
 // Upravit u něj funguje (tlačítko existuje) — PATCH už umí zapsat do členství.
-tvrdi('tým: přepnutého člena jde upravit', (await p.getByRole('button', { name: 'Upravit: Jakub Přepnutý' }).count()) === 1, 'bez tlačítka');
+// v4 (V4): „Upravit…" je první položka „···" řádku (jedna akce na R), ne samostatné tlačítko.
+await p.getByRole('button', { name: 'Další akce: Jakub Přepnutý' }).click();
+tvrdi('tým: přepnutého člena jde upravit', (await p.getByRole('menuitem', { name: 'Upravit…' }).count()) === 1, 'bez položky Upravit…');
+await p.keyboard.press('Escape');
 console.log(fails ? `\n${fails} SELHALO` : '\nčlen zůstává členem, i když stojí jinde');
 await b.close(); process.exit(fails ? 1 : 0);

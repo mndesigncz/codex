@@ -257,11 +257,12 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
             <Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10 w-2/3" />
           </div>
         ) : !open ? (
-          <div className="space-y-5">
-            <div className="space-y-3">
+          <div className="sloupec sloupec-6">
+            <div className="sloupec sloupec-3">
               <p className="t-meta">{t('Projdi sklad položku po položce a spočítej skutečné stavy. Rozdíly proti evidenci se po potvrzení zapíšou a uloží do historie položek.')}</p>
               {smiZahajit ? (
-                <Button variant="primary" icon="clipboard" onClick={start} loading={busy}>{t('Zahájit inventuru')}</Button>
+                // Jediná akce úvodu okna: L→R × 52 (V6/P17) — dřív obsahová šířka vlevo (osamělá, audit V17).
+                <Button variant="primary" size="lg" icon="clipboard" onClick={start} loading={busy} className="w-full">{t('Zahájit inventuru')}</Button>
               ) : (
                 <p className="t-meta">{t('Inventuru zahajuje vedení — pak může počítat kdokoli.')}</p>
               )}
@@ -410,7 +411,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                             ariaLabel={t('Spočítáno — {nazev} ({jednotka})', { nazev: r.name, jednotka: r.unit })}
                             invalid={!!chybaPocet} placeholder="—" className="flex-1 min-w-0"
                           />
-                          <Button variant={sediCele ? 'primary' : 'secondary'} icon="check" aria-pressed={sediCele} className="shrink-0"
+                          <Button variant={sediCele ? 'primary' : 'secondary'} size="lg" icon="check" aria-pressed={sediCele} className="shrink-0 !px-5"
                             aria-label={t('Sedí s evidencí — {nazev}', { nazev: r.name })} onClick={() => sedi(r)}>
                             {t('Sedí')}
                           </Button>

@@ -13,7 +13,7 @@ import React from 'react';
 import { cekaSpor, jeNapomenuti, stavTrestu, type Trest } from '@/lib/tresty';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
-import { Avatar, Button, Chip, ListRow, Menu } from '../ui';
+import { Avatar, Button, Chip, ListRow, Menu, Rada } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 
 /**
@@ -86,13 +86,14 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
       )}
       {spor && <span className="mt-1.5 flex [&>span]:justify-start">{stavADopad}</span>}
       {rozhodnuti && (
-        <span className="mt-2 flex flex-wrap items-center gap-2">
+        // Pár akcí ½ + ½ (P12) na ose textu, stejná výška — dřív dvě obsahové šířky vlevo.
+        <Rada vyska="s" className="mt-2 sm:max-w-[24rem]">
           {/* Jméno v přístupném názvu: v seznamu je víc stejných tlačítek za sebou. `tap-target` = 44 px na telefonu. */}
-          <Button variant="secondary" size="sm" icon="check" loading={pracuji} disabled={pracuji} className="tap-target"
+          <Button variant="secondary" size="sm" icon="check" loading={pracuji} disabled={pracuji} className="tap-target max-sm:[&>svg]:hidden"
             aria-label={t('Trest platí dál: {jmeno}', { jmeno: x.userName })} onClick={() => onPlatiDal(x)}>{t('Trest platí dál')}</Button>
           <Button variant="danger" size="sm" disabled={pracuji} className="tap-target"
             aria-label={t('Zrušit trest: {jmeno}', { jmeno: x.userName })} onClick={() => onZrusit(x)}>{t('Zrušit trest')}</Button>
-        </span>
+        </Rada>
       )}
     </>
   );
@@ -113,6 +114,7 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
       meta={meta}
       detail={maDetail ? detail : undefined}
       akceVRadku
+      // v4: na telefonu jde stav do druhého řádku na OSE TEXTU — ListRow to dělá sám.
       right={spor ? undefined : stavADopad}
       actions={menu} />
   );

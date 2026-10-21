@@ -113,7 +113,6 @@
   "Tým teď vidí, kdo má kdy směnu.": "The team now sees who works when.",
   "Tým vidí rozvrh ostatních": "Team sees others' schedule",
   "Uložit": "Save",
-  "Upravit": "Edit",
   "Upravit člena": "Edit member",
   "Uzávěrka": "Closing",
   "Uzávěrka je vázaná na směnu.": "The closing is tied to a shift.",
@@ -177,5 +176,6 @@
   "bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}": "no rate: {n, plural, one {# person} other {# people}}",
   "dovolená {zbyva}/{dni}": "leave {zbyva}/{dni}",
   "právě běží": "running now",
-  "Řadit lidi": "Sort people"
+  "Řadit lidi": "Sort people",
+  "Upravit…": "Edit…"
 }

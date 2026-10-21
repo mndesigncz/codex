@@ -299,7 +299,8 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   tvrdi('sklad: Segmented v jednom řádku bez posuvu, cíle ≥ 48 px', await pas.evaluate(e => e.scrollWidth <= e.clientWidth + 1) && ((await dochazi.boundingBox())?.height ?? 0) >= 47.5,
     `${await pas.evaluate(e => `${e.scrollWidth}/${e.clientWidth}`)} výška ${(await dochazi.boundingBox())?.height}`);
   // Název řádku = první textový uzel titulku ListRow (za ním je značka výrobce).
-  const nazvy = () => p.locator('main ul.list > li span.block.font-medium.truncate').evaluateAll(els => els.map(e => e.childNodes[0]?.textContent?.trim()).filter(Boolean));
+  // v4: titul řádku smí na dva řádky (line-clamp místo truncate) — hledá se podle třídy `list-titul`.
+  const nazvy = () => p.locator('main ul.list > li span.list-titul').evaluateAll(els => els.map(e => e.childNodes[0]?.textContent?.trim()).filter(Boolean));
   tvrdi('sklad: řazení kriticky › dochází › ok, pak název', (await nazvy()).slice(0, 4).join('|') === 'Citrony|Domácí limonáda zázvorová|Sirup Monin Levandule|Matcha Ceremonial', (await nazvy()).join('|'));
   await dochazi.click();
   tvrdi('sklad: Dochází nechá jen 4 položky pod minimem', await dokud(async () => (await nazvy()).length === 4, 2000), (await nazvy()).join('|'));

@@ -14,13 +14,13 @@ interface Souhrn {
   hoste: { poLhute?: number; upozornit: number; anonymizovat: number; cekat: number; upozorneno: number; anonymizovano: number; chyb: number; ukazkaId: number[] };
   auditLog: { kSmazani: number; smazano: number };
   oznameni: { kSmazani: number; smazano: number };
-  podniky: { kSmazani: number; smazano: number; ukazkaId: number[] };
+  podniky: { kSmazani: number; smazano: number; ukazkaId: number[]; upozornit30?: number; upozornit7?: number; cekat?: number; upozorneno?: number; chyb?: number };
   chyby: string[];
 }
 interface Beh { id: number; rezim: string; souhrn: Souhrn; createdAt: string | null }
 interface Data {
   zapnuta: boolean;
-  lhuty: { neaktivniHostMesicu: number; upozorneniPredemDni: number; auditLogLet: number; oznameniDni: number; zrusenyPodnikDni: number };
+  lhuty: { neaktivniHostMesicu: number; upozorneniPredemDni: number; auditLogLet: number; oznameniDni: number; zrusenyPodnikDni: number; podnikUpozorneniDni?: number; podnikDruheUpozorneniDni?: number };
   behy: Beh[];
 }
 
@@ -65,12 +65,13 @@ export default function RetenceSprava() {
                   <Stat label="Neaktivní hosté" value={cislo(posledni.hoste.poLhute ?? posledni.hoste.anonymizovat)} note={`déle než ${d.lhuty.neaktivniHostMesicu} měsíců`} />
                   <Stat label="Upozornit" value={cislo(posledni.hoste.upozornit)} note={`${d.lhuty.upozorneniPredemDni} dní předem`} />
                   <Stat label="Protokol změn" value={cislo(posledni.auditLog.kSmazani)} note={`řádků starších ${d.lhuty.auditLogLet} let`} />
-                  <Stat label="Zrušené podniky" value={cislo(posledni.podniky.kSmazani)} note={`${d.lhuty.zrusenyPodnikDni} dní po konci`} />
+                  <Stat label="Zrušené podniky" value={cislo(posledni.podniky.kSmazani)} note={`${d.lhuty.zrusenyPodnikDni} dní bez aktivity, po 2 upozorněních`} />
                 </StatRow>
                 <ul className="list mt-4">
                   <ListRow title="Oznámení v aplikaci" detail={`${cislo(posledni.oznameni.kSmazani)} starších než ${d.lhuty.oznameniDni} dní${posledni.rezim === 'ostry' ? ` · smazáno ${cislo(posledni.oznameni.smazano)}` : ''}`} />
                   <ListRow title="Hosté po upozornění" detail={`čeká na lhůtu ${cislo(posledni.hoste.cekat)} · k anonymizaci ${cislo(posledni.hoste.anonymizovat)}${posledni.rezim === 'ostry' ? ` · anonymizováno ${cislo(posledni.hoste.anonymizovano)} · upozorněno ${cislo(posledni.hoste.upozorneno)}` : ''}`}
                     right={posledni.hoste.ukazkaId.length ? <span className="t-meta">{`id ${posledni.hoste.ukazkaId.slice(0, 3).join(', ')}${posledni.hoste.ukazkaId.length > 3 ? '…' : ''}`}</span> : undefined} />
+                  <ListRow title="Zrušené podniky před smazáním" detail={`upozornit ${d.lhuty.podnikUpozorneniDni ?? 30} dní předem ${cislo(posledni.podniky.upozornit30 ?? 0)} · ${d.lhuty.podnikDruheUpozorneniDni ?? 7} dní předem ${cislo(posledni.podniky.upozornit7 ?? 0)} · čeká ${cislo(posledni.podniky.cekat ?? 0)}${posledni.rezim === 'ostry' ? ` · upozorněno ${cislo(posledni.podniky.upozorneno ?? 0)} · smazáno ${cislo(posledni.podniky.smazano)}` : ''}`} />
                   {posledni.podniky.ukazkaId.length > 0 && <ListRow title="Podniky ke smazání" detail={`id ${posledni.podniky.ukazkaId.join(', ')}`} />}
                 </ul>
                 {posledni.chyby.length > 0 && (

@@ -42,6 +42,14 @@ export function NavrhyTrestu({ navrhy, onDat, nahled = false }: {
       setZahazuji(null);
     }
   };
+  const akce = (n: (typeof navrhy)[number]) => (
+    <>
+      <Button variant="secondary" size="sm" icon="warning" className="tap-target" disabled={zahazuji === n.klic}
+        aria-label={t('Dát trest: {jmeno}', { jmeno: n.userName })} onClick={() => onDat(n)}>{t('Dát trest')}</Button>
+      <Button variant="ghost" size="sm" className="tap-target" loading={zahazuji === n.klic}
+        aria-label={t('Zahodit návrh: {jmeno}', { jmeno: n.userName })} onClick={() => { void zahodit(n); }}>{t('Zahodit')}</Button>
+    </>
+  );
   return (
     <>
       <ul className="list" data-navrhy-trestu>
@@ -51,14 +59,8 @@ export function NavrhyTrestu({ navrhy, onDat, nahled = false }: {
             title={n.userName || t('Člen týmu')}
             meta={fmtDatum(n.day, { jazyk: t.jazyk, styl: 'denKratce' })}
             detail={<span className="block text-[#16181A]">{popisNavrhu(t, n, money)}</span>}
-            actions={nahled ? undefined : (
-              <>
-                <Button variant="secondary" size="sm" icon="warning" className="tap-target" disabled={zahazuji === n.klic}
-                  aria-label={t('Dát trest: {jmeno}', { jmeno: n.userName })} onClick={() => onDat(n)}>{t('Dát trest')}</Button>
-                <Button variant="ghost" size="sm" className="tap-target" loading={zahazuji === n.klic}
-                  aria-label={t('Zahodit návrh: {jmeno}', { jmeno: n.userName })} onClick={() => { void zahodit(n); }}>{t('Zahodit')}</Button>
-              </>
-            )} />
+            // v4 (P12): na telefonu je pár akcí ½ + ½ na ose textu — ListRow to dělá sám.
+            actions={nahled ? undefined : akce(n)} />
         ))}
       </ul>
       <Toast message={toast?.text ?? null} tone={toast?.tone} id={toast?.id} onClose={() => setToast(null)} />

@@ -1651,7 +1651,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           <div className="flex gap-1.5 shrink-0 max-sm:hidden" role="group" aria-label={t('Rychlý výběr měsíce')}>
             {rychleMesice.map(m => (
               <button key={m.id} type="button" aria-pressed={month === m.id} onClick={() => zmenMesic(m.id)}
-                className={`filter-pill tap-target-sm ${month === m.id ? 'seg-on' : 'seg-off glass'}`}>{m.label}</button>
+                // v4 (P7): v řadě s MonthNav 44 mají pilulky taky 44.
+                className={`filter-pill tap-target-sm !h-11 ${month === m.id ? 'seg-on' : 'seg-off glass'}`}>{m.label}</button>
             ))}
           </div>
           {/* Stav publikování měsíce (kolo 7) — od `sm` vedle měsíce; na telefonu v podtitulku hlavičky. */}
@@ -1660,15 +1661,17 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               by ji spolu s dostupností odsunul pod ohyb (kolo 6 UX). */}
           {maPasy && !loading && !loadError && (
             <div className="sm:hidden shrink-0">
-              <Button variant="secondary" size="sm" aria-expanded={filtryTel || filtrAktivni} aria-controls="rozvrh-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
+              {/* Řada 44 jako MonthNav vedle (P7) — dřív 36 vedle 44. */}
+              <Button variant="secondary" aria-expanded={filtryTel || filtrAktivni} aria-controls="rozvrh-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
                 {t('Filtry')}{pocetAktivnich > 0 ? ` · ${pocetAktivnich}` : ''}
               </Button>
             </div>
           )}
           {/* Měsíc | Týden jen od `sm`: na telefonu je pohled vždy měsíc (viz `pohled`). */}
           {planovac && (
+            // v4 (P7): v řadě s MonthNav a pilulkami 44 je segment taky 44 (md).
             <div className="hidden sm:block">
-              <Segmented ariaLabel={t('Pohled plánovače')} size="sm" value={pohled} onChange={(v) => setPohled(v)}
+              <Segmented ariaLabel={t('Pohled plánovače')} value={pohled} onChange={(v) => setPohled(v)}
                 options={[{ id: 'mesic', label: t('Měsíc'), icon: 'calendar' }, { id: 'tyden', label: t('Týden'), icon: 'menu' }]} />
             </div>
           )}

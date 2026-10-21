@@ -112,27 +112,31 @@ export default function ChatView({ user, openConversationId = null }: Props) {
               {t('Nová')}
             </Button>
           </div>
-          <SearchField
-            value={q}
-            onChange={setQ}
-            placeholder={t('Hledat v konverzacích…')}
-            ariaLabel={t('Hledat v konverzacích')}
-            storageKey="chat"
-          />
-          {/* Filtr se ukazuje jen když je co filtrovat — prázdný přepínač
-              „Nepřečtené (0)" je jen další věc, kterou musí oko přeskočit. */}
-          {totalUnread > 0 && (
-            <button
-              type="button"
-              onClick={() => setOnlyUnread((v) => !v)}
-              aria-pressed={onlyUnread}
-              // .chip má odsazení v :where() a preflight tlačítka ho vynuloval —
-              // text narážel na rámeček. filter-pill je v @layer components.
-              className={`filter-pill tap-target-sm ${onlyUnread ? 'seg-on' : 'seg-off glass'}`}
-            >
-              {t('Nepřečtené · {n}', { n: totalUnread })}
-            </button>
-          )}
+          {/* v4 (P10, V05): hledání a filtr v jedné řadě 44 — pole pružné, „Nepřečtené" na pravé hraně.
+              Dřív se filtr zalomil pod pole na levý okraj a měl 36 vedle pole 44. */}
+          <div className="rada rada-pruzna rada-m">
+            <SearchField
+              value={q}
+              onChange={setQ}
+              placeholder={t('Hledat v konverzacích…')}
+              ariaLabel={t('Hledat v konverzacích')}
+              storageKey="chat"
+            />
+            {/* Filtr se ukazuje jen když je co filtrovat — prázdný přepínač
+                „Nepřečtené (0)" je jen další věc, kterou musí oko přeskočit. */}
+            {totalUnread > 0 && (
+              <button
+                type="button"
+                onClick={() => setOnlyUnread((v) => !v)}
+                aria-pressed={onlyUnread}
+                // .chip má odsazení v :where() a preflight tlačítka ho vynuloval —
+                // text narážel na rámeček. filter-pill je v @layer components.
+                className={`filter-pill tap-target-sm whitespace-nowrap ${onlyUnread ? 'seg-on' : 'seg-off glass'}`}
+              >
+                {t('Nepřečtené · {n}', { n: totalUnread })}
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
           {loading && (

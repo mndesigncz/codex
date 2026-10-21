@@ -89,12 +89,15 @@ export function SwitchRow({ title, hint, checked, onChange, disabled, as: Tag = 
   const idNazvu = `${uid}-n`;
   const idPopisu = `${uid}-h`;
   return (
-    <Tag className={`flex items-center justify-between gap-4 py-3 min-h-[3.25rem] ${className}`}>
+    // v4 (V5): řádek nastavení 56, přepínač vpravo na R.
+    // `flex-nowrap` + label `flex-1`: s třídou `list-row` se řádek na telefonu zalamoval a přepínač
+    // spadl pod dlouhý popis vlevo („Vyžadovat potvrzení" na Nástěnce) — vedle „Poslat i do chatu" s přepínačem na R.
+    <Tag className={`flex flex-nowrap items-center justify-between gap-4 py-3 min-h-14 ${className}`}>
       {/* Název i popis jsou uvnitř popisku (label), aby se dalo klepnout kamkoli na
           text. Přístupný název ale nese jen titulek (aria-labelledby) a popis
           jde zvlášť jako popis — jinak by odečítač četl celý odstavec jako
           jméno přepínače. */}
-      <label htmlFor={idPrepinace} className={`min-w-0 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+      <label htmlFor={idPrepinace} className={`min-w-0 flex-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
         <span id={idNazvu} className="block text-sm font-semibold text-[#16181A] text-pretty">{title}</span>
         {hint && <span id={idPopisu} className="block text-xs text-black/45 mt-0.5 text-pretty">{hint}</span>}
       </label>

@@ -24,12 +24,13 @@ export default function SekceVzhled() {
 
   return (
     <div className="space-y-6">
-      <section className="card p-6 space-y-4" aria-labelledby="nast-motiv-t">
+      {/* v4: karta 16/20, segmenty v kartě sm (36) přes šířku, každá volba je vlastní skupina — po 24 (P8, P11, P13). */}
+      <section className="card p-5 sloupec sloupec-6" aria-labelledby="nast-motiv-t">
         <div>
           <h2 id="nast-motiv-t" className="t-card">{t('Motiv')}</h2>
           <p className="t-meta mt-1">{t('Světlý, tmavý, nebo podle zařízení. Motiv se ukládá k účtu; zařízení bez vlastní volby ho převezme při přihlášení.')}</p>
         </div>
-        <Segmented ariaLabel={t('Motiv aplikace')} value={volba} onChange={(id: VolbaMotivu) => setTheme(id)}
+        <Segmented size="sm" ariaLabel={t('Motiv aplikace')} value={volba} onChange={(id: VolbaMotivu) => setTheme(id)}
           options={[
             { id: 'light', label: t('Světlý'), icon: 'sun' },
             { id: 'dark', label: t('Tmavý'), icon: 'moon' },
@@ -37,22 +38,24 @@ export default function SekceVzhled() {
           ]} />
       </section>
 
-      <section className="card p-6 space-y-4" aria-labelledby="nast-zobrazeni-t">
+      <section className="card p-5 sloupec sloupec-6" aria-labelledby="nast-zobrazeni-t">
         <div>
           <h2 id="nast-zobrazeni-t" className="t-card">{t('Zobrazení na tomhle zařízení')}</h2>
           <p className="t-meta mt-1">{t('Tahle nastavení platí jen tady; telefon a tablet si je drží každý zvlášť.')}</p>
         </div>
-        <div className="space-y-2">
-          <p className="field-label !mb-0">{t('Hustota')}</p>
-          <Segmented ariaLabel={t('Hustota')} value={vzhled.hustota} onChange={id => zmen({ hustota: id })}
-            options={[{ id: 'pohodlna', label: t('Pohodlná') }, { id: 'kompaktni', label: t('Kompaktní') }]} />
+        <div className="sloupec sloupec-6">
+          <div>
+            <p className="field-label">{t('Hustota')}</p>
+            <Segmented size="sm" ariaLabel={t('Hustota')} value={vzhled.hustota} onChange={id => zmen({ hustota: id })}
+              options={[{ id: 'pohodlna', label: t('Pohodlná') }, { id: 'kompaktni', label: t('Kompaktní') }]} />
+          </div>
+          <div>
+            <p className="field-label">{t('Velikost písma')}</p>
+            <Segmented size="sm" ariaLabel={t('Velikost písma')} value={vzhled.pismo} onChange={id => zmen({ pismo: id })}
+              options={[{ id: 'normalni', label: t('Normální') }, { id: 'vetsi', label: t('Větší') }, { id: 'nejvetsi', label: t('Největší') }]} />
+          </div>
         </div>
-        <div className="space-y-2">
-          <p className="field-label !mb-0">{t('Velikost písma')}</p>
-          <Segmented ariaLabel={t('Velikost písma')} value={vzhled.pismo} onChange={id => zmen({ pismo: id })}
-            options={[{ id: 'normalni', label: t('Normální') }, { id: 'vetsi', label: t('Větší') }, { id: 'nejvetsi', label: t('Největší') }]} />
-        </div>
-        <ul className="list">
+        <ul className="list -mt-3">
           <SwitchRow title={t('Omezit pohyb')} hint={t('Bez animací a přejezdů. Platí i tehdy, když systém omezení pohybu nehlásí.')}
             checked={vzhled.pohyb} onChange={v => zmen({ pohyb: v })} />
           <SwitchRow title={t('Vysoký kontrast')} hint={t('Výraznější okraje karet. Platí i tehdy, když systém vysoký kontrast nehlásí.')}
@@ -61,7 +64,7 @@ export default function SekceVzhled() {
       </section>
 
       {/* Nápovědy: zapnuto/vypnuto je přepínač, ne dvě limetkové volby. */}
-      <section className="card p-6 space-y-4" aria-labelledby="nast-napovedy-t">
+      <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-napovedy-t">
         <h2 id="nast-napovedy-t" className="t-card">{t('Nápovědy')}</h2>
         <ul className="list">
           <SwitchRow title={t('Zobrazovat nápovědy')}
@@ -69,7 +72,8 @@ export default function SekceVzhled() {
             checked={hintsOn} onChange={v => { setHintsEnabled(v); setHintsOn(v); }} />
         </ul>
         {hintsHidden > 0 && (
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+          // v4 (P2): počet vlevo, akce na pravé hraně v jednom řádku — nezalamuje se pod sebe.
+          <div className="rada rada-pruzna items-center">
             <p className="t-meta">
               {t('Zavřených rad: {n}', { n: hintsHidden })}
             </p>

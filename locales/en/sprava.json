@@ -896,7 +896,6 @@
   "Smazat záznam?": "Delete the record?",
   "Smazat {n, plural, one {# položka} few {# položky} other {# položek}}?": "Delete {n, plural, one {# item} other {# items}}?",
   "Smazat {nazev}": "Delete {nazev}",
-  "Smazat úkol {nazev}": "Delete task {nazev}",
   "Smazat úkol?": "Delete the task?",
   "Smazat účtenku {dodavatel}": "Delete receipt {dodavatel}",
   "Smazat účtenku?": "Delete the receipt?",
@@ -1869,5 +1868,8 @@
   "Automatické body postupů, úkolů a uzávěrek se nastaví podle způsobu výš a strop (když je zapnutý) začne platit i pro minulé dny — jako by to tak bylo odjakživa. Ruční úpravy vedení zůstanou. Před uložením uvidíš dopad.": "Automatic points for procedures, tasks and closings will follow the method above and the cap (when on) will apply to past days too — as if it had always been so. Manual edits by management stay. You'll see the impact before saving.",
   "I starší ruční hodnocení směn považovat za nahrazující": "Treat older manual shift reviews as replacing too",
   "Hodnocení směn uložená před touhle verzí se k automatickým bodům přičítala. Zaškrtnuté = i ona nahradí automatické body svého dne (jde vrátit).": "Shift reviews saved before this version were added to automatic points. Checked = they too replace the automatic points of their day (can be undone).",
-  "Další možnosti": "More options"
+  "Další možnosti": "More options",
+  "Upravit nebo smazat záznam: {jmeno}": "Edit or delete record: {jmeno}",
+  "Upravit čas…": "Edit time…",
+  "Smazat záznam…": "Delete record…"
 }

@@ -42,13 +42,14 @@ export default function SekceZkratky() {
   ];
 
   return (
-    <section className="card p-6 space-y-5" aria-labelledby="nast-zkratky-t">
+    <section className="card p-5 sloupec sloupec-4" aria-labelledby="nast-zkratky-t">
       <div>
         <h2 id="nast-zkratky-t" className="t-card">{t('Klávesové zkratky')}</h2>
         <p className="t-meta mt-1">{t('Přehled zkratek, které aplikace opravdu zná. Na telefonu a tabletu se hodí s připojenou klávesnicí.')}</p>
       </div>
       {skupiny.map(s => (
-        <div key={s.nazev} className="space-y-1">
+        // v4 (P13): skupiny po 16, štítek ↔ seznam 4 — jedna stupnice místo 20 / 16 / 58.
+        <div key={s.nazev} className="sloupec sloupec-1">
           <h3 className="t-label">{s.nazev}</h3>
           <ul className="list">
             {s.zkratky.map((z, i) => (

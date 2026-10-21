@@ -132,7 +132,7 @@ function Razitka({ pr }: { pr: Prehled }) {
     <ul className="list" aria-label="Razítka podle kampaní">
       {pr.kampane.map(k => (
         <ListRow key={k.id}
-          title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{k.name}</span>{!k.active && <Chip tone="muted" size="sm">Neběží</Chip>}</span>}
+          title={<span className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0"><span className="truncate max-w-full">{k.name}</span>{!k.active && <Chip tone="muted" size="sm">Neběží</Chip>}</span>}
           meta={[k.last_stamp_at ? `poslední razítko ${denCesky(k.last_stamp_at)}` : 'zatím bez razítka', k.completed > 0 ? `dokončeno ${k.completed}×${k.last_completed_at ? `, naposledy ${denCesky(k.last_completed_at)}` : ''}` : null, k.reward || null].filter(Boolean).join(' · ')}
           value={<>{k.stamps} <span className="text-xs font-medium text-black/50">z {k.required}</span></>} />
       ))}

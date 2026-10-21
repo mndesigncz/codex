@@ -14,7 +14,7 @@
 // registrace v components/widgety/oblasti/moje-smeny.tsx (KOMPONENTY).
 
 import { useMemo, useState } from 'react';
-import { Button, Chip, EmptyState, ListRow, Menu, Modal, Segmented, Stat, Toast } from '../ui';
+import { Button, Chip, EmptyState, ListRow, Menu, Modal, Segmented, Sloupec, Stat, Toast } from '../ui';
 import { Widget } from '../widgety/Widget';
 import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import { useMoney } from '../CurrencyProvider';
@@ -82,8 +82,10 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
     setMazu(false);
   };
 
-  const tlacitko = (size: 'sm' | 'md' = 'sm') => smiZapsat ? (
-    <Button variant="secondary" size={size} icon="plus" onClick={() => otevri()} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
+  // v4 (V16, P17): akce widgetu stojí v PATCE na konci karty (L→R × 44, pár ½ + ½) — ne obsahová pilulka
+  // pod číslem nebo nad seznamem (dřív pět šířek v jedné kartě: pilulky, tlačítko, odkaz, segment, řádky).
+  const tlacitko = () => smiZapsat ? (
+    <Button variant="secondary" icon="plus" onClick={() => otevri()} data-zapsat-navic-tlacitko>{t('Zapsat navíc')}</Button>
   ) : null;
 
   const radek = (z: Navic) => (
@@ -126,11 +128,10 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
   if (velikost === 'S') {
     return (
       <>
-        <Widget nacteni={data} kostra="cislo">
+        <Widget nacteni={data} kostra="cislo" patka={tlacitko() ?? undefined}>
           <Stat label={<span className="cz-sentence">{nazevMesice}</span>} value={String(souhrn.body)} unit={t('b')}
             note={ceka > 0 ? <Chip tone="wait" size="sm">{t('{n, plural, one {# čeká} few {# čekají} other {# čeká}}', { n: ceka })}</Chip>
               : souhrn.uznano > 0 ? t('{n, plural, one {# uznaný zápis} few {# uznané zápisy} other {# uznaných zápisů}}', { n: souhrn.uznano }) : t('zatím nic navíc')} />
-          {smiZapsat && <div className="mt-2">{tlacitko('sm')}</div>}
         </Widget>
         {okna}
       </>
@@ -140,19 +141,30 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
   const L = velikost === 'L';
   const videt = L ? items.filter(z => filtr === 'vse' || z.status === filtr) : items.slice(0, 3);
   const pocty = { ceka: items.filter(z => z.status === 'ceka').length, uznano: items.filter(z => z.status === 'uznano').length };
-  // Pilulky a „Zapsat navíc" NAD seznamem: střední karta se nad 300 px zkracuje pod „Zobrazit vše"
-  // a akce dole by zmizela pod odleskem — hlavní věc widgetu je zapsat, starší zápisy se smí schovat.
-  const akce = smiZapsat ? (
-    <div className="space-y-2" data-navic-akce>
-      {nabidka.length > 0 && <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} obsazene={obsazene} label={t('Co se dá udělat navíc')} pas={!L} />}
-      <div className="flex flex-wrap items-center gap-2">
-        {tlacitko('sm')}
-        {kUkolum && (
-          <Button variant="ghost" size="sm" iconAfter="chevronRight" onClick={() => nav.onNavigate('tasks', ARG_ZA_BODY)} data-navic-za-body>{t('Úkoly za body')}</Button>
-        )}
-      </div>
+  // Pilulky nabídky NAD seznamem (hlavní věc widgetu je zapsat; starší zápisy se smí schovat pod „Zobrazit vše").
+  // „Zapsat navíc" a „Úkoly za body" jsou v patce: ta stojí mimo zkrácení, takže je odlesk neschová.
+  const pilulky = smiZapsat && nabidka.length > 0 ? (
+    // Pás pilulek přesahoval kvůli prstenci fokusu o 4 px do odsazení karty — obsah karty pak začínal
+    // před levou osou (P5). Ve widgetu pás začíná přesně na L; pás i ve velké kartě (ne zalomené pilulky
+    // různé šířky pod sebou — zubatý sloupec, audit V03). Dlaždice pásu mají JEDNU šířku (12 rem, text
+    // na dva řádky, výška podle nejvyšší): v kartě pak zůstanou tři šířky ovládání (P3), ne pět.
+    <div data-navic-akce className={[
+      '[&_.scroll-fade-x]:mx-0 [&_.scroll-fade-x]:px-0',
+      '[&_.scroll-fade-x>button]:w-48 [&_.scroll-fade-x>button]:!h-auto [&_.scroll-fade-x>button]:min-h-[44px]',
+      '[&_.scroll-fade-x>button]:!whitespace-normal [&_.scroll-fade-x>button]:py-2 [&_.scroll-fade-x>button]:justify-start [&_.scroll-fade-x>button]:text-left',
+    ].join(' ')}>
+      <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} obsazene={obsazene} label={t('Co se dá udělat navíc')} pas />
     </div>
   ) : null;
+  const patka = smiZapsat ? (
+    <>
+      {tlacitko()}
+      {kUkolum && (
+        // Tichý odkaz v pravé půlce patky drží text u pravé hrany (P4) — na středu půlky by řada „končila" uprostřed.
+        <Button variant="ghost" iconAfter="chevronRight" className="justify-end !pr-2" onClick={() => nav.onNavigate('tasks', ARG_ZA_BODY)} data-navic-za-body>{t('Úkoly za body')}</Button>
+      )}
+    </>
+  ) : undefined;
 
   return (
     <>
@@ -161,15 +173,17 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
         // se vedle chipu lámal i šestipísmenný název („Ek / s…"); řádky v těle stav nesou samy.
         doplnek={L && ceka > 0 ? <Chip tone="wait" size="sm">{t('{n, plural, one {# čeká} few {# čekají} other {# čeká}}', { n: ceka })}</Chip> : undefined}
         prazdno={data.data && items.length === 0 && nabidka.length === 0 ? (
-          <EmptyState compact illustration="odmeny" title={minuly ? t('Nic navíc') : t('Zatím nic navíc')} hint={prazdnoText} action={tlacitko('md')} />
-        ) : undefined}>
-        <div className="space-y-3" data-navic-widget={velikost}>
-          {L && <StatRadek t={t} body={souhrn.body} premie={souhrn.premie} money={money} uznano={souhrn.uznano} mesic={nazevMesice} />}
-          {akce}
-          {L && items.length > 0 && (
-            <Segmented size="sm" ariaLabel={t('Stav')} value={filtr} onChange={setFiltr}
-              options={[{ id: 'vse', label: t('Vše') }, { id: 'ceka', label: t('Čeká'), count: pocty.ceka }, { id: 'uznano', label: t('Uznané'), count: pocty.uznano }]} />
-          )}
+          <EmptyState compact illustration="odmeny" title={minuly ? t('Nic navíc') : t('Zatím nic navíc')} hint={prazdnoText} action={tlacitko()} />
+        ) : undefined}
+        // v4 skladba (V2): segment stavů L→R × 36 pod hlavičkou, souhrn měsíce nad seznamem, akce v patce.
+        segment={L && items.length > 0 ? (
+          <Segmented size="sm" ariaLabel={t('Stav')} value={filtr} onChange={setFiltr}
+            options={[{ id: 'vse', label: t('Vše') }, { id: 'ceka', label: t('Čeká'), count: pocty.ceka }, { id: 'uznano', label: t('Uznané'), count: pocty.uznano }]} />
+        ) : undefined}
+        souhrn={L ? <StatRadek t={t} body={souhrn.body} premie={souhrn.premie} money={money} uznano={souhrn.uznano} mesic={nazevMesice} /> : undefined}
+        patka={patka}>
+        <Sloupec mezera={3} data-navic-widget={velikost}>
+          {pilulky}
           {videt.length > 0 ? (
             <ul className="list" data-navic-seznam>{videt.map(radek)}</ul>
           ) : items.length > 0 ? (
@@ -178,7 +192,7 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
             <p className="t-meta text-pretty">{prazdnoText}</p>
           )}
           {!L && items.length > videt.length && <p className="t-meta">{t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n: items.length - videt.length })}</p>}
-        </div>
+        </Sloupec>
       </Widget>
       {okna}
     </>
@@ -189,7 +203,8 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
 function StatRadek({ t, body, premie, money, uznano, mesic }: { t: PrekladFn; body: number; premie: number; money: (n: number) => string; uznano: number; mesic: string }) {
   const casti = [t('{n} uznáno', { n: uznano }), `${body} b`];
   if (premie > 0) casti.push(money(premie));
-  return <p className="t-meta tabular-nums" data-navic-souhrn><span className="cz-sentence">{mesic}</span>: {casti.join(' · ')}</p>;
+  // Obal (slot `souhrn`) kreslí t-meta odstavec; tady jen jeho obsah.
+  return <span className="tabular-nums" data-navic-souhrn><span className="cz-sentence inline-block">{mesic}</span>: {casti.join(' · ')}</span>;
 }
 
 export default NavicWidget;

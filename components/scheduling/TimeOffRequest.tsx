@@ -184,7 +184,7 @@ export function PoleVolna({ f }: { f: FormularVolna }) {
   const typLabel = (id: TimeOffType) => (id === 'vacation' ? t('Dovolená') : id === 'sick' ? t('Nemoc') : t('Jiné'));
   const narok = useNarokDovolene();
   return (
-    <div className="space-y-3">
+    <div className="sloupec sloupec-4">
       <DraftNote koncept={f.koncept} co="rozepsanou žádost" />{/* i18n-ok: druh konceptu je identifikátor, větu překládá DraftNote */}
       <ZustatekDovolene narok={narok} od={f.fromDate} doDne={f.toDate} typ={f.type} />{/* kolo 8: zůstatek nad poli */}
       {/* Dvojice dat sdílí řádek i na telefonu (DESIGN: dvojice polí grid-cols-2). */}
@@ -339,7 +339,7 @@ export default function TimeOffRequest() {
 
       <div className="space-y-3">
         <PoleVolna f={f} />
-        <Button variant="primary" icon="send" block loading={f.submitting} onClick={() => { void f.submit(); }}>{t('Odeslat žádost')}</Button>
+        <Button variant="primary" icon="send" className="w-full" loading={f.submitting} onClick={() => { void f.submit(); }}>{t('Odeslat žádost')}</Button>
       </div>
 
       <div className="pt-3 border-t border-black/[0.06]">

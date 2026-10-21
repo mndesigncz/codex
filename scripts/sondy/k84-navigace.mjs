@@ -160,7 +160,12 @@ if (sekce('2')) for (const w of [1280, 390]) {
   tvrdi(`2 ${w}: Souhrn měsíce má v hlavičce chip „Měsíc: Tento"`, await chip.count() === 1 && /Měsíc: Tento/.test(await chip.innerText()), await souhrn.locator('h2').innerText());
   const sbalit = souhrn.getByRole('button', { name: /^Sbalit/ });
   const [rc, rs] = [await chip.boundingBox(), await sbalit.boundingBox()];
-  tvrdi(`2 ${w}: Sbalit zůstává vpravo od chipu`, !!rc && !!rs && rs.x > rc.x + rc.width, JSON.stringify({ rc, rs }));
+  // v4 (spec V1/V2): na telefonu stojí rychlý filtr v řadě filtrů POD hlavičkou přes celou šířku — Sbalit
+  // je v hlavičce nad ním a končí na téže pravé hraně R (nic nestojí vpravo od Sbalit). Na monitoru je
+  // filtr dál v hlavičce před Sbalit.
+  tvrdi(`2 ${w}: Sbalit zůstává vpravo od chipu`, !!rc && !!rs && (w < 640
+    ? rs.y + rs.height <= rc.y && Math.abs((rs.x + rs.width) - (rc.x + rc.width)) <= 1.5
+    : rs.x > rc.x + rc.width), JSON.stringify({ rc, rs }));
   tvrdi(`2 ${w}: chip je dotykový cíl ≥ 24 px a nepřetéká kartu`, !!rc && rc.height >= 20 && (await souhrn.evaluate(el => el.scrollWidth <= el.clientWidth + 1)));
   tvrdi(`2 ${w}: velká karta s vlastní lištou období (Tržba po dnech) chip nemá`, await li(p, 'po-dnech').locator('[data-rychly-filtr]').count() === 0);
   tvrdi(`2 ${w}: střední Marže má chip (první pole vyber = Měsíc)`, await li(p, 'marze').locator('[data-rychly-filtr="mesic"]').count() === 1);

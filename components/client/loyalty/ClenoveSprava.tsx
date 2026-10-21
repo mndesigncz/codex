@@ -175,7 +175,9 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
       <div className="flex items-center gap-3 flex-wrap">
         <SearchField className="w-full max-w-sm" value={q} onChange={setQ} storageKey="hoste" placeholder={smi('zakaznici.kontakty') ? 'Jméno nebo e-mail' : 'Jméno'} ariaLabel="Hledat zákazníka" />
         {d && <p className="t-meta tabular-nums" aria-live="polite">{jeFiltrovano ? `${czCount(d.total, CLEN)} z ${d.all}` : czCount(d.total, CLEN)}</p>}
-        <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
+        {/* v4 (P2 výjimka a): počet vlevo, akce u pravé hrany i na telefonu — dřív „148 členů · Filtry ·
+            Duplicity" vlevo a řada končila v půlce. */}
+        <div className="flex items-center justify-end gap-2 flex-wrap ml-auto">
           <Button size="sm" variant={filtryOtevrene || pocetPodminek ? 'primary' : 'secondary'} icon="grid" aria-expanded={filtryOtevrene} onClick={() => setFiltryOtevrene(v => !v)}>
             {pocetPodminek ? `Filtry (${pocetPodminek})` : 'Filtry'}
           </Button>
@@ -248,8 +250,8 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
                   <li key={c.id}>
                     <ListRow as="div"
                       lead={(meniSkupiny || upravujeBody || piseZpravy) ? <SelectBox checked={vybran} onChange={() => prepniRadek(c.id)} label={`Vybrat: ${c.name}`} /> : undefined}
-                      title={<span className="flex items-center gap-2 min-w-0">
-                        <span className="truncate">{c.name}</span>
+                      title={<span className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                        <span className="truncate max-w-full">{c.name}</span>
                         {uroven.id !== 'bronze' && <Chip tone={uroven.id === 'silver' ? 'muted' : 'ink'} size="sm">{uroven.label}</Chip>}
                         {c.level_reduced && <Chip tone="wait" size="sm">snížená po pauze</Chip>}
                         {c.blocked && <Chip tone="bad" size="sm">Zablokovaný</Chip>}

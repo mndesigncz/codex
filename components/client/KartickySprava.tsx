@@ -68,8 +68,8 @@ export default function KartickySprava({ oznam }: { oznam: (text: string, ton?: 
   const [busy, setBusy] = useState(false);
   const [chybaOkna, setChybaOkna] = useState('');
 
-  if (error) return <div className="p-4 sm:p-6"><ErrorState title="Kartičky se nenačetly" onRetry={reload} detail={error} /></div>;
-  if (!data) return <div className="p-4 sm:p-6 space-y-4"><Skeleton className="h-24" /><Skeleton className="h-28" /><Skeleton className="h-64" /></div>;
+  if (error) return <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6"><ErrorState title="Kartičky se nenačetly" onRetry={reload} detail={error} /></div>;
+  if (!data) return <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 space-y-4"><Skeleton className="h-24" /><Skeleton className="h-28" /><Skeleton className="h-64" /></div>;
 
   const karty = [...data.karty, ...(navic?.karty ?? [])];
   const dalsi = navic ? navic.dalsi : data.dalsi;
@@ -130,7 +130,7 @@ export default function KartickySprava({ oznam }: { oznam: (text: string, ton?: 
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-4xl">
+    <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 space-y-5 max-w-4xl">
       <PageHeader hintId="clientadmin-karticky" title="Kartičky"
         subtitle="Plastové a papírové karty pro hosty bez aplikace. Vytiskni dávku, rozdej ji a u kasy kartu přiřaď hostovi. Pak funguje jako kartička v aplikaci."
         primary={smi ? <Button variant="accent" icon="print" onClick={() => { setChybaOkna(''); setNova({ pocet: '50', nazev: '' }); }}>Vytisknout dávku</Button> : undefined} />
@@ -200,7 +200,7 @@ export default function KartickySprava({ oznam }: { oznam: (text: string, ton?: 
                 </ul>
               )}
             </Card>
-            {dalsi && <Button variant="secondary" loading={nacitamDalsi} onClick={nactiDalsi} className="w-full sm:w-auto justify-center">Načíst další karty</Button>}
+            {dalsi && <Button variant="secondary" loading={nacitamDalsi} onClick={nactiDalsi} className="w-full justify-center">Načíst další karty</Button>}
           </section>
         </>
       )}

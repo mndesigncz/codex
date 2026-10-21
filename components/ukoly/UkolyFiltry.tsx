@@ -55,7 +55,10 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
   const radekRef = useRef<HTMLDivElement>(null);
   // Pole je v DOM pořád (jen schované), takže autoFocus by nezabral — fokus se dá ručně, až se ukáže.
   const otevriHledani = () => { setHledaniOtevreno(true); requestAnimationFrame(() => radekRef.current?.querySelector('input')?.focus()); };
-  const hledaniSbalene = kompaktniNaTelefonu && !hledaniOtevreno && !filtr.hledat;
+  // v4 (P10): má-li telefon nad seznamem přepínač pohledu, stojí segment NAHOŘE přes celou šířku a pod ním
+  // toolbar [hledání flex:1][Filtry] (44). Dřív segment + lupa v řádku a „Filtry" spadlo samo na druhý řádek vlevo.
+  const segmentNahore = kompaktniNaTelefonu && !!vlevoNaTelefonu;
+  const hledaniSbalene = kompaktniNaTelefonu && !segmentNahore && !hledaniOtevreno && !filtr.hledat;
   const pilulkyJenOdMd = kompaktniNaTelefonu && !pilulkyNaTelefonu && filtr.stav === 'vse';
   const kdoZapnuto = lide.length > 0 && filtr.kdo !== 'all';
   const n = pocetFiltru(filtr) + (kdoZapnuto ? 1 : 0) + (!skrytStav && stavVeFiltrech && filtr.stav !== 'vse' ? 1 : 0);
@@ -96,17 +99,18 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
           const kam = e.relatedTarget as HTMLElement | null;
           if (!filtr.hledat && !kam?.closest('[role=combobox], [role=listbox]')) setHledaniOtevreno(false);
         }) : undefined}>
-        {kompaktniNaTelefonu && vlevoNaTelefonu && <div className="md:hidden min-w-0 shrink">{vlevoNaTelefonu}</div>}
+        {kompaktniNaTelefonu && vlevoNaTelefonu && <div className="md:hidden min-w-0 basis-full">{vlevoNaTelefonu}</div>}
         {vlevo && <div className="min-w-0 flex-1">{vlevo}</div>}
         {/* Na telefonu v kompaktní podobě jde pole na vlastní řádek pod ovládání (order-last + celá šířka). */}
         <SearchField value={filtr.hledat} onChange={v => nastav({ hledat: v })} placeholder={t('Hledat v úkolech…')} ariaLabel={t('Hledat v úkolech')}
           storageKey="ukoly"
-          className={`min-w-0 flex-1 ${vlevo ? 'md:flex-none md:w-60' : ''} ${kompaktniNaTelefonu ? 'max-md:order-last max-md:basis-full' : ''} ${hledaniSbalene ? 'max-md:hidden' : ''}`} />
+          className={`min-w-0 flex-1 ${vlevo ? 'md:flex-none md:w-60' : ''} ${kompaktniNaTelefonu && !segmentNahore ? 'max-md:order-last max-md:basis-full' : ''} ${hledaniSbalene ? 'max-md:hidden' : ''}`} />
         {hledaniSbalene && (
-          <Button variant="secondary" size="sm" iconOnly icon="search" aria-label={t('Hledat v úkolech')} aria-expanded={false}
+          <Button variant="secondary" iconOnly icon="search" aria-label={t('Hledat v úkolech')} aria-expanded={false}
             className={`md:hidden shrink-0 ${vlevo ? '' : 'ml-auto'}`} onClick={otevriHledani} />
         )}
-        <Button variant="secondary" size="sm" aria-expanded={otevreno} onClick={() => setOtevreno(o => !o)}
+        {/* Toolbar = jedna řada 44 (P10): pole, lupa i „Filtry" stejně vysoké (dřív 48 / 36 / 36). */}
+        <Button variant="secondary" aria-expanded={otevreno} onClick={() => setOtevreno(o => !o)}
           className={`shrink-0 ${kompaktniNaTelefonu && !hledaniSbalene && !vlevo ? 'max-md:ml-auto' : ''}`}>
           {t('Filtry')}{n > 0 ? ` · ${n}` : ''}
         </Button>

@@ -48,7 +48,7 @@ import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { useMoney } from '../../CurrencyProvider';
 import { Icon } from '../../Icons';
-import { Avatar, BarSpark, Button, Chip, ListRow, Modal, Segmented, Stat, StatRow, type ChipTone } from '../../ui';
+import { Avatar, BarSpark, Button, Chip, ListRow, Modal, Segmented, Sloupec, Stat, StatRow, type ChipTone } from '../../ui';
 import { zmenaZtrat, type ZtrataInventury } from '@/lib/skladPrehled';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
@@ -941,7 +941,7 @@ function Uctenky({ velikost, nahled }: WidgetProps) {
   const soucet = mesicni.reduce((s, r) => s + (r.amount ?? 0), 0);
   const [pred, po] = rozdelVetu(t, 'Tento měsíc {castka}', 'castka');
   const nafotit = smiPridat ? (
-    <Button variant={velikost === 'S' ? 'primary' : 'secondary'} size="sm" icon="camera" onClick={() => setNova(true)}>{t('Nafotit')}</Button>
+    <Button variant={velikost === 'S' ? 'primary' : 'secondary'} icon="camera" onClick={() => setNova(true)}>{t('Nafotit')}</Button>
   ) : null;
 
   return (
@@ -949,23 +949,19 @@ function Uctenky({ velikost, nahled }: WidgetProps) {
       <Widget nacteni={ceka ? CEKA : data} kostra={velikost === 'S' ? 'cislo' : 'seznam'}
         odkaz={velikost !== 'S' && !naFinancich && nav.smiPohled('finance') && smi('finance.zobrazit') ? { popisek: t('Finance'), pohled: 'finance' } : undefined}
         prazdno={u && u.length === 0 ? (
-          <div className="space-y-3">
+          <Sloupec mezera={4}>
             <p className="t-meta text-pretty">{smiPridat ? t('Zatím žádná účtenka. Nafoť ji hned po nákupu — do Financí se propíše sama.') : t('Zatím žádná účtenka.')}</p>
-            {nafotit}
-          </div>
-        ) : undefined}>
+            {nafotit && <div className="rada rada-rovne rada-m">{nafotit}</div>}
+          </Sloupec>
+        ) : undefined}
+        // v4 (V16, P17): „Nafotit" je akce widgetu — patka L→R × 44 na konci karty; součet měsíce je souhrn nad seznamem.
+        souhrn={u && u.length > 0 && velikost !== 'S' ? <>{pred}<span className="font-semibold text-[#16181A] tabular-nums">{money(soucet)}</span>{po} · {t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: mesicni.length })}</> : undefined}
+        patka={nafotit ?? undefined}>
         {u && u.length > 0 && (velikost === 'S' ? (
-          <div className="space-y-3">
-            <Stat label={t('Tento měsíc')} value={money(soucet)} note={t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: mesicni.length })} />
-            {nafotit}
-          </div>
+          <Stat label={t('Tento měsíc')} value={money(soucet)} note={t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: mesicni.length })} />
         ) : (
-          <div className="space-y-3">
-            <p className="t-meta">{pred}<span className="font-semibold text-[#16181A] tabular-nums">{money(soucet)}</span>{po} · {t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: mesicni.length })}</p>
-            <SeznamUctenek uctenky={u} limit={velikost === 'M' ? 5 : 30} sFotkou={velikost === 'L'}
-              smiMazat={velikost === 'L' && !nahled && smi('finance.uctenky_upravit')} />
-            {nafotit}
-          </div>
+          <SeznamUctenek uctenky={u} limit={velikost === 'M' ? 5 : 30} sFotkou={velikost === 'L'}
+            smiMazat={velikost === 'L' && !nahled && smi('finance.uctenky_upravit')} />
         ))}
       </Widget>
       {smiPridat && (

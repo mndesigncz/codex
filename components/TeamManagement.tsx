@@ -26,7 +26,7 @@ import KioskSettings from './KioskSettings';
 import EmployeeProfile from './employer/EmployeeProfile';
 import ShareSettings from './employer/ShareSettings';
 import { usePersonProfile } from './employer/ProfileLinkProvider';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, ObdobiLista, SearchField, Segmented, Select, Skeleton, SwitchRow, Textarea, Toast, type MenuItem } from './ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, ObdobiLista, Rada, SearchField, Segmented, Select, Skeleton, SwitchRow, Textarea, Toast, type MenuItem } from './ui';
 import { Icon } from './Icons';
 import { PlochaWidgetu } from './widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from './widgety/useDataWidgetu';
@@ -524,31 +524,33 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           {data.data && <Chip tone="muted" size="sm">{members.length.toLocaleString(loc)}</Chip>}
         </h2>
         {/* Období hodin a výdělku (kolo 8): jedno tlačítko jako v Docházce — tento měsíc, minulý, 30 dní, vlastní od–do. */}
-        {smiHodiny && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <ObdobiLista value={obdobi} onChange={nastavObdobi} dnyTydne={false} hrubost={false}
-              volby={['tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} />
-            {soucet && (
-              <span className="t-meta tabular-nums" data-tym-soucet>
-                {t('Celkem {hodiny}', { hodiny: hodinyMinuty(soucet.ms) })}
-                {smiVidetSazby && soucet.mzda > 0 ? ` · ${money(soucet.mzda)}` : ''}
-                {smiVidetSazby && soucet.bezSazby > 0 ? ` · ${t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: soucet.bezSazby })}` : ''}
-              </span>
+        {/* v4 (V2/P10): období L→R; pod ním souhrn; pak toolbar 44 — hledání pružně a „Řadit" na R.
+            Dřív období obsahovou šířkou vlevo, hledání a segment řazení jako tři řady pod sebou. */}
+        {smiHodiny && <ObdobiLista value={obdobi} onChange={nastavObdobi} dnyTydne={false} hrubost={false} className="w-full"
+          volby={['tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} />}
+        {smiHodiny && soucet && (
+          <p className="t-meta tabular-nums -mt-1" data-tym-soucet>
+            {t('Celkem {hodiny}', { hodiny: hodinyMinuty(soucet.ms) })}
+            {smiVidetSazby && soucet.mzda > 0 ? ` · ${money(soucet.mzda)}` : ''}
+            {smiVidetSazby && soucet.bezSazby > 0 ? ` · ${t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: soucet.bezSazby })}` : ''}
+          </p>
+        )}
+        {(members.length >= 6 || (hodiny && members.length > 2)) && (
+          <Rada deleni="pruzne" vyska="m">
+            {/* Od šesti lidí se v seznamu hledalo Ctrl+F v prohlížeči (dřív až nad osm). */}
+            {members.length >= 6
+              ? <SearchField value={hledat} onChange={setHledat} storageKey="tym" placeholder={t('Hledat člena — jméno, pozice…')} ariaLabel={t('Hledat člena týmu')} />
+              : <span aria-hidden />}
+            {/* Podle čeho je na řádku největší číslo, podle toho musí jít řadit (DESIGN „Řazení"). */}
+            {hodiny && members.length > 2 && (
+              <select aria-label={t('Řadit lidi')} value={razeni} onChange={e => setRazeni(e.target.value as RazeniClenu)}
+                className="field !w-auto max-w-[45%] pr-9 text-sm font-medium" data-tym-razeni>
+                <option value="jmeno">{t('Jméno')}</option>
+                <option value="hodiny">{t('Hodiny', undefined, 'widgety')}</option>
+                {smiVidetSazby && <option value="vydelek">{t('Výdělek')}</option>}
+              </select>
             )}
-          </div>
-        )}
-        {/* Od šesti lidí se v seznamu hledalo Ctrl+F v prohlížeči (dřív až nad osm). */}
-        {members.length >= 6 && (
-          <SearchField value={hledat} onChange={setHledat} storageKey="tym" placeholder={t('Hledat člena — jméno, pozice…')} ariaLabel={t('Hledat člena týmu')} />
-        )}
-        {/* Podle čeho je na řádku největší číslo, podle toho musí jít řadit (DESIGN „Řazení"). */}
-        {hodiny && members.length > 2 && (
-          <Segmented size="sm" ariaLabel={t('Řadit lidi')} value={razeni} onChange={setRazeni}
-            options={[
-              { id: 'jmeno' as const, label: t('Jméno') },
-              { id: 'hodiny' as const, label: t('Hodiny', undefined, 'widgety') },
-              ...(smiVidetSazby ? [{ id: 'vydelek' as const, label: t('Výdělek') }] : []),
-            ]} />
+          </Rada>
         )}
         {smiHodiny && dochazka.error && !dochazka.data && (
           <ErrorState compact title={t('Hodiny se nenačetly')} detail={dochazka.error} onRetry={dochazka.reload} />
@@ -571,14 +573,13 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 ...(smiOdebrat && !owner && !nadeMnou(m) && m.id !== user.id ? [{ label: t('Odebrat z týmu'), kratce: t('Odebrat'), icon: 'minus', danger: true, onClick: () => setOdebrat(m) }] : []),
               ];
               const upravit = smiUpravitClena && !owner && !nadeMnou(m);
-              const akce = (
-                <>
-                  {upravit && <Button variant="secondary" size="sm" onClick={() => otevriUpravu(m)} aria-label={`Upravit: ${m.name}`}>{t('Upravit')}</Button>}
-                  {menu.length > 1 || (menu.length === 1 && upravit)
-                    ? <Menu size="sm" label={t('Další akce: {jmeno}', { jmeno: m.name })} items={menu} />
-                    : menu.length === 1 ? <Button variant="secondary" size="sm" onClick={menu[0].onClick}>{menu[0].kratce ?? menu[0].label}</Button> : null}
-                </>
-              );
+              // v4 (V4/V20): jedna akce řádku — „···" 36 na R v prvním řádku vedle čísla; „Upravit…" je v něm
+              // první. Dřív „Upravit" + „···" v druhém řádku vpravo, pod nimi chip role vlevo — tři hrany.
+              const polozky: MenuItem[] = [
+                ...(upravit ? [{ label: t('Upravit…'), icon: 'pencil', onClick: () => otevriUpravu(m) }] : []),
+                ...menu,
+              ];
+              const akce = polozky.length > 0 ? <Menu size="sm" label={t('Další akce: {jmeno}', { jmeno: m.name })} items={polozky} /> : null;
               // Meta: pozice · telefon (odkaz tel:) · sazba nebo „bez sazby" · e-mail. E-mail je poslední —
               // když se řádek na telefonu nevejde, utne se tečkami on, ne telefon. „Bez sazby"
               // je text, ne chip: widget Chybí sazba je hned nad nástrojem (vlastník se nepočítá).
@@ -612,21 +613,19 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     ? <button type="button" onClick={() => otevriProfil(m.id)} aria-label={t('Profil: {jmeno}', { jmeno: m.name })} className="max-w-full truncate text-left rounded-sm hover:underline decoration-black/25 underline-offset-2">{m.name}</button>
                     : m.name}
                   meta={meta}
+                  // Role (a „v jiném podniku") na ose textu pod meta — ne pod avatarem v druhém řádku.
+                  detail={<span className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {owner ? <Chip tone="ink" size="sm">{t('Vlastník')}</Chip> : <Chip tone="muted" size="sm">{nazevRole(t, m, role)}</Chip>}
+                    {m.aktivni_jinde && (
+                      <span className="inline-flex" title={jinde}>
+                        <Chip tone="muted" size="sm" icon="swap">{t('Právě v jiném podniku')}</Chip>
+                      </span>
+                    )}
+                  </span>}
                   // Sazba v jednom sloupci s tabulkovými číslicemi; bez ní pomlčka, ať sloupec drží.
                   value={smiHodiny ? hodinyRadku : smiVidetSazby ? (sazba != null ? t('{sazba}/h', { sazba: money(sazba) }) : <span aria-hidden className="hidden sm:inline text-black/35">—</span>) : undefined}
                   valueMeta={vydelekRadku}
-                  right={<>
-                    {owner ? <Chip tone="ink" size="sm">{t('Vlastník')}</Chip> : <Chip tone="muted" size="sm">{nazevRole(t, m, role)}</Chip>}
-                    {/* Na telefonu jen ikona (s popisem v title a pro odečítač), od sm celý chip. */}
-                    {m.aktivni_jinde && (
-                      <span className="inline-flex" title={jinde}>
-                        <Chip tone="muted" size="sm" icon="swap">
-                          <span className="sr-only sm:not-sr-only">{t('Právě v jiném podniku')}</span>
-                        </Chip>
-                      </span>
-                    )}
-                  </>}
-                  actions={upravit || menu.length > 0 ? akce : undefined}
+                  actions={akce ?? undefined}
                 />
               );
             })}

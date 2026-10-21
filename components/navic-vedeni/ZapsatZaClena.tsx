@@ -14,6 +14,7 @@ import { Button, Field, Input, Modal, Select, Textarea } from '../ui';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { obnovNavic } from './data';
+import { VolbaRadek, VolbyRadky } from '../ui/Volby';
 import { prelozHlaskuNavic } from './hlasky';
 import { uznaniVMezich } from './logika';
 
@@ -84,7 +85,7 @@ export function ZapsatZaClena({ nabidka, clovek, onClose, onHotovo }: {
         <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
         <Button type="submit" form="zapsat-za-clena" variant="primary" icon="check" loading={ukladam} disabled={!jde}>{t('Zapsat a uznat')}</Button>
       </>}>
-      <form id="zapsat-za-clena" className="space-y-3" data-zapsat-za-clena onSubmit={e => { e.preventDefault(); void uloz(); }}>
+      <form id="zapsat-za-clena" className="sloupec sloupec-4" data-zapsat-za-clena onSubmit={e => { e.preventDefault(); void uloz(); }}>
         {!clovek && (
           <Field id="navic-kdo" label={t('Komu')}>
             <Select id="navic-kdo" value={kdo} onChange={e => setKdo(e.target.value)} autoFocus>
@@ -94,17 +95,12 @@ export function ZapsatZaClena({ nabidka, clovek, onClose, onHotovo }: {
           </Field>
         )}
         {nabidka.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="t-label">{t('Z nabídky')}</p>
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Co se dá udělat navíc')}>
-              {nabidka.map(n => (
-                <button key={n.id} type="button" aria-pressed={offerId === n.id} onClick={() => zNabidky(n)}
-                  className={`filter-pill tap-target-sm max-w-full ${offerId === n.id ? 'seg-on' : 'seg-off glass'}`}>
-                  <span className="truncate">{n.title}</span> · {n.points} b
-                </button>
-              ))}
-            </div>
-          </div>
+          // Volby nabídky jako řádky L→R (název vlevo, body vpravo) — dřív zalamované pilulky (audit V03).
+          <VolbyRadky label={t('Z nabídky')} ariaLabel={t('Co se dá udělat navíc')}>
+            {nabidka.map(n => (
+              <VolbaRadek key={n.id} vybrano={offerId === n.id} onClick={() => zNabidky(n)} titul={n.title} hodnota={`${n.points} b`} />
+            ))}
+          </VolbyRadky>
         )}
         <Field id="navic-text" label={t('Co bylo navíc?')} hint={t('{n} / {max}', { n: text.length, max: MAX_DELKA_TEXTU })}>
           <Textarea id="navic-text" rows={3} value={text} onChange={e => setText(e.target.value)} maxLength={MAX_DELKA_TEXTU}
