@@ -1,11 +1,11 @@
 {
+  "3": "3",
   "+{castka} k výplatě": "+{castka} do wypłaty",
   "+{n} b každému": "+{n} pkt dla każdego",
   "+{n} min po začátku": "+{n} min po rozpoczęciu",
   "+{n} za 30 dní": "+{n} w ciągu 30 dni",
   "1. návštěva": "Pierwsza wizyta",
   "14 dní": "14 dni",
-  "3": "3",
   "3 měsíce": "3 miesiące",
   "30 dní": "30 dni",
   "6 měsíců": "6 miesięcy",
@@ -2688,5 +2688,8 @@
   "jen {komu}": "tylko {komu}",
   "Bez ceny či balení": "Bez ceny lub opakowania",
   "Přidat úkol…": "Dodaj zadanie…",
-  "Např. Objednat mléko zítra": "Np. Zamówić mleko jutro"
+  "Např. Objednat mléko zítra": "Np. Zamówić mleko jutro",
+  "Zapsat hned": "Zapisz teraz",
+  "Odchod zapíšu za {n} s. Do té doby ho jde vrátit.": "Wyjście zapiszę za {n} s. Do tego czasu można je cofnąć.",
+  "Vrátit odchod": "Cofnij wyjście"
 }

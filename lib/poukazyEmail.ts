@@ -3,12 +3,11 @@
 // jméno, zpráva a název podniku jdou do HTML jen přes escHtml (nikdy syrově).
 // Dárce může přidat vlastní vzkaz (nejvýš MAX_VZKAZ znaků); kód se ukazuje velký a opsatelný (DP-XXXX-XXXX).
 
-import { escHtml } from './email.ts';
 import { datumCesky } from './poukazyTisk.ts';
 import { formatMoney } from './money.ts';
 import { czCount, DEN } from './czech.ts';
 import { sablona } from './poukazySablony.ts';
-import { normalizujEmail, vypadaJakoEmail } from './emailAdresa.ts';
+import { escHtml, normalizujEmail, vypadaJakoEmail } from './emailAdresa.ts';
 
 export const MAX_VZKAZ = 300;
 

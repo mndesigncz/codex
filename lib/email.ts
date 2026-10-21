@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { emailText, sazejHtml } from './i18n/email.ts';
 import { LOCALE_PRO_JAZYK, type Jazyk } from './i18n/config.ts';
-import { htmlNaText } from './emailAdresa.ts';
+import { htmlNaText, escHtml } from './emailAdresa.ts';
 import { firma, identifikace } from './firma.ts';
 
 // E-mail, o kterém aplikace ví, jestli odešel.
@@ -26,14 +26,10 @@ import { firma, identifikace } from './firma.ts';
 // **Do HTML se vkládala jména bez ošetření.** Název podniku nebo jméno
 // kolegy s `<` rozbily šablonu; s `&` se rozpadl text na entitu.
 
-/** Text do HTML e-mailu. Escapuje se i `&`, jinak se „R&D" rozpadne. */
-export function escHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+// escHtml žije v emailAdresa.ts (čistý modul bez Resendu) — šablony, které
+// čte i klientský kód (poukazyEmail), ho berou odtamtud a SDK Resendu se
+// tak netáhne do bundlu prohlížeče. Tady zůstává re-export pro serverové trasy.
+export { escHtml } from './emailAdresa.ts';
 
 /** Zkušební adresa Resendu — funguje, ale nedoručuje komukoli. */
 const SANDBOX = 'onboarding@resend.dev';

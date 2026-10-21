@@ -55,7 +55,7 @@
 // mezipaměť (stejná adresa jako widgety „Podle stránky"), takže se po úpravě
 // záznamu obnoví obojí najednou (obnovDochazku).
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { Avatar, BulkBar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Select, SelectBox, Sloupec, Stat, StatRow, SwitchRow, Textarea, Well, runBulk, useSelection, type MenuItem } from '../../ui';
@@ -213,6 +213,8 @@ function odKdy(v: string | null | undefined): string {
 
 const hm = (t: string | null | undefined) => String(t ?? '').slice(0, 5);
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
+/** Jak dlouho jde odchod z Píchaček vrátit, než se zapíše. */
+const ODPOCET_ODCHODU_MS = 5000;
 
 // ---------------------------------------------------------------------------
 // Píchačky
@@ -314,17 +316,62 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
     void pichni(true);
   };
 
+  // Odchod s možností vrátit (audit Z02/B7, vzor Gmail „Vrátit odeslání", Homebase, Clockify):
+  // klepnutí na Odchod nezapíše hned — 5 s běží odpočet s „Vrátit" a „Zapsat hned".
+  // Omylem ukončená směna se tak vrátí bez vedoucího. Když člověk aplikaci zavře
+  // nebo přepne pryč, odchod se zapíše okamžitě (pagehide / skrytá karta), takže
+  // se nikdy neztratí. Otázka na pauzu po 6 h je sama potvrzením — tam odpočet není.
+  const [odpocet, setOdpocet] = useState<{ konec: number; akce: 'pichni' | 'z_pauzy' } | null>(null);
+  const odpocetRef = useRef(odpocet);
+  odpocetRef.current = odpocet;
+  const dokoncitOdchod = () => {
+    const o = odpocetRef.current;
+    if (!o) return;
+    odpocetRef.current = null;
+    setOdpocet(null);
+    if (o.akce === 'z_pauzy') void pauzuj('odchod'); else void pichni();
+  };
+  const dokoncitRef = useRef(dokoncitOdchod);
+  dokoncitRef.current = dokoncitOdchod;
+  const zacitOdchod = (akce: 'pichni' | 'z_pauzy') => {
+    if (nahled || ja.id == null || pise) return;
+    if (akce === 'pichni' && pauza?.zeptatSe) { void pichni(); return; }
+    setChyba(null); setPripomenUzaverku(false);
+    setOdpocet({ konec: Date.now() + ODPOCET_ODCHODU_MS, akce });
+  };
+  const [, setTik] = useState(0);
+  useEffect(() => {
+    if (!odpocet) return;
+    const id = window.setInterval(() => {
+      if (Date.now() >= odpocet.konec) dokoncitRef.current();
+      else setTik(x => x + 1);
+    }, 250);
+    const pryc = () => { if (document.visibilityState === 'hidden') dokoncitRef.current(); };
+    const zavreno = () => dokoncitRef.current();
+    document.addEventListener('visibilitychange', pryc);
+    window.addEventListener('pagehide', zavreno);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', pryc); window.removeEventListener('pagehide', zavreno); };
+  }, [odpocet]);
+  // Odchod rozběhnutý v odpočtu se zapíše i při odchodu z obrazovky (odmontování widgetu).
+  useEffect(() => () => { dokoncitRef.current(); }, []);
+  const zbyvaSekund = odpocet ? Math.max(1, Math.ceil((odpocet.konec - Date.now()) / 1000)) : 0;
+
   // Na směně dvě tlačítka vedle sebe (Odchod primary, Pauza secondary); na pauze „Konec pauzy" a tiché „Odchod".
   // v4 (V16, P12, P17): akce jsou PATKA widgetu — L→R × 44 na konci karty (pár ½ + ½), v každé velikosti.
   // Dřív „Odpíchnout příchod" na monitoru obsahová pilulka 172 px vlevo (block je přes šířku jen na telefonu).
-  const tlacitko = naPauze ? (
+  const tlacitko = odpocet ? (
+    <>
+      <Button variant="secondary" icon="undo" onClick={() => { odpocetRef.current = null; setOdpocet(null); }}>{t('Vrátit odchod')}</Button>
+      <Button variant="primary" icon="logout" loading={pise} onClick={dokoncitOdchod}>{t('Zapsat hned')}</Button>
+    </>
+  ) : naPauze ? (
     <>
       <Button variant="primary" icon="play" loading={pise} onClick={() => { void pauzuj('end'); }}>{t('Konec pauzy')}</Button>
-      <Button variant="secondary" icon="logout" disabled={pise} onClick={() => { void pauzuj('odchod'); }} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
+      <Button variant="secondary" icon="logout" disabled={pise} onClick={() => zacitOdchod('z_pauzy')} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
     </>
   ) : naSmene ? (
     <>
-      <Button variant="primary" icon="logout" loading={pise} onClick={() => { void pichni(); }} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
+      <Button variant="primary" icon="logout" loading={pise} onClick={() => zacitOdchod('pichni')} aria-label={t('Odpíchnout odchod')}>{t('Odchod')}</Button>
       <Button variant="secondary" icon="cup" disabled={pise} onClick={() => { void pauzuj('start'); }} aria-label={t('Začít pauzu')}>{t('Pauza')}</Button>
     </>
   ) : (
@@ -359,6 +406,11 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   ) : null;
   const hlaseni = (
     <>
+      {odpocet && (
+        <p className="note note-info !px-3 !py-2 text-[13px]" role="status" aria-live="polite" data-odpocet-odchodu>
+          {t('Odchod zapíšu za {n} s. Do té doby ho jde vrátit.', { n: zbyvaSekund })}
+        </p>
+      )}
       {chyba && <p className="note note-danger !px-3 !py-2 text-[13px]" role="alert">{chyba}</p>}
       {zjistujiPolohu && <p className="t-meta" role="status">{t('Ověřuji vzdálenost od podniku…')}</p>}
       {pripomenUzaverku && <p className="t-meta" role="status">{t('Směna skončila. Nezapomeň vyplnit uzávěrku.')}</p>}

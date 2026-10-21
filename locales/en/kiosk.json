@@ -242,5 +242,9 @@
   "PIN musí mít 6 číslic.": "The PIN must have 6 digits.",
   "Nový PIN má 6 číslic.": "A new PIN has 6 digits.",
   "Doporučujeme změnit PIN na 6 číslic.": "We recommend changing the PIN to 6 digits.",
-  "Moc špatných PINů. Zkus to za {n} s.": "Too many wrong PINs. Try again in {n} s."
+  "Moc špatných PINů. Zkus to za {n} s.": "Too many wrong PINs. Try again in {n} s.",
+  "Přidat příchod": "Add a clock-in",
+  "Kolega přichází na směnu": "A colleague is starting a shift",
+  "Kdo přichází?": "Who is coming in?",
+  "Vyber se a odpíchni příchod PINem.": "Pick yourself and clock in with your PIN."
 }

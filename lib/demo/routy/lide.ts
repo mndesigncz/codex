@@ -44,6 +44,12 @@ export const lide: Obsluha = (p, k) => {
       const moje = s.pichacky.filter(x => x.employeeId === meId).sort((a, b) => b.clockIn.localeCompare(a.clockIn));
       const otevrena = moje.find(x => x.clockOut == null) ?? null;
       const ja: Record<string, unknown> = { id: meId, openSince: otevrena?.clockIn ?? null };
+      // Vlastní řádek nese dnešní směnu jako skutečné API (attendance GET, řádek „ja") —
+      // bez ní Píchačky psaly „Dnes nemáš směnu v rozvrhu" a Nejbližší směna o kus níž „Právě probíhá".
+      const mojeSmena = smenaDnes(s, meId);
+      ja.shiftStart = mojeSmena?.startTime ?? null;
+      ja.shiftEnd = mojeSmena?.endTime ?? null;
+      ja.shiftDate = mojeSmena ? s.dnes : null;
       if (opr.has('finance.moje_mzda') || opr.has('finance.mzdy')) ja.hourlyRate = clen(meId).hourlyRate;
       return ok({ roster: [ja], entries: moje.map(x => ({ id: x.id, employeeId: x.employeeId, clockIn: x.clockIn, clockOut: x.clockOut, source: x.source, note: x.note })) });
     }

@@ -131,7 +131,7 @@ export default function ({ eq, ok }: Testy) {
   const brana = bezKomentaru(precti('components/kiosk/KioskShiftGate.tsx'));
   ok('Tablet: hlášení přes sdílený Toast, ne ruční limetkový proužek', brana.includes('<Toast ') && !brana.includes('text-[#5B7A08]') && !brana.includes('border-[#C8F542]/40'));
   ok('Tablet: přepínač osoby je MenuPanel s usePopover, aria-expanded a aria-checked', brana.includes('<MenuPanel') && brana.includes('usePopover(open, setOpen')
-    && brana.includes('aria-expanded={canSwitch ? open : undefined}') && brana.includes('aria-checked={vybrany}') && !brana.includes("? 'bg-[#C8F542]/20'"));
+    && brana.includes('aria-expanded={open}') && brana.includes('data-cip-osoby="stitek"') && brana.includes('aria-checked={vybrany}') && !brana.includes("? 'bg-[#C8F542]/20'"));
   ok('Tablet: PIN bez znaku ⌫, smazání je ikona s aria-label', !brana.includes('⌫') && brana.includes("aria-label={t('Smazat číslici')}"));
   ok('Tablet: PunchDialog je <Modal>, ne ruční překryv', !brana.includes('modal-overlay') && /export function PunchDialog[\s\S]*<Modal open/.test(brana));
 

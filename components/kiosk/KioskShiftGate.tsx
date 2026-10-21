@@ -13,7 +13,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, SearchField, Stat, StatRow, Toast } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuItemButton, MenuPanel, Modal, SearchField, Stat, StatRow, Toast } from '../ui';
 import { useNavigace } from '../widgety/NavigaceKontext';
 import { usePopover } from '@/lib/usePopover';
 import { useT } from '@/lib/i18n/client';
@@ -752,8 +752,7 @@ export function WhoIsWorking() {
 /** Header chip: who the tablet is recording as, plus a one-tap switcher. */
 export function ActivePersonChip() {
   const t = useT('kiosk');
-  const { active, onShift, selectPerson, requireActive } = useKioskShift();
-  const [open, setOpen] = useState(false);
+  const { active, onShift, requireActive } = useKioskShift();
 
   // Bez vybraného člověka se dřív odznak prostě nevykreslil — u baru to
   // vypadalo, že tablet nikoho nezapisuje, a přitom stačilo ťuknout na úkol
@@ -771,9 +770,7 @@ export function ActivePersonChip() {
       </button>
     );
   }
-  const canSwitch = onShift.length > 1;
-
-  return <PrepinacOsoby active={active} onShift={onShift} canSwitch={canSwitch} selectPerson={selectPerson} />;
+  return <PrepinacOsoby active={active} onShift={onShift} />;
 }
 
 /**
@@ -782,39 +779,61 @@ export function ActivePersonChip() {
  * zavření ztratil (DP §3.9). Teď sdílený MenuPanel s usePopover — stejné
  * chování jako menu „···". Vybraný člověk nese fajfku a aria-checked, ne
  * limetkový podklad (limetka na obrazovce patří jen hlavní akci).
+ *
+ * Audit K02/B11: s jedním člověkem na směně byl čip tlačítko, které po klepnutí
+ * nedělalo nic. Teď nabídka vždy něco umí — kromě lidí na směně i „Přidat příchod"
+ * (kolega přichází: vybere se a píchne PINem, vzor Square Team „Clock in"). Když
+ * na směně je jen jeden člověk a nikdo další v týmu, je čip jen štítek (ne tlačítko).
  */
-function PrepinacOsoby({ active, onShift, canSwitch, selectPerson }: {
-  active: ActivePerson; onShift: RosterMember[]; canSwitch: boolean; selectPerson: (id: number) => void;
-}) {
+function PrepinacOsoby({ active, onShift }: { active: ActivePerson; onShift: RosterMember[] }) {
   const [open, setOpen] = useState(false);
+  const [pridat, setPridat] = useState(false);
   const t = useT('kiosk');
+  const { offShift, selectPerson, punch } = useKioskShift();
   const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
+  const lzePrepnout = onShift.length > 1;
+  const lzePridat = offShift.length > 0;
+  const interaktivni = lzePrepnout || lzePridat;
+  const tvar = 'flex items-center gap-2.5 rounded-full pl-2.5 pr-4 py-2 min-h-[44px]';
+  const vzhled = `btn-secondary ${tvar} transition`;
+  const obsah = (
+    <>
+      <Avatar emoji={active.avatar} size="sm" ring={false} />
+      <span className="text-left leading-tight min-w-0">
+        {/* Na telefonu popisek ustoupí jménu — 49 px na „Eva Testová" nestačilo. */}
+        <span className="hidden sm:block t-label">{t('Zapisuje se jako')}</span>
+        <span className="block font-bold text-[#16181A] text-sm truncate max-w-[7rem] sm:max-w-[11rem]">{active.name}</span>
+      </span>
+    </>
+  );
+
+  // Jediný člověk v celém týmu: není co přepnout ani koho přidat — štítek, ne tlačítko.
+  if (!interaktivni) {
+    return (
+      <div className={`glass ${tvar}`} data-cip-osoby="stitek">
+        {obsah}
+      </div>
+    );
+  }
 
   return (
     <div ref={pop.ref} className="relative">
       <button
         type="button"
         ref={pop.triggerRef}
-        onClick={() => canSwitch && setOpen(v => !v)}
-        onKeyDown={canSwitch ? pop.onTriggerKeyDown : undefined}
-        aria-haspopup={canSwitch ? 'menu' : undefined}
-        aria-expanded={canSwitch ? open : undefined}
+        onClick={() => setOpen(v => !v)}
+        onKeyDown={pop.onTriggerKeyDown}
+        aria-haspopup="menu"
+        aria-expanded={open}
         // v3: šedá pilulka (jako sekundární tlačítko), ne limetkový nádech — limetka
         // na obrazovce patří jen hlavní akci; kdo se zapisuje, nese avatar a jméno.
-        className={`btn-secondary flex items-center gap-2.5 rounded-full pl-2.5 pr-4 py-2 min-h-[44px] transition ${
-          canSwitch ? '' : 'cursor-default'
-        }`}
+        className={vzhled}
       >
-        <Avatar emoji={active.avatar} size="sm" ring={false} />
-        <span className="text-left leading-tight min-w-0">
-          {/* Na telefonu popisek ustoupí jménu — 49 px na „Eva Testová" nestačilo. */}
-          <span className="hidden sm:block t-label">{t('Zapisuje se jako')}</span>
-          <span className="block font-bold text-[#16181A] text-sm truncate max-w-[7rem] sm:max-w-[11rem]">{active.name}</span>
-        </span>
-        {canSwitch && <Icon name="chevron" size={15} className="text-black/35" />}
+        {obsah}
+        <Icon name="chevron" size={15} className="text-black/35" />
       </button>
 
-      {open && canSwitch && (
+      {open && (
         <MenuPanel ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} aria-label={t('Zapisovat jako')}
           className="absolute right-0 top-full mt-2 w-64 origin-top-right">
           {onShift.map(m => {
@@ -834,7 +853,22 @@ function PrepinacOsoby({ active, onShift, canSwitch, selectPerson }: {
               </button>
             );
           })}
+          {lzePridat && (
+            <MenuItemButton icon="plus" label={t('Přidat příchod')} hint={t('Kolega přichází na směnu')}
+              oddelit={onShift.length > 0 ? true : undefined} className="min-h-[52px]"
+              onClick={() => { pop.close(); setPridat(true); }} />
+          )}
         </MenuPanel>
+      )}
+
+      {pridat && (
+        <Modal open onClose={() => setPridat(false)} size="sm" title={t('Kdo přichází?')} subtitle={t('Vyber se a odpíchni příchod PINem.')}>
+          <PersonPicker
+            members={offShift}
+            onPick={m => { setPridat(false); punch(m); }}
+            emptyText={t('Všichni z týmu už jsou na směně.')}
+          />
+        </Modal>
       )}
     </div>
   );

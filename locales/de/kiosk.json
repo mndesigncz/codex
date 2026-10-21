@@ -242,5 +242,9 @@
   "PIN musí mít 6 číslic.": "Die PIN muss 6 Ziffern haben.",
   "Nový PIN má 6 číslic.": "Eine neue PIN hat 6 Ziffern.",
   "Doporučujeme změnit PIN na 6 číslic.": "Wir empfehlen, die PIN auf 6 Ziffern zu ändern.",
-  "Moc špatných PINů. Zkus to za {n} s.": "Zu viele falsche PINs. Versuche es in {n} s erneut."
+  "Moc špatných PINů. Zkus to za {n} s.": "Zu viele falsche PINs. Versuche es in {n} s erneut.",
+  "Přidat příchod": "Kommen erfassen",
+  "Kolega přichází na směnu": "Ein Kollege beginnt die Schicht",
+  "Kdo přichází?": "Wer kommt?",
+  "Vyber se a odpíchni příchod PINem.": "Wähle dich aus und stempel dich mit deiner PIN ein."
 }
