@@ -7,7 +7,7 @@ import Billing from './Billing';
 import { Icon } from './Icons';
 import { EmptyState, Button, Skeleton, PageHeader, Segmented, Badge, Chip, ListRow, Modal, Stat, StatRow, Label } from './ui';
 import { useObal } from './ObalProvider';
-import PravniOdkazy from './pravni/PravniOdkazy';
+import ProvozovatelInfo from './pravni/ProvozovatelInfo';
 import NahlasenyObsah from './moderace/NahlasenyObsah';
 import Zablokovani from './moderace/Zablokovani';
 import { OvereniEmailuNastaveni } from './auth/OvereniEmailu';
@@ -622,7 +622,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
               <section className="card p-5 sloupec sloupec-3" aria-labelledby="nast-o-aplikaci">
                 <h2 id="nast-o-aplikaci" className={cardTitle}>{t('O aplikaci')}</h2>
                 <p className="t-meta -mt-2">{t('Právní informace a kontakt na podporu.')}</p>
-                <PravniOdkazy className="text-sm" />
+                <ProvozovatelInfo className="text-sm" />
               </section>
             </div>
           ) : section === 'notifications' ? (

@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Button, SwitchRow } from '../ui';
-import PravniOdkazy from '../pravni/PravniOdkazy';
+import ProvozovatelInfo from '../pravni/ProvozovatelInfo';
 import SmazatUcet from '../ucet/SmazatUcet';
 import ZamekAplikace from '../ucet/ZamekAplikace';
 import { jeNativni, nativniMost, stavNativnihoPushe } from '@/lib/nativni/most';
@@ -187,7 +187,7 @@ export default function UcetHosta({ novinky, novinkyEmail = true, onFlash }: { n
         {stazeno === 'nejde' && <p role="alert" className="note note-danger">{t('Data se nepodařilo stáhnout. Zkus to za chvíli znovu.')}</p>}
       </div>
 
-      <PravniOdkazy className="mt-3 text-sm text-black/60" />
+      <ProvozovatelInfo className="mt-3 text-sm text-black/60" />
       <SmazatUcet jeHost />
     </section>
   );
