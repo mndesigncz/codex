@@ -35,7 +35,7 @@ import {
 } from '@/lib/packaging';
 import ConsumeControl from '../inventory/ConsumeControl';
 import PoleMnozstvi from '../inventory/PoleMnozstvi';
-import { VolbaDil, VolbaRadek } from '../navic/NabidkaChipy';
+import { VolbaDil, VolbaRadek } from '../ui/Volby';
 import SkladZalozky from '../inventory/SkladZalozky';
 import { vyznamCeny, jednotkaSnesDesetiny } from '@/lib/jednotky';
 import { NABIDKA_JEDNOTEK, jeZNabidky, vedeniPolozky, celkemObsahu } from '@/lib/mnozstvi';

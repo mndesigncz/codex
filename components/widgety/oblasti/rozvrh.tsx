@@ -45,7 +45,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import {
-  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, PersonChip, SelectBox, Sloupec, Stat, Textarea, Toast,
+  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, PersonChip, Rada, SelectBox, Sloupec, Stat, Textarea, Toast,
   runBulk, useSelection, type MenuItem,
 } from '../../ui';
 import { useMoney } from '../../CurrencyProvider';
@@ -504,11 +504,12 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
     )
   ) : null);
   const sestavit = smiSestavit || smiPripomenout ? (
-    // Tichá akce se srovná s levým okrajem (DESIGN: Na telefonu nesmí prvek skončit v půlce).
-    <div className="flex flex-wrap items-center gap-2">
+    // v4 (P2, P12): akce jsou řada L→R — dvě ½ + ½, jedna přes šířku. Dřív dvě obsahové pilulky vlevo,
+    // druhá končila v třetině karty („Sestavit rozvrh" 145 + „Připomenout (1)" 147 px).
+    <Rada vyska="s">
       {smiSestavit && <Button variant="secondary" size="sm" icon="calendar" onClick={() => nav.onNavigate('shifts')}>{t('Sestavit rozvrh')}</Button>}
       {tlacitkoPripomenout(false)}
-    </div>
+    </Rada>
   ) : null;
   const shrnuti = <p className="t-meta">{t('Na {mesic} zadalo {zadali} z {celkem}.', { mesic: naMesic, zadali: zadali.length.toLocaleString('cs-CZ'), celkem: celkem.toLocaleString('cs-CZ') })}</p>;
   const vsichni = chybi.length === 0 && celkem > 0 ? (

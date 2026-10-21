@@ -8,23 +8,17 @@
 // na levé ose karty: titul 15/600 → 4 → věta 13 → 16 → jediná akce přes celou šířku (L→R × 44).
 
 import React from 'react';
-import { Sloupec } from '../ui';
+import { EmptyState } from '../ui';
 
+/** Tenký obal kolem `EmptyState vlevo` (jedna podoba prázdna v kartě pro widgety i nástroje stránek). */
 export function PrazdnoWidgetu({ titul, text, akce }: {
   titul?: React.ReactNode;
   text?: React.ReactNode;
   /** Nejvýš jedna akce (`<Button variant="secondary">`); vyplní šířku karty. */
   akce?: React.ReactNode;
 }) {
-  return (
-    <Sloupec mezera={4}>
-      <Sloupec mezera={1}>
-        {titul && <p className="stav-titul text-balance">{titul}</p>}
-        {text && <p className="t-meta text-pretty">{text}</p>}
-      </Sloupec>
-      {akce && <div className="rada rada-rovne rada-m">{akce}</div>}
-    </Sloupec>
-  );
+  if (!titul) return <EmptyState vlevo title={<span className="t-meta font-normal">{text}</span>} action={akce} />;
+  return <EmptyState vlevo title={titul} hint={text} action={akce} />;
 }
 
 export default PrazdnoWidgetu;

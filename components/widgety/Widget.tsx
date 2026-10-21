@@ -18,6 +18,7 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, u
 import { Icon } from '../Icons';
 import { Button, Card, ErrorState, Menu, MenuPanel, Modal, Skeleton, type MenuItem } from '../ui';
 import { StavovaKarta } from '../ui/StavovaKarta';
+import { PrazdnoVlevo } from '../ui/EmptyState';
 import type { LoadState } from '../ui/useLoad';
 import type { DefiniceWidgetu, Kostra, PoleNastaveni, Rozhrani, Smi, Tarif, Velikost } from '@/lib/widgety/typy';
 import { kostraWidgetu } from '@/lib/widgety/rozlozeni';
@@ -485,8 +486,10 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   // neslo titul + „1 čeká" + filtr + „Odměny ›" + ⤢ + ^ — skupina ovládání (nejvýš 45 %) přetekla
   // a filtr se kreslil PŘES odkaz („Měsíc: Tento" na „Odměny"), titul „Tresty v tý…" se utnul (V1: titul ≥ 55 %).
   const filtrVRade = !!poleFiltru && (S || telefon || maFiltry || (!!odkaz && nav.smiPohled(odkaz.pohled)) || doplnek != null);
+  // Malá karta: filtr dole vedle šipky má ~90 px — jen hodnota („Tento ▾"), název pole nese aria-label.
+  const filtrDole = S && filtrVRade && !maFiltry && !!poleFiltru;
   const filtr = poleFiltru ? (
-    <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={filtrVRade}
+    <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={filtrVRade} jenHodnota={filtrDole}
       onZmena={id => k.zmenNastaveni?.({ [poleFiltru.klic]: id })} />
   ) : null;
   const filtrVHlavicce = filtr && !filtrVRade ? filtr : null;
@@ -494,7 +497,6 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   // šipkou „Otevřít" (pružný + pevný, 36). Nahoře by posunul štítek a číslo o řadu níž než
   // u sousední dlaždice bez filtru (Přehled: „Úkoly na dnes" 2 na y 705 vedle „Docházející zásoby"
   // 3 na y 657) a filtr nahoře + šipka dole dělaly zubatý sloupec (Marže, Souhrn měsíce).
-  const filtrDole = S && filtrVRade && !maFiltry && !!filtr;
   const radaFiltru = (filtrVRade && filtr && !filtrDole) || maFiltry ? (
     <div className="rada rada-rovne rada-s" data-w-filtry="">
       {filtrVRade && filtr}
@@ -613,6 +615,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
       {sloty && (
         // `mt-3` (12 pod hlavičkou) zůstává i jako háček sond (widgety-sbalit hledá tělo karty).
         <div className={`w-telo relative mt-3 flex-1 min-h-0`}>
+          <PrazdnoVlevo.Provider value>
           {radaFiltru}
           {maSegment && <div className="min-w-0" data-w-segment="">{segment}</div>}
           {maSouhrn ? (
@@ -623,6 +626,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
           ) : jadro}
           {maPatku && <div className="rada rada-rovne rada-m w-patka" data-w-patka="">{patka}</div>}
           {pataMale}
+          </PrazdnoVlevo.Provider>
         </div>
       )}
       {otevrit && (
@@ -687,7 +691,7 @@ export function Chybi() {
   if (vyvoj) {
     return (
       <Widget>
-        <ErrorState compact title={t('Widget chybí')} hint={t('Oblast nemá komponentu pro {widget}.', { widget: k.definice?.id ?? t('tenhle widget') })} className="!py-3" />
+        <ErrorState compact vlevo title={t('Widget chybí')} hint={t('Oblast nemá komponentu pro {widget}.', { widget: k.definice?.id ?? t('tenhle widget') })} className="!py-3" />
       </Widget>
     );
   }
@@ -730,7 +734,7 @@ function ZaloznaChyba({ onZnovu, detail }: { onZnovu: () => void; detail: string
   const t = useT('widgety');
   return (
     <Widget>
-      <ErrorState compact title={t('Widget se nenačetl')} onRetry={onZnovu} detail={detail} className="!py-3" />
+      <ErrorState compact vlevo title={t('Widget se nenačetl')} onRetry={onZnovu} detail={detail} />
     </Widget>
   );
 }

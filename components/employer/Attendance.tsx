@@ -38,7 +38,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, Button, Card, Chip, ErrorState, Field, Input, ListRow, Modal, ObdobiLista, SearchField, Segmented, Select, Skeleton, Stat, StatRow, SwitchRow, Textarea, Toast } from '../ui';
+import { Avatar, Button, Card, Chip, ErrorState, Field, Input, ListRow, Menu, Modal, ObdobiLista, SearchField, Segmented, Select, Skeleton, Stat, StatRow, SwitchRow, Textarea, Toast } from '../ui';
 import { usePersonProfile } from './ProfileLinkProvider';
 import { useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -579,6 +579,13 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 const akce = d.zamek ? (
                   <Button variant="ghost" size="sm" iconOnly icon="lock" className="max-sm:!h-11 max-sm:!w-11" onClick={() => oznam(hlaskaZamku(d.zamek!), 'bad')}
                     aria-label={t('Období je uzavřené: {jmeno}', { jmeno })} title={t('Období je uzavřené')} data-zamek />
+                ) : smiUpravit && smiMazat && !zapomenuty ? (
+                  // v4 (V4): úprava a smazání jsou jedno „···" 36 na R — dřív tužka a koš jako dvě holé ikony
+                  // na vlastním druhém řádku (prázdný řádek jen kvůli dvěma ikonám u pravé hrany).
+                  <Menu size="sm" label={t('Upravit nebo smazat záznam: {jmeno}', { jmeno })} items={[
+                    { label: t('Upravit čas…'), icon: 'pencil', onClick: () => otevriUpravu(x) },
+                    { label: t('Smazat záznam…'), icon: 'trash', danger: true, onClick: () => { setChybaSmazani(null); setSmazat(x); } },
+                  ]} />
                 ) : (
                   <>
                     {smiUpravit && (zapomenuty
@@ -609,7 +616,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                     // Pod lg je doplněk skrytý a chipy jdou do `right`, který ocas zalomí pod jméno. `right`
                     // dostane každý řádek (na lg+ prázdný), jinak by mezera navíc posunula čísla o 12 px.
                     aside={chipy ?? ''}
-                    right={<span className="lg:hidden">{chipy}</span>}
+                    right={chipy ? <span className="lg:hidden">{chipy}</span> : undefined}
                     actions={smiUpravit || smiMazat ? akce : undefined}
                   />
                 );

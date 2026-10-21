@@ -2,6 +2,7 @@
 
 import React, { useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import { PrazdnoVlevo } from './EmptyState';
 import { Icon } from '../Icons';
 import { useModal } from '@/lib/useModal';
 import { DiscardGuard } from './DiscardGuard';
@@ -74,13 +75,11 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
           <button type="button" onClick={modal.guard.attemptClose} aria-label={t('Zavřít')}
             className="btn-icon tap-target shrink-0 -mt-1"><Icon name="close" size={16} /></button>
         </div>
-        {!prazdneTelo && <div className="px-5 sm:px-6 pb-6 overflow-y-auto scrollbar-thin">{children}</div>}
-        {/* Tlačítka se zalamují: na 320 px má tělo okna 240 px a „Stornieren" +
-            „Eintrag speichern" mají 270 — bez zalomení vyjelo Zrušit za levý okraj. */}
-        {/* Na telefonu (spodní okno) jdou tlačítka přes šířku jako v inspiracích: jedno nebo dvě pilulky
-            vedle sebe, palec je nemine. Od sm zůstávají vpravo podle obsahu. */}
-        {/* v4 (V6, P12): patička = stupeň L (52); na telefonu L→R nebo 2 × ½ (mezera 8). */}
-        {footer && <div className="okno-paticka px-5 sm:px-6 pb-5 sm:pb-6 pt-0 flex flex-wrap items-center justify-end gap-2 max-sm:[&>*]:flex-1 max-sm:[&>*]:min-w-[8rem]">{footer}</div>}
+        {/* Okno je portál: prázdný stav v něm nedědí „vlevo" z widgetu, ze kterého se otevřelo. */}
+        {!prazdneTelo && <div className="px-5 sm:px-6 pb-6 overflow-y-auto scrollbar-thin"><PrazdnoVlevo.Provider value={false}>{children}</PrazdnoVlevo.Provider></div>}
+        {/* v4 (V6, P12): patička je řada L→R — jedna akce přes šířku, dvě ½ + ½, tři ⅓, výška 52.
+            Dřív od sm obsahové pilulky u pravé hrany (každá jiná šířka) a na telefonu flex se zalamováním. */}
+        {footer && <div className="okno-paticka px-5 sm:px-6 pb-5 sm:pb-6 pt-0">{footer}</div>}
       </div>
     </div>,
     document.body,

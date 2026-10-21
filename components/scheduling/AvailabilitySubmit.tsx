@@ -368,7 +368,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         {/* Do minulosti nejde — dostupnost na uplynulý měsíc nemá smysl. Tichá akce „Jako minulý měsíc"
             se na telefonu zalomí pod přepínač a drží se levého okraje. */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <MonthNav value={month} onChange={setMonth} min={currentMonth} />
+          <MonthNav velikost="s" value={month} onChange={setMonth} min={currentMonth} />
           {ukazJakoMinule && !loading && !loadFailed && (
             <Button variant="ghost" size="sm" icon="copy" onClick={() => { void jakoMinule(); }} className="tap-target"
               title={t('Převezme z minulého měsíce, co se opakovalo podle dne v týdnu — jen do dnů, které ještě nemají vlastní stav.')}>
@@ -401,14 +401,16 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         <>
           <div>
             {/* Legenda je zároveň štětec: vybraný stav nastaví klepnutý den, „Přepínat" cyklí. */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-2" role="radiogroup" aria-label={t('Co nastaví klepnutí na den')}>
+            {/* v4 (P2, DESIGN „jedna vodorovná řada čipů"): jeden posuvný pás mezi L a R karty — dřív se
+                pět pilulek zalomilo do dvou řad se dvěma různými pravými hranami. */}
+            <div className="flex flex-nowrap items-center gap-1.5 mb-2 overflow-x-auto scroll-fade-x scrollbar-none py-0.5" role="radiogroup" aria-label={t('Co nastaví klepnutí na den')}>
               <button type="button" role="radio" aria-checked={stetec === null} onClick={() => setStetec(null)}
-                className={`filter-pill tap-target-sm ${stetec === null ? 'seg-on' : 'seg-off glass'}`}>
+                className={`filter-pill tap-target-sm shrink-0 ${stetec === null ? 'seg-on' : 'seg-off glass'}`}>
                 {t('Přepínat')}
               </button>
               {stateList.map((st) => (
                 <button key={st} type="button" role="radio" aria-checked={stetec === st} onClick={() => setStetec(st)}
-                  className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 ${stetec === st ? 'seg-on' : 'seg-off glass'}`}>
+                  className={`filter-pill tap-target-sm shrink-0 inline-flex items-center gap-1.5 ${stetec === st ? 'seg-on' : 'seg-off glass'}`}>
                   <span aria-hidden className={`h-2.5 w-2.5 rounded-full shrink-0 ${metaOf(st).dot}`} /> {metaOf(st).label}
                 </button>
               ))}

@@ -1,7 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { Icon } from '../Icons';
+
+/**
+ * v4 (V7, rozhodnutí ověřovatele): prázdný stav UVNITŘ karty nebo widgetu stojí vlevo na ose karty —
+ * stejně jako chyba v kartě (`ErrorState vlevo`) a stavová karta (V8). Na střed jen na prázdné stránce,
+ * v okně s jediným obsahem a s ilustrací. Widget nastaví kontext pro své tělo, takže `EmptyState`
+ * v obsahu widgetu je vlevo bez dalšího zásahu; karta mimo widget řekne `vlevo` sama.
+ */
+export const PrazdnoVlevo = createContext(false);
 
 // Prázdný stav, který učí, ne jen hlásí „nic tu není".
 //
@@ -9,7 +17,7 @@ import { Icon } from '../Icons';
 // limetkový akcent) místo dvaceti čtyř různě napsaných „Zatím žádné…".
 // Text říká, co tu bude a jak to sem dostat; tlačítko to udělá.
 
-export function EmptyState({ illustration, icon, title, hint, action, compact = false, className = '' }: {
+export function EmptyState({ illustration, icon, title, hint, action, compact = false, vlevo: vlevoProp, className = '' }: {
   /** Název souboru bez přípony v /public/illu (např. „sklad"). */
   illustration?: string;
   /** Náhradní ikona, když ilustrace pro tenhle stav není. */
@@ -19,8 +27,28 @@ export function EmptyState({ illustration, icon, title, hint, action, compact = 
   action?: React.ReactNode;
   /** Menší varianta do panelu nebo karty. */
   compact?: boolean;
+  /** Vlevo na ose karty (kruh 40 na L, věta vedle, akce L→R × 44). Bez určení: vlevo uvnitř widgetu. */
+  vlevo?: boolean;
   className?: string;
 }) {
+  const vKarte = useContext(PrazdnoVlevo);
+  const vlevo = vlevoProp ?? (vKarte && !illustration);
+  if (vlevo) {
+    return (
+      <div className={`sloupec sloupec-4 min-w-0 text-left ${className}`} data-prazdno-vlevo="">
+        <div className="flex items-start gap-3 min-w-0">
+          {icon && (
+            <span aria-hidden className="stav-kruh bg-black/[0.05] text-black/50"><Icon name={icon} size={20} strokeWidth={1.6} /></span>
+          )}
+          <div className={`min-w-0 flex-1 ${icon ? 'pt-0.5' : ''}`}>
+            <p className="stav-titul text-balance">{title}</p>
+            {hint && <p className="t-meta mt-1 text-pretty">{hint}</p>}
+          </div>
+        </div>
+        {action && <div className="rada rada-rovne rada-m">{action}</div>}
+      </div>
+    );
+  }
   return (
     // v4 (V7): kruh 56 → 12 → titul 16/600 → 4 → nápověda 13 (nejvýš 280 široká) → 16 → jedna akce 44.
     // Odsazení nad a pod 24 ve widgetu, 48 na prázdné stránce.

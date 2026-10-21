@@ -14,7 +14,7 @@ import { Button, Field, Input, Modal, Select, Textarea } from '../ui';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { obnovNavic } from './data';
-import { VolbaRadek, VolbyRadky } from '../navic/NabidkaChipy';
+import { VolbaRadek, VolbyRadky } from '../ui/Volby';
 import { prelozHlaskuNavic } from './hlasky';
 import { uznaniVMezich } from './logika';
 

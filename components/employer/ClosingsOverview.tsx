@@ -386,7 +386,7 @@ export default function ClosingsOverview() {
                 <li key={c.id}>
                   <ListRow as="div"
                     lead={<Avatar emoji={c.author_avatar} size="sm" />}
-                    title={<span className="cz-sentence">{denKratce(denUzaverky(c), loc)}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
+                    title={<span className="cz-sentence">{denKratce(denUzaverky(c), loc)}{c.shift_label ? <> · <span className="whitespace-nowrap">{c.shift_label}</span></> : ''}</span>}
                     // Posádka na vlastním řádku, nejvýš na dva (V04): v jednom řádku s tržbou se utínala
                     // na „Směna: Jakub Kolář + Petra Mar…". Tržba je číslo řádku — pevný sloupec
                     // s tabulkovými číslicemi na monitoru, na telefonu vlevo pod jménem a rozdíl kasy vedle ní.

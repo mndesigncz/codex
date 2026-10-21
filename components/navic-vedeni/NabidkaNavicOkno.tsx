@@ -18,7 +18,7 @@ import { apiMessage, okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 import { pragueToday } from '@/lib/pragueTime';
 import { Button, Field, Input, Modal, Rada, Select, SwitchRow, Textarea } from '../ui';
-import { VolbaDil } from '../navic/NabidkaChipy';
+import { VolbaDil } from '../ui/Volby';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { obnovNavic } from './data';

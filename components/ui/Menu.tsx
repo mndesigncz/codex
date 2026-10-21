@@ -137,10 +137,11 @@ export function Menu({ items, label, size = 'md', align = 'right', icon = 'more'
     <div ref={pop.ref} className={`relative shrink-0 ${jenMobil ? 'md:hidden' : ''} ${className}`}>
       {/* v3: „···" je ikona v šedém kruhu 40 px — stejná jako hledání a oznámení
           v liště. Malé (36 px) zůstává v řádku a v hlavičce widgetu. */}
-      {size === 'sm' ? (
+      {/* `lg` = spouštěč 44 do toolbaru (P7: v řadě 44 má ikonové tlačítko průměr 44, ne kruh 40). */}
+      {size === 'sm' || size === 'lg' ? (
         <Button
           ref={pop.triggerRef}
-          variant="secondary" size="sm" iconOnly icon={icon} aria-label={label ?? t('Další akce')}
+          variant="secondary" size={size === 'lg' ? 'md' : 'sm'} iconOnly icon={icon} aria-label={label ?? t('Další akce')}
           aria-haspopup="menu" aria-expanded={open}
           onClick={() => setOpen(v => !v)}
           onKeyDown={pop.onTriggerKeyDown}

@@ -1908,11 +1908,19 @@ html[data-obal] .jen-web { display: none !important; }
    ===================================================================== */
 
 /* ---------- Řady (components/ui/Rada.tsx) ---------- */
-.rada { display: flex; align-items: stretch; gap: var(--m-2); width: 100%; min-width: 0; }
+/* `display` řady a sloupce je v @layer components, aby ho přebila utilita (`hidden`, `md:hidden`,
+   `hidden md:flex`) — mimo vrstvu by `.sloupec` nebo `.rada` zobrazily i schovaný prvek. Zbytek
+   pravidel zůstává mimo vrstvu (musí přebít výšku a zalamování z utilit dílů). */
+@layer components {
+  .rada { display: flex; }
+  .rada-rovne { display: grid; }
+  .sloupec { display: flex; }
+}
+.rada { align-items: stretch; gap: var(--m-2); width: 100%; min-width: 0; }
 .rada-mezera-3 { gap: var(--m-3); }
 /* Rovné díly: 2 × ½, 3 × ⅓ — každý přímý potomek stejně široký, nikdy přes R. Mřížka, ne flex:
    u `flex: 1 1 0` by díl s velkým odsazením (select se šipkou, 50 px) dostal o to víc. */
-.rada-rovne { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.rada-rovne { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 .rada-rovne > * { min-width: 0; }
 /* Pružný + pevný: první díl (pole, titul, segment) bere zbytek, ostatní obsahová šířka na R. */
 .rada-pruzna > :first-child { flex: 1 1 auto; min-width: 0; }
@@ -1926,11 +1934,11 @@ html[data-obal] .jen-web { display: none !important; }
 /* Dlouhý popisek (de/pl) se v dílu zalomí, díl nepřeteče (P2, §8). */
 .rada > :is(button, a, .btn) { white-space: normal; line-height: 1.15; text-align: center; overflow: hidden; }
 .rada-rovne > :is(button, a, .btn) { padding-left: 0.75rem; padding-right: 0.75rem; }
-/* select v řadě: výška z řady, ne z `.field` (44/52). */
-.rada > select.field, .rada > div > select.field { height: 100%; min-height: 0; }
+/* select v řadě: výšku mu dá `.rada-s/-m/-l > *` (neuvrstvené, přebije `.field` 44/52). Dřív tu bylo
+   `height: 100%`, které v řadě bez pevné výšky spadlo na výšku textu (25 px, Tým to obcházel `!h-…`). */
 
 /* ---------- Sloupec (skupiny pod sebou s mezerou ze škály) ---------- */
-.sloupec { display: flex; flex-direction: column; min-width: 0; }
+.sloupec { flex-direction: column; min-width: 0; }
 .sloupec-1 { gap: var(--m-1); } .sloupec-2 { gap: var(--m-2); } .sloupec-3 { gap: var(--m-3); }
 .sloupec-4 { gap: var(--m-4); } .sloupec-5 { gap: var(--m-5); } .sloupec-6 { gap: var(--m-6); } .sloupec-8 { gap: var(--m-8); }
 
@@ -2001,7 +2009,8 @@ html[data-obal] .jen-web { display: none !important; }
 
 /* ---------- Hlavní akce stránky a patička okna: stupeň L (52) ---------- */
 .ph-hlavni > :is(button, a, .btn) { height: var(--h-l); font-size: 1rem; padding-left: 1.5rem; padding-right: 1.5rem; }
-.okno-paticka > :is(button, a, .btn) { height: var(--h-l); }
+.okno-paticka { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--m-2); align-items: stretch; }
+.okno-paticka > :is(button, a, .btn) { height: var(--h-l); min-width: 0; white-space: normal; line-height: 1.15; text-align: center; }
 
 /* Položka nabídky oddělená linkou (lišta „···": akce stránky nahoře, akce lišty pod linkou). */
 .menu-oddelit { margin-top: 0.375rem; position: relative; }

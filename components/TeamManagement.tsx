@@ -544,7 +544,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             {/* Podle čeho je na řádku největší číslo, podle toho musí jít řadit (DESIGN „Řazení"). */}
             {hodiny && members.length > 2 && (
               <select aria-label={t('Řadit lidi')} value={razeni} onChange={e => setRazeni(e.target.value as RazeniClenu)}
-                className="field !h-[var(--h-m)] !w-auto max-w-[45%] pr-9 text-sm font-medium" data-tym-razeni>
+                className="field !w-auto max-w-[45%] pr-9 text-sm font-medium" data-tym-razeni>
                 <option value="jmeno">{t('Jméno')}</option>
                 <option value="hodiny">{t('Hodiny', undefined, 'widgety')}</option>
                 {smiVidetSazby && <option value="vydelek">{t('Výdělek')}</option>}

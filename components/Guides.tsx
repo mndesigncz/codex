@@ -481,7 +481,8 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
           suggestions={categories.map(c => ({ label: c.name, hint: t('kategorie') }))} className="min-w-0 flex-1" />
         {(maPasKategorii || maPasStavu) && (
           <div className="sm:hidden shrink-0">
-            <Button variant="secondary" size="sm" aria-expanded={ukazPasy} aria-controls="navody-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
+            {/* v4 (P7, P10): toolbar je jedna řada 44 — pole hledání i „Filtry“ (dřív 36 vedle pole 44). */}
+            <Button variant="secondary" aria-expanded={ukazPasy} aria-controls="navody-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
               {pocetFiltru > 0 ? t('Filtry · {n}', { n: pocetFiltru }) : t('Filtry')}
             </Button>
           </div>

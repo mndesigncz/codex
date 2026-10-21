@@ -175,7 +175,9 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
       <div className="flex items-center gap-3 flex-wrap">
         <SearchField className="w-full max-w-sm" value={q} onChange={setQ} storageKey="hoste" placeholder={smi('zakaznici.kontakty') ? 'Jméno nebo e-mail' : 'Jméno'} ariaLabel="Hledat zákazníka" />
         {d && <p className="t-meta tabular-nums" aria-live="polite">{jeFiltrovano ? `${czCount(d.total, CLEN)} z ${d.all}` : czCount(d.total, CLEN)}</p>}
-        <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
+        {/* v4 (P2 výjimka a): počet vlevo, akce u pravé hrany i na telefonu — dřív „148 členů · Filtry ·
+            Duplicity" vlevo a řada končila v půlce. */}
+        <div className="flex items-center justify-end gap-2 flex-wrap ml-auto">
           <Button size="sm" variant={filtryOtevrene || pocetPodminek ? 'primary' : 'secondary'} icon="grid" aria-expanded={filtryOtevrene} onClick={() => setFiltryOtevrene(v => !v)}>
             {pocetPodminek ? `Filtry (${pocetPodminek})` : 'Filtry'}
           </Button>

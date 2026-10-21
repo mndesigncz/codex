@@ -31,7 +31,7 @@ import { apiMessage, okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 import { pragueToday } from '@/lib/pragueTime';
 import { Button, Field, Input, Modal, Rada, Select, Textarea, Toast } from '../ui';
-import { VolbaRadek, VolbyRadky } from '../navic/NabidkaChipy';
+import { VolbaRadek, VolbyRadky } from '../ui/Volby';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';

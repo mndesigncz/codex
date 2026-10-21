@@ -262,9 +262,10 @@ export default function SuggestionsBoard() {
     <div className="space-y-4">
       {items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          {/* v4 (P2, P10): na telefonu „Filtry" pružný díl řady (s řazením na pravé hraně), ne osamělé vlevo. */}
+          {/* v4 (P2, P10): na telefonu „Filtry" pružný díl řady (s řazením na pravé hraně), ne osamělé vlevo;
+              toolbar stránky je jedna řada 44 (dřív 36). */}
           <div className="sm:hidden flex-1 min-w-0">
-            <Button variant="secondary" size="sm" className="w-full" aria-expanded={ukazPas} aria-controls={`${id}-pas`} onClick={() => setFiltryTel(v => !v)}>
+            <Button variant="secondary" className="w-full" aria-expanded={ukazPas} aria-controls={`${id}-pas`} onClick={() => setFiltryTel(v => !v)}>
               {pocetFiltru > 0 ? t('Filtry · {n}', { n: pocetFiltru }) : t('Filtry')}
             </Button>
           </div>
@@ -281,7 +282,7 @@ export default function SuggestionsBoard() {
             })}
           </div>
           {items.length > 2 && (
-            <Menu size="sm" icon="swap" label={t('Řazení: {druh}', { druh: sort === 'votes' ? t('nejvíc hlasů') : t('od nejnovějších') })} className="shrink-0" items={[
+            <Menu size="lg" icon="swap" label={t('Řazení: {druh}', { druh: sort === 'votes' ? t('nejvíc hlasů') : t('od nejnovějších') })} className="shrink-0" items={[
               { label: t('Od nejnovějších'), icon: sort === 'new' ? 'check' : 'clock', onClick: () => setSort('new') },
               { label: t('Nejvíc hlasů'), icon: sort === 'votes' ? 'check' : 'trend', onClick: () => setSort('votes') },
             ]} />
@@ -317,9 +318,12 @@ export default function SuggestionsBoard() {
                   {/* v4 (V4): stav, posun stavu i poznámky na ose textu (ne pod hlasem), rozestup 8;
                       „···" na pravé hraně. Dřív segment přes celý řádek od levého okraje pod hlasem. */}
                   <div className="min-w-0 flex-1 sloupec sloupec-2">
+                    {/* „···" v řádku titulu, ne jako sloupec řádku: obsah pod titulem (segment stavu, poznámky)
+                        pak sahá až na R — dřív končil 48 px před ní a segment ořízl „Hotovo". */}
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="t-card min-w-0 break-words">{s.title}</h3>
-                      <Chip tone={meta.tone} size="sm" className="shrink-0">{meta.label}</Chip>
+                      <h3 className="t-card min-w-0 flex-1 break-words">{s.title}</h3>
+                      <Chip tone={meta.tone} size="sm" className="shrink-0 mt-0.5">{meta.label}</Chip>
+                      {polozky.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: s.title })} items={polozky} className="shrink-0 -my-1" />}
                     </div>
                     {s.content && <p className="text-sm text-black/60 -mt-1 whitespace-pre-wrap break-words text-pretty">{s.content}</p>}
                     <p className="flex items-center gap-1.5 text-[13px] text-black/55 min-w-0">
@@ -346,7 +350,6 @@ export default function SuggestionsBoard() {
                       </div>
                     )}
                   </div>
-                  {polozky.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: s.title })} items={polozky} className="shrink-0 -my-1" />}
                 </li>
               );
             })}

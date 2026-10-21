@@ -148,13 +148,21 @@ tenčí a menší (`stat-jednotka`); odstavce `text-wrap: pretty`; minimum písm
   krátká věta pod ním, zavírací kříž v šedém kruhu a tlačítka v patičce
   přes šířku (jedno nebo dvě pilulky vedle sebe). v4: odsazení 20 / 24 (sm),
   kříž 36 končí na R, patička 52 (`.okno-paticka`), pole 52 (vzor V6).
+  Patička je **řada L→R na všech šířkách** (mřížka rovných dílů: 1 = přes šířku,
+  2 = ½ + ½, 3 = ⅓) — ne obsahové pilulky u pravé hrany od sm.
 - **Prázdný stav:** `EmptyState` — klidný symbol v šedém kruhu 56 (ne
   limetková dlaždice), jedna věta titulku, nanejvýš jedna věta nápovědy
-  (šířka do 280) a jedna akce — vzor V7. Chyba **uvnitř karty** je
-  `ErrorState vlevo` (kruh na L, věta vedle, „Zkusit znovu“ L→R × 44); na střed
-  jen na celé stránce.
+  (šířka do 280) a jedna akce — vzor V7. **v4: uvnitř karty a widgetu vlevo**
+  (`EmptyState vlevo`: kruh 40 na L, titul 15/600 a věta vedle, akce L→R × 44 pod
+  nimi) — stejně jako chyba v kartě (`ErrorState vlevo`) a stavová karta (V8).
+  Widget to nastaví pro své tělo sám (kontext `PrazdnoVlevo`, okno ho ruší),
+  `PrazdnoWidgetu` je jen obal. **Na střed** jen prázdná stránka, okno s jediným
+  obsahem a stav s ilustrací.
 - **Přepínač:** `Switch` / `SwitchRow` — limetka bez záře je stav, ne akce.
-  v4: řádek nastavení 56, přepínač vpravo na R.
+  v4: řádek nastavení 56, přepínač vpravo na R. Přepínač (28) je ovládání
+  řádku, ne díl řady ovládání — výšky řady (P7) a stupně se na něj nevztahují
+  (sonda `skladba` i detektor ho z řad vynechávají). Nikdy pod textem vlevo:
+  i řádek s dlouhým popisem má přepínač vpravo nahoře na R.
 - Nic nepřetéká: žádný vodorovný posuv stránky, nic nevyčuhuje z karty,
   widgetu ani okna — hlídají sondy `preteceni-*` (vedení, zaměstnanec,
   tablet + veřejné stránky, okna) na 320/390/768/1024 px, česky, německy
@@ -261,6 +269,12 @@ titul malé karty na telefonu má rezervované dva řádky.
 
 ## Čísla v řádku (v4)
 
+- **Osa textu (V4):** řádek s úvodním prvkem (avatar, jamka, zaškrtávátko) je na
+  telefonu mřížka a jeho druhý řádek (stav, chipy, akce) začíná **pod textem**, ne pod
+  avatarem; pár textových akcí v něm je ½ + ½ přes šířku textu. Úvodní prvek drží
+  nahoře u titulu. Dělá to `ListRow` sám (globals.css „OSA TEXTU“) — žádné obaly
+  ani `useJeTelefon` v oblastech. Na monitoru stojí doplněk (`right`) před hodnotou,
+  takže hodnota končí na R.
 - **Hodnota vpravo, zarovnaná na R (P15):** `ListRow value` stojí v prvním řádku
   vpravo i na telefonu (`text-align: right`, `tabular-nums`), pravá hrana = R,
   se šipkou R − 28 (hodnota, 8, šipka v boxu 20). Druhý údaj (`valueMeta`) pod ní
@@ -293,7 +307,9 @@ Field/Label/Input/Select/Textarea, SearchField (poslední hledání, návrhy,
 klávesnice), Modal (sm/md/lg + `sheet`), Switch/SwitchRow.
 
 **Skladba v4:** `Rada` / `Sloupec` (řady L→R s jednou výškou, skupiny s mezerou
-ze škály — viz „Řady ovládání“), `StavovaKarta` / `StavovyKruh` (vzor V8),
+ze škály — viz „Řady ovládání“), `VolbaRadek` / `VolbaDil` / `VolbyRadky` (volby
+v okně jako řádky L→R a rovné díly, components/ui/Volby.tsx), `Menu size="lg"`
+(spouštěč „···“ 44 do toolbaru), `StavovaKarta` / `StavovyKruh` (vzor V8),
 `MenuStrankyProvider` + `MenuListy` + `usePrevzitMenuListy` („···“ jednou na obrazovce —
 viz „Vzory obrazovek“), sloty `Widget` `filtry` / `segment` / `souhrn` / `patka`
 (vzor V2), `ErrorState vlevo` (chyba v kartě), `Segmented sirka`.
@@ -390,14 +406,18 @@ odsazení 16 → L = 37, R = 353. Vzory jsou změřené z inspirací (spec-sklad
 - **V1 Hlavička widgetu** (`Widget`) — výška 44: [ikona 20 v boxu 24] 12 [titul 16/600,
   jeden řádek s „…“, aspoň 55 % šířky] 8 [čip počtu] … [› 36] 4 [^ 36]; nejvýš dvě
   ikonová tlačítka na telefonu (Zvětšit ⤢ až od sm), Sbalit úplně vpravo a jeho kruh
-  končí na R; 12 ↓ první obsah. Malá karta na telefonu: titul smí na dva řádky
-  (rezervované), text na L + 28.
+  končí na R; 12 ↓ první obsah. Malá karta jako dlaždice (karta ≤ 240 px, kontejnerový
+  dotaz `wkarta`): titul smí na dva řádky (rezervované), text na L + 28. Malá karta,
+  která stojí v řadě sama (přes celou šířku telefonu), má hlavičku jako ostatní.
 - **V2 Filtry ve widgetu** — sloty `Widget`: `filtry` (řada ½ + ½ × 36 spolu s rychlým
   filtrem z katalogu), `segment` (L→R × 36), `souhrn` (t-meta, 8 nad obsahem),
   obsah, `patka` (akce widgetu L→R × 44 na konci, dvě ½ + ½). Rytmus 12 · 12 · 8 · 16.
-  Rychlý filtr bez dalších filtrů: na telefonu a v malé kartě díl přes celou šířku,
-  na monitoru u střední a velké karty pilulka 36 v hlavičce. Čip filtru NIKDY sám
-  na řádku. Vzor: `NavicTymu` / `TrestyTymu` (components/widgety/oblasti/odmeny.tsx).
+  Rychlý filtr bez dalších filtrů: na telefonu díl přes celou šířku, na monitoru
+  u střední a velké karty pilulka 36 v hlavičce — jen když v ní není odkaz ani čip
+  počtu (jinak řada pod hlavičkou). **Malá karta** má filtr DOLE v jedné řadě se
+  šipkou „Otevřít“ (pružný + pevný), aby čísla dvou dlaždic vedle sebe seděla na
+  stejné y. Čip filtru NIKDY sám na řádku. „Zobrazit vše“ (zkrácený obsah) je tichý
+  přepínač (bez plochy) nad patkou — ne druhá šedá plná šířka. Vzor: `NavicTymu` / `TrestyTymu` (components/widgety/oblasti/odmeny.tsx).
 - **V3 Souhrn čísel** — `Stat` / `StatRow` (viz Čísla v řádku); linka nad řadou statů
   16 nad i pod, L→R.
 - **V4 Řádek seznamu** — `ListRow`: [lead 40] 12 [titul 15/500 + meta 13] 12
@@ -420,9 +440,9 @@ odsazení 16 → L = 37, R = 353. Vzory jsou změřené z inspirací (spec-sklad
   na stejné y.
 
 **Sonda `skladba`** (`scripts/sondy/skladba.mjs`) měří spec §8 na klíčových
-obrazovkách ukázky (390 + 1280): hrany, výšky v řadě a povolené stupně, nejvýš
+obrazovkách ukázky (390 + 1280, světle i tmavě): hrany, výšky v řadě a povolené stupně, nejvýš
 3 šířky v kartě, titul widgetu na jeden řádek, hodnoty v řádku na R, „···“
-jednou. Zatím není v ZELENE — nálezy v obsahu oblastí se opravují po oblastech.
+jednou, dvojice malých karet s čísly na stejné y. Je v ZELENE — kdo ji rozbije, opraví skladbu, ne sondu.
 
 ## Pohyb a přístupnost
 

@@ -789,7 +789,7 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
       {/* v4 (V14): měsíc → mřížka → legenda s jednou mezerou 12 (Sloupec), ne mt-3 v obsahu. */}
       <Sloupec mezera={3}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <MonthNav value={mesic} onChange={m => setMesic(m)} max={tento} />
+        <MonthNav velikost="s" value={mesic} onChange={m => setMesic(m)} max={tento} />
         <p className="t-meta tabular-nums">
           {uzaverekPocet(t, hotovych)}
           {chybi > 0 && <span className="text-bad-ink font-semibold"> · {t('{n} chybí', { n: chybi })}</span>}
