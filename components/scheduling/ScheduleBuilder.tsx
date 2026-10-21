@@ -524,6 +524,14 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   // pro uživatele a podnik). Pod `sm` je vždy měsíc: přepínač se tam nekreslí
   // a týden po dnech na telefonu už dělá widget „Kdo má směnu".
   const [pohled, setPohled] = useState<PohledRozvrhu>('mesic');
+  // Telefon: seznam dnů (výchozí) nebo měsíční mřížka; pamatuje se v zařízení.
+  const [pohledTel, setPohledTel] = useState<'seznam' | 'mesic'>('seznam');
+  useEffect(() => { try { if (localStorage.getItem('managero-rozvrh-pohled-tel') === 'mesic') setPohledTel('mesic'); } catch { /* bez úložiště */ } }, []);
+  const prepniPohledTel = () => {
+    const dalsi = pohledTel === 'seznam' ? 'mesic' : 'seznam';
+    setPohledTel(dalsi);
+    try { localStorage.setItem('managero-rozvrh-pohled-tel', dalsi); } catch { /* bez úložiště */ }
+  };
   const [siroka, setSiroka] = useState(true);
   useEffect(() => {
     const mq = window.matchMedia?.('(min-width: 640px)');
@@ -1474,8 +1482,17 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     || (z.id === 'oteviraci' && (smiNastaveni || smiOteviraci)));
   const aktivniTab: Tab = zalozky.some(z => z.id === tab) ? tab : 'rozvrh';
   const naRozvrhu = aktivniTab === 'rozvrh';
-  const aside = zalozky.length > 1
-    ? <Segmented ariaLabel={t('Část rozvrhu')} value={aktivniTab} onChange={(v) => setTab(v as Tab)} options={zalozky} />
+  // Telefon (audit 2026-10 V06): šest záložek v pásu se na 390 px uřízlo („Otevírací d…") a nastavení
+  // rozvrhu přehlušilo samotný rozvrh. Na telefonu je v segmentu Rozvrh | Kalendář (a otevřená část
+  // nastavení, ať je vidět, kde jsem); Typy směn, Otevírací doba, Pevné dny a Pravidla jsou v „···".
+  const NASTAVENI_ROZVRHU: Tab[] = ['typy', 'oteviraci', 'pevne', 'pravidla'];
+  const zalozkySegmentu = siroka ? zalozky
+    : zalozky.filter(z => !NASTAVENI_ROZVRHU.includes(z.id) || z.id === aktivniTab);
+  const menuNastaveniTel: MenuItem[] = siroka ? [] : zalozky
+    .filter(z => NASTAVENI_ROZVRHU.includes(z.id) && z.id !== aktivniTab)
+    .map(z => ({ label: z.label, icon: 'settings', onClick: () => setTab(z.id) }));
+  const aside = zalozkySegmentu.length > 1
+    ? <Segmented ariaLabel={t('Část rozvrhu')} value={aktivniTab} onChange={(v) => setTab(v as Tab)} options={zalozkySegmentu} />
     : undefined;
 
   // Stav publikování pro Chip a texty Publikovat (jen plánovač — náhled publikaci nezná).
@@ -1547,6 +1564,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           ? <Button variant="secondary" icon="send" onClick={() => { void publish(); }} loading={publishing}>{stavPub === 'zmeneno' ? t('Publikovat změny') : t('Publikovat')}</Button>
           : undefined,
     menu: menu.length ? menu : undefined,
+    menuTelefon: menuNastaveniTel.length ? menuNastaveniTel : undefined,
   };
 
   // ---- Nástroj: měsíční plánovač ----
@@ -1667,7 +1685,14 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               </Button>
             </div>
           )}
-          {/* Měsíc | Týden jen od `sm`: na telefonu je pohled vždy měsíc (viz `pohled`). */}
+          {/* Telefon: seznam dnů ↔ měsíční mřížka (ikonové tlačítko 44 v řadě s měsícem, P10). */}
+          {!siroka && !loading && !loadError && (
+            <Button variant="secondary" iconOnly icon={pohledTel === 'seznam' ? 'calendar' : 'menu'} className="sm:hidden shrink-0"
+              aria-label={pohledTel === 'seznam' ? t('Ukázat měsíc jako mřížku') : t('Ukázat dny jako seznam')}
+              title={pohledTel === 'seznam' ? t('Ukázat měsíc jako mřížku') : t('Ukázat dny jako seznam')}
+              onClick={prepniPohledTel} data-prepinac-pohledu-tel={pohledTel} />
+          )}
+          {/* Měsíc | Týden jen od `sm`: na telefonu je seznam dnů nebo měsíc (viz `pohledTel`). */}
           {planovac && (
             // v4 (P7): v řadě s MonthNav a pilulkami 44 je segment taky 44 (md).
             <div className="hidden sm:block">
@@ -1875,6 +1900,20 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               tecka={(s) => tridaTecky(resolveShiftType(s, shiftTypes, t).color)}
               varovani={(s) => varovaniU('id' in s ? `u-${s.id}` : klicNavrhu(s))}
               trzby={planTrzby?.poDnech ?? null} cilMezd={cilMezd}
+              onDen={otevriDen}
+            />
+          ) : !siroka && pohledTel === 'seznam' ? (
+            <AgendaMesice
+              dny={grid.filter((c): c is string => !!c && denProjde(denVidet(c), filtr))}
+              jazyk={jazyk}
+              smenyDne={(d) => ({
+                ulozene: (shiftsByDay[d] ?? []).filter(s => projdeSmena({ employeeId: s.employeeId, typ: typUlozene(s) }, filtr)),
+                navrh: (proposedByDay[d] ?? []).filter(p => projdeSmena({ employeeId: p.employeeId, typ: typNavrhu(p) }, filtr)),
+              })}
+              tecka={(s) => tridaTecky(resolveShiftType(s, shiftTypes, t).color)}
+              typ={(s) => resolveShiftType(s, shiftTypes, t).label}
+              problem={(d) => { const pr = problemsByDate[d]; return !pr ? null : pr.gaps.some(jePovinna) ? 'povinna' : 'zadouci'; }}
+              nahradiUlozene={nahradiUlozene}
               onDen={otevriDen}
             />
           ) : (<>
@@ -2294,6 +2333,80 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
  * od–do, návrh čárkovaně) a klepnutí otevře stávající okno dne. Tabulka je
  * `table-fixed` ve šířce karty, nic nejede do strany.
  */
+/**
+ * Telefon: rozvrh jako seznam dnů (audit 2026-10 V06, vzor 7shifts / Deputy / Homebase „Schedule"
+ * na telefonu). Měsíční mřížka na 390 px má buňku 47 px a v ní jen tečku a emoji — kdo má jakou
+ * směnu a kdy, šlo zjistit až klepnutím na den. Tady je každý den řádkem s datem a pod ním směny
+ * „08–16 · Eva · Ranní". Aktuální měsíc začíná dneškem; dřívější dny se rozbalí tlačítkem.
+ * Klepnutí na den otevře stejné okno dne jako mřížka (přidat, upravit, výměna).
+ */
+function AgendaMesice({ dny, jazyk, smenyDne, tecka, typ, problem, nahradiUlozene, onDen }: {
+  dny: string[];
+  jazyk: Jazyk;
+  smenyDne: (den: string) => { ulozene: Shift[]; navrh: Proposed[] };
+  tecka: (s: Shift | Proposed) => string;
+  typ: (s: Shift | Proposed) => string;
+  problem: (den: string) => 'povinna' | 'zadouci' | null;
+  nahradiUlozene: boolean;
+  onDen: (den: string) => void;
+}) {
+  const t = useT('rozvrh');
+  const dnes = pragueToday();
+  const odDneska = dny.includes(dnes);
+  const [vse, setVse] = useState(false);
+  const skryte = odDneska && !vse ? dny.filter(d => d < dnes).length : 0;
+  const videt = skryte > 0 ? dny.filter(d => d >= dnes) : dny;
+  return (
+    <div data-agenda-rozvrhu className="space-y-2">
+      {skryte > 0 && (
+        <Button variant="secondary" icon="chevronUp" className="w-full" onClick={() => setVse(true)}>
+          {t('Dřívější dny ({n})', { n: skryte })}
+        </Button>
+      )}
+      <ul className="divide-y divide-black/[0.07]">
+        {videt.map(den => {
+          const { ulozene, navrh } = smenyDne(den);
+          const p = problem(den);
+          const vse = [...ulozene.map(s => ({ s, navrh: false })), ...navrh.map(s => ({ s, navrh: true }))]
+            .sort((a, b) => String(a.s.startTime).localeCompare(String(b.s.startTime)));
+          const jeDnes = den === dnes;
+          return (
+            <li key={den}>
+              <button type="button" onClick={() => onDen(den)} data-den={den} data-dnes={jeDnes ? '' : undefined}
+                aria-label={`${dayLabel(den, jazyk)}: ${smenTxt(t, ulozene.length)}${navrh.length ? `, ${t('v návrhu {smen}', { smen: smenTxt(t, navrh.length) })}` : ''}${p === 'povinna' ? `, ${t('nikdo neotevře')}` : p ? `, ${t('chybí druhý člověk')}` : ''}`}
+                // Den je řádek seznamu v kartě nástroje (žádná karta v kartě); díra se pozná chipem.
+                className="w-full text-left py-3 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+                <span className="flex items-center gap-2 min-h-[28px]">
+                  <span className="t-card cz-sentence">{dayLabel(den, jazyk)}</span>
+                  {jeDnes && <Chip tone="ink" size="sm">{t('Dnes')}</Chip>}
+                  {p === 'povinna' && <Chip tone="bad" size="sm" icon="warning">{t('Nikdo neotevře')}</Chip>}
+                  {p === 'zadouci' && <Chip tone="wait" size="sm">{t('Chybí druhý člověk')}</Chip>}
+                  <Icon name="chevronRight" size={16} className="ml-auto shrink-0 text-black/35" />
+                </span>
+                {vse.length === 0 ? (
+                  <span className="t-meta block mt-1">{t('Bez směn')}</span>
+                ) : (
+                  <span className="mt-2 flex flex-col gap-1.5" aria-hidden>
+                    {vse.map(({ s: sm, navrh: jeNavrh }, i) => (
+                      <span key={i} className={`flex items-center gap-2 min-w-0 rounded-xl px-2 py-1.5 ${jeNavrh ? 'border border-dashed border-black/30 dark:border-white/40' : 'bg-black/[0.04]'} ${!jeNavrh && nahradiUlozene ? 'line-through text-black/45' : ''}`}>
+                        <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${tecka(sm)}`} />
+                        <span className="tabular-nums text-[13px] font-semibold shrink-0">{casKratce(sm.startTime, sm.endTime)}</span>
+                        <Avatar emoji={sm.employeeAvatar} name={sm.employeeName} size="2xs" ring={false} />
+                        <span className="min-w-0 truncate text-[13px] font-medium">{sm.employeeName}</span>
+                        <span className="ml-auto shrink-0 t-meta truncate max-w-[40%]">{jeNavrh ? t('návrh') : typ(sm)}</span>
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function TydenniPohled({ tydny, tyden, onTyden, mesic, zacatek, jazyk, radky, dny, hodiny, nahradiUlozene, mimoFiltr, smenyDne, tecka, varovani, trzby = null, cilMezd = null, onDen }: {
   tydny: string[];
   tyden: string;

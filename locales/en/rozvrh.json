@@ -506,5 +506,11 @@
   "{h} h odpočinku (nejméně {limit})": "{h} h of rest (at least {limit})",
   "{h} h směna (nejvýš {limit})": "{h} h shift (at most {limit})",
   "{h} h týdně (nejvýš {limit})": "{h} h per week (at most {limit})",
-  "{n, plural, one {# varování} few {# varování} other {# varování}} k limitům rozvrhu": "{n, plural, one {# warning} other {# warnings}} about schedule limits"
+  "{n, plural, one {# varování} few {# varování} other {# varování}} k limitům rozvrhu": "{n, plural, one {# warning} other {# warnings}} about schedule limits",
+  "Dřívější dny ({n})": "Earlier days ({n})",
+  "Dnes": "Today",
+  "Bez směn": "No shifts",
+  "návrh": "draft",
+  "Ukázat měsíc jako mřížku": "Show month as a grid",
+  "Ukázat dny jako seznam": "Show days as a list"
 }

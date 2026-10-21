@@ -506,5 +506,11 @@
   "{h} h odpočinku (nejméně {limit})": "{h} h odpočinku (najmenej {limit})",
   "{h} h směna (nejvýš {limit})": "{h} h zmena (najviac {limit})",
   "{h} h týdně (nejvýš {limit})": "{h} h týždenne (najviac {limit})",
-  "{n, plural, one {# varování} few {# varování} other {# varování}} k limitům rozvrhu": "{n, plural, one {# varovanie} few {# varovania} other {# varovaní}} k limitom rozvrhu"
+  "{n, plural, one {# varování} few {# varování} other {# varování}} k limitům rozvrhu": "{n, plural, one {# varovanie} few {# varovania} other {# varovaní}} k limitom rozvrhu",
+  "Dřívější dny ({n})": "Skoršie dni ({n})",
+  "Dnes": "Dnes",
+  "Bez směn": "Bez zmien",
+  "návrh": "návrh",
+  "Ukázat měsíc jako mřížku": "Ukázať mesiac ako mriežku",
+  "Ukázat dny jako seznam": "Ukázať dni ako zoznam"
 }
