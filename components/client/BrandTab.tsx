@@ -100,7 +100,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
     try {
       const r = await fetch('/api/client/admin/profile', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logo_url: p.logo_url || '', cover_url: p.cover_url || '', gallery: p.gallery ?? [], accent: p.accent || '', tagline: p.tagline, description: p.description, address: p.address }),
+        body: JSON.stringify({ logo_url: p.logo_url || '', cover_url: p.cover_url || '', gallery: p.gallery ?? [], accent: p.accent || '', tagline: p.tagline, description: p.description, address: p.address, phone: p.phone ?? '' }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'Uložení se nepovedlo.');
@@ -197,6 +197,9 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
         <Field id="b-tag" label="Motto"><Input id="b-tag" value={p.tagline ?? ''} onChange={e => setP({ ...p, tagline: e.target.value })} placeholder="Čaj z lístků, ne z pytlíků." maxLength={120} /></Field>
         <Field id="b-desc" label="Pár vět"><Textarea id="b-desc" value={p.description ?? ''} onChange={e => setP({ ...p, description: e.target.value })} rows={3} placeholder="Malý podnik v přízemí starého domu. Sedí se u stolů i na baru." maxLength={1200} /></Field>
         <Field id="b-addr" label="Adresa"><Input id="b-addr" value={p.address ?? ''} onChange={e => setP({ ...p, address: e.target.value })} placeholder="Vodní 14, Brno" /></Field>
+        <Field id="b-tel" label="Telefon" hint="Host ho uvidí jako „Zavolat“ na stránce podniku. Prázdné = bez telefonu.">
+          <Input id="b-tel" type="tel" inputMode="tel" autoComplete="tel" value={p.phone ?? ''} onChange={e => setP({ ...p, phone: e.target.value })} placeholder="+420 777 123 456" maxLength={30} />
+        </Field>
       </Card>
     </form>
     </div>

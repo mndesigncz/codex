@@ -164,7 +164,7 @@ export function profil(): any {
     silver_at: 10, gold_at: 25, platinum_at: 40, member_discount: 0, silver_discount: 0, gold_discount: 5, platinum_discount: 10, tier_by: 'visits',
     reservations_on: true, ordering_on: true, max_party: 8, lead_days: 30, slot_minutes: 30, auto_confirm: true, auto_confirm_max_party: 4,
     description: 'Malá kavárna u staré lípy. Výběrová káva, domácí koláče a klidná zahrádka.', tagline: 'Výběrová káva a koláče od rána',
-    address: 'Lipová 12, Brno', logo_url: '', cover_url: '', gallery: [], accent: BARVA, order_qr_required: true, order_geo: 'warn', lat: 49.1951, lng: 16.6068,
+    address: 'Lipová 12, Brno', phone: '+420 777 123 456', logo_url: '', cover_url: '', gallery: [], accent: BARVA, order_qr_required: true, order_geo: 'warn', lat: 49.1951, lng: 16.6068,
     geo_radius_m: 100, order_auto_pos: true, menu_slug: 'denni', opening_hours: OTEVIRACI_DOBA, welcome_points: 20, birthday_points: 0,
   };
 }

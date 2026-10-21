@@ -2556,6 +2556,8 @@ export async function GET(request: Request) {
     // Propadání: po kolika dnech body propadnou (0 = nikdy) a od kdy se stáří počítá.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_expire_days INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_expire_since TEXT`);
+    // Kolo 92 (SPRÁVA, kontrakt HOST ↔ SPRÁVA §5): telefon podniku na stránce hosta („Zavolat"). Stejný řádek má blok Host — idempotentní.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS phone TEXT`);
     // Bonusové akce (Happy hour): násobič bodů a razítka navíc podle dne, hodin a data.
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_bonus_rules (
