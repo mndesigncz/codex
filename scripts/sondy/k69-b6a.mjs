@@ -529,7 +529,8 @@ for (const [nazev, viewport] of [['1280', { width: 1280, height: 950 }], ['390',
   stav.rozlozeniPodle = { 'vedeni.planovani': FIX_PLAN, 'vedeni.ukoly': FIX_UKOLY };
   await otevri(p, PLANOVANI, 'vedeni.planovani');
   const nastroj = widgetLi(p, 'nastroj');
-  if (mobil) { await nastroj.getByRole('tab', { name: /^Rozpracováno/ }).click(); await p.waitForTimeout(300); }
+  // Audit 2026-10 (V31): na telefonu krátký název záložky „V práci".
+  if (mobil) { await nastroj.getByRole('tab', { name: /^V práci/ }).click(); await p.waitForTimeout(300); }
   const patka = nastroj.locator('li.card', { hasText: 'Oprava mlýnku' }).locator('p.t-meta');
   const tP = (await patka.innerText()).trim();
   tvrdi(`K7-5 (${nazev}): patka karty „Oprava mlýnku" — křestní jméno autora a stáří („Eva · před 2 dny"), celé jméno v title`,
