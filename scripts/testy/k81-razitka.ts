@@ -186,5 +186,5 @@ export default function ({ eq, ok }: Testy) {
   ok('klíč akce zůstává po výpadku sítě a uvolní se po odmítnutí', /pochybe\(status: number \| null\) \{ if \(status != null && status < 500\)/.test(ui));
   const tabs = zdroj('components/client/LoyaltyTabs.tsx');
   ok('správa: editor kartičky je jeden (KampanEditor s náhledem pohledem hosta) a ruční razítka hromadně jsou v nabídce kartičky', /<KampanEditor form=/.test(tabs) && /<RucniRazitka kampan=/.test(tabs));
-  ok('host: stránka podniku používá kartu pohledem hosta a skončené kartičky', /<KartaRazitek karta=\{cp\}/.test(zdroj('components/client/BusinessPage.tsx')) && /endedCampaigns/.test(zdroj('components/client/BusinessPage.tsx')));
+  ok('host: stránka podniku používá kartu pohledem hosta a skončené kartičky', /<RazitkaMrizka pocet=\{k\.stamps\}/.test(zdroj('components/client/BusinessPage.tsx')) && /endedCampaigns/.test(zdroj('components/client/BusinessPage.tsx')));
 }

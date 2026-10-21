@@ -43,7 +43,7 @@ export default function ClientHome() {
           {/* v3: štítek větou (ne verzálky s prostrkáním), nadpis ze škály — t-page, na monitoru o stupeň větší. */}
           <p className="t-label mb-2">{t('Pro hosty')}</p>
           <h1 className="t-page sm:text-[2.5rem] md:text-[3rem] md:leading-[1.02] text-balance">
-            {t('Kartička, rezervace a objednávka od stolu.')}
+            {t('Karta, rezervace a objednávka od stolu.')}
           </h1>
           <p className="mt-3 text-[15px] sm:text-base text-black/60 leading-relaxed max-w-[44ch] text-pretty">
             {t('Jeden účet pro všechny podniky, kam chodíš. Razítka a body sbíráš u kasy.')}
@@ -71,7 +71,7 @@ export default function ClientHome() {
           </div>
           {/* Co tu host dostane: seznam v jedné kartě, ikony monochromně v šedém kruhu (limetka patří akci). */}
           <ul className="card list px-4">
-            {([['card', t('Kartička s QR'), t('ukážeš u kasy, obsluha přidá razítko nebo body')], ['calendarCheck', t('Rezervace'), t('stůl na den a hodinu, potvrzení přijde do telefonu')], ['cup', t('Objednávka od stolu'), t('naskenuješ QR na stole, jde rovnou do kasy')]] as const).map(([ic, nadpis, h]) => (
+            {([['card', t('Karta s QR'), t('ukážeš u kasy, obsluha přidá razítko nebo body')], ['calendarCheck', t('Rezervace'), t('stůl na den a hodinu, potvrzení přijde do telefonu')], ['cup', t('Objednávka od stolu'), t('naskenuješ QR na stole, jde rovnou do kasy')]] as const).map(([ic, nadpis, h]) => (
               <li key={nadpis} className="list-row">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/[0.05] text-black/70" aria-hidden><Icon name={ic} size={18} /></span>
                 <span className="min-w-0 flex-1"><span className="block text-[15px] font-medium leading-tight">{nadpis}</span><span className="block t-meta mt-0.5 leading-snug">{h}</span></span>

@@ -55,6 +55,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   client_vouchers: 'upravit',
   // čekající párování kartičky s účtem (spuštění, balík Q): bez hosta nemá smysl
   client_bill_claims: 'smazat',
+  // host (přestavba): přibalená odměna k příští návštěvě — bez účtu nemá smysl
+  client_host_zamery: 'smazat',
   // fyzické kartičky (spuštění, balík C): plastová karta patří podniku — od hosta se odpojí a zablokuje (nikdo jiný ji nepoužije);
   // dávku karet založil člověk z vedení, záznam o dávce zůstává podniku pod anonymním autorem
   client_card_aliases: 'upravit', client_card_batches: 'ponechat',
@@ -125,6 +127,8 @@ export const OSOBNI_UDAJE: Record<string, { zpusob: ZpusobOsobni; co: string }> 
   menu_boards: { zpusob: 'podnik', co: 'PIN tabule s menu patří podniku (ne osobě) a maže se s ním.' },
   client_reservations: { zpusob: 'anonymizovat', co: 'Rezervace hosta zůstanou podniku: budoucí se zruší a poznámky hosta se vymažou, vazba jde na anonymní účet. Jméno a telefon ručně zapsaného hosta (guest_name, guest_phone — host bez účtu, kterého zapsala obsluha) jsou údaje podniku a zmizí se smazáním podniku; created_by u nich ukazuje na anonymizovaný účet obsluhy.' },
   suppliers: { zpusob: 'podnik', co: 'Kontakty na dodavatele patří podniku a mažou se s ním.' },
+  client_profiles: { zpusob: 'podnik', co: 'Veřejný profil podniku pro hosty (popis, adresa, telefon podniku pro „Zavolat“) patří podniku a maže se s ním.' },
+  client_login_kody: { zpusob: 'smazat', co: 'Jednorázové kódy pro přihlášení hosta e-mailem (otisk kódu a adresa) se se smazáním účtu smažou; samy platí 10 minut.' },
   billing_events: { zpusob: 'ponechat', co: 'Id událostí Stripe bez osobních údajů; evidence fakturace podniku (zákon o účetnictví). Faktury samotné zůstávají ve Stripe.' },
   referral_rewards: { zpusob: 'ponechat', co: 'Provize za doporučení, jen čísla podniků a částka; účetní záznam platformy.' },
   admin_audit: { zpusob: 'ponechat', co: 'Bezpečnostní protokol zásahů správce platformy (actor je e-mail správce, ne dotčené osoby); správce se sám smazat nemůže.' },
@@ -155,6 +159,8 @@ export const TYMOVE_TABULKY = [
   'extra_claims',
   // spuštění (balík Q): párování kartičky s účtem z pokladny
   'client_bill_claims',
+  // host (přestavba): záměr hosta u kasy (přibalená odměna)
+  'client_host_zamery',
   // spuštění (balík C): fyzické kartičky a jejich tiskové dávky
   'client_card_batches', 'client_card_aliases',
   // spuštění (balík G): souhlasy s novinkami podniku
@@ -258,6 +264,7 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     for (const t of ['client_cards', 'client_memberships', 'client_loyalty_ledger', 'client_stamp_progress', 'client_coupon_claims',
       'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards', 'client_import_clenove', 'client_member_notes', 'client_automatizace_log', 'client_stamp_events']) del(t, 'customer_id');
     del('client_bill_claims', 'customer_id');
+    del('client_host_zamery', 'customer_id');
     // Plastová karta patří podniku: od smazaného hosta se odpojí a zablokuje, ať ji u kasy nikdo nepřiřadí znovu.
     k.push(volitelny('odpojit a zablokovat fyzické karty hosta', `UPDATE client_card_aliases SET customer_id = NULL, stav = 'blokovana', blocked_at = NOW() WHERE customer_id = $1`, [id]));
     // Účet v pokladně patří podniku; jen se odpojí od hosta, kterého k němu věrnost přiřadila.
@@ -276,6 +283,8 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
   k.push(volitelny('odpojit soubory podniku od osoby', `UPDATE uploads SET user_id = NULL, name = 'Příloha' WHERE user_id = $1`, [id]));
   // Odpověď podniku na hodnocení hosta zůstává podniku, jen bez vazby na smazaný účet toho, kdo ji psal.
   k.push(volitelny('odpojit odpovědi na hodnocení od osoby', `UPDATE client_reviews SET replied_by = NULL WHERE replied_by = $1`, [id]));
+  // Kódy pro přihlášení hosta e-mailem (jen hosté je mají; u ostatních krok nic nenajde).
+  k.push(volitelny('smazat kódy pro přihlášení e-mailem', `DELETE FROM client_login_kody WHERE email = lower($1)`, [u.email]));
   // Protokol akcí: zůstane, vymaže se volný text. Záznam o samotném smazání (bez osobních údajů) se zachová.
   k.push(volitelny('vymazat text protokolu', `UPDATE audit_log SET detail = NULL WHERE (user_id = $1 OR (entity = 'user' AND entity_id = $1))
     AND action NOT IN ('ucet.smazan', 'podnik.smazan', 'ucet.stripe_chyba')`, [id]));

@@ -90,7 +90,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
   );
   if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-[28px]" /><Skeleton className="h-20 rounded-3xl" /><Skeleton className="h-64 rounded-3xl" /></div>;
 
-  const b = d.business; const me = d.me; const today: string = d.today;
+  const b = d.business; const me = d.me; const today: string = d.today; const signedIn = !!d.signedIn;
   const accent: string = b.accent || '#C8F542';
   const lzeObjednat = !!b.orderingOn && (d.tables?.length ?? 0) > 0;
   const join = async () => {
@@ -198,7 +198,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
             <h2 id="h-pravidla" className="sr-only">{t('Pravidla věrnosti')}</h2>
             <HostPravidla b={b} campaigns={d.stampCampaigns ?? []} />
             {me?.member && <SkonceneKarticky list={me.endedCampaigns ?? []} />}
-            {d.signedIn && <HostHistorie slug={slug} className="mt-5 border-t border-black/[0.06] pt-4" />}
+            {signedIn && <HostHistorie slug={slug} className="mt-5 border-t border-black/[0.06] pt-4" />}
             <p className="mt-4 t-meta text-pretty">{t('Máš promo kód nebo dárkový poukaz?')} <Link href={cesta('/client/me/odmeny')} className="font-semibold text-black/80 underline underline-offset-2 tap-target-sm">{t('Zadej ho v Odměnách')}</Link></p>
           </section>
         )}
@@ -308,7 +308,7 @@ function MojeKarta({ b, me, today, accent }: { b: any; me: any; today: string; a
               <div className="mt-3"><RazitkaMrizka pocet={k.stamps} cil={k.required} data={me.razitkaData?.[String(k.id)] ?? []} popis={t('{name}: {stamps} z {required} razítek', { name: k.name, stamps: k.stamps, required: k.required })} /></div>
               <p className="mt-3 text-[13px] h-karta-tlume text-pretty">
                 {zbyva > 0 ? t('Ještě {n, plural, one {# razítko} few {# razítka} other {# razítek}} do odměny {odmena}', { n: zbyva, odmena: k.reward || t('odměna') }) : t('Karta je plná — {odmena} je připravená', { odmena: k.reward || t('odměna') })}
-                {k.validTill ? ` · ${t('Kartička platí do {datum}.', { datum: datum(k.validTill) })}` : ''}
+                {k.validTill ? ` · ${t('Karta platí do {datum}.', { datum: datum(k.validTill) })}` : ''}
               </p>
               {k.expired && <p role="status" className="mt-1.5 text-xs font-semibold">{t('Rozdělaná karta vypršela, {n, plural, one {# razítko propadlo} few {# razítka propadla} other {# razítek propadlo}}. Další razítko začne novou kartu.', { n: k.expiredStamps })}</p>}
               {!k.expired && k.finishBy && k.stamps > 0 && <p className="mt-1.5 text-xs font-semibold">{k.daysLeft === 0 ? t('Dosbírej kartu dnes, jinak razítka propadnou.') : t('Dosbírej kartu do {datum}, jinak razítka propadnou.', { datum: datum(k.finishBy) })}</p>}

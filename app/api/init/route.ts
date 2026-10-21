@@ -3163,6 +3163,18 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS host_aktivita_videno TIMESTAMP`);
     // Telefon podniku pro akci „Zavolat“ na stránce podniku (vyplňuje správa ve Stránce a vzhledu).
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS phone TEXT`);
+    // Přihlášení hosta kódem z e-mailu (lib/klient/prihlaseniKodem.ts): v databázi jen otisk kódu.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_login_kody (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        hash TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        pokusy INTEGER NOT NULL DEFAULT 0,
+        used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_login_kody_email ON client_login_kody (email, created_at DESC)`);
     // ---- konec Host ----
 
 

@@ -13,13 +13,12 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../../Icons';
-import { Segmented, Skeleton, EmptyState, ErrorState } from '../../ui';
+import { Segmented, Skeleton, EmptyState, ErrorState, Modal } from '../../ui';
 import HostPoukazy from '../loyalty/HostPoukazy';
 import { LogoPodniku } from '../karta/KartaPodniku';
 import { useHostMe, obnovHosta, useTed } from './data';
 import { pripraveneOdmeny, hlavniKampan, dniDo, denMesicRok, type Odmena } from './model';
 import { useCesta, useJeDemo } from './cesty';
-import { useModal } from '@/lib/useModal';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import { tierForMember } from '@/lib/clientSlots';
@@ -307,7 +306,6 @@ export function MamKod({ onHotovo }: { onHotovo: (zprava: string) => void }) {
 function ZivyPoukaz({ odmena, onClose }: { odmena: Odmena; onClose: () => void }) {
   const t = useT('klient-host');
   const demo = useJeDemo();
-  const m = useModal(true, onClose, t('Odměna {nazev}', { nazev: odmena.title }));
   const ted = useTed(1000);
   const [uplatneno, setUplatneno] = useState(false);
   const kurzor = useRef<string | null>(null);
@@ -336,17 +334,12 @@ function ZivyPoukaz({ odmena, onClose }: { odmena: Odmena; onClose: () => void }
   }, [uplatneno, odmena.id]);
   const hh = String(ted.getHours()).padStart(2, '0'); const mm = String(ted.getMinutes()).padStart(2, '0'); const ss = String(ted.getSeconds()).padStart(2, '0');
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center modal-overlay" onClick={m.guard.attemptClose}>
-      <div ref={m.ref} {...m.dialogProps} onClick={e => e.stopPropagation()}
-        className="modal-sheet h-vyjed w-full max-w-md rounded-t-[28px] sm:rounded-[28px] max-h-[calc(100dvh-12px)] overflow-y-auto px-5 sm:px-6 pt-4 pb-[max(env(safe-area-inset-bottom),20px)]">
-        <div className="flex justify-end"><button type="button" onClick={onClose} className="tap-target btn-icon" aria-label={t('Zavřít')}><Icon name="close" size={16} /></button></div>
-        <div className="flex flex-col items-center text-center -mt-3">
+    <Modal open onClose={onClose} size="md" className="h-vyjed" title={odmena.title} subtitle={odmena.business}>
+        <div className="flex justify-center">
           <LogoPodniku nazev={odmena.business} logoUrl={odmena.logoUrl} barva={odmena.accent} velikost={56} />
-          <p className="t-meta mt-3">{odmena.business}</p>
-          <h2 className="t-page !text-[26px] mt-1 text-balance">{odmena.title}</h2>
         </div>
         {uplatneno ? (
-          <div className="mt-6 flex flex-col items-center text-center" role="status">
+          <div className="mt-5 flex flex-col items-center text-center" role="status">
             <span className="h-plus h-pop"><Icon name="check" size={30} strokeWidth={2.4} /></span>
             <p className="mt-4 t-section">{t('Uplatněno. Dobrou chuť!')}</p>
           </div>
@@ -364,7 +357,6 @@ function ZivyPoukaz({ odmena, onClose }: { odmena: Odmena; onClose: () => void }
         <p className="mt-4 t-meta text-center text-pretty">{odmena.validUntil ? t('Platí do {datum}. Obsluha odměnu uplatní jedním klepnutím.', { datum: denMesicRok(odmena.validUntil) }) : t('Obsluha odměnu uplatní jedním klepnutím.')}</p>
         {demo && !uplatneno && <button type="button" onClick={() => { (window as any).__hostDemoNacteni?.(odmena.slug, [odmena.id]); }} className="mt-3 btn btn-secondary w-full !h-[52px]"><Icon name="sparkle" size={17} />{t('Ukázat uplatnění u kasy (ukázka)')}</button>}
         <button type="button" onClick={onClose} className="mt-3 btn btn-primary w-full !h-[52px]">{uplatneno ? t('Hotovo') : t('Zavřít')}</button>
-      </div>
-    </div>
+    </Modal>
   );
 }

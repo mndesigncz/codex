@@ -55,7 +55,7 @@ export default function ({ ok }: Testy) {
     && moje.includes("error: 'Kód karty má osm znaků, třeba ABCD-EFGH.'") && moje.includes("error: 'Karta mezitím připadla někomu jinému.'"));
   ok('připojení: hádání kódu brzdí omezení pokusů', moje.includes('hit(klic, 10, 60 * 60)'));
   ok('převzetí: stejné sloučení jako duplicity ve správě členů, bez uvítacích kuponů', /pripojKartu[\s\S]*?INSERT INTO client_memberships \(customer_id, team_id\)[\s\S]*?slucClena\(tid, meId, zId/.test(db));
-  ok('Moje: plastové karty pod kartičkou', zdroj('components/client/MyPage.tsx').includes('<KartickyHosta />'));
+  ok('Moje (profil): plastové karty u karty a peněženky', zdroj('components/client/host/Profil.tsx').includes('<KartickyHosta />'));
 
   // ---- Import z Kartičky ----
   const imp = zdroj('lib/importKartickaDb.ts');

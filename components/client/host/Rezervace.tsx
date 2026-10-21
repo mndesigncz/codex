@@ -8,8 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { Icon } from '../../Icons';
-import { useModal } from '@/lib/useModal';
-import { DiscardGuard } from '../../ui/DiscardGuard';
+import { Modal } from '../../ui';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import { okJson } from '@/lib/api';
@@ -27,7 +26,6 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
   const cesta = useCesta();
-  const m = useModal(true, onClose, t('Rezervovat stůl'));
   const [osob, setOsob] = useState(2);
   const [den, setDen] = useState(dnes);
   const [cas, setCas] = useState('');
@@ -78,20 +76,10 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center modal-overlay" onClick={m.guard.attemptClose}>
-      <div ref={m.ref} {...m.dialogProps} onClick={e => e.stopPropagation()}
-        className="modal-sheet h-vyjed w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] max-h-[calc(100dvh-12px)] overflow-y-auto overscroll-contain px-5 sm:px-6 pt-5 pb-[max(env(safe-area-inset-bottom),20px)]">
-        <DiscardGuard guard={m.guard} />
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="t-section !text-[24px] font-bold">{hotovo ? (hotovo.potvrzeno ? t('Rezervace potvrzena') : t('Rezervace odeslána')) : t('Rezervovat stůl')}</h2>
-            <p className="t-meta mt-1 truncate">{nazev}</p>
-          </div>
-          <button type="button" onClick={m.guard.attemptClose} className="tap-target btn-icon shrink-0" aria-label={t('Zavřít')}><Icon name="close" size={16} /></button>
-        </div>
+    <Modal open onClose={onClose} size="md" className="h-vyjed" title={hotovo ? (hotovo.potvrzeno ? t('Rezervace potvrzena') : t('Rezervace odeslána')) : t('Rezervovat stůl')} subtitle={nazev}>
 
         {hotovo ? (
-          <div className="mt-6">
+          <div>
             <div className="card p-4 flex items-center gap-3">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#C8F542] text-[#16181A]" aria-hidden><Icon name="calendarCheck" size={20} /></span>
               <div className="min-w-0">
@@ -107,7 +95,7 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
           </div>
         ) : (
           <>
-            <div className="mt-5 flex items-center gap-3 min-h-[44px]">
+            <div className="flex items-center gap-3 min-h-[44px]">
               <p className="flex-1 text-[15px] font-semibold" id="r-osob">{t('Kolik vás bude')}</p>
               <button type="button" aria-label={t('Méně')} onClick={() => setOsob(o => Math.max(1, o - 1))} disabled={osob <= 1} className="tap-target btn-icon disabled:opacity-40"><Icon name="minus" size={16} /></button>
               <span className="w-8 text-center text-[20px] font-semibold tabular-nums" aria-live="polite" aria-labelledby="r-osob">{osob}</span>
@@ -151,7 +139,6 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
             </button>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

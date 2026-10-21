@@ -15,6 +15,7 @@ import { obalZUserAgent, rolePatriDoObalu } from './obal';
 import { cistyJazyk } from './i18n/config';
 import { verzeRelace, relaceOdvolana, RELACE_ODVOLANA } from './authVerze';
 import { zaznamenejNavstevu } from './naposledy';
+import { overKodPrihlaseni } from './klient/prihlaseniKodem';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -198,6 +199,36 @@ export const authOptions: NextAuthOptions = {
           superadmin,
           lang,
           sv,
+        } as any;
+      },
+    }),
+    // Host (Managero client): přihlášení kódem z e-mailu bez hesla. Jen účty hostů; kód ověří
+    // lib/klient/prihlaseniKodem.ts (otisk, 10 minut, jednou, 5 pokusů). Brzda na IP jako u hesla.
+    CredentialsProvider({
+      id: 'host-kod',
+      name: 'host-kod',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        kod: { label: 'Kód', type: 'text' },
+      },
+      async authorize(credentials, req) {
+        if (!credentials?.email || !credentials?.kod) return null;
+        const ipGate = await hit(`login-ip:${klientIp(req?.headers)}`, 30, 15 * 60, { failClosed: true });
+        if (!ipGate.ok) return null;
+        const id = await overKodPrihlaseni(credentials.email, credentials.kod);
+        if (!id) return null;
+        const ua = ((req?.headers ?? {}) as Record<string, string | string[] | undefined>)['user-agent'];
+        if (!rolePatriDoObalu(obalZUserAgent(Array.isArray(ua) ? ua[0] : ua).obal, 'customer')) throw new Error('OBAL_ROLE');
+        const sqlH = neon(process.env.DATABASE_URL!);
+        const [u] = await sqlH`SELECT id, name, email, role, avatar, job_title FROM users WHERE id = ${id} AND role = 'customer'`;
+        if (!u) return null;
+        let lang: string | undefined;
+        try { const [l] = await sqlH`SELECT lang FROM users WHERE id = ${id}`; lang = cistyJazyk(l?.lang); } catch { /* sloupec ještě není */ }
+        let sv = 0;
+        try { const [r] = await sqlH`SELECT session_version FROM users WHERE id = ${id}`; sv = verzeRelace(r?.session_version); } catch { /* sloupec ještě není */ }
+        return {
+          id: String(u.id), name: u.name, email: u.email, role: 'customer',
+          avatar: u.avatar ?? '👤', jobTitle: u.job_title ?? '', teamId: null, superadmin: false, lang, sv,
         } as any;
       },
     }),

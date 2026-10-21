@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import Profil from '@/components/client/host/Profil';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Profil · Managero client' };
+export const metadata: Metadata = { title: 'Moje · Managero client' };
 
 export default async function Page() {
   const session = await getServerSession(authOptions);

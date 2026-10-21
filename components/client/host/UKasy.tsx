@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import Link from 'next/link';
 import { Icon } from '../../Icons';
 import { Switch } from '../../ui';
-import { useModal } from '@/lib/useModal';
+import { Modal } from '../../ui';
 import { useT } from '@/lib/i18n/client';
 import { okJson } from '@/lib/api';
 import { useObal } from '../../ObalProvider';
@@ -77,7 +77,6 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
   const cesta = useCesta();
   const demo = useJeDemo();
   const { jeObal } = useObal();
-  const m = useModal(true, onClose, t('U kasy'));
   const karta = useKartaHosta();
   const me = useHostMe();
   const umiDrzet = useDrzDisplej();
@@ -152,23 +151,14 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
   const vm = podnik ? kartaZClenstvi(podnik, odmeny, t) : null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center modal-overlay" onClick={m.guard.attemptClose}>
-      <div ref={m.ref} {...m.dialogProps} onClick={e => e.stopPropagation()}
-        className="modal-sheet h-vyjed w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] sm:mb-6 min-h-[calc(100dvh-24px)] sm:min-h-0 max-h-[calc(100dvh-12px)] overflow-y-auto overscroll-contain px-5 sm:px-6 pt-3 pb-[max(env(safe-area-inset-bottom),20px)]">
-        <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-black/15" aria-hidden />
+    <Modal open onClose={onClose} size="md" className="h-vyjed min-h-[calc(100dvh-1rem)] sm:min-h-0"
+      title={udalosti ? souhrnOdezvy(udalosti, t).titul : t('Ukaž u kasy')}
+      subtitle={udalosti ? souhrnOdezvy(udalosti, t).podtitul : umiDrzet ? t('Displej necháme svítit. Platí ve všech podnicích.') : t('Zvyš jas displeje. Platí ve všech podnicích.')}>
         {udalosti ? (
           <Odezva udalosti={udalosti} podnik={clenstvi.find(c => c.slug === udalosti[0]?.slug) ?? null} onHotovo={onClose} onDalsi={() => { setUdalosti(null); }} hodnotitHref={cesta('/client/me/aktivita')} />
         ) : (
           <>
-            <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <h2 className="t-section !text-[22px] font-bold">{t('Ukaž u kasy')}</h2>
-                <p className="t-meta mt-1 text-pretty">{umiDrzet ? t('Displej necháme svítit. Platí ve všech podnicích.') : t('Zvyš jas displeje. Platí ve všech podnicích.')}</p>
-              </div>
-              <button type="button" onClick={onClose} className="tap-target btn-icon shrink-0" aria-label={t('Zavřít')}><Icon name="close" size={16} /></button>
-            </div>
-
-            <div className="mt-5 mx-auto w-full max-w-[18rem] aspect-square h-qr-pole p-4 border border-black/[0.07]">
+            <div className="mx-auto w-full max-w-[18rem] aspect-square h-qr-pole p-4 border border-black/[0.07]">
               {karta.data?.svg
                 ? <span dangerouslySetInnerHTML={{ __html: karta.data.svg }} className="block w-full h-full" role="img" aria-label={t('QR kód karty {kod}', { kod: karta.data.code })} />
                 : karta.data?.code
@@ -229,36 +219,35 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
             )}
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
+}
+
+/** Titul a čísla listu po načtení: razítko má přednost, pak body, pak uplatněná odměna. */
+function souhrnOdezvy(udalosti: Udalost[], t: (cs: string, p?: any) => string) {
+  const raz = udalosti.find(u => u.typ === 'razitko');
+  const body = udalosti.filter(u => u.typ === 'body' && u.delta > 0).reduce((a, u) => a + u.delta, 0);
+  const uplatneno = udalosti.some(u => u.typ === 'uplatneno');
+  const prvni = raz ?? udalosti[0];
+  const d = new Date(prvni.at);
+  const cas = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const titul = raz ? (raz.delta > 1 ? t('Razítka připsána') : t('Razítko připsáno')) : body > 0 ? t('Body připsány') : uplatneno ? t('Odměna uplatněna') : t('Hotovo');
+  return { raz, body, titul, podtitul: t('{podnik} · dnes {cas}', { podnik: prvni.podnik, cas }), velke: raz ? `+${raz.delta}` : body > 0 ? `+${body}` : '' };
 }
 
 /** „Razítko připsáno“ / „Body připsány“ / „Odměna uplatněna“ — list po načtení u kasy. */
 function Odezva({ udalosti, podnik, onHotovo, onDalsi, hodnotitHref }: { udalosti: Udalost[]; podnik: any | null; onHotovo: () => void; onDalsi: () => void; hodnotitHref: string }) {
   const t = useT('klient-host');
-  const raz = udalosti.find(u => u.typ === 'razitko');
-  const body = udalosti.filter(u => u.typ === 'body' && u.delta > 0).reduce((a, u) => a + u.delta, 0);
+  const { raz, body, velke } = souhrnOdezvy(udalosti, t);
   const uplatneno = udalosti.filter(u => u.typ === 'uplatneno');
   const odmena = udalosti.find(u => u.typ === 'odmena');
   const prvni = raz ?? udalosti[0];
-  const cas = (() => { const d = new Date(prvni.at); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; })();
-  const titul = raz ? (raz.delta > 1 ? t('Razítka připsána') : t('Razítko připsáno'))
-    : body > 0 ? t('Body připsány')
-    : uplatneno.length ? t('Odměna uplatněna')
-    : t('Hotovo');
-  const velke = raz ? `+${raz.delta}` : body > 0 ? `+${body}` : '';
   const k = raz?.karta;
   const plna = !!k && k.razitka >= k.cil;
   return (
     <div className="pb-1" role="status" aria-live="polite">
-      <div className="flex justify-end">
-        <button type="button" onClick={onHotovo} className="tap-target btn-icon" aria-label={t('Zavřít')}><Icon name="close" size={16} /></button>
-      </div>
-      <div className="flex flex-col items-center text-center -mt-4">
+      <div className="flex justify-center">
         {velke ? <span className="h-plus h-pop">{velke}</span> : <span className="h-plus h-pop"><Icon name="check" size={30} strokeWidth={2.4} /></span>}
-        <h2 className="mt-4 t-page !text-[28px]">{titul}</h2>
-        <p className="t-meta mt-1">{t('{podnik} · dnes {cas}', { podnik: prvni.podnik, cas })}</p>
       </div>
       {k && k.cil > 0 && (
         <div className="h-karta mt-5" style={stylKarty(prvni.accent ?? podnik?.accent)}>

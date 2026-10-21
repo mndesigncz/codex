@@ -172,6 +172,23 @@ export async function sendPasswordResetEmail(to: string, name: string, cesta: st
   });
 }
 
+/** Host: jednorázový kód pro přihlášení do Managero client bez hesla (lib/klient/prihlaseniKodem.ts). Platí 10 minut. */
+export async function sendHostLoginCodeEmail(to: string, name: string, kod: string): Promise<SendResult> {
+  return send({
+    label: 'Managero client',
+    to,
+    subject: `${kod} je tvůj kód do Managero client`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; background: #F1F4EC; color: #16181A; border-radius: 20px;">
+        <h1 style="font-size: 22px; margin: 0 0 8px;">Kód pro přihlášení</h1>
+        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, tímhle kódem se přihlásíš do Managero client. Platí 10 minut a jde použít jednou.</p>
+        <p style="font-family: ui-monospace, monospace; font-size: 34px; font-weight: bold; letter-spacing: 0.3em; margin: 18px 0;">${escHtml(kod)}</p>
+        <p style="color: #5c6353; font-size: 13px;">Pokud ses nepřihlašoval(a), e-mail ignoruj. Bez kódu se do účtu nikdo nedostane.</p>
+      </div>
+    `,
+  });
+}
+
 /** E-mail s potvrzením smazání účtu. Bez otevření odkazu se nic nesmaže. */
 export async function sendAccountDeleteEmail(to: string, name: string, cesta: string): Promise<SendResult> {
   const url = `${odkazovyZaklad()}${cesta}`;

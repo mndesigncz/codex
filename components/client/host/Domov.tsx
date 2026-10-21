@@ -53,7 +53,7 @@ export default function Domov() {
           <p className="t-meta">{pozdrav(hodina, t)}</p>
           <h1 className="t-page !text-[28px] sm:!text-[32px] truncate">{jmeno || (d ? t('Karta') : ' ')}</h1>
         </div>
-        <Link href={cesta('/client/me/profil')} className="md:hidden tap-target rounded-full shrink-0" aria-label={t('Profil')}>
+        <Link href={cesta('/client/me/profil')} className="md:hidden tap-target rounded-full shrink-0" aria-label={t('Moje')}>
           <AvatarHosta name={d?.me?.name ?? ''} size={40} />
         </Link>
       </header>

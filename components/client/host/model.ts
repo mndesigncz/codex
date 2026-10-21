@@ -1,4 +1,5 @@
 'use client';
+// Texty jdou přes t() z useT('klient-host') volajícího (sekce slovníku pro kontrolu i18n).
 
 // Z odpovědi /api/client/me skládá, co host vidí: karty podniků s jedním číslem, připravené odměny,
 // „dnes“ (rezervace, objednávka, kupon, kterému končí platnost). Čisté funkce bez fetch.

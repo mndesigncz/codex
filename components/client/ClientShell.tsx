@@ -175,7 +175,7 @@ function ListaPrihlaseny({ me, polozky, c }: { me: ClientUser; polozky: readonly
             <button type="button" onClick={otevriNajit} aria-label={skenIkona === 'camera' ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')} title={skenPopis}
               className="tap-target btn-icon !h-10 !w-10"><Icon name={skenIkona} size={17} /></button>
             <button type="button" onClick={() => otevri()} className="btn btn-primary !h-10 !px-4 text-sm"><Icon name="qr" size={16} /> {t('Ukázat kartu')}</button>
-            <Link href={c('/client/me/profil')} className="tap-target rounded-full" aria-label={t('Profil')} title={me.name}><AvatarHosta name={me.name} size={40} /></Link>
+            <Link href={c('/client/me/profil')} className="tap-target rounded-full" aria-label={t('Moje')} title={me.name}><AvatarHosta name={me.name} size={40} /></Link>
           </div>
         </div>
       </div>
