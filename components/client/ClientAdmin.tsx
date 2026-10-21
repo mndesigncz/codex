@@ -42,6 +42,7 @@ import PrechodZKarticky, { PRECHOD_TLACITKO, PRECHOD_OTAZKA, PRECHOD_POPIS, useI
 import ClenoveSprava from './loyalty/ClenoveSprava';
 import KuponVybranym from './loyalty/KuponVybranym';
 import CteckaPanel from './sprava/CteckaPanel';
+import OsaRezervaci from './sprava/OsaRezervaci';
 import KampaneStranka, { CASTI_KAMPANI, type CastKampani } from './sprava/KampaneStranka';
 import KuponyAPoukazy, { type CastKuponu } from './sprava/KuponyAPoukazy';
 import type { VyberHostu } from './loyalty/ClenoveHromadne';
@@ -466,6 +467,8 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
   const [jenNedorazili, setJenNedorazili] = useState(false);
   const [kalendar, setKalendar] = useState(false);
   const [hostOkno, setHostOkno] = useState<Rezervace | null>(null);
+  // Kolo 92: osa stolů × hodin pro jeden den (dnes nebo vybraný); seznam zůstává výchozí.
+  const [osa, setOsa] = useState(false);
   const url = hleda ? `/api/client/admin/reservations?q=${encodeURIComponent(hledano)}`
     : den ? `/api/client/admin/reservations?date=${den}`
     : obdobi === 'past' ? `/api/client/admin/reservations?range=past&limit=${limit}${jenNedorazili ? '&status=no_show' : ''}`
@@ -547,6 +550,11 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
         <Button variant={den ? 'primary' : 'secondary'} icon="calendar" className="shrink-0 cz-sentence" aria-haspopup="dialog" aria-label={den ? `Vybraný den ${czDay(den, true)}; změnit den` : 'Vybrat den v kalendáři'}
           onClick={() => setKalendar(true)}>{den ? czDay(den) : 'Den'}</Button>
         {den && <Button variant="ghost" iconOnly icon="close" className="shrink-0" aria-label="Zrušit výběr dne" onClick={() => setDen(null)} />}
+        <Button variant={osa ? 'primary' : 'secondary'} icon="grid" className="shrink-0" aria-pressed={osa}
+          aria-label={osa ? 'Zpět na seznam rezervací' : 'Osa stolů: rezervace dne po stolech a hodinách'}
+          onClick={() => { if (!osa && !den && obdobi !== 'today') { setObdobi('today'); setQ(''); setHledano(''); } setOsa(v => !v); }}>
+          <span className="max-sm:sr-only">{osa ? 'Seznam' : 'Osa stolů'}</span>
+        </Button>
       </div>
       {/* Filtrovací pás jen, když je co filtrovat (DESIGN „Filtrovací pás"). */}
       {vMinulych && minule && minule.nedorazeni > 0 && (
@@ -639,7 +647,18 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
         )}
       </div>
     );
-  const nastroj = <div className="space-y-4">{lista}{seznam}</div>;
+  const denOsy = den ?? (obdobi === 'today' ? dnes : null);
+  const nastroj = (
+    <div className="space-y-4">
+      {lista}
+      {osa && denOsy && !hleda && data.data ? (
+        <Card aria-label={`Osa stolů · ${czDay(denOsy, true)}`}>
+          <OsaRezervaci rezervace={rezervace} stoly={stoly} den={denOsy} dnes={dnes} ted={ted}
+            onStul={r => setStulPro({ r, stul: r.stulId ? String(r.stulId) : '' })} />
+        </Card>
+      ) : seznam}
+    </div>
+  );
 
   return (
     <>
