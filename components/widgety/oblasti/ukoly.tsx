@@ -42,7 +42,6 @@ import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
 import { apiMessage, okJson } from '@/lib/api';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../../PredUzaverkou';
-import { OSA_TEXTU, OSA_ZASKRTNUTI, osaTextu } from '../osaTextu';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtHM } from '@/lib/i18n/format';
@@ -266,7 +265,7 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
       ) : (
         <Sloupec mezera={2}>
           {/* v4 (V4): štítky (Po termínu, Před uzávěrkou) na ose textu pod titulkem, ne pod zaškrtávátkem. */}
-          <ul className={`list ${OSA_TEXTU}`} style={osaTextu(OSA_ZASKRTNUTI)}>
+          <ul className="list">
             {zobrazene.map(t => {
               const hotovo = t.status === 'done';
               const pozde = !!t.dueDate && t.dueDate < dnes;

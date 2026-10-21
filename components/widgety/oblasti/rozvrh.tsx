@@ -51,7 +51,6 @@ import {
 import { useMoney } from '../../CurrencyProvider';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, type StavNacteni } from '../Widget';
-import { OSA_TEXTU } from '../osaTextu';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { otevriDen } from '@/lib/denUdalost';
 import { Icon } from '../../Icons';
@@ -351,7 +350,7 @@ function DnesniSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ den?: string
         <Sloupec mezera={2}>
           {/* v4 (P15, V12): čas je poslední sloupec řádku na R — chip příchodu (různé šířky) stojí PŘED ním,
               jinak by konec času skákal podle délky chipu (audit: 07:30–14:00 na 1126 vs 1025). */}
-          <ul className={`list sm:[&_.list-value]:order-1 ${OSA_TEXTU}`}>
+          <ul className="list">
             {radky.map(s => (
               <ListRow key={s.klic}
                 lead={<Avatar emoji={s.avatar} size="sm" />}

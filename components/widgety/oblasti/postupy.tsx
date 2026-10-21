@@ -26,7 +26,6 @@ import { Avatar, Button, Chip, ListRow, Stat, runBulk } from '../../ui';
 import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, type StavNacteni } from '../Widget';
-import { OSA_JAMKA, OSA_TEXTU, osaTextu } from '../osaTextu';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -182,7 +181,7 @@ function PovinneDnes({ velikost, nahled }: WidgetProps) {
         <>
           {cekaji.length > 0 && <p className="t-meta text-pretty">{t('Bez nich nepůjde odeslat uzávěrka.')}</p>}
           {/* v4 (V4): chip stavu na ose textu, ne pod jamkou. */}
-          <ul className={`list ${OSA_TEXTU}`} style={osaTextu(OSA_JAMKA)}>
+          <ul className="list">
             {seznam.map(p => {
               const bezi = active?.procedureId === p.id;
               const klik = smiSpustit && !p.hotovo && !bezi ? () => spust(p.id) : undefined;

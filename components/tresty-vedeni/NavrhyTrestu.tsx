@@ -10,8 +10,7 @@ import { URL_NAVRHY_TRESTU, type NavrhTrestu } from '@/lib/tresty';
 import { apiMessage, okJson } from '@/lib/api';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
-import { Avatar, Button, ListRow, Rada, Toast } from '../ui';
-import { useJeTelefon } from '@/lib/useJeTelefon';
+import { Avatar, Button, ListRow, Toast } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import { obnovTresty } from './data';
 
@@ -28,7 +27,6 @@ export function NavrhyTrestu({ navrhy, onDat, nahled = false }: {
   nahled?: boolean;
 }) {
   const t = useT('widgety');
-  const telefon = useJeTelefon();
   const money = useMoney();
   const [zahazuji, setZahazuji] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
@@ -60,12 +58,9 @@ export function NavrhyTrestu({ navrhy, onDat, nahled = false }: {
             lead={<Avatar emoji={n.userAvatar} name={n.userName} size="sm" />}
             title={n.userName || t('Člen týmu')}
             meta={fmtDatum(n.day, { jazyk: t.jazyk, styl: 'denKratce' })}
-            detail={<>
-              <span className="block text-[#16181A]">{popisNavrhu(t, n, money)}</span>
-              {/* Telefon: pár akcí ½ + ½ na ose textu (P12) — v ocasu by stál pod avatarem na L. */}
-              {telefon && !nahled && <Rada vyska="s" className="mt-2">{akce(n)}</Rada>}
-            </>}
-            actions={nahled || telefon ? undefined : akce(n)} />
+            detail={<span className="block text-[#16181A]">{popisNavrhu(t, n, money)}</span>}
+            // v4 (P12): na telefonu je pár akcí ½ + ½ na ose textu — ListRow to dělá sám.
+            actions={nahled ? undefined : akce(n)} />
         ))}
       </ul>
       <Toast message={toast?.text ?? null} tone={toast?.tone} id={toast?.id} onClose={() => setToast(null)} />

@@ -76,7 +76,6 @@ import {
   type DenHodnoceni, type MojeUroven, type NabidkaOdmeny, type ObdobiZebricku, type Zadost,
 } from '@/lib/odmenyPrehled';
 import { Icon } from '../../Icons';
-import { OSA_JAMKA, OSA_TEXTU, osaTextu } from '../osaTextu';
 import {
   Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented, Select, SelectBox, Sloupec, Stat, StatRow, Toast, Well,
   runBulk, useSelection,
@@ -132,7 +131,7 @@ function sTucnym(t: PrekladFn, klic: string, tucne: React.ReactNode, className: 
 }
 const sZnamenkem = (n: number) => `${n > 0 ? '+' : ''}${cislo(n)}`;
 
-// v4 (V4, P12): seznam řádků s avatarem — stavový řádek a akce na ose textu (OSA_TEXTU, ../osaTextu).
+// v4 (V4, P12): seznam řádků s avatarem — stavový řádek a akce na ose textu (ListRow to dělá sám, globals.css „OSA TEXTU").
 
 /** Akce v prázdném stavu widgetu (patka se nad prázdnem nekreslí): L→R × 44 pod větou. */
 function AkcePrazdna({ children }: { children: React.ReactNode }) {
@@ -314,7 +313,7 @@ function OhodnotitSmeny({ velikost }: WidgetProps) {
               {radky.every(r => r.hodnoceno) && (
                 <p className="note note-ok flex items-center gap-2"><Icon name="check" size={15} className="shrink-0" />{t('Vše ohodnoceno')}</p>
               )}
-              <ul className={`list ${OSA_TEXTU}`}>
+              <ul className="list">
                 {videt.map(r => (
                   <ListRow key={r.id} lead={<Avatar emoji={r.avatar} size="sm" />} title={r.jmeno} meta={metaSmeny(r, t)}
                     right={!r.hodnoceno ? <Chip tone="wait" size="sm">{t('Čeká')}</Chip>
@@ -1052,7 +1051,7 @@ function ZadostiOOdmeny({ velikost, nahled }: WidgetProps) {
             )}
           </>
         ) : undefined}>
-        <Sloupec mezera={3} className={OSA_TEXTU}>
+        <Sloupec mezera={3}>
         <ul className="list">
           {videt.map(z => (
             <ListRow key={z.id}
@@ -1062,7 +1061,7 @@ function ZadostiOOdmeny({ velikost, nahled }: WidgetProps) {
               title={z.jmeno ?? t('Člen týmu')} meta={`${z.nazev} · ${cislo(z.cena)} ${bodTvar(t, z.cena)}`}
               actions={vyber.selecting ? undefined : (
                 <>
-                  {/* v3: v řádku fronty šedá pilulka, ne inkoust — pět inkoustových „Schválit“ pod sebou tahalo oko víc než hlavní akce (DESIGN „max jedno inkoustové v zorném poli“). v4: na telefonu pár ½ + ½ na ose textu (OSA_TEXTU). */}
+                  {/* v3: v řádku fronty šedá pilulka, ne inkoust — pět inkoustových „Schválit“ pod sebou tahalo oko víc než hlavní akce (DESIGN „max jedno inkoustové v zorném poli“). v4: na telefonu pár ½ + ½ na ose textu (ListRow). */}
                   <Button variant="secondary" size="sm" icon="check" loading={pracuji === z.id} disabled={pracuji != null && pracuji !== z.id}
                     aria-label={t('Schválit: {jmeno}, {nazev}', { jmeno: z.jmeno ?? '', nazev: z.nazev })} onClick={() => jedna(z, 'approve')}>{t('Schválit')}</Button>
                   <Button variant="danger" size="sm" disabled={pracuji != null}
@@ -1718,7 +1717,7 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
       ) : undefined}
       souhrn={<span data-navic-souhrn>{souhrnText.join(' · ')}</span>}
       patka={tlacitko || undefined}>
-      <Sloupec mezera={2} className={OSA_TEXTU}>
+      <Sloupec mezera={2}>
         {videt.length === 0 ? (
           <p className="t-meta">{filtr === 'ceka' ? t('Nic nečeká na uznání.') : t('Pro tenhle filtr tu nic není.')}</p>
         ) : (
@@ -1843,7 +1842,7 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
       patka={tlacitko || undefined}>
       {/* v4 (V14): skupiny seznamu (Nesouhlasí, Návrhy, Tresty) pod sebou viditelně 24 (gap 12 + spodní
           odsazení řádku 12), uvnitř skupiny štítek → seznam 4 — dřív mt-3 / mt-1 / mt-2 (7 různých mezer). */}
-      <Sloupec mezera={3} className={OSA_TEXTU}>
+      <Sloupec mezera={3}>
         {sporne.length > 0 && (
           <Sloupec mezera={1} data-tresty-sporne>
             <p className="t-label">{t('Nesouhlasí')}</p>
@@ -1925,9 +1924,9 @@ function ZaBodyTymu({ velikost, nahled }: WidgetProps) {
       patka={tlacitko || undefined}>
       {/* Dnešní úkoly první (hlavní údaj karty — na telefonu nesmí skončit pod „Zobrazit vše"), čekající pod nimi
           (skupina 24); že něco čeká, říká už chip v hlavičce. */}
-      <Sloupec mezera={3} className={OSA_TEXTU}>
+      <Sloupec mezera={3}>
         {ukoly.length > 0 ? (
-          <Sloupec mezera={1} style={osaTextu(OSA_JAMKA)}>
+          <Sloupec mezera={1}>
             <ul className="list" data-za-body-seznam>{videt.map(u => <RadekUkoluDnes key={u.nabidka.id} u={u} />)}</ul>
             {ukoly.length > videt.length && <p className="t-meta">{aDalsich(t, ukoly.length - videt.length)}</p>}
           </Sloupec>

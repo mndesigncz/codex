@@ -54,8 +54,10 @@ export function ListRow({
   const akceMimoOcas = akceVRadku && !maCislo && !!actions && !!right;
   const inner = (
     <>
-      {lead && <span className="shrink-0 flex items-center">{lead}</span>}
-      <span className="min-w-0 flex-1">
+      {/* v4 (V4): úvodní prvek drží nahoře u titulu (vysoký řádek ho nenechá plavat uprostřed textu);
+          na telefonu je to první sloupec mřížky řádku a druhý řádek (ocas) začíná na OSE TEXTU, ne pod ním. */}
+      {lead && <span className="list-lead shrink-0 flex items-center">{lead}</span>}
+      <span className="list-text min-w-0 flex-1">
         {/* v4 (V4): titul smí na dva řádky — s hodnotou v témže řádku by se jinak useknul („Po 19. října · 07:"). */}
         <span className="list-titul block font-medium text-[15px] leading-snug text-[#16181A] line-clamp-2 break-words">{title}</span>
         {meta && <span className="block text-[13px] text-black/55 leading-snug mt-0.5 truncate">{meta}</span>}

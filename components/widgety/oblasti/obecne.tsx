@@ -52,7 +52,6 @@ import {
 } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
-import { OSA_TEXTU } from '../osaTextu';
 import { PrazdnoWidgetu } from '../PrazdnoWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { navigaceCile, rozeberCil, useNavigace, useSmi, type CilOdkazu } from '../NavigaceKontext';
@@ -927,7 +926,7 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
           {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
           {M ? (
             <Sloupec mezera={2}>
-              <ul className={`list ${OSA_TEXTU}`}>{radkyM.slice(0, 5).map(radek)}</ul>
+              <ul className="list">{radkyM.slice(0, 5).map(radek)}</ul>
               {radkyM.length > 5 && <p className="t-meta">{aDalsich(t, radkyM.length - 5)}</p>}
               {/* Střední nástěnka nemá místo na formulář — „Nové oznámení" v patce otevře okno.
                   Jedna položka v nabídce „···" v hlavičce by vedle „···" řádků jen mátla. */}
@@ -935,12 +934,12 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
           ) : (
             <>
               {pripnuta.length > 0
-                ? <ul className={`list ${OSA_TEXTU}`}>{pripnuta.map(radek)}</ul>
+                ? <ul className="list">{pripnuta.map(radek)}</ul>
                 : <p className="t-meta">{t('Na nástěnce zatím nic nevisí.')}</p>}
               {odepnuta.length > 0 && (
                 <Sloupec mezera={1}>
                   <p className="t-label">{t('Odepnutá')}</p>
-                  <ul className={`list ${OSA_TEXTU}`}>{odepnuta.map(radek)}</ul>
+                  <ul className="list">{odepnuta.map(radek)}</ul>
                 </Sloupec>
               )}
             </>

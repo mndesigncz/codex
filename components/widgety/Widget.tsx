@@ -169,11 +169,13 @@ export function Zkratitelne({ id, velikost, children }: { id: string; velikost: 
         style={zkraceno ? { maxHeight: prah, overflow: 'hidden', maskImage: maska, WebkitMaskImage: maska } : undefined}>
         <div ref={vnitrek}>{children}</div>
       </div>
-      {/* v4 (P2): pod obsahem karty stojí ovládání přes celou šířku L→R, ne osamělá
-          obsahová pilulka vlevo (audit V16). Stupeň S (36) — je to přepínač, ne akce. */}
+      {/* v4 (P2, P12): pod obsahem karty stojí přepínač přes celou šířku L→R, ne osamělá
+          obsahová pilulka vlevo (audit V16). Tichý (bez plochy), text na střed — je to přepínač
+          zkrácení, ne akce: šedá pilulka 36 nad akcí widgetu 44 dělala dvě plné šířky dvou výšek
+          pod sebou („Zobrazit vše" nad „Zapsat za člena"). */}
       {dlouhy && (
-        <Button variant="secondary" size="sm" icon={zkraceno ? 'chevron' : 'chevronUp'} aria-expanded={!zkraceno} onClick={prepni}
-          className="mt-3 w-full">
+        <Button variant="ghost" size="sm" icon={zkraceno ? 'chevron' : 'chevronUp'} aria-expanded={!zkraceno} onClick={prepni}
+          className="mt-2 w-full w-zobrazit-vse">
           {zkraceno ? t('Zobrazit vše') : t('Ukázat méně')}
         </Button>
       )}
@@ -479,13 +481,21 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   // Jen na monitoru u střední a velké karty bez dalších filtrů zůstává v hlavičce před ovládáním
   // karty — tam má místo a řada pod hlavičkou by nesla jediný prvek přes 600 px.
   const maFiltry = filtry != null && filtry !== false;
-  const filtrVRade = !!poleFiltru && (S || telefon || maFiltry);
+  // Do hlavičky se filtr vejde jen bez odkazu a bez čipu počtu: „Navíc v týmu" se 470 px na monitoru
+  // neslo titul + „1 čeká" + filtr + „Odměny ›" + ⤢ + ^ — skupina ovládání (nejvýš 45 %) přetekla
+  // a filtr se kreslil PŘES odkaz („Měsíc: Tento" na „Odměny"), titul „Tresty v tý…" se utnul (V1: titul ≥ 55 %).
+  const filtrVRade = !!poleFiltru && (S || telefon || maFiltry || (!!odkaz && nav.smiPohled(odkaz.pohled)) || doplnek != null);
   const filtr = poleFiltru ? (
     <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={filtrVRade}
       onZmena={id => k.zmenNastaveni?.({ [poleFiltru.klic]: id })} />
   ) : null;
   const filtrVHlavicce = filtr && !filtrVRade ? filtr : null;
-  const radaFiltru = (filtrVRade && filtr) || maFiltry ? (
+  // Malá karta (dlaždice ½, V9/P14): rychlý filtr bez dalších filtrů stojí DOLE, v jedné řadě se
+  // šipkou „Otevřít" (pružný + pevný, 36). Nahoře by posunul štítek a číslo o řadu níž než
+  // u sousední dlaždice bez filtru (Přehled: „Úkoly na dnes" 2 na y 705 vedle „Docházející zásoby"
+  // 3 na y 657) a filtr nahoře + šipka dole dělaly zubatý sloupec (Marže, Souhrn měsíce).
+  const filtrDole = S && filtrVRade && !maFiltry && !!filtr;
+  const radaFiltru = (filtrVRade && filtr && !filtrDole) || maFiltry ? (
     <div className="rada rada-rovne rada-s" data-w-filtry="">
       {filtrVRade && filtr}
       {filtry}
@@ -494,7 +504,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const ovladaniInkoust = '!text-white/70 hover:!text-white hover:!bg-white/10';
   const tlacitkoCile = sipkaCile ? (
     <Button variant="ghost" size="sm" iconOnly icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
-      className={`tap-target ${sipkaDole ? 'shrink-0 self-end' : ''} ${inkoust ? ovladaniInkoust : 'w-ovladani'}`}
+      className={`tap-target ${sipkaDole ? 'shrink-0' : ''} ${inkoust ? ovladaniInkoust : 'w-ovladani'}`}
       onClick={otevriCil} />
   ) : null;
   // Ovládání karty vpravo v hlavičce: nejvýš DVĚ ikonová tlačítka na telefonu (› proklik, ^ Sbalit),
@@ -505,15 +515,16 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const maSegment = segment != null && segment !== false && !nacitam && !chyba;
   const maSouhrn = souhrn != null && souhrn !== false && sData;
   const maPatku = patka != null && patka !== false && sData;
-  const jadro = sipkaDole ? (
-    // Chyba se „Zkusit znovu" potřebuje celou šířku karty — šipka jde pod ni, ne vedle.
-    // v4 (P14): obsah malé karty stojí NAHOŘE (štítek → číslo na stejné y ve dvojici karet),
-    // šipka zůstává vpravo dole.
-    <div className={`flex-1 min-h-0 ${chyba ? 'flex flex-col gap-1' : 'flex items-stretch gap-1'}`}>
-      <div className={`min-w-0 ${chyba ? '' : 'flex-1'}`}>{obsah}</div>
-      {tlacitkoCile}
+  // v4 (P14): obsah malé karty stojí NAHOŘE (štítek → číslo na stejné y ve dvojici karet); šipka
+  // a rychlý filtr jsou jedna řada u dna karty — filtr vyplní zbytek, šipka 36 končí na R.
+  const pataMale = S && (filtrDole || sipkaDole) && sloty ? (
+    <div className="w-pata-s" data-w-filtry={filtrDole ? '' : undefined}>
+      {filtrDole && <div className="flex min-w-0 flex-1 [&>*]:flex-1">{filtr}</div>}
+      {sipkaDole && tlacitkoCile}
     </div>
-  ) : !S && !bezZkraceni && !k.nahled && !k.upravy && sData
+  ) : null;
+  const jadro = S ? <div className="min-w-0">{obsah}</div>
+    : !bezZkraceni && !k.nahled && !k.upravy && sData
     ? <Zkratitelne id={k.instance} velikost={k.velikost as 'M' | 'L'}>{obsah}</Zkratitelne>
     : obsah;
   return (
@@ -531,7 +542,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
       inert={k.upravy || undefined}
       className={[
         'min-w-0 h-full flex flex-col',
-        S ? `relative ${prazdnyStav ? '' : 'min-h-[8.5rem]'}` : '',
+        S ? `w-karta-s relative ${prazdnyStav ? '' : 'min-h-[8.5rem]'}` : '',
         // Klepnutelná karta (natažený odkaz, nebo cíl z katalogu) se na hover jemně zvedne.
         otevrit || klepnutelna ? 'relative transition-shadow hover:shadow-[shadow:var(--shadow-float)]' : '',
         // Jediná tmavá plocha v obsahu: hlavní číslo peněz (DP §2.10), v3 bez záře v rohu.
@@ -557,7 +568,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
             <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={20} className={inkoust ? 'text-white/60' : 'w-ikona'} />
           </span>
           <span className={S
-            ? 'line-clamp-2 break-words hyphens-auto [hyphenate-limit-chars:10_5_5] [-webkit-hyphenate-limit-before:5] [-webkit-hyphenate-limit-after:5] max-sm:min-h-[2.6em]'
+            ? 'w-titul-s line-clamp-2 break-words hyphens-auto [hyphenate-limit-chars:10_5_5] [-webkit-hyphenate-limit-before:5] [-webkit-hyphenate-limit-after:5]'
             : 'truncate'} title={nazev}>{nazev}</span>
           {doplnek}
         </h2>
@@ -611,6 +622,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
             </div>
           ) : jadro}
           {maPatku && <div className="rada rada-rovne rada-m w-patka" data-w-patka="">{patka}</div>}
+          {pataMale}
         </div>
       )}
       {otevrit && (

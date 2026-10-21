@@ -456,6 +456,18 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
 /* Na počítači ocas neexistuje a jeho děti sedí přímo v řádku — jen tak
    drží sloupce svisle přes všechny řádky. */
 .list-tail { display: contents; }
+/* v4 (V4): úvodní prvek (avatar, jamka, zaškrtávátko) drží nahoře u titulu. Když je vyšší než
+   text, řádek má jeho výšku a text stojí uprostřed (jako dřív); když je text vyšší (titul + meta
+   + detail + stav), avatar nezůstane plavat v půlce bloku textu. */
+.list-lead { align-self: flex-start; }
+@media (min-width: 641px) {
+  /* v4 (P15): hodnota končí na R — doplněk (`right`, chip) a tichý údaj (`aside`) stojí PŘED ní,
+     akce a šipka za ní. Dřív se chip kreslil za hodnotou a hodnota na monitoru končila
+     o šířku chipu dřív (Rozvrh to obcházel `sm:[&_.list-value]:order-1`). */
+  .list-row > .list-value { order: 2; }
+  .list-tail > .list-actions, .list-row > .list-actions-radek { order: 3; }
+  .list-row > .list-sipka { order: 4; }
+}
 @media (max-width: 640px) {
   /* Na mobilu se ocas odlomí pod jméno: číslo vlevo, akce vpravo. Pevná
      šířka sloupce by tu jen ubírala místo textu, tak ji pouštíme. */
@@ -488,6 +500,33 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
      skladu) jde dál do druhého řádku, jinak by titulu nezbylo místo. */
   .list-tail-akce:has(> .list-actions > :only-child) { display: contents; }
   .list-tail-akce:has(> .list-actions > :only-child) > .list-actions { flex: 0 0 auto; margin-left: 0; order: 0; }
+
+  /* v4 (V4, P12) — OSA TEXTU: řádek s úvodním prvkem je na telefonu mřížka
+       [lead] 14 [text 1fr] 12 [hodnota] [akce v řádku] 8 [›]
+     a druhý řádek (ocas: stav, chipy, akce) začíná pod TEXTEM, ne pod avatarem na L.
+     Dřív to každá oblast obcházela po svém (obal OSA_TEXTU s odhadnutou šířkou avataru,
+     useJeTelefon + přesun stavu do `detail`). Mezery jako okraje, ne `gap`: prázdný
+     sloupec (řádek bez hodnoty, bez šipky) pak nic nezabere. */
+  .list-row:has(> .list-lead) {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    column-gap: 0; row-gap: var(--m-3); align-items: center;
+  }
+  .list-row:has(> .list-lead) > .list-lead { grid-column: 1; grid-row: 1; margin-right: 0.875rem; align-self: start; }
+  .list-row:has(> .list-lead) > .list-text { grid-column: 2; grid-row: 1; }
+  /* Procento šířky by se v mřížce počítalo z vlastního (auto) sloupce a „07:30–14:00" by se zalomilo. */
+  .list-row:has(> .list-lead) > .list-value { grid-column: 3; grid-row: 1; margin-left: var(--m-3); max-width: 45vw; }
+  .list-row:has(> .list-lead) > .list-actions-radek,
+  .list-row:has(> .list-lead) > .list-tail-akce > .list-actions { grid-column: 4; grid-row: 1; margin-left: var(--m-3); }
+  .list-row:has(> .list-lead) > .list-sipka { grid-column: 5; grid-row: 1; margin-left: var(--m-2); }
+  .list-row:has(> .list-lead) > .list-tail:not(.list-tail-tichy) { grid-column: 2 / -1; grid-row: 2; }
+  /* Jediná akce řádku zůstává v prvním řádku (pravidlo výš) — ocas je pak `contents`, ne druhý řádek. */
+  .list-row:has(> .list-lead) > .list-tail-akce:has(> .list-actions > :only-child) { display: contents; }
+  /* Pár textových akcí v ocasu (Uznat / Odmítnout, Body ± / Deník) je ½ + ½ přes šířku textu (P12),
+     stejná výška — ne dvě obsahové pilulky u pravé hrany. Ikonová tlačítka (krokovač, „···") ne. */
+  .list-tail > .list-actions:has(> :nth-child(2)):not(:has(> :nth-child(3))):not(:has(.w-9, .w-11)) {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--m-2); flex: 1 1 100%; margin-left: 0;
+  }
+  .list-tail > .list-actions:has(> :nth-child(2)):not(:has(> :nth-child(3))):not(:has(.w-9, .w-11)) > * { width: 100%; min-width: 0; }
 }
 
 /* ---------- Typografická škála (v3) ----------
@@ -510,6 +549,10 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
 .statrow-karta { container-type: inline-size; }
 .statrow-karta-v { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--m-4); row-gap: var(--m-4); }
 .statrow-karta-v > * { min-width: 0; }
+.statrow-karta-v.statrow-tri { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--m-3); }
+/* Štítek statu: jeden řádek, v úzké třetině smí na dva (bez „…" — „Hodnocených s…" nic neřekne). */
+.stat-stitek { min-width: 0; overflow-wrap: break-word; hyphens: auto; min-height: var(--stitek-v, auto); }
+@media (min-width: 640px) { .stat-stitek { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
 @container (min-width: 34rem) {
   .statrow-karta-v { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 }
@@ -1911,13 +1954,22 @@ html[data-obal] .jen-web { display: none !important; }
 .w-titul > :nth-child(2) { min-width: 0; }
 .w-titul > .chip, .w-titul > :last-child:not(:nth-child(2)) { flex-shrink: 0; }
 .w-ikona-box { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; flex-shrink: 0; }
-/* Malá karta na telefonu (dlaždice ½, 171 px): titul na dva řádky zarovnaný nahoru, text na
-   L + 28 (ikona 20, mezera 8) — s L + 36 by „Nehodnocené" (101 px) nezbylo na jeden řádek ani slovo. */
-@media (max-width: 639.98px) {
+/* Malá karta jako DLAŽDICE (½ telefonu, 169 px): titul na dva řádky zarovnaný nahoru a s rezervou
+   dvou řádků (P14 — štítky a čísla dvou dlaždic na stejné y), text na L + 28 (ikona 20, mezera 8) —
+   s L + 36 by „Nehodnocené" (101 px) nezbylo na jeden řádek ani slovo.
+   Podle šířky KARTY, ne okna (kontejnerový dotaz): malá karta, která na telefonu stojí v řadě sama
+   (přes celou šířku), má hlavičku jako ostatní widgety pod ní — text na L + 36, jeden řádek. Dřív
+   „Souhrn uzávěrek", „Pozvánky" nebo „Moje tresty" začínaly titulem o 8 px vlevo od widgetů nad
+   i pod sebou a pod jednořádkovým titulem nesly prázdný druhý řádek. */
+.w-karta-s { container: wkarta / inline-size; }
+@container wkarta (max-width: 15rem) {
   .w-hlavicka-s, .w-hlavicka-s .w-titul { align-items: flex-start; }
   .w-hlavicka-s .w-titul { gap: var(--m-2); }
   .w-hlavicka-s .w-ikona-box { width: 1.25rem; margin-top: -0.0625rem; }
+  .w-titul-s { min-height: 2.6em; }
 }
+/* Pata malé karty: rychlý filtr (zbytek šířky) a šipka „Otevřít" (36 na R) v jedné řadě u dna. */
+.w-pata-s { display: flex; align-items: center; justify-content: flex-end; gap: var(--m-2); margin-top: auto; min-width: 0; }
 .w-ovladani-skupina { display: flex; align-items: center; gap: var(--m-1); flex-shrink: 0; max-width: 45%; }
 /* Tělo widgetu: sloty a obsah s jednou mezerou 12 (skupina); souhrn ↔ obsah 8; obsah ↔ akce 16. */
 .w-telo { display: flex; flex-direction: column; gap: var(--m-3); }
