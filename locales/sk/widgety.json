@@ -2713,5 +2713,7 @@
   "Body můžou být 1 až 500.": "Body môžu byť 1 až 500.",
   "Vyber, komu děkuješ.": "Vyber, komu ďakuješ.",
   "Tento měsíc už nemáš body k rozdání.": "Tento mesiac už nemáš body na rozdanie.",
-  "Můžeš poslat 1 až {n} b.": "Môžeš poslať 1 až {n} b."
+  "Můžeš poslat 1 až {n} b.": "Môžeš poslať 1 až {n} b.",
+  "Nastaveno {hotovo} z {celkem}": "Nastavené {hotovo} z {celkem}",
+  "Nastaveno z {pct} %": "Nastavené na {pct} %"
 }

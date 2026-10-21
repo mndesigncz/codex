@@ -36,14 +36,17 @@ export const STRANKA: DefiniceStranky = {
     'odkaz',
   ],
   vychozi: {
+    // Audit 2026-10 (V20, vzor MarketMan / Sortly): seznam položek je hlavní obsah Skladu —
+    // hned pod dvojicí malých čísel (Bez ceny, Hlášení), ne až pod třemi středními kartami.
+    // Docházející zásoby, objednávky a výroba jsou pod ním. Uložená rozložení se nemění.
     'typ:vedeni': [
       { w: 'sklad.navrhy', s: 'M' },
       { w: 'sklad.chybi_udaje', s: 'S' },
       { w: 'sklad.hlaseni', s: 'S' },
+      { w: 'nastroj' },
       { w: 'sklad.dochazi', s: 'M' },
       { w: 'sklad.objednavky', s: 'M' },
       { w: 'vyroba.k_vyrobe', s: 'L' },
-      { w: 'nastroj' },
     ],
     'role:skladnik': [
       { w: 'sklad.navrhy', s: 'M' },

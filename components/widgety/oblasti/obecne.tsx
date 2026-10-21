@@ -467,7 +467,20 @@ function PrvniKroky({ velikost }: WidgetProps) {
     <Widget nacteni={ceka ? CEKA : kroky.map(k => k.s)}
       doplnek={polozky.length > 0 && !nacitaSe ? <Chip tone="muted" size="sm">{hotovo}/{polozky.length}</Chip> : undefined}
       prazdno={!ceka && (skryto || kroky.length === 0 || vseHotovo) ? null : undefined}>
-      <Checklist items={polozky} />
+      {/* Audit 2026-10 (V44, vzor Shopify setup guide / Toast „Jsi nastaven z 55 %"): pruh postupu nad
+          kroky — kolik zbývá, je vidět dřív, než člověk kroky přečte. Inkoust, ne limetka (stav, ne akce). */}
+      <Sloupec mezera={3}>
+        {polozky.length > 0 && !nacitaSe && (
+          <div className="flex items-center gap-3" data-prvni-kroky-postup>
+            <div className="h-1.5 flex-1 rounded-full bg-black/[0.07] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={polozky.length} aria-valuenow={hotovo}
+              aria-label={t('Nastaveno {hotovo} z {celkem}', { hotovo, celkem: polozky.length })}>
+              <div className="h-full rounded-full bg-[#16181A] dark:bg-white/80 transition-[width] duration-300" style={{ width: `${Math.round((hotovo / polozky.length) * 100)}%` }} />
+            </div>
+            <span className="t-meta tabular-nums shrink-0">{t('Nastaveno z {pct} %', { pct: Math.round((hotovo / polozky.length) * 100) })}</span>
+          </div>
+        )}
+        <Checklist items={polozky} />
+      </Sloupec>
     </Widget>
   );
 }

@@ -2711,5 +2711,7 @@
   "Body můžou být 1 až 500.": "Punkte können 1 bis 500 sein.",
   "Vyber, komu děkuješ.": "Wähle, wem du dankst.",
   "Tento měsíc už nemáš body k rozdání.": "Du hast diesen Monat keine Punkte mehr zu vergeben.",
-  "Můžeš poslat 1 až {n} b.": "Du kannst 1 bis {n} P. senden."
+  "Můžeš poslat 1 až {n} b.": "Du kannst 1 bis {n} P. senden.",
+  "Nastaveno {hotovo} z {celkem}": "{hotovo} von {celkem} eingerichtet",
+  "Nastaveno z {pct} %": "Zu {pct} % eingerichtet"
 }
