@@ -8,7 +8,7 @@
 // proměnné FIRMA_* nejsou, a server i prohlížeč tak vykreslí stejný text (bez nesouladu hydratace).
 // Změna provozovatele = změnit výchozí hodnoty v lib/firma.ts (viz docs/PRAVNI.md).
 
-import { firma, identifikace, jeEmail } from '@/lib/firma';
+import { firma, identifikace } from '@/lib/firma';
 import { useJazyk } from '@/lib/i18n/client';
 import type { KlicOdkazu } from '@/lib/pravni/odkazy';
 import PravniOdkazy from './PravniOdkazy';
@@ -22,11 +22,9 @@ export default function ProvozovatelInfo({ jen, className = '' }: {
   const f = firma({});
   return (
     <div className={`grid gap-1.5 ${className}`} data-provozovatel>
-      <p className="t-meta text-pretty">
-        {identifikace(f, jazyk)}{' '}
-        {jeEmail(f.emailPodpory) && <a href={`mailto:${f.emailPodpory}`} className="underline underline-offset-2 break-words">{f.emailPodpory}</a>}
-      </p>
-      <PravniOdkazy jazyk={jazyk} jen={jen} />
+      {/* Kontakt (e-mail, telefon) je za odkazem Podpora — samotný e-mail v textu by byl dotykový cíl pod 44 px. */}
+      <p className="t-meta text-pretty">{identifikace(f, jazyk)}</p>
+      <PravniOdkazy jazyk={jazyk} jen={jen} vysoke />
     </div>
   );
 }
