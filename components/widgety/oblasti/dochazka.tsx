@@ -250,9 +250,6 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   const pauza = useMemo(() => (ja.id != null && data.data ? stavPauzy(data.data.entries as ZaznamDochazkyLib[], ja.id, pragueToday(), ted) : null), [data.data, ja.id, ted]);
   const naPauze = !!pauza?.naPauze && !naSmene;
   const [ptamSe, setPtamSe] = useState(false);
-  // Odchod se potvrzuje (audit 2026-10 B7, vzor Homebase „Clock out?"): jedno klepnutí
-  // omylem dřív ukončilo směnu bez možnosti vrátit. Příchod jde dál na jedno klepnutí.
-  const [potvrditOdchod, setPotvrditOdchod] = useState<'smena' | 'pauza' | null>(null);
   // Poloha při příchodu (spuštění, balík P): jen když ji podnik ověřuje; před prvním použitím informace.
   const [infoPolohy, setInfoPolohy] = useState(false);
   const [zjistujiPolohu, setZjistujiPolohu] = useState(false);
@@ -277,14 +274,13 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
     }
   };
 
-  const pichni = async (poInfu = false, potvrzeno = false) => {
+  const pichni = async (poInfu = false) => {
     if (nahled || ja.id == null || pise) return;
     const akce = naSmene ? 'out' : 'in';
     // Odchod po víc než 6 h bez pauzy: nejdřív otázka, pak teprve zápis (zákoník: 30 min nejdéle po 6 h).
-    // Otázka sama je potvrzení — druhé okno by bylo navíc.
+    // Otázka sama je potvrzení — odpočet s Vrátit by byl navíc. Jinak odchod sem přijde
+    // až po odpočtu (zacitOdchod níž) — jediný vzor pojistky proti omylu, žádné další okno.
     if (akce === 'out' && pauza?.zeptatSe) { setPtamSe(true); return; }
-    if (akce === 'out' && !potvrzeno) { setPotvrditOdchod('smena'); return; }
-    setPotvrditOdchod(null);
     // Příchod u podniku, který ověřuje vzdálenost: poprvé na zařízení nejdřív věta, co se ukládá.
     const sPolohou = akce === 'in' && data.data?.poloha === true;
     if (sPolohou && !poInfu && !infoPolohyPotvrzeno(typeof window !== 'undefined' ? window.localStorage : null)) { setInfoPolohy(true); return; }
@@ -324,6 +320,8 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
 
   // Odchod s možností vrátit (audit Z02/B7, vzor Gmail „Vrátit odeslání", Homebase, Clockify):
   // klepnutí na Odchod nezapíše hned — 5 s běží odpočet s „Vrátit" a „Zapsat hned".
+  // Jediný vzor pojistky (ověření kola 92): potvrzovací okno „Odpíchnout odchod?" je pryč —
+  // stálo by druhé klepnutí při každém odchodu a omyl jde vrátit i takhle.
   // Omylem ukončená směna se tak vrátí bez vedoucího. Když člověk aplikaci zavře
   // nebo přepne pryč, odchod se zapíše okamžitě (pagehide / skrytá karta), takže
   // se nikdy neztratí. Otázka na pauzu po 6 h je sama potvrzením — tam odpočet není.
@@ -410,21 +408,6 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
       <p className="text-sm text-black/70 text-pretty">{t('„Ano" zapíše 30 minut pauzy doprostřed směny a odpíchne odchod. „Ne" odpíchne odchod a vedoucí dostane poznámku.')}</p>
     </Modal>
   ) : null;
-  // Potvrzení odchodu: kdy a kolik — člověk vidí, co odpíchne, a „Zpět" nic nezapíše.
-  const casTed = dbTimeHM(new Date(ted));
-  const oknoOdchodu = potvrditOdchod ? (
-    <Modal open onClose={() => setPotvrditOdchod(null)} size="sm" title={t('Odpíchnout odchod?')}
-      subtitle={potvrditOdchod === 'pauza'
-        ? t('Pauza skončí a odchod se zapíše na {cas}. Dnes odpracováno {delka}.', { cas: casTed, delka: delkaSlovy(t, pauza?.dnesMs ?? 0) })
-        : t('Odchod se zapíše na {cas}. Na směně od {od}, to je {delka}.', { cas: casTed, od: odKdy(openSince), delka: delkaSlovy(t, bezi) })}
-      footer={<>
-        <Button variant="secondary" onClick={() => setPotvrditOdchod(null)}>{t('Zpět')}</Button>
-        <Button variant="primary" icon="logout" loading={pise}
-          onClick={() => { if (potvrditOdchod === 'pauza') { setPotvrditOdchod(null); void pauzuj('odchod'); } else void pichni(false, true); }}>{t('Potvrdit odchod')}</Button>
-      </>}>
-      <p className="t-meta text-pretty">{t('Když jsi klepl/a omylem, dej Zpět — nic se nezapíše.')}</p>
-    </Modal>
-  ) : null;
   const hlaseni = (
     <>
       {odpocet && (
@@ -489,7 +472,6 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
         </Sloupec>
       )}
       {otazkaPauzy}
-      {oknoOdchodu}
       {oknoPolohy}
     </Widget>
   );
