@@ -43,6 +43,9 @@ import dynamic from 'next/dynamic';
 const RoleEditor = dynamic(() => import('./role/RoleEditor'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
 // Výchozí rozložení stránek (kolo 68) nese plochu s editorem úprav — taky až na otevření.
 const VychoziRozlozeni = dynamic(() => import('./widgety/VychoziRozlozeni'), { loading: () => <Skeleton className="h-48 rounded-3xl" /> });
+// Audit N15: navigace aplikace (skrýt, přejmenovat, dok) patří k nastavení stránek — je tu
+// i v Týmu (odkud ji lidé znají), obě místa ukládají totéž nastavení podniku.
+const NavigaceNastaveni = dynamic(() => import('./NavigaceNastaveni'), { loading: () => <Skeleton className="h-48 rounded-3xl" /> });
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -168,7 +171,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     ...(isEmployer && organizace.data?.org ? [sekce('organizace', t('Organizace'), 'grid', t('Sdílení mezi podniky'))] : []),
     ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [sekce('roles', t('Role a oprávnění'), 'lock', t('Kdo co v podniku smí'))] : []),
     // Výchozí plocha pro typ role nebo roli a zámky (spec §3.8); tablet stačí spravovat.
-    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [sekce('stranky', t('Stránky'), 'overview', t('Výchozí plocha a zámky'))] : []),
+    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [sekce('stranky', t('Stránky'), 'overview', ma('podnik.nastaveni') ? t('Výchozí plocha, zámky a navigace') : t('Výchozí plocha a zámky'))] : []),
     ...(isEmployer && ma('pokladna.stav') ? [sekce('pos', t('Pokladna'), 'trend', t('Napojení Storyous'))] : []),
     ...(isEmployer && smiPlatby && ma('predplatne.zobrazit') ? [sekce('billing', t('Předplatné'), 'award', t('Plán a fakturace'))] : []),
     ...(isEmployer && ma('audit.zobrazit') ? [sekce('audit', t('Historie změn'), 'clock', t('Kdo co kdy změnil'))] : []),
@@ -898,7 +901,10 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           ) : section === 'roles' ? (
             <RoleEditor />
           ) : section === 'stranky' ? (
-            <VychoziRozlozeni vNastaveni />
+            <div className="space-y-6">
+              <VychoziRozlozeni vNastaveni />
+              {ma('podnik.nastaveni') && <NavigaceNastaveni />}
+            </div>
           ) : section === 'audit' ? (
             // Historie změn s hledáním, lidmi, oblastmi a „Načíst starší" (kolo 7) — vlastní soubor.
             <SekceHistorie />
