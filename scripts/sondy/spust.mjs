@@ -185,6 +185,8 @@ export const ZELENE = [
   'preteceni-okna',
   'preteceni-jazyky',
   'preteceni-jazyky-zamestnanec',
+  // přestavba hosta 2026-10-21: ukázka /client/demo — Karta, Podniky, Odměny, Aktivita, Moje, podnik; 320–1280, cs/de/pl
+  'preteceni-host',
   // redesign v4 „skladba" (spec §8): hrany, řady, výšky, šířky, dvojice karet — 24 obrazovek, 390 + 1280, světle i tmavě
   'skladba',
 ];

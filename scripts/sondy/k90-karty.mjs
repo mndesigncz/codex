@@ -193,7 +193,8 @@ for (const [sirka, mobil] of [[390, true], [1280, false]]) {
   const chyby = [];
   p.on('pageerror', e => chyby.push(String(e)));
   p.on('console', msg => { if (msg.type() === 'error' && !/Failed to load resource/.test(msg.text())) chyby.push(msg.text()); });
-  await p.goto(BASE + '/client/me', { waitUntil: 'networkidle' });
+  // Přestavba hosta: plastové karty jsou na stránce Moje (profil) v části Karta a peněženka.
+  await p.goto(BASE + '/client/me/profil', { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: 'Mám plastovou kartu' }).waitFor({ timeout: 15000 });
   await p.getByRole('button', { name: 'Mám plastovou kartu' }).click();
   await p.getByLabel('Kód z plastové karty').fill('zzzz zzzz');
