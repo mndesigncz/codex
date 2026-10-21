@@ -19,6 +19,9 @@ export const FUNKCE: Record<string, readonly string[]> = {
   // Údaje provozovatele mají od 2026-10-21 výchozí hodnoty v lib/firma.ts (Martin, IČO 17944953);
   // proměnné FIRMA_* je jen přebíjejí. Stav se proto počítá z firma(), ne z prostředí (viz stavNastaveni).
   pravniUdaje: [],
+  // Retence osobních údajů (lib/retence.ts): zásady a zpracovatelská smlouva popisují lhůty jako platné,
+  // cron je ale bez RETENCE_ZAPNUTA=1 jen náhled. Ano jen s přesně „1“ (stejně jako retenceZapnuta()).
+  retenceOstra: [],
   walletApple: ['APPLE_PASS_TYPE_ID', 'APPLE_TEAM_ID', 'APPLE_PASS_CERT_P12_BASE64', 'APPLE_WWDR_CERT_PEM'],
   walletGoogle: ['GOOGLE_WALLET_ISSUER_ID', 'GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_WALLET_PRIVATE_KEY'],
 };
@@ -30,5 +33,6 @@ export function stavNastaveni(env: Env): { povinneChybi: string[]; funkce: Recor
   const funkce = Object.fromEntries(Object.entries(FUNKCE).map(([f, klice]) => [f, klice.every(k => ma(env, k))]));
   // Právní údaje: vyplněné, když lib/firma.ts (výchozí hodnoty + FIRMA_*) nemá žádný chybějící povinný údaj.
   funkce.pravniUdaje = chybejiciUdaje(firma(env)).length === 0;
+  funkce.retenceOstra = String(env.RETENCE_ZAPNUTA ?? '').trim() === '1';
   return { povinneChybi, funkce };
 }

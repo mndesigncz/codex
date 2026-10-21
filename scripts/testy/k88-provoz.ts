@@ -14,6 +14,7 @@ export default async function ({ eq, ok }: Testy) {
   eq('zdraví: bez prostředí žádná funkce (kromě údajů provozovatele, ty mají výchozí hodnoty v lib/firma.ts)', Object.entries(prazdne.funkce).filter(([k, v]) => v && k !== 'pravniUdaje').length, 0);
   eq('zdraví: údaje provozovatele vyplněné z lib/firma.ts', prazdne.funkce.pravniUdaje, true);
   eq('zdraví: rozbité IČO z prostředí = údaje chybí', stavNastaveni({ FIRMA_ICO: '{{ICO}}' }).funkce.pravniUdaje, false);
+  eq('zdraví: retence ostře jen s RETENCE_ZAPNUTA=1', [stavNastaveni({}).funkce.retenceOstra, stavNastaveni({ RETENCE_ZAPNUTA: 'true' }).funkce.retenceOstra, stavNastaveni({ RETENCE_ZAPNUTA: ' 1 ' }).funkce.retenceOstra], [false, false, true]);
   const plne = stavNastaveni({
     DATABASE_URL: 'postgres://x', NEXTAUTH_SECRET: 'tajne-heslo-123', NEXTAUTH_URL: 'https://a', NEXT_PUBLIC_APP_URL: 'https://a', CRON_SECRET: 'c',
     RESEND_API_KEY: 're_x', EMAIL_FROM: 'a@b.cz',
