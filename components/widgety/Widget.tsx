@@ -290,7 +290,7 @@ function RychlyFiltr({ pole, hodnota, onZmena, inkoust, idTitulku, uzky, jenHodn
  * Co obal potřebuje ze stavu dat — výsledek useDataWidgetu (nebo useLoad)
  * jakéhokoli typu. Bez `set`, ať jde předat `StavDat<Polozka[]>` bez přetypování.
  */
-export type StavNacteni = Pick<LoadState<unknown>, 'data' | 'error' | 'loading' | 'reload'> & { vypnuto?: boolean };
+export type StavNacteni = Pick<LoadState<unknown>, 'data' | 'error' | 'loading' | 'reload'> & { vypnuto?: boolean; url?: string };
 
 export interface ObalWidgetuProps {
   /** Jen odkaz a výjimky; jinak název z registru, ať titulek nemůže ujet od galerie. */
@@ -418,11 +418,13 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const zkusitRef = useRef(zkusitZnovu);
   zkusitRef.current = zkusitZnovu;
   const hlasitChybu = !!chyba && !k.nahled && !k.upravy;
+  // Zdroj chyby = adresa prvního selhaného dotazu (bez ní widget sám za sebe).
+  const zdrojChyby = hlasitChybu ? (aktivni.find(s => s.error)?.url ?? klicVypadku) : null;
   useEffect(() => {
     if (!vypadek) return;
-    vypadek.nahlas(klicVypadku, hlasitChybu ? () => zkusitRef.current() : null);
-  }, [vypadek, klicVypadku, hlasitChybu]);
-  useEffect(() => () => vypadek?.nahlas(klicVypadku, null), [vypadek, klicVypadku]);
+    vypadek.nahlas(klicVypadku, zdrojChyby, zdrojChyby ? () => zkusitRef.current() : null);
+  }, [vypadek, klicVypadku, zdrojChyby]);
+  useEffect(() => () => vypadek?.nahlas(klicVypadku, null, null), [vypadek, klicVypadku]);
   const vHromadnem = hlasitChybu && !!vypadek?.hromadny;
   if (prazdny && !k.upravy && !k.nahled) return null;
 

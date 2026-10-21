@@ -28,6 +28,8 @@ import { MEZIPAMET_DAT_MS, OBNOVA_PO_NAVRATU_MS } from '@/lib/widgety/konstanty'
 export type StavDat<T> = LoadState<T> & {
   /** URL je null: dotaz se neposílá (bez oprávnění, nebo vypnutá část widgetu). */
   vypnuto: boolean;
+  /** Adresa dotazu — lišta výpadku podle ní pozná jeden rozbitý endpoint od výpadku spojení. */
+  url?: string;
 };
 
 interface Zaznam {
@@ -146,7 +148,7 @@ export function useDataWidgetu<T>(url: string | null, pick?: (raw: any) => T): S
   if (!url) return { data: null, error: null, loading: false, reload, set, vypnuto: true };
   const data = mistni && mistni.zaklad === z?.raw ? mistni.data : vybrano.data;
   const error = vybrano.chyba ?? (data === null ? z?.chyba ?? null : null);
-  return { data, error, loading: data === null && error === null, reload, set, vypnuto: false };
+  return { data, error, loading: data === null && error === null, reload, set, vypnuto: false, url };
 }
 
 export default useDataWidgetu;

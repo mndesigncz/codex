@@ -9,21 +9,22 @@
 // ztlumené s krátkou větou, opakování samo (návrat spojení, každých 30 s) i tlačítkem.
 //
 // Chyba jednoho dotazu zůstává chybou jeho widgetů (vlastní ErrorState se Zkusit znovu) —
-// jeden endpoint často krmí dva widgety (Tržba po dnech a Průměrná účtenka z /api/pos/daily).
-// Lišta je až od tří nenačtených widgetů, nebo hned, když prohlížeč hlásí offline.
+// jeden endpoint často krmí víc widgetů (/api/pos/daily Tržbu po dnech i Průměrnou účtenku,
+// /api/attendance celou stránku Moje směny). Lišta je, až když selhávají aspoň dva RŮZNÉ
+// dotazy (to už je spojení nebo server, ne jeden endpoint), nebo hned, když prohlížeč hlásí offline.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui';
 import { Icon } from '../Icons';
 import { useT } from '@/lib/i18n/client';
 
-/** Od kolika nenačtených widgetů je to „výpadek" (jedna lišta) místo chyby jednoho widgetu. */
-export const PRAH_VYPADKU = 3;
+/** Od kolika různých selhaných dotazů je to „výpadek" (jedna lišta) místo chyby jednoho endpointu. */
+export const PRAH_VYPADKU = 2;
 const OPAKOVAT_MS = 30_000;
 
 interface KontextVypadku {
-  /** Widget hlásí svou chybu (`reload`), nebo že je v pořádku (`null`). */
-  nahlas: (klic: string, reload: (() => void) | null) => void;
+  /** Widget hlásí svou chybu (zdroj = adresa selhaného dotazu, `reload`), nebo že je v pořádku (`null`). */
+  nahlas: (klic: string, zdroj: string | null, reload: (() => void) | null) => void;
   /** Je víc nenačtených widgetů najednou → ukazuje se lišta, widgety jsou ztlumené. */
   hromadny: boolean;
   pocet: number;
@@ -37,14 +38,16 @@ export function useVypadekPlochy(): KontextVypadku | null {
 }
 
 export function VypadekProvider({ children }: { children: React.ReactNode }) {
-  const chyby = useRef(new Map<string, () => void>());
+  const chyby = useRef(new Map<string, { zdroj: string; reload: () => void }>());
   const [pocet, setPocet] = useState(0);
-  const nahlas = useCallback((klic: string, reload: (() => void) | null) => {
+  const [zdroju, setZdroju] = useState(0);
+  const nahlas = useCallback((klic: string, zdroj: string | null, reload: (() => void) | null) => {
     const m = chyby.current;
-    if (reload) m.set(klic, reload); else m.delete(klic);
+    if (zdroj && reload) m.set(klic, { zdroj, reload }); else m.delete(klic);
     setPocet(m.size);
+    setZdroju(new Set([...m.values()].map(x => x.zdroj)).size);
   }, []);
-  const zkusitVse = useCallback(() => { for (const r of [...chyby.current.values()]) r(); }, []);
+  const zkusitVse = useCallback(() => { for (const x of [...chyby.current.values()]) x.reload(); }, []);
   const [offline, setOffline] = useState(false);
   useEffect(() => {
     const f = () => setOffline(typeof navigator !== 'undefined' && navigator.onLine === false);
@@ -53,7 +56,7 @@ export function VypadekProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('offline', f);
     return () => { window.removeEventListener('online', f); window.removeEventListener('offline', f); };
   }, []);
-  const hromadny = pocet >= PRAH_VYPADKU || (offline && pocet > 0);
+  const hromadny = zdroju >= PRAH_VYPADKU || (offline && pocet > 0);
 
   // Samo znovu: hned po návratu spojení a pak každých 30 s, dokud výpadek trvá.
   useEffect(() => {
