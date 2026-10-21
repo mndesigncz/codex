@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BulkBar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, SearchField, SelectBox, Select, Skeleton,
+  BulkBar, Button, Card, Chip, EmptyState, ErrorBoundary, ErrorState, Field, Input, ListRow, Modal, SearchField, SelectBox, Select, Skeleton,
   useLoad, useSelection, type BulkAction,
 } from '../../ui';
 import { cislo } from '@/lib/klientSprava/format';
@@ -329,7 +329,8 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce, otevritPr
                     const prumer = prumernyUcet(c.spend, c.visits);
                     const otevren = profil?.id === c.id;
                     return (
-                      <tr key={c.id} className={`border-t border-black/[0.06] align-top ${otevren ? 'bg-black/[0.035]' : 'hover:bg-black/[0.02]'}`}>
+                      // `list-row` (s `table-row`): řádek seznamu hostů — výběr a jméno jsou ovládání řádku (V4), ne řada ovládání karty.
+                      <tr key={c.id} className={`list-row table-row border-t border-black/[0.06] align-top ${otevren ? 'bg-black/[0.035]' : 'hover:bg-black/[0.02]'}`}>
                         {vybiraSe && <td className="py-3"><SelectBox checked={vsechny || sel.has(c.id)} onChange={() => prepniRadek(c.id)} label={`Vybrat: ${c.name}`} /></td>}
                         <td className="py-2.5 pr-3 min-w-0">
                           <button type="button" onClick={() => setProfil(otevren ? null : c)} aria-expanded={otevren}
@@ -372,16 +373,20 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce, otevritPr
           </Card>
           {profil && siroke && (
             <Card className="sticky top-4 max-h-[calc(100dvh-6rem)] overflow-y-auto scrollbar-thin" aria-label={`Profil hosta ${profil.name}`}>
-              <ProfilHosta key={`${profil.id}-${verzeDeniku}`} host={profil} oznam={oznam} vidiDenik={vidiDenik} akce={akceProfilu(profil)}
-                onZavrit={() => setProfil(null)} onZmena={() => { setProfil(null); reload(); }} />
+              <ErrorBoundary resetKey={profil.id} zalozka="Profil hosta">
+                <ProfilHosta key={`${profil.id}-${verzeDeniku}`} host={profil} oznam={oznam} vidiDenik={vidiDenik} akce={akceProfilu(profil)}
+                  onZavrit={() => setProfil(null)} onZmena={() => { setProfil(null); reload(); }} />
+              </ErrorBoundary>
             </Card>
           )}
           </div>
         )}
       {profil && !siroke && (
         <Modal open onClose={() => setProfil(null)} size="lg" title={profil.name}>
-          <ProfilHosta key={`${profil.id}-${verzeDeniku}`} vOkne host={profil} oznam={oznam} vidiDenik={vidiDenik} akce={akceProfilu(profil)}
-            onZmena={() => { setProfil(null); reload(); }} />
+          <ErrorBoundary resetKey={profil.id} zalozka="Profil hosta">
+            <ProfilHosta key={`${profil.id}-${verzeDeniku}`} vOkne host={profil} oznam={oznam} vidiDenik={vidiDenik} akce={akceProfilu(profil)}
+              onZmena={() => { setProfil(null); reload(); }} />
+          </ErrorBoundary>
         </Modal>
       )}
       {imp.okno}
@@ -411,13 +416,14 @@ function StitkyRadku({ c }: { c: ClenRadek }) {
   const auto = stitkyHosta(c, new Date());
   const sg = c.skupiny ?? [];
   const uroven = c.level ?? 'bronze';
-  if (!auto.length && uroven === 'bronze' && !c.has_birthday_month && !sg.length && !c.blocked && !c.level_reduced) return null;
+  if (!auto.length && uroven === 'bronze' && !c.has_birthday_month && !sg.length && !c.blocked && !c.level_reduced && !(Number(c.discount) > 0)) return null;
   return (
     <span className="mt-1 flex flex-wrap items-center gap-1 min-w-0">
       {c.blocked && <Chip tone="bad" size="sm">Zablokovaný</Chip>}
       {auto.map(a => <Chip key={a.text} tone={a.ton} size="sm">{a.text}</Chip>)}
       {uroven !== 'bronze' && <Chip tone={uroven === 'silver' ? 'muted' : 'ink'} size="sm">{c.level_label ?? 'Člen'}</Chip>}
       {c.level_reduced && <Chip tone="wait" size="sm">snížená po pauze</Chip>}
+      {Number(c.discount) > 0 && <Chip tone="ok" size="sm">{`Sleva ${c.discount} %${c.discount_source === 'skupina' && c.discount_name ? ` (${c.discount_name})` : ''}`}</Chip>}
       {c.has_birthday_month && <Chip tone="info" size="sm" icon="gift">Narozeniny</Chip>}
       {sg.slice(0, 2).map(g => <Chip key={g.id} tone={tonBarvy(g.color)} size="sm">{g.name}</Chip>)}
       {sg.length > 2 && <Chip tone="muted" size="sm">{`+${sg.length - 2}`}</Chip>}

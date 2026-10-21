@@ -129,8 +129,9 @@ async function behy(viewport, mobil) {
     tvrdi(`${jmeno} historie: přehled i část Návštěvy se načtou`, await dokud(async () => (await p.getByRole('tab', { name: 'Návštěvy' }).count()) > 0, 3000));
     await p.getByRole('tab', { name: 'Návštěvy' }).first().click();
     tvrdi(`${jmeno} historie: ukáže návštěvu u kasy`, await dokud(() => p.getByText('Návštěva u kasy').first().isVisible(), 3000));
-    // Kolo 92: profil hosta je na telefonu okno — před výběrem v seznamu se zavře.
-    await p.keyboard.press('Escape');
+    // Kolo 92: profil hosta (na telefonu okno, na monitoru panel) se před výběrem v seznamu zavře.
+    if (await p.getByRole('button', { name: 'Zavřít profil' }).count()) await p.getByRole('button', { name: 'Zavřít profil' }).click();
+    else await p.keyboard.press('Escape');
     await p.waitForTimeout(300);
 
     // Kupon vybraným.

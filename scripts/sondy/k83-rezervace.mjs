@@ -178,7 +178,7 @@ for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'],
   tvrdi('D2: …se jménem a poznámkou a přizná, že je obnovené', obnoveno.jmeno === 'Rozepsaný Host' && obnoveno.pozn === 'Volal v poledne' && obnoveno.veta, JSON.stringify(obnoveno));
   await okno.getByRole('button', { name: 'Zrušit', exact: true }).click();
   await p.waitForTimeout(400);
-  await zalozka('Objednávky').click();
+  await zalozka('Hosté').click();
   await p.waitForTimeout(800);
   await zalozka('Rezervace').click();
   await p.waitForTimeout(1200);
