@@ -370,7 +370,7 @@ function Zebricek({ slug, b, me, today, campaigns, coupons, signedIn, onDone }: 
         <ul className="card list px-4 sm:px-5" aria-label={t('Připravené odměny')}>
           {claims.map((c: any) => (
             <li key={c.id} className="list-row !py-3.5">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#C8F542] text-[#16181A]" aria-hidden><Icon name="gift" size={18} /></span>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#C8F542] on-accent" aria-hidden><Icon name="gift" size={18} /></span>
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-semibold leading-tight truncate">{c.title}</p>
                 <PlatnostKuponu validUntil={c.valid_until} today={today} className="block t-meta mt-0.5" />

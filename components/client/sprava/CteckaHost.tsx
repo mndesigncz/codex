@@ -110,7 +110,7 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
         {zamer && smiKupon && (
           <Button size="lg" variant="accent" icon="check" className="w-full" loading={busy === 'kombinace'}
             onClick={() => onKombinace(zamer)} data-testid="ctecka-kombinace">
-            {lzeRazitko ? `Uplatnit ${zamer.title.toLowerCase()} a přidat razítko` : `Uplatnit ${zamer.title.toLowerCase()}`}
+            {lzeRazitko ? `Uplatnit ${zamer.title.toLowerCase()} a přidat ${pocet > 1 ? czCount(pocet, RAZITKO) : 'razítko'}` : `Uplatnit ${zamer.title.toLowerCase()}`}
           </Button>
         )}
         {/* Razítko bez platné karty (mimo okno, dnes už má) zůstává vidět zakázané — důvod říká karta níž. */}

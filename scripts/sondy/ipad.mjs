@@ -43,10 +43,14 @@ for (const [jm, w, h] of rozmery) {
       if (el.children.length) continue;
       const t = (el.textContent || '').trim(); if (t.length < 3) continue;
       const r = el.getBoundingClientRect();
+      // Text jen pro odečítač (sr-only: 1 × 1 px s ořezem, např. nápověda úprav plochy) není zkolabovaný.
+      const cs = getComputedStyle(el);
+      if (cs.position === 'absolute' && r.width <= 1 && r.height <= 1 && (cs.clip === 'rect(0px, 0px, 0px, 0px)' || cs.clipPath === 'inset(50%)' || cs.overflow === 'hidden')) continue;
       if (r.width < 6 && r.height > 0) nula++;
     }
     return { prestek, male, nula };
   });
+  if (m.prestek || m.male || m.nula || chyby.length) process.exitCode = 1;
   console.log(`${jm} ${w}×${h}: přetéká=${m.prestek ? 'ANO ✗' : 'ne ✓'} · malé dotykové cíle=${m.male}${m.male ? ' ✗' : ' ✓'} · zkolabovaný text=${m.nula}${m.nula ? ' ✗' : ' ✓'}${chyby.length ? ' CHYBY: ' + chyby.join('|') : ''}`);
   await p.screenshot({ path: `shots/kiosk-${w}x${h}.png` });
   await ctx.close();

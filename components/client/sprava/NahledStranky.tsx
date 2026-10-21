@@ -49,7 +49,7 @@ export default function NahledStranky({ p }: { p: any }) {
               <KartaPodniku nazev={nazev} logoUrl={p.logo_url || null} barva={p.accent || null} podtitul="Tvoje karta" cislo={`0 / ${cil}`} jednotka="razítek"
                 veta={p.stamp_reward ? `${p.stamp_reward} za ${cil} návštěv.` : undefined} />
             )}
-            <div aria-hidden className="h-11 rounded-full bg-[#C8F542] grid place-items-center text-[15px] font-semibold text-[#16181A]">Přidat se</div>
+            <div aria-hidden className="h-11 rounded-full bg-[#C8F542] grid place-items-center text-[15px] font-semibold on-accent">Přidat se</div>
           </div>
         </div>
       </RamTelefonu>

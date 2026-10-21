@@ -25,6 +25,8 @@ import { apiMessage, okJson } from '@/lib/api';
 import { useSirka } from '@/lib/klientSprava/useSirka';
 import { j, type Hlaska } from '../import/typy';
 import ZpravyNahled from '../loyalty/ZpravyNahled';
+import { DraftNote } from '../../ui/DraftNote';
+import { useDraft } from '@/lib/useDraft';
 import KombinaceVyber from '../loyalty/KombinaceVyber';
 
 const CLEN: CzNoun = { one: 'člen', few: 'členové', many: 'členů' };
@@ -227,6 +229,9 @@ function Pruvodce({ d, publika, start, editId, oznam, onZavrit, onHotovo }: {
 }) {
   const [krok, setKrok] = useState(0);
   const [f, setF] = useState<Zprava>(start);
+  // Rozepsaná NOVÁ kampaň přežije přechod jinam i zavření průvodce (jako dřív rozeslání ve Zprávách):
+  // jde stovkám hostů, píše se rozmyšleně. Úprava naplánované kampaně koncept nemá.
+  const koncept = useDraft('rozeslani', f, setF, { vychozi: PRAZDNA, aktivni: editId === null, upravujeSe: editId !== null });
   const [busy, setBusy] = useState(false);
   const [testuji, setTestuji] = useState(false);
   const [dosah, setDosah] = useState<{ pocet: number; souhlas: number; dosah: DosahZpravy | null } | null>(null);
@@ -274,6 +279,7 @@ function Pruvodce({ d, publika, start, editId, oznam, onZavrit, onHotovo }: {
           const zt = Number(r.ztlumeno) || 0;
           oznam(`Odesláno ${czCount(Number(r.doruceno) || 0, CLENOVI)}.${zt ? ` ${czCount(zt, HOST)} má novinky vypnuté.` : ''}`);
         }
+        koncept.hotovo();
       }
       onHotovo();
     } catch (err) { oznam(apiMessage(err, 'Kampaň se nepodařilo odeslat.'), 'bad'); }
@@ -309,6 +315,7 @@ function Pruvodce({ d, publika, start, editId, oznam, onZavrit, onHotovo }: {
               {editId !== null ? 'Uložit změny' : naplanovano ? 'Naplánovat' : `Poslat ${czCount(dostane ?? target, CLENOVI)}`}
             </Button>}
       </>}>
+      {editId === null && <div className="mb-4 empty:hidden"><DraftNote koncept={koncept} co="rozepsané rozeslání" /></div>}
       {/* Ukazatel kroků: tři díly přes šířku (P2), hotové a aktuální inkoustem. */}
       <ol className="grid grid-cols-3 gap-2 mb-6" aria-label="Kroky kampaně">
         {KROKY.map((k, i) => (

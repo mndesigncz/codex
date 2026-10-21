@@ -97,7 +97,7 @@ export default function Rezervace({ slug, nazev, adresa, maxOsob, dnes, prihlase
         {hotovo ? (
           <div>
             <div className="card p-4 flex items-center gap-3">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#C8F542] text-[#16181A]" aria-hidden><Icon name="calendarCheck" size={20} /></span>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#C8F542] on-accent" aria-hidden><Icon name="calendarCheck" size={20} /></span>
               <div className="min-w-0">
                 <p className="text-[16px] font-semibold cz-sentence">{nazevDne(den)} {cas} · {t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: osob })}</p>
                 <p className="t-meta mt-0.5">{hotovo.potvrzeno ? t('Podnik s tebou počítá.') : t('Podnik ji potvrdí. Dáme ti vědět v Aktivitě.')}</p>

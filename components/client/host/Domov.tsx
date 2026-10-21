@@ -85,7 +85,7 @@ export default function Domov() {
                   return (
                     <li>
                       <Link href={cesta(`/client/${nejblizsi.slug}?tab=reserve&rezervace=${nejblizsi.id}`)} className="flex items-center gap-3 py-3.5 min-h-[64px]">
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#C8F542] text-[#16181A]" aria-hidden><Icon name="calendar" size={18} /></span>
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#C8F542] on-accent" aria-hidden><Icon name="calendar" size={18} /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-[15px] font-semibold leading-tight cz-sentence">{kdy(nejblizsi.date)} {nejblizsi.time} · {t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: nejblizsi.party })}</span>
                           <span className="block t-meta truncate mt-0.5">{[nejblizsi.business, nejblizsi.note, t(st.label).toLowerCase()].filter(Boolean).join(' · ')}</span>

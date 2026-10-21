@@ -1174,8 +1174,9 @@ async function stahni(){
 
 /* ---------- offline: ať menu naskočí i když venku vypadne wifi ----------
    Rozsah je zúžený na tuhle jednu stránku, aby se to nebilo s /sw.js aplikace.
-   V náhledu (artifact) registrace selže a to nevadí — proto try/catch. */
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+   V náhledu (artifact) registrace selže a to nevadí — proto try/catch. Bezpečný kontext
+   (https, ale i localhost) — na localhostu si offline chování ověří sonda offline. */
+if ('serviceWorker' in navigator && window.isSecureContext) {
   window.addEventListener('load', () => {
     try { navigator.serviceWorker.register('/menu-sw.js', { scope: '/menu-akce.html' }).catch(() => {}); }
     catch (e) {}

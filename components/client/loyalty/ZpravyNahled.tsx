@@ -50,7 +50,7 @@ export default function ZpravyNahled({ nazev, title, body, priloha, linkKind, zk
           {body.trim() && <p className="text-sm text-black/80 mt-2 leading-relaxed break-words whitespace-pre-line">{body.trim()}</p>}
           {priloha?.kupon?.title && <p className="mt-3 rounded-xl bg-[#F1F4EC] px-3 py-2 text-sm"><strong>{priloha.kupon.title}</strong><br /><span className="text-black/55">{emailText('novinkyKupon', 'cs')}</span></p>}
           {priloha?.promo?.code && <p className="mt-3 rounded-xl bg-[#F1F4EC] px-3 py-2 text-sm">{emailText('novinkyPromo', 'cs', { kod: priloha.promo.code })}</p>}
-          <p className="mt-4"><span className="inline-block rounded-full bg-[#C8F542] px-5 py-2.5 text-sm font-bold text-[#16181A]">{emailText('novinkyOtevrit', 'cs')} →</span></p>
+          <p className="mt-4"><span className="inline-block rounded-full bg-[#C8F542] px-5 py-2.5 text-sm font-bold on-accent">{emailText('novinkyOtevrit', 'cs')} →</span></p>
           <p className="mt-4 border-t border-black/10 pt-3 text-[11px] leading-snug text-black/45">
             {emailText('novinkyPaticka', 'cs', { podnik: nazev || 'Tvůj podnik' })} <span className="underline">{emailText('novinkyOdhlasit', 'cs')}</span>
           </p>

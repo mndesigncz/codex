@@ -54,26 +54,31 @@ const kontext = async (role) => {
   await ctx.close();
 }
 
-// ——— Rozeslání zákazníkům.
+// ——— Rozeslání zákazníkům: Kampaně → Zprávy → „Nová kampaň" (průvodce v okně, kolo 92).
 {
   const ctx = await kontext('employer');
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?mode=client&tab=customers', { waitUntil: 'networkidle' });
-  // Rozeslání je pod Zákazníci → Zprávy členům.
-  await p.waitForTimeout(700); await p.getByRole('tab', { name: 'Zprávy členům' }).first().click().catch(() => {}); await p.waitForTimeout(500);
-  await p.waitForTimeout(1800);
-  const pole = p.locator('#bc-body, textarea:visible').first();
+  const otevriPruvodce = async () => {
+    await p.goto('http://localhost:3000/employer/overview?mode=client&tab=campaigns', { waitUntil: 'networkidle' });
+    await p.waitForTimeout(1200);
+    await p.getByRole('button', { name: 'Nová kampaň' }).first().click().catch(() => {});
+    const okno = p.getByRole('dialog');
+    await okno.waitFor({ timeout: 5000 }).catch(() => {});
+    await okno.getByRole('button', { name: 'Pokračovat k textu' }).click().catch(() => {});
+    await p.waitForTimeout(500);
+    return okno;
+  };
+  const okno = await otevriPruvodce();
+  const pole = okno.locator('#kp-body');
   if (await pole.count()) {
+    await okno.locator('#kp-title').fill('Rozepsaná kampaň');
     await pole.click();
     await p.keyboard.type('rozepsane rozeslani sondy', { delay: 10 });
     await p.waitForTimeout(400);
     await p.goto('http://localhost:3000/employer/overview?mode=client&tab=events', { waitUntil: 'networkidle' });
     await p.waitForTimeout(700);
-    await p.goto('http://localhost:3000/employer/overview?mode=client&tab=customers', { waitUntil: 'networkidle' });
-  // Rozeslání je pod Zákazníci → Zprávy členům.
-  await p.waitForTimeout(700); await p.getByRole('tab', { name: 'Zprávy členům' }).first().click().catch(() => {}); await p.waitForTimeout(500);
-    await p.waitForTimeout(1800);
-    const v = await p.locator('#bc-body, textarea:visible').first().inputValue().catch(() => '');
+    const znovu = await otevriPruvodce();
+    const v = await znovu.locator('#kp-body').inputValue().catch(() => '');
     kontrola('rozeslání: koncept je zpátky', v.includes('rozepsane'));
     kontrola('rozeslání: a přizná se', (await p.locator('text=/Vrátili jsme ti/').count().catch(() => 0)) > 0);
   } else { console.log('  ? rozeslání: pole nenalezeno'); chyb++; }

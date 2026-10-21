@@ -8,7 +8,7 @@
 //  • průvodce v angličtině: nadpisy a tlačítka anglicky;
 //  • tmavý režim: text prvního kroku a patička mají kontrast ≥ 4,5 : 1 a nic nezmizí;
 //  • sdílený ErrorState (spadlé načtení průvodce) mluví jazykem aplikace a má tlačítko „Erneut versuchen“;
-//  • /zapomenute-heslo v němčině (formální „Sie“): nadpis, popisek, tlačítko, bez přetečení;
+//  • /zapomenute-heslo v němčině (tykání „du“ jako celá aplikace, audit 2026-10): nadpis, popisek, tlačítko, bez přetečení;
 //  • čeština zůstává beze změny (nadpis prvního kroku a tlačítko „Začít“);
 //  • (oprava po recenzi) výchozí pozice pozvaných, názvy měn a formátů čísel, názvy směn, kategorií
 //    a postupů ve Shrnutí jsou v jazyce majitele, ne česky; poznámky finále přicházejí ze serveru
@@ -248,7 +248,7 @@ const kontrast = (p, koren = '[data-pruvodce]') => p.evaluate((koren) => {
   await ctx.close();
 }
 
-// ============================================================ zapomenuté heslo (vykání), němčina
+// ============================================================ zapomenuté heslo (tykání „du“), němčina
 {
   const ctx = await b.newContext({ viewport: TEL, locale: 'de-DE', isMobile: true, hasTouch: true });
   await ctx.addCookies([{ name: 'managero-lang', value: 'de', domain: new URL(BASE).hostname, path: '/', sameSite: 'Lax' }]);
@@ -258,7 +258,7 @@ const kontrast = (p, koren = '[data-pruvodce]') => p.evaluate((koren) => {
   await p.waitForTimeout(500);
   tvrdi('DE zapomenuté heslo: nadpis „Passwort vergessen“', (await p.locator('h1').first().innerText()).trim() === 'Passwort vergessen', await p.locator('h1').first().innerText());
   const t = await p.locator('main').innerText();
-  tvrdi('DE zapomenuté heslo: formální Sie, tlačítko, odkaz zpět', /Geben Sie/.test(t) && /Link senden/.test(t) && /Zurück zur Anmeldung/.test(t), t.slice(0, 200));
+  tvrdi('DE zapomenuté heslo: tyká („Gib … deines Kontos“, žádné „Sie“), tlačítko, odkaz zpět', /Gib die E-Mail deines Kontos/.test(t) && !/\bSie\b/.test(t) && /Link senden/.test(t) && /Zurück zur Anmeldung/.test(t), t.slice(0, 200));
   tvrdi('DE zapomenuté heslo: bez české diakritiky', !CESKE_ZNAKY.test(t), t);
   const o = await overflow(p);
   tvrdi('DE zapomenuté heslo: nic nepřetéká na 390 px', o.dok <= 0 && o.telo <= 0, JSON.stringify(o));

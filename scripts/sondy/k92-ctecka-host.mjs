@@ -157,6 +157,7 @@ tvrdi('E2 (1280): čtečka ukáže „Host chce uplatnit: Filtr dne jako odměna
 const kombinace = obsl.p.locator('[data-testid="ctecka-kombinace"]');
 tvrdi('E2: hlavní akce „Uplatnit filtr dne jako odměna a přidat razítko"', /Uplatnit filtr dne jako odměna a přidat razítko/.test(await kombinace.innerText()), await kombinace.innerText().catch(() => ''));
 await obsl.p.getByRole('button', { name: 'O razítko víc' }).click();
+tvrdi('E2: se 2 razítky hlavní akce říká „… a přidat 2 razítka"', await dokud(async () => /a přidat 2 razítka/.test(await kombinace.innerText()), 2000), await kombinace.innerText().catch(() => ''));
 await obsl.p.screenshot({ path: SNIMKY + 'k92-ctecka-zamer-1280.png' });
 const kurzorPred = svet.kurzor;
 await kombinace.click();

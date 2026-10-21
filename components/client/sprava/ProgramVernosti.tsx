@@ -172,7 +172,7 @@ export default function ProgramVernosti({ otevri, bonusy }: {
                 </ul>
               </div>
             )}
-            <div aria-hidden className="h-11 rounded-full bg-[#C8F542] grid place-items-center text-[15px] font-semibold text-[#16181A]">{pohled === 'clen' ? 'Ukázat kartu' : 'Přidat se'}</div>
+            <div aria-hidden className="h-11 rounded-full bg-[#C8F542] grid place-items-center text-[15px] font-semibold on-accent">{pohled === 'clen' ? 'Ukázat kartu' : 'Přidat se'}</div>
           </div>
         </RamTelefonu>
         </div>

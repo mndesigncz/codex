@@ -49,7 +49,7 @@ export function AvatarHosta({ name, size = 40 }: { name: string; size?: number }
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
   const txt = ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '·';
   return (
-    <span className="inline-grid place-items-center rounded-full bg-[#C8F542] text-[#16181A] font-semibold shrink-0 tracking-[-0.01em]" style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.36)) }} aria-hidden>{txt}</span>
+    <span className="inline-grid place-items-center rounded-full bg-[#C8F542] on-accent font-semibold shrink-0 tracking-[-0.01em]" style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.36)) }} aria-hidden>{txt}</span>
   );
 }
 

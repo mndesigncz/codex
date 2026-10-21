@@ -127,7 +127,7 @@ function Radek({ p, nove, onHodnoceno }: { p: Polozka; nove: boolean; onHodnocen
   }
   const obsah = (
     <>
-      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${limetka ? 'bg-[#C8F542] text-[#16181A]' : 'bg-black/[0.05]'}`} aria-hidden><Icon name={ikona} size={18} /></span>
+      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${limetka ? 'bg-[#C8F542] on-accent' : 'bg-black/[0.05]'}`} aria-hidden><Icon name={ikona} size={18} /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-semibold leading-snug text-pretty">{titul}</span>
         {text && <span className="block text-sm text-black/70 mt-0.5 text-pretty">{text}</span>}
