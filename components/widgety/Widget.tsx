@@ -419,7 +419,8 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   zkusitRef.current = zkusitZnovu;
   const hlasitChybu = !!chyba && !k.nahled && !k.upravy;
   // Zdroj chyby = adresa prvního selhaného dotazu (bez ní widget sám za sebe).
-  const zdrojChyby = hlasitChybu ? (aktivni.find(s => s.error)?.url ?? klicVypadku) : null;
+  // Bez query: Tržba po dnech a Průměrná účtenka čtou /api/pos/daily s jiným obdobím — pořád jeden endpoint.
+  const zdrojChyby = hlasitChybu ? (aktivni.find(s => s.error)?.url?.split('?')[0] ?? klicVypadku) : null;
   useEffect(() => {
     if (!vypadek) return;
     vypadek.nahlas(klicVypadku, zdrojChyby, zdrojChyby ? () => zkusitRef.current() : null);
