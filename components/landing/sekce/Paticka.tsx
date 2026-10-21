@@ -7,12 +7,16 @@ import PravniOdkazy from '@/components/pravni/PravniOdkazy';
 import JazykMenu from '@/components/ui/JazykMenu';
 import { useT } from '@/lib/i18n/client';
 import { NAVIGACE, PATICKA } from '../obsah';
+import { telOdkaz } from '@/lib/firma';
 
 
 // Patička. Kdo dojel až sem a nekoupil, hledá buď funkci, kterou přehlédl, nebo
 // cestu dovnitř. Tlačítko je tu světlé: nad patičkou je závěrečná výzva
 // a dvě limetky nad sebou by si konkurovaly.
-export default function Paticka() {
+export default function Paticka({ provozovatel }: {
+  /** Identifikace provozovatele a kontakt (lib/firma.ts) — skládá server (Landing.tsx), klient proměnné FIRMA_* nevidí. */
+  provozovatel?: { text: string; email: string; telefon: string };
+}) {
   const t = useT('landing');
   return (
     <footer className="border-t border-[color:var(--ld-linka)]">
@@ -41,10 +45,17 @@ export default function Paticka() {
         {/* Jazyk je dole, ne v liště: lišta nese jen sekce a dvě akce. Volba platí
             pro celou aplikaci (cookie), stejně se nabízí na přihlášení a registraci. */}
         <div className="mt-12 flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
-          <PravniOdkazy className="text-sm text-[color:var(--ld-text-3)]" />
+          <PravniOdkazy vse className="text-sm text-[color:var(--ld-text-3)]" />
           <span className="ld-jazyk"><JazykMenu align="right" /></span>
         </div>
         <p className="mt-6 pt-6 border-t border-[color:var(--ld-linka)] text-xs text-[color:var(--ld-text-3)] max-w-2xl text-pretty">{t(PATICKA.poctivost)}</p>
+        {provozovatel && (
+          <p className="mt-3 text-xs text-[color:var(--ld-text-3)] max-w-2xl text-pretty" data-provozovatel>
+            {provozovatel.text}{' '}
+            <a href={`mailto:${provozovatel.email}`} className="underline-offset-2 hover:underline">{provozovatel.email}</a>{' · '}
+            <a href={telOdkaz(provozovatel.telefon)} className="underline-offset-2 hover:underline whitespace-nowrap">{provozovatel.telefon}</a>
+          </p>
+        )}
       </div>
     </footer>
   );

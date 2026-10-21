@@ -1,23 +1,31 @@
 // Odkazy na právní stránky. Jedna komponenta pro patičku webu, přihlášení,
-// registraci, nastavení a patičku hostovské části; texty a cesty jsou
-// v lib/pravni/texty.ts. Bez závislosti na stavu, takže jde použít i v server
-// komponentách.
+// registraci, nastavení a patičku hostovské části; názvy a cesty jsou
+// v lib/pravni/odkazy.ts (čistý modul bez textů dokumentů, jde i do klienta).
+// Bez závislosti na stavu, takže jde použít i v server komponentách.
 
 import Link from 'next/link';
-import { ODKAZY_PRAVNI, type KlicDokumentu } from '@/lib/pravni/texty';
+import { ODKAZY_PRAVNI, ODKAZY_ZAKLAD, cestaDokumentu, type KlicOdkazu } from '@/lib/pravni/odkazy';
 
-export default function PravniOdkazy({ jen, className = '', jazyk = 'cs' }: {
+// Bez `jen` a `vse` ukazuje základní čtveřici (zásady, podmínky, podpora, smazání účtu) jako
+// dřív — přihlášení, účet hosta a nastavení nemají dostat smluvní dokumenty pro podniky.
+// Patička webu a právních stránek posílá `vse`.
+export default function PravniOdkazy({ jen, vse = false, bezPodniku = false, className = '', jazyk = 'cs' }: {
   /** Jen vybrané odkazy (např. v registraci stačí zásady a podmínky). */
-  jen?: KlicDokumentu[];
+  jen?: KlicOdkazu[];
+  /** Všechny právní stránky včetně obchodních podmínek a zpracovatelské smlouvy. */
+  vse?: boolean;
+  /** Bez dokumentů jen pro podniky (obchodní podmínky, zpracovatelská smlouva, zrušení předplatného). */
+  bezPodniku?: boolean;
   className?: string;
   jazyk?: 'cs' | 'en';
 }) {
-  const seznam = ODKAZY_PRAVNI.filter(o => !jen || jen.includes(o.klic));
-  const predpona = jazyk === 'en' ? '/en' : '';
+  const vyber = jen ?? (vse ? null : ODKAZY_ZAKLAD);
+  const seznam = (vyber ? vyber.map(k => ODKAZY_PRAVNI.find(o => o.klic === k)!).filter(Boolean) : ODKAZY_PRAVNI)
+    .filter(o => !(bezPodniku && o.podnik));
   return (
     <nav aria-label={jazyk === 'en' ? 'Legal' : 'Právní informace'} className={`flex flex-wrap items-center gap-x-4 gap-y-1 ${className}`}>
       {seznam.map(o => (
-        <Link key={o.klic} href={`${predpona}/${o.klic}`} className="tap-target-sm inline-flex items-center underline-offset-2 hover:underline">
+        <Link key={o.klic} href={cestaDokumentu(o.klic, jazyk)} className="tap-target-sm inline-flex items-center underline-offset-2 hover:underline">
           {jazyk === 'en' ? o.en : o.cs}
         </Link>
       ))}

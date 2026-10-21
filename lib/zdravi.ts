@@ -1,6 +1,8 @@
 // Které nastavení prostředí chybí — pro /api/health a pro kontrolu před
 // spuštěním. Jen názvy proměnných a ano/ne, nikdy jejich hodnoty.
 
+import { chybejiciUdaje, firma } from './firma.ts';
+
 type Env = Record<string, string | undefined>;
 
 /** Bez těchhle aplikace na ostrém nasazení nefunguje (přihlášení, odkazy, crony). */
@@ -14,7 +16,9 @@ export const FUNKCE: Record<string, readonly string[]> = {
   pushWeb: ['NEXT_PUBLIC_VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT'],
   pushIos: ['APNS_KEY_P8', 'APNS_KEY_ID', 'APNS_TEAM_ID'],
   pushAndroid: ['FCM_PROJECT_ID', 'FCM_SERVICE_ACCOUNT'],
-  pravniUdaje: ['FIRMA_NAZEV', 'FIRMA_ICO', 'FIRMA_ADRESA', 'FIRMA_EMAIL_PODPORY', 'FIRMA_REGION_DAT'],
+  // Údaje provozovatele mají od 2026-10-21 výchozí hodnoty v lib/firma.ts (Martin, IČO 17944953);
+  // proměnné FIRMA_* je jen přebíjejí. Stav se proto počítá z firma(), ne z prostředí (viz stavNastaveni).
+  pravniUdaje: [],
   walletApple: ['APPLE_PASS_TYPE_ID', 'APPLE_TEAM_ID', 'APPLE_PASS_CERT_P12_BASE64', 'APPLE_WWDR_CERT_PEM'],
   walletGoogle: ['GOOGLE_WALLET_ISSUER_ID', 'GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_WALLET_PRIVATE_KEY'],
 };
@@ -24,5 +28,7 @@ const ma = (env: Env, k: string) => Boolean(env[k]?.trim());
 export function stavNastaveni(env: Env): { povinneChybi: string[]; funkce: Record<string, boolean> } {
   const povinneChybi = POVINNE.filter(k => !ma(env, k));
   const funkce = Object.fromEntries(Object.entries(FUNKCE).map(([f, klice]) => [f, klice.every(k => ma(env, k))]));
+  // Právní údaje: vyplněné, když lib/firma.ts (výchozí hodnoty + FIRMA_*) nemá žádný chybějící povinný údaj.
+  funkce.pravniUdaje = chybejiciUdaje(firma(env)).length === 0;
   return { povinneChybi, funkce };
 }

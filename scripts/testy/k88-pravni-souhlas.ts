@@ -8,23 +8,29 @@ import {
   potrebujeSouhlas, souhlasAktualni, souhlasZTela, vekZTela,
 } from '../../lib/pravni/verze.ts';
 import { POLE_PROFILU } from '../../lib/exportUctu.ts';
+import { RETENCE } from '../../lib/retence.ts';
+import { LHUTY, RETENCE_TEXT, TARIFY } from '../../lib/pravni/lhuty.ts';
+import { PRICES, TRIAL_DAYS } from '../../lib/plan.ts';
+import { PLATNOST_ODKAZU_DNI } from '../../lib/pravni/zalohaOdkaz.ts';
 
 const cti = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 
 export default function ({ eq, ok }: Testy) {
-  eq('verze podmínek a zásad', [VERZE_PODMINEK, VERZE_ZASAD], ['2026-10-14', '2026-10-14']);
+  eq('verze podmínek a zásad', [VERZE_PODMINEK, VERZE_ZASAD], ['2026-10-21', '2026-10-21']);
   eq('host: aspoň 15 let', MIN_VEK_HOSTA, 15);
 
   // ---- pravidla ----
-  ok('aktuální: obě verze dnešní nebo novější', souhlasAktualni({ terms_version: '2026-10-14', privacy_version: '2026-10-14' }) && souhlasAktualni({ terms_version: '2027-01-01', privacy_version: '2026-12-01' }));
-  ok('neaktuální: starší verze, chybějící verze, smetí, null', !souhlasAktualni({ terms_version: '2026-09-30', privacy_version: '2026-10-14' })
-    && !souhlasAktualni({ terms_version: '2026-10-14', privacy_version: null }) && !souhlasAktualni({ terms_version: 'ano', privacy_version: 'ano' }) && !souhlasAktualni(null));
+  ok('aktuální: obě verze dnešní nebo novější', souhlasAktualni({ terms_version: VERZE_PODMINEK, privacy_version: VERZE_ZASAD }) && souhlasAktualni({ terms_version: '2027-01-01', privacy_version: '2026-12-01' }));
+  ok('neaktuální: starší verze (i ta z 2026-10-14), chybějící verze, smetí, null', !souhlasAktualni({ terms_version: '2026-10-14', privacy_version: '2026-10-14' })
+    && !souhlasAktualni({ terms_version: VERZE_PODMINEK, privacy_version: null }) && !souhlasAktualni({ terms_version: 'ano', privacy_version: 'ano' }) && !souhlasAktualni(null));
   ok('brána: sdílený tablet se neptá nikdy', !potrebujeSouhlas('kiosk', null));
   ok('brána: účet bez verze (z doby před verzováním) se zeptá', potrebujeSouhlas('employer', { terms_version: null, privacy_version: null }) && potrebujeSouhlas('customer', {}));
   ok('brána: s aktuální verzí se neptá', !potrebujeSouhlas('employee', { terms_version: VERZE_PODMINEK, privacy_version: VERZE_ZASAD }));
   ok('souhlas z těla: jen výslovné true', souhlasZTela({ terms: true }) && !souhlasZTela({ terms: 'true' }) && !souhlasZTela({ terms: 1 }) && !souhlasZTela({}) && !souhlasZTela(null));
   ok('věk z těla: jen výslovné true', vekZTela({ vek15: true }) && !vekZTela({ vek15: 'ano' }) && !vekZTela({}));
-  eq('odkazy: česky české stránky, jinak anglické', [odkazyPravni('cs'), odkazyPravni('de')], [{ podminky: '/podminky', soukromi: '/soukromi' }, { podminky: '/en/podminky', soukromi: '/en/soukromi' }]);
+  eq('odkazy: česky české stránky, jinak anglické', [odkazyPravni('cs'), odkazyPravni('de')], [
+    { podminky: '/podminky', soukromi: '/soukromi', obchodniPodminky: '/obchodni-podminky', zpracovatelskaSmlouva: '/zpracovatelska-smlouva' },
+    { podminky: '/en/podminky', soukromi: '/en/soukromi', obchodniPodminky: '/en/obchodni-podminky', zpracovatelskaSmlouva: '/en/zpracovatelska-smlouva' }]);
   ok('brána běží v aplikaci, ne na veřejných, právních a přihlašovacích stránkách',
     ['/employer/overview', '/employee/shifts', '/client', '/client/me', '/admin'].every(cestaSBranou)
     && !['/', '/podminky', '/soukromi', '/en/podminky', '/login', '/register', '/join', '/demo', '/client/login', '/client/register', '/client/odhlasit', null].some(c => cestaSBranou(c as string)));
@@ -61,8 +67,23 @@ export default function ({ eq, ok }: Testy) {
   ok('brána je připojená v providers (mimo ukázku)', /\{!demo && <NovaVerze \/>\}/.test(cti('app/providers.tsx')));
   ok('ukázkový režim zná /api/account/souhlas', /'\/api\/account\/souhlas'/.test(cti('lib/demo/routy/zaklad.ts')));
 
+  // ---- podnik: B2B prohlášení, obchodní podmínky a zpracovatelská smlouva (2026-10-21) ----
+  ok('registrace podniku: SouhlasPodminek ve variantě podnik', /<SouhlasPodminek id="cs-souhlas" podnik /.test(cti('components/registrace/Cesta.tsx')));
+  const souhlasUi = cti('components/pravni/SouhlasPodminek.tsx');
+  ok('souhlas podniku: „jednám jako podnikatel“ a odkazy na obchodní podmínky a zpracovatelskou smlouvu', /Jednám jako podnikatel/.test(souhlasUi) && /odkazy\.obchodniPodminky/.test(souhlasUi) && /odkazy\.zpracovatelskaSmlouva/.test(souhlasUi));
+  ok('brána: vlastník podniku dostane variantu podnik', /podnik=\{vlastnik\}/.test(brana) && /vlastnik: await jeVlastnikPodniku\(id\)/.test(api));
+
+  // ---- čísla v dokumentech sedí s kódem ----
+  eq('lhůty retence v dokumentech = lib/retence.ts', [RETENCE_TEXT.neaktivniHostMesicu, RETENCE_TEXT.upozorneniPredemDni, RETENCE_TEXT.auditLogLet, RETENCE_TEXT.oznameniDni, RETENCE_TEXT.zrusenyPodnikDni],
+    [RETENCE.neaktivniHostMesicu, RETENCE.upozorneniPredemDni, RETENCE.auditLogLet, RETENCE.oznameniDni, RETENCE.zrusenyPodnikDni]);
+  ok('auth_attempts se mažou po 1 dni (init)', RETENCE_TEXT.pokusyPrihlaseniDni === 1 && /DELETE FROM auth_attempts WHERE window_start < NOW\(\) - INTERVAL '1 day'/.test(init));
+  eq('tarify v dokumentech = lib/plan.ts', [TARIFY.zkusebniDni, TARIFY.ceny], [TRIAL_DAYS, PRICES]);
+  eq('platnost odkazu na zálohu', LHUTY.odkazZalohyDni, PLATNOST_ODKAZU_DNI);
+  ok('platnost relace 30 dní (lib/authRelace.ts)', LHUTY.relaceDni === 30 && /PLATNOST_S = 30 \* 24 \* 60 \* 60/.test(cti('lib/authRelace.ts')));
+
   // ---- Stripe ----
   const billing = cti('lib/billing.ts');
+  ok('Stripe: patička faktury z lib/firma.ts u nového zákazníka i před pokladnou', /invoice_settings: \{ footer: patickaFaktury\(\) \}/.test(billing) && /nastavPatickuFaktury\(s, customer\)/.test(billing));
   ok('Stripe: consent_collection jen s STRIPE_SOUHLAS_PODMINEK=1', /env\.STRIPE_SOUHLAS_PODMINEK === '1'/.test(billing) && /\.\.\.\(souhlasVPokladne\(\) \? \{ consent_collection: \{ terms_of_service: 'required' as const \} \} : \{\}\)/.test(billing));
 
   // ---- export ----

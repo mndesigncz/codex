@@ -338,7 +338,6 @@
   "Bez souhlasu s podmínkami účet založit nejde.": "Bez akceptacji warunków nie można założyć konta.",
   "Aktualizovali jsme podmínky": "Zaktualizowaliśmy warunki",
   "Platí od {datum}. Než budeš pokračovat, potvrď je prosím.": "Obowiązują od {datum}. Zanim przejdziesz dalej, potwierdź je.",
-  "Změny se týkají toho, jaké údaje aplikace zpracovává a jak s nimi zachází. Celé znění najdeš v odkazech níž.": "Zmiany dotyczą tego, jakie dane aplikacja przetwarza i jak z nimi postępuje. Pełną treść znajdziesz w linkach poniżej.",
   "Souhlasím a pokračovat": "Akceptuję i dalej",
   "Souhlas se nepodařilo uložit. Zkus to znovu.": "Nie udało się zapisać zgody. Spróbuj ponownie.",
   "E-mail se nepodařilo potvrdit.": "Nie udało się potwierdzić e-maila.",
@@ -363,5 +362,9 @@
   "Zámek se nezapnul — ověření Face ID nebo otiskem neproběhlo.": "Blokada nie została włączona — weryfikacja Face ID lub odciskiem palca nie powiodła się.",
   "Zamykat aplikaci Face ID / otiskem": "Blokuj aplikację Face ID / odciskiem palca",
   "Po návratu do aplikace se nejdřív ověříš. Platí jen na tomhle telefonu.": "Po powrocie do aplikacji najpierw się zweryfikujesz. Dotyczy tylko tego telefonu.",
-  "Zámek aplikace": "Blokada aplikacji"
+  "Zámek aplikace": "Blokada aplikacji",
+  "Jednám jako podnikatel v rámci své podnikatelské činnosti, souhlasím s obchodními podmínkami, zpracovatelskou smlouvou a podmínkami užívání a beru na vědomí zásady ochrany osobních údajů.": "Działam jako przedsiębiorca w ramach mojej działalności gospodarczej, akceptuję warunki handlowe, umowę powierzenia przetwarzania danych i warunki korzystania oraz przyjmuję do wiadomości politykę prywatności.",
+  "Obchodní podmínky": "Warunki handlowe",
+  "Zpracovatelská smlouva": "Umowa powierzenia przetwarzania danych",
+  "Doplnili jsme obchodní podmínky pro podniky, zpracovatelskou smlouvu a seznam subzpracovatelů a zpřesnili podmínky užívání a zásady ochrany osobních údajů. Celé znění najdeš v odkazech níž.": "Dodaliśmy warunki handlowe dla firm, umowę powierzenia przetwarzania danych i listę podmiotów przetwarzających oraz doprecyzowaliśmy warunki korzystania i politykę prywatności. Pełne teksty znajdziesz w linkach poniżej."
 }

@@ -22,7 +22,7 @@ import { mistniCesta } from '../../lib/bezpecnaUrl.ts';
 import { zjistiObalUa } from '../../lib/nativni/most.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { bezpecnyNazev } from '../../lib/nazevSouboru.ts';
-import { firma, chybejiciUdaje, jeEmail, ZASTUPNA } from '../../lib/firma.ts';
+import { firma, chybejiciUdaje, jeEmail, identifikace, patickaFaktury, VYCHOZI } from '../../lib/firma.ts';
 import { dokument, KLICE_DOKUMENTU } from '../../lib/pravni/texty.ts';
 
 const UA_PROVOZ = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 ManageroApp/1.0.0 (build 12)';
@@ -201,27 +201,33 @@ export default async function ({ eq, ok }: Testy) {
   eq('soubor: prázdný název dostane výchozí', [bezpecnyNazev(''), bezpecnyNazev('  '), bezpecnyNazev('..'), bezpecnyNazev('***', 'x')], ['soubor', 'soubor', 'soubor', '-']);
   eq('soubor: běžný název zůstane', bezpecnyNazev('rozvrh-2026-09.csv'), 'rozvrh-2026-09.csv');
 
-  // ---- údaje provozovatele: nikdy nevymyšlené ----
+  // ---- údaje provozovatele: Martin Nemeškal (ARES), prostředí je přebíjí ----
   const prazdna = firma({});
-  eq('firma: bez prostředí zůstanou viditelná zástupná pole', [prazdna.nazev, prazdna.ico, prazdna.adresa, prazdna.emailPodpory], [ZASTUPNA.nazev, ZASTUPNA.ico, ZASTUPNA.adresa, ZASTUPNA.emailPodpory]);
-  eq('firma: chybějící údaje se dají vypsat', chybejiciUdaje(prazdna), ['nazev', 'ico', 'adresa', 'emailPodpory', 'regionDat']);
-  const vyplnena = firma({ FIRMA_NAZEV: 'Příklad s.r.o.', FIRMA_ICO: '12345678', FIRMA_ADRESA: 'Ulice 1, Praha', FIRMA_EMAIL_PODPORY: 'podpora@priklad.cz', FIRMA_REGION_DAT: 'EU' });
-  eq('firma: vyplněné údaje se berou z prostředí', [chybejiciUdaje(vyplnena), vyplnena.nazev], [[], 'Příklad s.r.o.']);
-  ok('firma: zástupný e-mail není mailto, skutečný ano', !jeEmail(ZASTUPNA.emailPodpory) && jeEmail('podpora@priklad.cz'));
+  eq('firma: bez prostředí výchozí údaje z ARES', [prazdna.nazev, prazdna.ico, prazdna.adresa, prazdna.emailPodpory, prazdna.telefon], ['Martin Nemeškal', '17944953', 'Míru 482, 790 70 Javorník', 'podpora@managero.app', '+420 727 960 413']);
+  eq('firma: výchozí údaje jsou úplné', chybejiciUdaje(prazdna), []);
+  ok('firma: zápis v živnostenském rejstříku a neplátce DPH', /živnostenském rejstříku vedeném Městským úřadem Jeseník/.test(prazdna.zapis) && prazdna.platceDph === false && prazdna.dic === '' && prazdna.typ === 'fyzicka');
+  eq('firma: identifikace podle § 435 OZ', identifikace(prazdna), 'Managero provozuje Martin Nemeškal, IČO 17944953, Míru 482, 790 70 Javorník. Zapsán v živnostenském rejstříku vedeném Městským úřadem Jeseník. Neplátce DPH.');
+  ok('firma: patička faktury bez DPH', /Nejsem plátce DPH/.test(patickaFaktury(prazdna)) && patickaFaktury(prazdna).includes('17944953'));
+  ok('firma: DIČ identifikované osoby nedělá plátce', /Neplátce DPH, DIČ CZ123/.test(identifikace(firma({ FIRMA_DIC: 'CZ123' }))));
+  const vyplnena = firma({ FIRMA_NAZEV: 'Příklad s.r.o.', FIRMA_ICO: '12345678', FIRMA_ADRESA: 'Ulice 1, Praha', FIRMA_EMAIL_PODPORY: 'podpora@priklad.cz', FIRMA_REGION_DAT: 'EU', FIRMA_TYP: 'pravnicka', FIRMA_ZAPIS: 'zapsaná v obchodním rejstříku vedeném Městským soudem v Praze, oddíl C, vložka 1' });
+  eq('firma: prostředí přebíjí výchozí údaje', [chybejiciUdaje(vyplnena), vyplnena.nazev, vyplnena.typ, vyplnena.telefon], [[], 'Příklad s.r.o.', 'pravnicka', VYCHOZI.telefon]);
+  eq('firma: rozbité údaje z prostředí se ohlásí', chybejiciUdaje(firma({ FIRMA_ICO: '{{ICO}}', FIRMA_EMAIL_PODPORY: 'x' })), ['ico', 'emailPodpory']);
+  ok('firma: e-mail jde do mailto, zástupné pole ne', !jeEmail('{{EMAIL_PODPORY}}') && jeEmail('podpora@priklad.cz'));
 
-  // ---- právní texty: věcné, dvoujazyčné a bez vymyšlených údajů ----
+  // ---- právní texty: věcné, dvoujazyčné, s identifikací a bez zástupných polí ----
   for (const klic of KLICE_DOKUMENTU) {
     for (const jazyk of ['cs', 'en'] as const) {
       const d = dokument(klic, jazyk, prazdna);
       ok(`právní text ${klic}/${jazyk}: titulek, úvod a sekce`, d.titulek.length > 3 && d.uvod.length > 40 && d.sekce.length >= 3);
       const cele = JSON.stringify(d);
-      ok(`právní text ${klic}/${jazyk}: bez firmy nese zástupná pole, ne vymyšlená jména`, !/s\.r\.o\.|a\.s\.|GmbH|Ltd/.test(cele));
+      ok(`právní text ${klic}/${jazyk}: bez zástupných polí, „návrhu“ a platformy ODR`, !/\{\{|\}\}/.test(cele) && !/\bODR\b|ec\.europa\.eu\/consumers\/odr/.test(cele) && !/Návrh:|ověřit u advokáta/i.test(cele));
+      ok(`právní text ${klic}/${jazyk}: odkazy jen na existující právní stránky`, [...cele.matchAll(/\[\[([^|\]]+)\|/g)].every(m => m[1].startsWith('/') || m[1] === 'nahlasit' || (KLICE_DOKUMENTU as string[]).includes(m[1])));
     }
   }
   const soukromi = JSON.stringify(dokument('soukromi', 'cs', vyplnena));
   ok('soukromí: zná správce a kontakt z konfigurace', soukromi.includes('Příklad s.r.o.') && soukromi.includes('12345678') && soukromi.includes('podpora@priklad.cz'));
   ok('soukromí: jmenuje zpracovatele z kódu (Neon, Vercel, Resend, Apple, Google, Stripe)', ['Neon', 'Vercel', 'Resend', 'Apple', 'Google', 'Stripe'].every(x => soukromi.includes(x)));
-  ok('soukromí: říká, že poloha se neukládá a že se nesleduje', /Souřadnice se neukládají/.test(soukromi) && /Nepoužíváme reklamní ani sledovací/.test(soukromi));
+  ok('soukromí: říká, že poloha se neukládá a že se nesleduje', /Souřadnice se neukládají/.test(soukromi) && /nepoužíváme reklamní ani sledovací/i.test(soukromi));
   const smaz = JSON.stringify(dokument('smazat-ucet', 'cs', vyplnena));
   ok('smazání účtu: říká, co zmizí a co zůstane anonymně', /Smazaný uživatel/.test(smaz) && /Zrušíme|zruší/.test(smaz) && /potvrd/i.test(smaz));
   ok('podmínky: zakazují nevhodný obsah a popisují nahlášení a blokaci', /Nahlásit/.test(JSON.stringify(dokument('podminky', 'cs', vyplnena))) && /Report/.test(JSON.stringify(dokument('podminky', 'en', vyplnena))));

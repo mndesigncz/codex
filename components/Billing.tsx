@@ -345,7 +345,7 @@ export default function Billing() {
             ))}
           </tbody>
         </table>
-        <p className="mt-3 t-meta">{t('Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.')}</p>
+        <p className="mt-3 t-meta">{t('Ceny jsou konečné, provozovatel není plátcem DPH. Fakturu vystaví Stripe a najdete ji v portálu.')}</p>
       </div>
     </div>
   );

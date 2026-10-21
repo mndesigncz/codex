@@ -49,8 +49,9 @@ export default function ({ eq, ok }: Testy) {
   ok('init: oznámení bez účtu a kontakt oznamovatele', /ALTER COLUMN reporter_id DROP NOT NULL/.test(cti('app/api/init/route.ts')) && /reporter_email/.test(cti('app/api/init/route.ts')));
   ok('smazání účtu vymaže i kontakt oznamovatele', /reporter_name = NULL, reporter_email = NULL/.test(cti('lib/smazaniUctu.ts')));
   const p = dokument('podpora', 'cs', firma({}));
-  ok('podpora: kontaktní místo DSA a odkaz na /nahlasit', p.sekce.some(s => s.p?.some(x => /Kontaktní místo podle Aktu o digitálních službách/.test(x))) && p.sekce.some(s => s.p?.some(x => /\/nahlasit/.test(x))));
-  ok('podpora anglicky taky', dokument('podpora', 'en', firma({})).sekce.some(s => s.p?.some(x => /Digital Services Act/.test(x))));
+  const pText = JSON.stringify(p);
+  ok('podpora: kontaktní místo DSA a odkaz na /nahlasit', /Kontaktní místo podle Aktu o digitálních službách/.test(pText) && /\[\[nahlasit\|/.test(pText));
+  ok('podpora anglicky taky', /Digital Services Act/.test(JSON.stringify(dokument('podpora', 'en', firma({})))));
   const form = cti('app/nahlasit/Formular.tsx');
   ok('formulář: prohlášení, e-mail s inputMode, kontrola jako server', /dsa-prohlaseni/.test(form) && /inputMode="email"/.test(form) && /platneOznameni\(telo\)/.test(form));
 }

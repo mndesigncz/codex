@@ -31,6 +31,7 @@ import { zapomenTarif } from './tarifServer';
 import { notifyUsers } from './push';
 import { audit } from './audit';
 import { pragueToday } from './pragueTime';
+import { patickaFaktury } from './firma';
 import {
   rezimZKlice, rezimZLivemode, rozhodniOZdroji, jeChybejiciZdroj, jeChybejiciZakaznik, jeSmazanyZakaznik,
   udalostPatriDoRezimu, vyhodnotPredplatne, nabidnoutTrial, jeZivyStav, ulozenyRezim, type StripeRezim,
@@ -197,6 +198,8 @@ export async function ensureCustomer(teamId: number): Promise<string> {
     name: String(t.name ?? `Podnik ${teamId}`),
     email: t.owner_email ?? undefined,
     metadata: { teamId: String(teamId), app: 'managero' },
+    // Patička faktur: identifikace provozovatele a „Nejsem plátce DPH“ (§ 435 OZ, lib/firma.ts).
+    invoice_settings: { footer: patickaFaktury() },
     // Jazyk podniku (kolo 76); před migrací sloupce a bez nastavení čeština.
     preferred_locales: [stripeLocale(await jazykPodniku(teamId))],
   });
@@ -241,6 +244,20 @@ async function sZakaznikem<T>(teamId: number, akce: (customer: string) => Promis
   }
 }
 
+/**
+ * Patička faktury u zákazníka Stripe (identifikace provozovatele, neplátce DPH) — z lib/firma.ts,
+ * jedna pravda pro web i faktury. Doplní ji i zákazníkům založeným dřív a po změně údajů
+ * (přechod na s.r.o., DIČ). Nepovedená aktualizace pokladnu nezastaví: fakturu pak ponese
+ * výchozí patička z dashboardu Stripe (Settings → Invoices → Default footer), viz docs/PRAVNI.md.
+ */
+async function nastavPatickuFaktury(s: Stripe, customer: string): Promise<void> {
+  try {
+    await s.customers.update(customer, { invoice_settings: { footer: patickaFaktury() } });
+  } catch (e) {
+    console.error('billing: patičku faktury se nepodařilo nastavit', customer, (e as { message?: string })?.message ?? e);
+  }
+}
+
 /** Chce pokladna Stripe souhlas s podmínkami? Jen s výslovným STRIPE_SOUHLAS_PODMINEK=1 (viz createCheckout). */
 export function souhlasVPokladne(env: Record<string, string | undefined> = process.env): boolean {
   return env.STRIPE_SOUHLAS_PODMINEK === '1';
@@ -263,7 +280,7 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
   // Trial s kartou jen jednou na podnik — kdo už předplatné měl, platí hned.
   // Stejné pravidlo používají texty v aplikaci (billingPravidla.nabidnoutTrial).
   const trial = nabidnoutTrial({ hadSubscription: t.had_subscription, stripeSubscriptionId: t.stripe_subscription_id });
-  const session = await sZakaznikem(teamId, customer => s.checkout.sessions.create({
+  const session = await sZakaznikem(teamId, async customer => { await nastavPatickuFaktury(s, customer); return s.checkout.sessions.create({
     mode: 'subscription',
     customer,
     client_reference_id: String(teamId),
@@ -286,7 +303,8 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
     metadata: { teamId: String(teamId), plan, interval },
     // Souhlas s obchodními podmínkami přímo v pokladně (spuštění, balík P) — JEN se zapnutým
     // STRIPE_SOUHLAS_PODMINEK=1: Stripe vytvoření pokladny odmítne, když v dashboardu
-    // (Settings → Public details) chybí adresa podmínek. Bez proměnné se chová jako dřív.
+    // (Settings → Public details → Terms of service) chybí adresa podmínek. Bez proměnné se
+    // chová jako dřív. Adresa má být https://www.managero.app/obchodni-podminky (docs/PRAVNI.md).
     ...(souhlasVPokladne() ? { consent_collection: { terms_of_service: 'required' as const } } : {}),
     ...(mode === 'embedded' ? {
       // Stripe hodnotu přejmenoval: „embedded“ už neexistuje, platí „embedded_page“.
@@ -298,7 +316,7 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
       success_url: `${appUrl()}/employer/overview?view=settings&tab=billing&billing=success`,
       cancel_url: `${appUrl()}/employer/overview?view=settings&tab=billing&billing=cancel`,
     }),
-  }));
+  }); });
   if (mode === 'embedded') {
     if (!session.client_secret) throw new Error('Stripe nevrátil klíč pokladny.');
     return { clientSecret: session.client_secret };

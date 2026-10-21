@@ -118,7 +118,7 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
                 {points.map(p => <li key={p} className="text-[13px] text-[#16181A] flex items-start gap-2"><Icon name="check" size={14} className={`shrink-0 mt-0.5 ${plan === 'pro' ? 'text-[#5B7A08]' : 'text-[#0A5CC0]'}`} />{p}</li>)}
               </ul>
               <p className="mt-4 text-[11px] text-black/45">
-                {trial ? t('Zrušit jde kdykoli během zkušební doby, nic se nestrhne.') : t('Kdykoli zrušit, platí do konce zaplaceného období.')} {t('Ceny bez DPH, fakturu pošle Stripe.')}
+                {trial ? t('Zrušit jde kdykoli během zkušební doby, nic se nestrhne.') : t('Kdykoli zrušit, platí do konce zaplaceného období.')} {t('Ceny jsou konečné (neplátce DPH), předplatné se obnovuje automaticky, fakturu pošle Stripe.')}
               </p>
             </div>
           </aside>
