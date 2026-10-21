@@ -113,7 +113,10 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
             <div className={`card p-5 ${plan === 'pro' ? 'card-accent' : 'card-info'}`}>
               <p className="t-label">{PLAN_NAMES[plan]}</p>
               <p className="mt-1"><span className="text-3xl font-bold tracking-tight text-[#16181A]">{czk(amount)}</span> <span className="text-sm text-black/45">{interval === 'year' ? t('ročně') : t('měsíčně')}</span></p>
-              {interval === 'year' && <p className="text-[13px] text-black/45"><s>{czk(pr.yearCompare)}</s> · {t('ušetříte {castka}', { castka: czk(pr.yearCompare - pr.year) })}</p>}
+              {/* Úspora se počítá (12 × měsíční cena − roční), jako na landingu (Pricing.tsx). Dřív tu stála
+                  přeškrtnutá „srovnávací“ cena (PRICES.*.yearCompare), kterou nikdo nikdy neúčtoval —
+                  klamavá referenční cena (§ 4 a 5 zákona o ochraně spotřebitele). */}
+              {interval === 'year' && <p className="text-[13px] text-black/55">{t('Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.', { castka: czk(12 * pr.month - pr.year), mesicne: czk(Math.round(pr.year / 12)) })}</p>}
               <ul className="mt-4 space-y-1.5">
                 {points.map(p => <li key={p} className="text-[13px] text-[#16181A] flex items-start gap-2"><Icon name="check" size={14} className={`shrink-0 mt-0.5 ${plan === 'pro' ? 'text-[#5B7A08]' : 'text-[#0A5CC0]'}`} />{p}</li>)}
               </ul>

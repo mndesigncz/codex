@@ -83,7 +83,6 @@
   "měsíčně": "per month",
   "ne": "no",
   "ročně": "per year",
-  "ušetříte {castka}": "you save {castka}",
   "váš plán": "your plan",
   "za podnik, kdykoli zrušit": "per business, cancel any time",
   "za {n, plural, one {# den} few {# dny} other {# dní}}": "in {n, plural, one {# day} other {# days}}",
@@ -130,5 +129,6 @@
   "Plno": "Full",
   "bez limitu": "no limit",
   "Zbývá {n, plural, one {# místo} few {# místa} other {# míst}}": "{n, plural, one {# place} other {# places}} left",
-  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {# link} other {# links}} left"
+  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {# link} other {# links}} left",
+  "Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "You save {castka} compared to paying monthly, which works out at {mesicne} a month."
 }

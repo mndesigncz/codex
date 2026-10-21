@@ -83,7 +83,6 @@
   "měsíčně": "miesięcznie",
   "ne": "nie",
   "ročně": "rocznie",
-  "ušetříte {castka}": "oszczędzasz {castka}",
   "váš plán": "Twój plan",
   "za podnik, kdykoli zrušit": "za lokal, rezygnacja w każdej chwili",
   "za {n, plural, one {# den} few {# dny} other {# dní}}": "za {n, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}}",
@@ -130,5 +129,6 @@
   "Plno": "Pełne",
   "bez limitu": "bez limitu",
   "Zbývá {n, plural, one {# místo} few {# místa} other {# míst}}": "{n, plural, one {Zostało # miejsce} few {Zostały # miejsca} many {Zostało # miejsc} other {Zostało # miejsca}}",
-  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {Został # link} few {Zostały # linki} many {Zostało # linków} other {Zostało # linku}}"
+  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "{n, plural, one {Został # link} few {Zostały # linki} many {Zostało # linków} other {Zostało # linku}}",
+  "Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "Oszczędzasz {castka} w porównaniu z płatnością miesięczną, co daje {mesicne} miesięcznie."
 }

@@ -152,7 +152,8 @@ export default function Billing() {
         </div>
         {interval === 'year' ? (
           <p className="mt-2"><span className="text-[1.75rem] font-bold tracking-tight tabular-nums text-[#16181A]">{czk(pr.year)}</span> <span className="text-sm text-black/55">{t('ročně')}</span>
-            <span className="block text-[13px] text-black/55"><s>{czk(pr.yearCompare)}</s> · {t('ušetříte {castka}', { castka: czk(pr.yearCompare - pr.year) })}</span></p>
+            {/* Spočtená úspora (12 × měsíční − roční), ne přeškrtnutá „srovnávací“ cena, která se nikdy neúčtovala (§ 4–5 ZOS). */}
+            <span className="block text-[13px] text-black/55">{t('Ušetříte {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.', { castka: czk(12 * pr.month - pr.year), mesicne: czk(Math.round(pr.year / 12)) })}</span></p>
         ) : (
           <p className="mt-2"><span className="text-[1.75rem] font-bold tracking-tight tabular-nums text-[#16181A]">{czk(pr.month)}</span> <span className="text-sm text-black/55">{t('měsíčně')}</span>
             <span className="block text-[13px] text-black/55">{t('za podnik, kdykoli zrušit')}</span></p>
