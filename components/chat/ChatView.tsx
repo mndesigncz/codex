@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/Icons';
-import { EmptyState, SearchField, Button, Badge, Skeleton } from '../ui';
+import { EmptyState, SearchField, Button, Badge, Skeleton, Modal } from '../ui';
 import { Menu, type MenuItem } from '../ui/Menu';
 import NahlasitOkno from '../moderace/NahlasitOkno';
 import PollsStrip from './Polls';
@@ -298,6 +298,9 @@ function Thread({
   // Kolo 8: odpověď cituje zprávu (pruh nad polem), reakce se přepínají optimisticky, „Viděli" z last_read_at.
   const [odpovedNa, setOdpovedNa] = useState<ChatMessage | null>(null);
   const [reakceChyba, setReakceChyba] = useState('');
+  // Audit V33/Z14 (vzor Connecteam „187 / 210 přečetlo", Slack): kdo poslední vlastní zprávu ve skupině
+  // viděl a kdo ještě ne — klepnutím na „Viděli 4 z 6" se otevře seznam.
+  const [ctenari, setCtenari] = useState<{ videli: string[]; nevideli: string[] } | null>(null);
   // Cizí anketu smí zavřít ten, kdo spravuje ankety (server to hlídá stejným
   // klíčem). Do ankety se dřív předávalo jen meId, takže „Uzavřít“ viděl
   // jen autor. Před načtením oprávnění tlačítko nekreslíme (`ma()` by tehdy
@@ -499,14 +502,23 @@ function Thread({
         {messages.map((m, i) => {
           const prev = messages[i - 1];
           // „Viděli" jen u poslední vlastní zprávy: v týmu jména, v soukromé konverzaci čas přečtení.
-          let videli: string | undefined;
+          let videli: React.ReactNode;
           if (m.id === posledniVlastni) {
             if (conv.type === 'direct') {
               const druhy = members.find(c => c.id !== meId);
               videli = druhy && kdoVidel(members, m).length ? t('Přečteno {cas}', { cas: formatClock(druhy.lastReadAt, t) }) : undefined;
             } else {
-              const j = shrnJmena(kdoVidel(members, m));
-              videli = j.text ? (j.dalsich ? t('Viděli: {jmena} +{n}', { jmena: j.text, n: j.dalsich }) : t('Viděli: {jmena}', { jmena: j.text })) : undefined;
+              const kdo = kdoVidel(members, m);
+              const ostatni = members.filter(c => c.id !== m.senderId);
+              const j = shrnJmena(kdo);
+              const jmena = j.text ? (j.dalsich ? t('Viděli: {jmena} +{n}', { jmena: j.text, n: j.dalsich }) : t('Viděli: {jmena}', { jmena: j.text })) : t('Zatím to nikdo neviděl');
+              videli = ostatni.length > 0 ? (
+                <button type="button" data-ctenari=""
+                  onClick={() => setCtenari({ videli: kdo, nevideli: ostatni.map(c => c.name).filter(n => !kdo.includes(n)) })}
+                  className="tap-target-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] rounded">
+                  {t('{jmena} · {n} z {celkem}', { jmena, n: kdo.length, celkem: ostatni.length })}
+                </button>
+              ) : undefined;
             }
           }
           // Oddělovač dne. Dlouhé vlákno bez něj je jedna stěna a u zprávy
@@ -628,6 +640,25 @@ function Thread({
         <Button type="submit" variant="accent" iconOnly icon="send" aria-label={t('Odeslat')}
           disabled={!text.trim() || sending} className="shrink-0" />
       </form>
+      {ctenari && (
+        <Modal open onClose={() => setCtenari(null)} size="sm" title={t('Kdo zprávu viděl')}
+          subtitle={t('{n} z {celkem} lidí ve vlákně', { n: ctenari.videli.length, celkem: ctenari.videli.length + ctenari.nevideli.length })}>
+          <div className="space-y-4" data-ctenari-okno="">
+            {ctenari.nevideli.length > 0 && (
+              <section className="space-y-1.5">
+                <h3 className="t-label">{t('Ještě neviděli')}</h3>
+                <p className="text-[15px] text-[#16181A] text-pretty">{ctenari.nevideli.join(', ')}</p>
+              </section>
+            )}
+            {ctenari.videli.length > 0 && (
+              <section className="space-y-1.5">
+                <h3 className="t-label">{t('Viděli')}</h3>
+                <p className="text-[15px] text-[#16181A] text-pretty">{ctenari.videli.join(', ')}</p>
+              </section>
+            )}
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
@@ -660,7 +691,7 @@ export function MessageBubble({
   onReagovat?: (emoji: string) => void;
   onOdpovedet?: () => void;
   onSkocNa?: (id: number) => void;
-  videli?: string;
+  videli?: React.ReactNode;
 }) {
   const t = useT('chat');
   // Lišta reakcí po podržení prstu (na monitoru stačí najetí — CSS group-hover).

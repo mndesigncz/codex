@@ -93,5 +93,11 @@
   "Reakci se nepodařilo uložit.": "The reaction could not be saved.",
   "Přejít na původní zprávu": "Go to the original message",
   "Napiš otázku ankety.": "Write the poll question.",
-  "Vyplň aspoň dvě možnosti.": "Fill in at least two options."
+  "Vyplň aspoň dvě možnosti.": "Fill in at least two options.",
+  "Zatím to nikdo neviděl": "Nobody has seen it yet",
+  "{jmena} · {n} z {celkem}": "{jmena} · {n} of {celkem}",
+  "Kdo zprávu viděl": "Who has seen the message",
+  "{n} z {celkem} lidí ve vlákně": "{n} of {celkem} people in the thread",
+  "Ještě neviděli": "Not seen yet",
+  "Viděli": "Seen"
 }

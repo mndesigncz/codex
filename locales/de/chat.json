@@ -93,5 +93,11 @@
   "Reakci se nepodařilo uložit.": "Die Reaktion konnte nicht gespeichert werden.",
   "Přejít na původní zprávu": "Zur ursprünglichen Nachricht",
   "Napiš otázku ankety.": "Schreib die Frage der Umfrage.",
-  "Vyplň aspoň dvě možnosti.": "Fülle mindestens zwei Optionen aus."
+  "Vyplň aspoň dvě možnosti.": "Fülle mindestens zwei Optionen aus.",
+  "Zatím to nikdo neviděl": "Noch niemand hat es gesehen",
+  "{jmena} · {n} z {celkem}": "{jmena} · {n} von {celkem}",
+  "Kdo zprávu viděl": "Wer die Nachricht gesehen hat",
+  "{n} z {celkem} lidí ve vlákně": "{n} von {celkem} Personen im Verlauf",
+  "Ještě neviděli": "Noch nicht gesehen",
+  "Viděli": "Gesehen"
 }
