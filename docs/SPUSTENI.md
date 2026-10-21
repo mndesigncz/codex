@@ -15,12 +15,18 @@ které za něj nikdo jiný nezapne. Stav nastavení kdykoli ukáže `GET https:/
    s produkční databází.
 4. Proměnné z `.env.example` — povinné: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`,
    `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`. Doporučené: `APP_SECRET_KEY`, `SUPERADMIN_USER_IDS`, `ADMIN_API_TOKEN`.
-5. Údaje provozovatele `FIRMA_*` — až po schválení textů advokátem; do té doby stránky ukazují „Návrh“.
+5. Údaje provozovatele jsou výchozí hodnoty v `lib/firma.ts` (Martin Nemeškal, IČO 17944953); `FIRMA_*`
+   nejsou potřeba, jen je přebíjejí na serveru (Nastavení → O aplikaci bere vždy výchozí hodnoty z kódu).
+   Až bude DIČ: `FIRMA_DIC`. Podrobně `docs/PRAVNI.md` §3.
 
 ## 2. E-maily
 
 Resend: ověř doménu `managero.app` (DNS záznamy SPF, DKIM, DMARC), placený tarif kvůli objemu,
-`RESEND_API_KEY` a `EMAIL_FROM`.
+`RESEND_API_KEY` a `EMAIL_FROM`. Bez nich neodejdou ani upozornění před smazáním podniku — retence pak
+podnik nesmaže a hlásí chybu.
+
+Schránka **`podpora@managero.app`** musí přijímat poštu (Resend jen odesílá): MX záznam a schránka nebo
+přeposílání. Odkazují na ni e-maily, patičky webu i faktury.
 
 ## 3. Platby
 
@@ -28,7 +34,20 @@ Stripe v ostrém režimu: produkty s `lookup_key` `pro_monthly`, `pro_yearly`, `
 kupon `MAX30`, webhook na `https://www.managero.app/api/billing/webhook` s událostmi
 `checkout.session.completed`, `customer.subscription.created|updated|deleted|trial_will_end`,
 `invoice.paid`, `invoice.payment_failed`. Proměnné `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
-`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. DPH: podle stanoviska daňového poradce (Stripe Tax, nebo ručně).
+`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. Provozovatel není plátce DPH: Stripe Tax vypnutý, žádné sazby DPH.
+
+Dashboard (podrobně `docs/PRAVNI.md` §3): Public details (URL obchodních podmínek a zásad, podpora,
+telefon) → potom ve Vercelu `STRIPE_SOUHLAS_PODMINEK=1`; výchozí patička faktur; zasílání faktur
+e-mailem; Revenue recovery → po posledním pokusu zrušit předplatné; kupon `MAX30` s `duration = once`.
+Povinné pole IČO v pokladně si kód nastavuje sám (nic v dashboardu).
+
+## 3a. Retence osobních údajů
+
+Až **po nasazení** a po `/api/init` (nové sloupce): Správa platformy → Retence → „Spočítat náhled teď“,
+zkontrolovat počty, pak `RETENCE_ZAPNUTA=1` (Production) a redeploy. Cron `/api/retence` (denně 3:35)
+pak anonymizuje neaktivní hosty (24 měsíců, e-mail 30 dní předem) a maže zrušené podniky bez aktivity
+(90 dní, e-mail vlastníkovi a správcům předplatného 30 a 7 dní předem). Stav: `/api/health` →
+`funkce.retenceOstra`. Podrobně `docs/PRAVNI.md` §7.
 
 ## 4. Hlídání
 

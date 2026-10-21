@@ -54,16 +54,19 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
   „Neplátce DPH", e-mail, telefon: `lib/firma.ts` → patička právních stránek, `/nahlasit`,
   landing, `/podpora`, OP čl. 1, DPA čl. 1, zásady, podmínky, e-maily, faktury.
 - ✅ „Managero je obchodní značka, ne společnost": OP čl. 1; patička „Managero provozuje …".
-- ⚠ Nastavení → O aplikaci v aplikaci: identifikace tam zatím není (soubor `components/Settings.tsx`
-  patří jinému balíku; odkazy na právní stránky tam jsou). Doplnit při další práci na Nastavení.
+- ✅ V aplikaci: Managero → Nastavení → O aplikaci a Managero client → Moje → Účet a soukromí
+  (`components/pravni/ProvozovatelInfo.tsx`: věta `identifikace()` + odkazy 44 px). Bere výchozí
+  údaje z `lib/firma.ts` (`firma({})`, běží i v prohlížeči) — proměnné `FIRMA_*` se tu neprojeví.
 
 ### 2.2 Obchodní podmínky B2B
 - ✅ Smluvní strany, zákazník = podnikatel, spotřebitel nemůže objednat: čl. 1.
 - ✅ Prohlášení „jednám jako podnikatel" při registraci: `SouhlasPodminek podnik` v `components/registrace/Cesta.tsx`.
-- ⚠ Povinné IČO před objednávkou: **neděláme** (registrace ani pokladna IČO nevyžadují; Stripe
-  sbírá jen DIČ přes `tax_id_collection`). Náhrada: B2B prohlášení v click-wrapu + čl. 1 (právo
-  vyžádat IČO a bez něj tarif nezřídit). Doporučení: povinné pole IČO v pokladně (Stripe
-  `custom_fields`) nebo v Nastavení → Předplatné. Viz §5.
+- ✅ Povinné IČO před objednávkou placeného tarifu: pokladna Stripe má povinné pole „IČO“
+  (`custom_fields`, 8 číslic; `lib/icoPokladna.ts`), předvyplněné z Nastavení → Profil podniku.
+  Webhook `checkout.session.completed` ověří kontrolní součet (mod 11), uloží IČO do `teams.ico`
+  a na faktury zákazníka (`invoice_settings.custom_fields`), název firmy z pokladny do jména
+  zákazníka. Neplatné IČO se neuloží (záznam v historii změn). OP čl. 1: objednat smí jen podnikatel,
+  uvede IČO. Registrace podniku (tarif Zdarma) IČO dál nevyžaduje — B2B nese prohlášení v click-wrapu.
 - ✅ Předmět (SaaS, licence, ne prodej SW), vývoj funkcí: čl. 3.
 - ✅ Uzavření smlouvy, archivace verze, jazyk, oprava chyb: čl. 4 (verze + čas u účtu).
 - ✅ Tarify, ceny, měna, konečné ceny, neplátce DPH, doložka pro registraci k DPH **s právem
@@ -89,7 +92,8 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
 - ✅ Změny podmínek a cen 30 dní předem, právo odmítnout a vypovědět bez sankce + vrácení
   poměrné části (§ 1752): čl. 18.
 - ✅ Ukončení: zákazník kdykoli, poskytovatel s výpovědní dobou 2 měsíce, okamžitě při podstatném
-  porušení; smazání neaktivního zrušeného podniku po 90 dnech (podle `lib/retence.ts`): čl. 19.
+  porušení; smazání nepoužívaného zrušeného podniku po 90 dnech jen po e-mailu vlastníkovi a správcům
+  předplatného 30 a 7 dní předem (podle `lib/retence.ts` → `rozhodniPodnik`): čl. 19.
 - ✅ Data Act čl. 25: popis exportu (JSON záloha + CSV moduly + na požádání další data),
   přechodné období 30 dní, vyzvednutí ≥ 30 dní, výmaz, zálohy do 30 dní, bez poplatků za
   přechod: čl. 20. Výpovědní doba zákazníka „kdykoli" (≤ 2 měsíce splněno).
@@ -129,7 +133,8 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
 - ✅ Příjemci (odkaz na subzpracovatele), Stripe zčásti samostatný správce, podnik, úřady: „Komu…".
 - ✅ Předání do USA (DPF/SCC): „Předávání mimo EU".
 - ✅ Retence po účelech (účet, neaktivní host 24 m + upozornění 30 dní, pokusy přihlášení 1 den,
-  audit 3 roky, oznámení 365 dní, zrušený podnik 90 dní, fakturace „až 10 let", zálohy 30 dní): `#retence`.
+  audit 3 roky, oznámení 365 dní, zrušený podnik 90 dní bez aktivity + upozornění 30 a 7 dní předem,
+  fakturace „až 10 let", zálohy 30 dní): `#retence`. Účet nese i den posledního otevření aplikace.
 - ✅ Práva + ÚOOÚ (adresa), lhůta 1 měsíc, export účtu v aplikaci: „Vaše práva".
 - ✅ Automatizované rozhodování (body, žebříčky, návrhy trestů = výpočty, rozhoduje člověk, čl. 22 neprovádíme): „Automatizované rozhodování".
 - ✅ Věk 15+: „Děti". ✅ Cookies a localStorage výčet (relace 30 dní, CSRF/callback, jazyk 1 rok,
@@ -192,7 +197,7 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
 ### 2.12 Přístupnost — ➖ mikropodnik mimo působnost zákona 424/2023; WCAG drží design.
 ### 2.13 Zaměstnanecká data — ✅ OP čl. 14, DPA čl. 5 a 7, šablona `/informace-pro-zamestnance` (§ 316 odst. 3 ZP + čl. 13 GDPR). Přejmenování „trestů" v UI na „hodnocení plnění kritérií" je mimo tento balík (k ověření, §4).
 ### Kap. 3 OSVČ — ✅ strop a výluky v OP čl. 17, ✅ postoupení na s.r.o. čl. 21; pojištění a sídlo §3.
-### 5.2 Faktura — ✅ patička faktury z `lib/firma.ts` („Nejsem plátce DPH", jméno, IČO, sídlo, zápis); ⚠ IČO odběratele jen pokud ho vyplní (DIČ přes `tax_id_collection`).
+### 5.2 Faktura — ✅ patička faktury z `lib/firma.ts` („Nejsem plátce DPH", jméno, IČO, sídlo, zápis); ✅ IČO odběratele z povinného pole pokladny / profilu podniku (`invoice_settings.custom_fields`), DIČ přes `tax_id_collection`. ⚠ U první (nulové) faktury zkoušky se IČO zadané až v pokladně ještě neobjeví — webhook ho zákazníkovi doplní hned potom; má-li ho podnik v profilu předem, je na faktuře od začátku.
 ### 5.3 Pokladna — ✅ cena + měna + perioda, automatické obnovování, zkušební doba (modal); ⚠ povinné zaškrtnutí v pokladně Stripe jen po zapnutí `STRIPE_SOUHLAS_PODMINEK=1` (§3); ✅ B2B prohlášení je v registraci.
 
 ### 1A/1B/1C (seznam dokumentů)
@@ -229,7 +234,10 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
 9. Ověřit **region Blob úložiště** (Storage → Blob → region); ideálně Frankfurt (`fra1`). Seznam
    subzpracovatelů uvádí „serverové funkce ve Frankfurtu" — to zajišťuje `vercel.json` `regions: ["fra1"]`.
 10. Zapnout **`RETENCE_ZAPNUTA=1`** — zásady a DPA popisují lhůty retence jako platné; bez proměnné
-   cron jen počítá náhled a nic nemaže.
+   cron jen počítá náhled a nic nemaže. Od 21. 10. 2026 je zapnutí bezpečné (upozornění 30 a 7 dní
+   předem, širší aktivita, viz §7) — ale **až po nasazení** této verze, po `/api/init` (nové sloupce)
+   a po kontrole náhledu ve Správě platformy → Retence. Vyžaduje funkční Resend (`RESEND_API_KEY`,
+   `EMAIL_FROM`): bez odeslaného upozornění se podnik nesmaže a běh hlásí chybu.
 11. `FIRMA_*` proměnné nejsou potřeba (výchozí údaje jsou v kódu; od oponentury i pro e-mail moderace,
    viz §6). Až bude DIČ: `FIRMA_DIC=CZ…`
    (DIČ identifikované osoby **neznamená** plátce). Při registraci k DPH navíc `FIRMA_PLATCE_DPH=1`
@@ -269,8 +277,8 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
 3. **Strop odpovědnosti** 12 měsíců plateb / min. 10 000 Kč a výluky (§ 433, § 1753, § 2898) — přiměřenost
    vůči malým podnikům; zda přidat zkrácení lhůty pro nároky (§ 630).
 4. **Data Act čl. 25** pro malý SaaS: přechodné 30 + vyzvednutí 30 dní; okamžitý výmaz při smazání
-   podniku zákazníkem; smazání neaktivního zrušeného podniku po 90 dnech **bez předchozího upozornění**
-   (kód upozornění neposílá — doporučeno doplnit); vývoj Digital Omnibus.
+   podniku zákazníkem; smazání nepoužívaného zrušeného podniku po 90 dnech s e-mailem 30 a 7 dní
+   předem (od 21. 10. 2026 v kódu); vývoj Digital Omnibus.
 5. **DPA**: zda převzít celé SCC 2021/915; strop v DPA a regres; audit 1× ročně na náklady správce.
 6. **Krácení nenárokové prémie jako „trest"** vs. § 346b a NS 21 Cdo 3471/2024 — OP to váže na předem
    stanovená kritéria za období; zvážit přejmenování v UI.
@@ -284,11 +292,10 @@ Značky: ✅ pokryto (kde) · ➖ vědomě vynecháno (proč) · ⚠ pokryto č�
 
 ## 5. Co v kódu zbývá (mimo tento balík nebo nestihnuto)
 
-- Povinné **IČO** v pokladně nebo při objednávce placeného tarifu (Stripe `custom_fields` / vlastní pole).
-- **Upozornění e-mailem** vlastníkovi 30 dní před smazáním neaktivního zrušeného podniku (`lib/retenceDb.ts`).
+- ~~Povinné IČO v pokladně~~ — hotovo (§7). ~~Upozornění před smazáním zrušeného podniku~~ — hotovo (§7).
 - **Hromadný e-mail** vlastníkům o změně OP/DPA/subzpracovatelů (dnes ručně).
-- Identifikace provozovatele v **Nastavení → O aplikaci** a odkazy na obchodní podmínky v Nastavení →
-  Předplatné (`components/Settings.tsx`, `components/Billing.tsx` patří jiným balíkům).
+- ~~Identifikace provozovatele v Nastavení → O aplikaci~~ — hotovo (§7). Odkazy na obchodní podmínky
+  přímo v Nastavení → Předplatné (`components/Billing.tsx`) zůstávají na příští úpravu (pokladna je má).
 - ~~Přeškrtnutá „srovnávací" cena v pokladně~~ — opraveno v oponentuře (§6). `PRICES.*.yearCompare`
   v `lib/plan.ts` (a v `lib/demo/routy/zaklad.ts`) už UI nepoužívá; při příští úpravě `lib/plan.ts` smazat.
 - Texty ceníku a pokladny o DPH jsou psané pro neplátce natvrdo; při registraci k DPH přepsat.
@@ -363,7 +370,8 @@ oznamovatele povinné kromě ohrožení dětí, smazání vlastníka ruší Stri
 ### 6.2 Co zůstává a proč
 
 Na Martinovi před ostrým provozem (navíc k §3):
-- **`RETENCE_ZAPNUTA=1`** — bez ní zásady i DPA slibují lhůty, které se neplní. Ale pozor: zapnutím
+- ✅ *Vyřešeno 21. 10. 2026 (§7): upozornění 30 a 7 dní předem a širší aktivita jsou v kódu; zapnout
+  po nasazení.* Původní zjištění: **`RETENCE_ZAPNUTA=1`** — bez ní zásady i DPA slibují lhůty, které se neplní. Ale pozor: zapnutím
   se zároveň začnou **bez upozornění** mazat podniky po 90 dnech bez aktivity, a „aktivita" je jen
   záznam v protokolu změn nebo docházka (tým, který jen chatuje nebo jen čte rozvrh, se počítá jako
   neaktivní). Doporučení: před zapnutím doplnit do `lib/retenceDb.ts` (jiný balík) e-mail vlastníkovi
@@ -376,7 +384,7 @@ Na Martinovi před ostrým provozem (navíc k §3):
 - Stripe: zasílání faktur e-mailem (§3 bod 7a), `MAX30` duration once, Revenue recovery → cancel.
 
 K ověření advokátem (navíc k §4):
-1. **IČO není povinné** ani při registraci, ani v pokladně — B2B povahu nese jen prohlášení v
+1. ✅ *Vyřešeno 21. 10. 2026 (§7): IČO je povinné v pokladně.* Původní zjištění: **IČO není povinné** ani při registraci, ani v pokladně — B2B povahu nese jen prohlášení v
    zaškrtávátku. Pokud si tarif koupí člověk, který jedná mimo podnikání, hrozí spotřebitelský režim
    (14denní odstoupení, § 1826a tlačítko, § 1814). Doporučuji povinné IČO v pokladně (Stripe
    `custom_fields`) — kód mimo tento balík.
@@ -393,6 +401,63 @@ K ověření advokátem (navíc k §4):
 V kódu nezměněno (mimo balík nebo neověřitelné):
 - Okno pokladny se nedalo vyfotit (ukázka `/demo` nemá Předplatné a sondy běží bez databáze); změna je
   pokrytá `tsc`, testem a čtením kódu.
-- Identifikace provozovatele v Nastavení → O aplikaci (beze změny, §5).
+- ~~Identifikace provozovatele v Nastavení → O aplikaci~~ — doplněno 21. 10. 2026 (§7).
 - Text souhlasu při registraci podniku je dlouhý, ale přesný; nezkracoval jsem ho kvůli sondám a
   překladům (k zvážení při příští úpravě registrace).
+
+## 7. Dokončení před spuštěním (21. 10. 2026, větev `pravni`)
+
+### 7.1 Co je teď v kódu hotové
+
+**Retence zrušených podniků je bezpečně zapnutelná** (`lib/retence.ts`, `lib/retenceDb.ts`, cron `/api/retence`):
+- *Aktivita podniku* = nejnovější z: člen podniku nebo vlastník byl v aplikaci (nový sloupec
+  `users.naposledy_at`, zapisuje ho čtení relace v `lib/auth.ts` nejvýš jednou za 6 h — `lib/naposledy.ts`),
+  otevřel nativní aplikaci (`device_tokens.last_seen_at`), protokol změn, docházka, týmový chat, zprávy,
+  úkoly (založení i splnění), směny, uzávěrky, postupy, denní reporty.
+- *Lhůta* 90 dní běží od pozdějšího z konce předplatného (nebo zkoušky) a poslední aktivity.
+- *Upozornění*: vlastník + lidé s oprávněním `predplatne.spravovat` dostanou e-mail **30 dní** a znovu
+  **7 dní** před smazáním (Resend přes `sendPravniEmail`, patička s provozovatelem, odkaz na přihlášení
+  a na Nastavení → Data a soukromí). Stačí se přihlásit — aktivita upozornění zneplatní.
+- *Smazání* jen když: první upozornění odešlo po poslední aktivitě a aspoň 30 dní předem, druhé po
+  prvním a aspoň 7 dní předem, lhůta neaktivity uplynula a předplatné je pořád `canceled`.
+  Rozhoduje čistá funkce `rozhodniPodnik` (test `scripts/testy/k92-retence-podniku.ts`).
+- *Idempotence*: `teams.retence_upozorneno30_at` / `retence_upozorneno7_at`; podnik se nejdřív „zabere“
+  podmíněným zápisem (souběžný běh ho přeskočí), když neodejde ani jeden e-mail, zápis se vrátí
+  a podnik se nesmaže (chyba v souhrnu běhu). Dávky: 50 upozornění a 5 smazání za běh.
+- *Hosté* (24 měsíců + upozornění 30 dní předem s „Ponechat účet“) fungovaly už dřív; nově se jako
+  aktivita počítá i otevření Managero client na webu (`users.naposledy_at`). Host bez platného e-mailu
+  (import bez aplikace) upozornění dostat nemůže — lhůta se mu rozběhne i tak (beze změny).
+- Správa platformy → Retence ukazuje počty upozornění a smazání podniků; `/api/health` dál hlásí
+  `funkce.retenceOstra`.
+- Texty: OP čl. 19, zásady `#retence` (+ „den posledního otevření aplikace“ mezi údaji účtu), DPA čl. 13
+  (cs i en) popisují kritérium a obě upozornění. Čísla v `lib/pravni/lhuty.ts` (`RETENCE_TEXT`).
+
+**IČO u objednávky předplatného** — viz §2.2 (pole v pokladně, webhook, OP čl. 1, test `k92-ico-pokladna`).
+
+**Identifikace provozovatele v aplikaci** — viz §2.1 (`ProvozovatelInfo`, test `k92-provozovatel`).
+
+Verze dokumentů (`VERZE_PODMINEK`, `VERZE_ZASAD`) zůstává `2026-10-21`: změny vznikly týž den před
+spuštěním, nikdo ostrý ještě nesouhlasil se starším zněním. Po spuštění by obdobná změna znamenala
+novou verzi.
+
+### 7.2 Co zbývá na Martinovi (pořadí)
+
+1. **Nasadit** větev a spustit `/api/init` (nové sloupce `users.naposledy_at`, `teams.retence_upozorneno30_at`,
+   `teams.retence_upozorneno7_at`). Cron `/api/init` běží denně i sám.
+2. **Resend**: ověřit doménu `managero.app` (SPF, DKIM, DMARC), ve Vercelu `RESEND_API_KEY` a
+   `EMAIL_FROM` (např. `Managero <noreply@managero.app>`). Bez toho neodejdou upozornění a retence
+   podniky nesmaže.
+3. **`podpora@managero.app`** musí přijímat poštu (MX + schránka nebo přeposílání) — odkazují na ni
+   e-maily, patičky i faktury.
+4. **Stripe Dashboard**: §3 body 1–7a (Public details s URL podmínek a zásad → pak `STRIPE_SOUHLAS_PODMINEK=1`,
+   výchozí patička faktur, Stripe Tax vypnutý, Revenue recovery → zrušit, `MAX30` duration once,
+   zasílání faktur e-mailem). Pole IČO v pokladně nepotřebuje žádné nastavení v dashboardu.
+5. **Vercel**: plán Pro, region Blob, proměnné výše.
+6. **Retenci zapnout až po nasazení**: Správa platformy → Retence → „Spočítat náhled teď“, zkontrolovat
+   počty (kolik podniků by dostalo upozornění), pak `RETENCE_ZAPNUTA=1` (Production) a redeploy. První
+   smazání podniku nastane nejdřív 30 dní po prvním upozornění.
+
+### 7.3 Nehotovo / vědomě ne
+- E-maily před smazáním podniku jsou jen česky (stejně jako ostatní provozní e-maily).
+- Odkaz „Ponechat podnik“ bez přihlášení není — stačí přihlášení (je to jednodušší a je to zároveň aktivita).
+- Hromadný e-mail o změně OP/DPA/subzpracovatelů dál ručně (§5).
