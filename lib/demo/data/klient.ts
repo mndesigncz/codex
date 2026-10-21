@@ -11,6 +11,7 @@ import { dnes, posunDen } from '../cas';
 import { MENU } from './menu';
 import { VYCHOZI_THEME } from '@/lib/menuTheme';
 import { narozeninyBlizko } from '@/lib/klientSprava/zdravi';
+import { vychoziKonfigurace } from '@/lib/automatizace';
 
 export const SLUG = 'kavarna-u-lipy';
 export const NAZEV = 'Kavárna U Lípy (ukázka)';
@@ -186,13 +187,15 @@ export const STATISTIKA_RAZITEK = {
   top: [{ customerId: 101, jmeno: 'Jana N.', dokonceno: 4, razitek: 9 }, { customerId: 102, jmeno: 'Tereza M.', dokonceno: 3, razitek: 7 }],
 };
 
-/** Kupony (tvar /api/client/admin/coupons — shapeCoupon). */
-export const KUPONY = [
-  { id: 1, title: 'Káva podle výběru', description: 'Odměna za plnou kávovou kartu.', kind: 'reward', cost_points: 0, discount_pct: 0, discount_amount: 0, active: true, archived: false, issued: 61, redeemed: 41, open: 20, valid_until: null, benefit: 'káva zdarma', target: 'all' },
-  { id: 2, title: 'Koláč k flat white', description: 'Za 120 bodů domácí koláč ke kávě.', kind: 'points', cost_points: 120, discount_pct: 0, discount_amount: 0, active: true, archived: false, issued: 74, redeemed: 66, open: 8, valid_until: null, benefit: 'koláč zdarma', target: 'all' },
-  { id: 3, title: 'Sleva 15 % na snídani', description: 'Ve všední dny do 10:00.', kind: 'offer', cost_points: 0, discount_pct: 15, discount_amount: 0, active: true, archived: false, issued: 40, redeemed: 17, open: 23, valid_until: null, benefit: '−15 %', target: 'all' },
-  { id: 4, title: 'Narozeninový dezert', description: 'Dezert zdarma v týdnu narozenin.', kind: 'offer', cost_points: 0, discount_pct: 0, discount_amount: 0, active: true, archived: false, issued: 12, redeemed: 7, open: 5, valid_until: null, benefit: 'dezert zdarma', target: 'all' },
+/** Kupony jako řádky databáze (client_coupons); route je tvaruje přes shapeCoupon jako skutečné API. */
+export const KUPONY_RADKY = [
+  { id: 1, title: 'Káva podle výběru', description: 'Odměna za plnou kávovou kartu.', kind: 'stamps', cost_points: 0, benefit_kind: 'free_item', active: true, issued: 61, claimed: 61, redeemed: 41 },
+  { id: 2, title: 'Koláč k flat white', description: 'Za 120 bodů domácí koláč ke kávě.', kind: 'offer', cost_points: 120, benefit_kind: 'free_item', active: true, issued: 74, claimed: 74, redeemed: 66 },
+  { id: 3, title: 'Sleva 15 % na snídani', description: 'Ve všední dny do 10:00.', kind: 'offer', cost_points: 0, benefit_kind: 'percent', percent_off: 15, active: true, issued: 40, claimed: 40, redeemed: 17, days_of_week: [1, 2, 3, 4, 5], hour_till: 10 },
+  { id: 4, title: 'Narozeninový dezert', description: 'Dezert zdarma v týdnu narozenin.', kind: 'offer', cost_points: 0, benefit_kind: 'free_item', active: true, issued: 12, claimed: 12, redeemed: 7 },
 ];
+/** Kupony v podobě, kterou čte Program věrnosti (žebříček odměn). */
+export const KUPONY = KUPONY_RADKY.map(k => ({ id: k.id, title: k.title, kind: k.kind, cost_points: k.cost_points, active: k.active, archived: false }));
 
 export const PROMO_KODY = [
   { id: 1, code: 'LIPA10', title: 'Sleva 10 % z letáku', discount_pct: 10, discount_amount: 0, uses: 34, max_uses: 200, active: true, valid_until: null, created_at: '2026-09-01 10:00:00' },
@@ -215,20 +218,30 @@ export function plastoveKarty(dnes: string): any {
   };
 }
 
-/** Dárkové poukazy (tvar /api/client/admin/vouchers?prehled). */
-export function poukazy(dnes: string): any {
-  const p = (id: number, code: string, value: number, balance: number, stav: string, dni: number, recipient: string | null) => ({
-    id, code, value_amount: value, balance, stav, valid_until: posunDen(dnes, 365 - dni), created_at: `${posunDen(dnes, -dni)} 11:00:00`, recipient_name: recipient, customer_name: recipient,
+/** Dárkové poukazy (tvar /api/client/admin/vouchers: seznam, ?prehled=1, ?id=). */
+export function poukazy(dnes: string): { seznam: any[]; prehled: any } {
+  const radek = (id: number, code: string, value: number, balance: number, recipient: string | null, dni: number, o: Record<string, unknown> = {}) => ({
+    id, code, value_amount: value, balance, currency: 'CZK', recipient_name: recipient, buyer_name: null, note: null, customer_id: null,
+    valid_until: posunDen(dnes, 365 - dni), status: 'active', created_at: `${posunDen(dnes, -dni)}T11:00:00`, stav: 'active', ...o,
   });
   const seznam = [
-    p(1, 'LIPA-7K2M-Q9', 1000, 1000, 'active', 4, 'Klára Š.'),
-    p(2, 'LIPA-3HD8-PL', 500, 180, 'active', 22, 'Petr N.'),
-    p(3, 'LIPA-9WX1-TT', 500, 0, 'used', 60, 'Eva H.'),
-    p(4, 'LIPA-4NQ7-ZR', 750, 750, 'active', 2, null),
+    radek(1, 'DP-LIPA-7K2M', 1000, 1000, 'Klára Š.', 4, { note: 'k narozeninám' }),
+    radek(2, 'DP-LIPA-3HD8', 500, 180, 'Petr N.', 22),
+    radek(3, 'DP-LIPA-4NQ7', 750, 750, null, 2),
+    radek(4, 'DP-LIPA-9WX1', 500, 0, 'Eva H.', 60, { status: 'used', stav: 'used' }),
   ];
+  const mesice = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(Date.UTC(Number(dnes.slice(0, 4)), Number(dnes.slice(5, 7)) - 1 - (11 - i), 1));
+    const prodano = [0, 0, 500, 0, 1000, 0, 500, 750, 0, 1500, 500, 2250][i];
+    const uplatneno = [0, 0, 0, 250, 500, 0, 0, 500, 320, 900, 400, 820][i];
+    return { mesic: d.toISOString().slice(0, 7), prodano, pocetProdanych: Math.round(prodano / 600), uplatneno, vraceno: 0, cistoUplatneno: uplatneno };
+  });
   return {
-    poukazy: seznam, celkem: seznam.length,
-    souhrn: { aktivnich: 3, zavazek: 1930, prodano30: 3, uplatneno30: 820, propada30: 0 },
+    seznam,
+    prehled: {
+      prehled: { zavazek: 1930, pocetPlatnych: 3, propadlo: 0, pocetPropadlych: 0, brzyPropadne: { pocet: 0, castka: 0 }, vJineMene: 0, brzyDni: 30 },
+      mesice, limity: { min: 0, max: 0 }, nastaveni: { minUtrata: 0, bodyZaNakup: 0 }, poukazBezBodu: false, currency: 'CZK', dnes,
+    },
   };
 }
 
@@ -256,9 +269,9 @@ export function kampane(dnes: string): any {
 
 /** Automatizace: všechny recepty vypnuté (Martinovo pravidlo), jen připravené k zapnutí. */
 export function automatizace(): any {
-  const druhy = ['uvitani', 'prvni_navsteva', 'dokoncena_karta', 'narozeniny_kupon', 'chybis_nam'];
+  const druhy = ['uvitani', 'prvni_navsteva', 'dokoncena_karta', 'narozeniny_kupon', 'chybis_nam'] as const;
   return {
-    pravidla: druhy.map(druh => ({ druh, enabled: false, config: null, enabled_at: null })),
+    pravidla: druhy.map(druh => ({ druh, enabled: false, config: vychoziKonfigurace(druh), enabled_at: null })),
     pocty: {}, log: [], kupony: KUPONY.filter(k => k.kind === 'offer').map(k => ({ id: k.id, title: k.title })), muzePravidla: true,
   };
 }
@@ -276,7 +289,7 @@ export function menuDesky(): any[] {
         posProductId: m.productId, posPrice: m.price, allergens: m.category === 'Pečivo' ? [1, 3, 7] : m.category === 'Káva' ? [7] : [], tags: [],
       })),
     })),
-    langs: { vychozi: 'cs', dalsi: [] },
+    langs: { vychozi: 'cs', nabizet: ['cs'] },
   }];
 }
 

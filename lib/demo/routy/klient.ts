@@ -8,8 +8,11 @@ import { posunDen } from '../cas';
 import { formatMoney } from '@/lib/money';
 import { normalizujFiltr, normalizujRazeni, seradCleny, splnujeFiltr, strankuj, maNarozeninyVMesici } from '@/lib/clenoveFiltr';
 import { poctySegmentu } from '@/lib/klientSprava/segmentyHostu';
+import { benefitLabel, conditionBadges } from '@/lib/kuponyPopisky';
+import { kusyZbyva, stavKuponu } from '@/lib/kuponyPravidla';
+import { odhadSlevy, souhrnKuponu } from '@/lib/kuponyPrehled';
 import {
-  HOSTE, SKUPINY, STOLY, UROVNE, SLUG, NAZEV, KAMPANE_RAZITEK, STATISTIKA_RAZITEK, KUPONY, PROMO_KODY,
+  HOSTE, SKUPINY, STOLY, UROVNE, SLUG, NAZEV, KAMPANE_RAZITEK, STATISTIKA_RAZITEK, KUPONY_RADKY, PROMO_KODY,
   automatizace, hodnoceni, kampane, menuDesky, plastoveKarty, poukazy, profil, rezervaceDne,
 } from '../data/klient';
 
@@ -172,9 +175,45 @@ export const klient: Obsluha = (p, k) => {
     });
   }
   if (cesta === '/api/client/admin/stamps/stats') return ok({ ...STATISTIKA_RAZITEK, poDnech: radaPoDnech(dnes).map(d => ({ den: d.day, razitek: d.stamps, karet: d.redeemed > 1 ? 1 : 0 })) });
-  if (cesta === '/api/client/admin/coupons') return ok({ coupons: KUPONY, groups: SKUPINY });
+  if (cesta === '/api/client/admin/coupons') {
+    // Tvar shapeCoupon (lib/coupons.ts — ten tahá databázi, do prohlížeče nesmí), popisky stejnými funkcemi.
+    const tvar = (r: any) => ({
+      id: r.id, title: r.title, description: r.description, costPoints: r.cost_points, active: r.active, benefitKind: r.benefit_kind,
+      percentOff: r.percent_off ?? null, amountOff: null, xyBuy: null, xyFree: null, minOrderValue: null, targetTiers: [], targetGroups: [],
+      perCustomer: 0, cooldownDays: 0, daysOfWeek: r.days_of_week ?? [], hourFrom: null, hourTill: r.hour_till ?? null, adultOnly: false, welcome: false,
+      menuItemId: null, menuItemName: null, excludedItems: [], excludedSections: [], maxTotal: null, issued: r.issued, remaining: kusyZbyva(r),
+      dailyLimit: null, draft: false, archived: false, stav: stavKuponu(r, dnes), validSince: null, validUntil: null,
+      benefit: benefitLabel(r, formatMoney), badges: conditionBadges(r, formatMoney),
+    });
+    return ok({ coupons: KUPONY_RADKY.map(r => ({ ...tvar(r), claimed: r.claimed, redeemed: r.redeemed, targetGroupNames: [] })), groups: SKUPINY.map(g => ({ id: g.id, name: g.name, members: HOSTE.filter(h => h.groups.includes(g.id)).length })) });
+  }
+  if (cesta === '/api/client/admin/coupons/prehled') {
+    // Řádky uplatnění jako z databáze (vydané a uplatněné kódy), souhrn stejnými funkcemi jako server.
+    const radky = KUPONY_RADKY.filter(k => k.kind === 'offer').map(k => {
+      const rows = Array.from({ length: k.claimed }, (_, i) => ({
+        coupon_id: k.id, claimed_at: kdy(dnes, -(i % 28) - 2, '09:00'), redeemed_at: i < k.redeemed ? kdy(dnes, -(i % 28), '11:30') : null,
+        order_value: i < k.redeemed ? 180 + (i * 37) % 160 : null, valid_until: null, benefit_kind: k.benefit_kind, percent_off: (k as any).percent_off ?? null, amount_off: null,
+      }));
+      return { id: k.id, title: k.title, rows };
+    });
+    const vse = radky.flatMap(r => r.rows);
+    return ok({
+      celkem: { ...souhrnKuponu(vse, dnes), odhadSlevy: odhadSlevy(vse) }, zkraceno: false,
+      kupony: radky.map(r => ({ id: r.id, title: r.title, ...souhrnKuponu(r.rows, dnes), odhadSlevy: odhadSlevy(r.rows) })),
+      posledni: [
+        { id: 1, redeemed_at: kdy(dnes, 0, '09:12'), order_value: 214, redeem_note: null, title: 'Sleva 15 % na snídani', host: 'Pavla S.', obsluha: 'Eliška N.' },
+        { id: 2, redeemed_at: kdy(dnes, -1, '16:40'), order_value: 186, redeem_note: null, title: 'Koláč k flat white', host: 'Tereza M.', obsluha: 'Marta H.' },
+      ],
+    });
+  }
   if (cesta === '/api/client/admin/promos') return ok({ promos: PROMO_KODY });
-  if (cesta === '/api/client/admin/vouchers') return ok({ ...poukazy(dnes), dnes, nastaveni: { prodej: false }, poukazBezBodu: true });
+  if (cesta === '/api/client/admin/vouchers' && p.metoda === 'GET') {
+    const v = poukazy(dnes);
+    if (q.get('prehled') === '1') return ok(v.prehled);
+    const id = Number(q.get('id'));
+    if (id) { const x = v.seznam.find(r => r.id === id); return x ? ok({ poukaz: x, historie: [], limity: { min: 0, max: 0 }, clen: null, kupujici: null }) : ok({ error: 'Poukaz nenalezen.' }, 404); }
+    return ok({ poukazy: v.seznam, celkem: v.seznam.length, strana: 1, naStranu: 25, currency: 'CZK', dnes });
+  }
   if (cesta === '/api/client/cards') return ok(plastoveKarty(dnes));
   if (cesta === '/api/client/admin/bonus-rules') {
     return ok({ rules: [
