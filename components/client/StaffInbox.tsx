@@ -24,7 +24,7 @@ import CardScan from './CardScan';
 import CekaNaZaplaceni from './CekaNaZaplaceni';
 import { RES_STATUS } from '@/lib/clientSlots';
 import { TON_REZERVACE, type StavRezervace } from '@/lib/klientPrehled';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { dbTimeHM, parseDbTime } from '@/lib/pragueTime';
 import { usePrice } from '../CurrencyProvider';
 import { okJson, apiMessage } from '@/lib/api';
@@ -35,7 +35,7 @@ const EVERY_MS = 20 * 1000;
 export function useStaffInbox(enabled = true) {
   const [d, setD] = useState<any | null>(null);
   const [err, setErr] = useState('');
-  const load = useCallback(() => fetch('/api/client/staff/inbox').then(okJson).then(x => { if (!x.error) { setD(x); setErr(''); } else setErr(x.error); }).catch(e => setErr(apiMessage(e, 'Příjem se nenačetl.'))), []);
+  const load = useCallback(() => fetch('/api/client/staff/inbox').then(okJson).then(x => { if (!x.error) { setD(x); setErr(''); } else setErr(x.error); }).catch(e => setErr(apiMessage(e, 'Příjem se nenačetl.'))), []); // i18n-ok: háček bez překladače, jen záložní text chyby
   useEffect(() => {
     if (!enabled) return;
     load();
@@ -49,48 +49,74 @@ export function useStaffInbox(enabled = true) {
 
 /** Stav objednávky slovem a tónem — stejný ve frontě i v historii (Client › Objednávky). */
 export const ORDER_STATUS: Record<string, { label: string; tone: ChipTone }> = {
-  new: { label: 'Nová', tone: 'wait' }, confirmed: { label: 'Připravuje se', tone: 'ok' }, done: { label: 'Hotovo', tone: 'muted' }, declined: { label: 'Nepřijato', tone: 'muted' },
+  new: { label: 'Nová', tone: 'wait' }, confirmed: { label: 'Připravuje se', tone: 'ok' }, done: { label: 'Hotovo', tone: 'muted' }, declined: { label: 'Nepřijato', tone: 'muted' }, // i18n-ok: překlad ve stavObjednavky
 };
-const POS_STATE: Record<string, string> = { NEW: 'v kase čeká na přijetí', CONFIRMED: 'v kase, připravuje se', DISPATCHED: 'v kase vydáno', DECLINED: 'kasa odmítla', SCHEDULING_DELIVERY: 'v kase' };
+const POS_STATE: Record<string, string> = { NEW: 'v kase čeká na přijetí', CONFIRMED: 'v kase, připravuje se', DISPATCHED: 'v kase vydáno', DECLINED: 'kasa odmítla', SCHEDULING_DELIVERY: 'v kase' }; // i18n-ok: překlad ve stavVKase
 const PRIJATO_V_KASE = /^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i;
-const NOVA_OBJEDNAVKA: CzNoun = { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' };
-const OSOBA: CzNoun = { one: 'osoba', few: 'osoby', many: 'osob' };
+/** Stav objednávky slovy (ORDER_STATUS nese české popisky, překládají se při vykreslení). */
+function stavObjednavky(stav: string, cs: string, t: PrekladFn): string {
+  return stav === 'new' ? t('Nová') : stav === 'confirmed' ? t('Připravuje se') : stav === 'done' ? t('Hotovo') : stav === 'declined' ? t('Nepřijato') : cs;
+}
+function stavVKase(stav: string, t: PrekladFn): string | null {
+  switch (stav) {
+    case 'NEW': return t('v kase čeká na přijetí');
+    case 'CONFIRMED': return t('v kase, připravuje se');
+    case 'DISPATCHED': return t('v kase vydáno');
+    case 'DECLINED': return t('kasa odmítla');
+    case 'SCHEDULING_DELIVERY': return t('v kase');
+    default: return null;
+  }
+}
+function stavRezervace(stav: string, t: PrekladFn): string {
+  switch (stav) {
+    case 'requested': return t('Čeká na potvrzení');
+    case 'confirmed': return t('Potvrzeno');
+    case 'seated': return t('Usazeni');
+    case 'done': return t('Proběhlo');
+    case 'declined': return t('Nepřijato');
+    case 'cancelled': return t('Zrušeno');
+    default: return RES_STATUS[stav]?.label ?? stav;
+  }
+}
 
 /** Jak víme, že host sedí u stolu: QR ze stolu a poloha telefonu. */
 function Overeni({ o }: { o: any }) {
+  const t = useT('sprava');
   const casti: { text: string; tone: ChipTone; icon: string }[] = [];
-  if (o.via_qr) casti.push({ text: 'QR ze stolu', tone: 'ok', icon: 'tag' });
-  else if (o.via_qr === false) casti.push({ text: 'bez QR', tone: 'wait', icon: 'tag' });
-  if (o.geo_status === 'ok') casti.push({ text: `u podniku${o.geo_distance_m != null ? ` · ${o.geo_distance_m} m` : ''}`, tone: 'ok', icon: 'location' });
-  else if (o.geo_status === 'far') casti.push({ text: `daleko · ${o.geo_distance_m} m`, tone: 'bad', icon: 'location' });
-  else if (o.geo_status === 'none') casti.push({ text: 'bez polohy', tone: 'wait', icon: 'location' });
+  if (o.via_qr) casti.push({ text: t('QR ze stolu'), tone: 'ok', icon: 'tag' });
+  else if (o.via_qr === false) casti.push({ text: t('bez QR'), tone: 'wait', icon: 'tag' });
+  if (o.geo_status === 'ok') casti.push({ text: `${t('u podniku')}${o.geo_distance_m != null ? ` · ${o.geo_distance_m} m` : ''}`, tone: 'ok', icon: 'location' });
+  else if (o.geo_status === 'far') casti.push({ text: `${t('daleko')} · ${o.geo_distance_m} m`, tone: 'bad', icon: 'location' });
+  else if (o.geo_status === 'none') casti.push({ text: t('bez polohy'), tone: 'wait', icon: 'location' });
   return <>{casti.map(c => <Chip key={c.text} tone={c.tone} size="sm" icon={c.icon}>{c.text}</Chip>)}</>;
 }
 
 /** Kde je objednávka v kase — jeden Chip místo čtyř ručně barvených pilulek s tečkou. */
 function StavKasy({ o }: { o: any }) {
+  const t = useT('sprava');
   const st = String(o.pos_state ?? '');
-  if (!o.storyous_order_id) return o.status !== 'declined' ? <Chip tone="wait" size="sm">Není v kase</Chip> : null;
-  if (st === 'DECLINED') return <Chip tone="bad" size="sm">Kasa odmítla</Chip>;
-  if (PRIJATO_V_KASE.test(st)) return <Chip tone="ok" size="sm" icon="check">Přijato v kase · tiskne se</Chip>;
-  return <Chip tone="wait" size="sm">V kase čeká na přijetí</Chip>;
+  if (!o.storyous_order_id) return o.status !== 'declined' ? <Chip tone="wait" size="sm">{t('Není v kase')}</Chip> : null;
+  if (st === 'DECLINED') return <Chip tone="bad" size="sm">{t('Kasa odmítla')}</Chip>;
+  if (PRIJATO_V_KASE.test(st)) return <Chip tone="ok" size="sm" icon="check">{t('Přijato v kase · tiskne se')}</Chip>;
+  return <Chip tone="wait" size="sm">{t('V kase čeká na přijetí')}</Chip>;
 }
 
 /** „před 3 min", starší s časem. Čas z databáze přes parseDbTime — nese UTC bez zóny. */
-function kdy(iso: string): string {
+function kdy(iso: string, t: PrekladFn): string {
   const d = parseDbTime(iso);
   if (!d) return '';
   const m = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
-  if (m < 1) return 'právě teď';
-  if (m === 1) return 'před minutou';
-  if (m < 60) return `před ${m} min`;
-  return `v ${dbTimeHM(iso)}`;
+  if (m < 1) return t('právě teď');
+  if (m === 1) return t('před minutou');
+  if (m < 60) return t('před {n} min', { n: m });
+  return t('v {cas}', { cas: dbTimeHM(iso) });
 }
 
 // onZmena: po přijetí, hotovu, odmítnutí nebo odeslání do kasy — skořápka Clientu
 // podle toho obnoví odznaky „Objednávky N" (jinak by svítily staré až do Přehledu).
 export default function StaffInbox({ compact = false, onToast, onZmena }: { compact?: boolean; onToast?: (m: string) => void; onZmena?: () => void }) {
   const { d, err, reload } = useStaffInbox(true);
+  const t = useT('sprava');
   // Tlačítka podle `ma` (před načtením oprávnění ANO, rozhoduje server).
   const { ma } = useOpravneni();
   const vyridi = ma('objednavky.vyridit');
@@ -125,9 +151,9 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
     try {
       const r = await fetch('/api/client/admin/pos-check');
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Zkouška se nepovedla.');
+      if (!r.ok) throw new Error(x.error || t('Zkouška se nepovedla.'));
       setTest(Array.isArray(x.kroky) ? x.kroky : []);
-    } catch (e) { toast(apiMessage(e, 'Zkouška se nepovedla.')); }
+    } catch (e) { toast(apiMessage(e, t('Zkouška se nepovedla.'))); }
     setTestuji(false);
   };
 
@@ -138,10 +164,10 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
     try {
       const r = await fetch('/api/client/staff/inbox', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'pos' }) });
       const x = await r.json().catch(() => ({}));
-      toast(x.posNote || x.error || (x.ok ? 'Objednávka je v pokladně.' : 'Do pokladny to nešlo.'));
+      toast(x.posNote || x.error || (x.ok ? t('Objednávka je v pokladně.') : t('Do pokladny to nešlo.')));
       await reload();
       onZmena?.();
-    } catch { toast('Spojení se serverem selhalo.'); }
+    } catch { toast(t('Spojení se serverem selhalo.')); }
     setBusy(null);
   };
 
@@ -150,15 +176,15 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
     try {
       const r = await fetch('/api/client/staff/inbox', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) });
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
+      if (!r.ok) throw new Error(x.error || t('Nepovedlo se.'));
       if (x.posNote) toast(x.posNote);
-      else if (status === 'done' && x.loyalty?.stamp?.rewarded) toast('Hotovo. Host nasbíral všechna razítka a má odměnu.');
-      else if (status === 'done') toast('Hotovo. Body připsány.');
-      else if (status === 'declined') toast('Objednávka odmítnuta — host dostane zprávu.');
-      else toast('Objednávka přijata.');
+      else if (status === 'done' && x.loyalty?.stamp?.rewarded) toast(t('Hotovo. Host nasbíral všechna razítka a má odměnu.'));
+      else if (status === 'done') toast(t('Hotovo. Body připsány.'));
+      else if (status === 'declined') toast(t('Objednávka odmítnuta — host dostane zprávu.'));
+      else toast(t('Objednávka přijata.'));
       await reload();
       onZmena?.();
-    } catch (e) { toast(apiMessage(e, 'Nepovedlo se.')); }
+    } catch (e) { toast(apiMessage(e, t('Nepovedlo se.'))); }
     setBusy(null);
   };
 
@@ -176,12 +202,12 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
   // se to říká nahoře a jmenovitě.
   const pos = d.pos ?? {};
   const vady: string[] = [];
-  if (pos.connected === false) vady.push('Pokladna Storyous není připojená (Nastavení → Pokladna).');
+  if (pos.connected === false) vady.push(t('Pokladna Storyous není připojená (Nastavení → Pokladna).'));
   else {
-    if (pos.autoPos === false) vady.push('Automatické odesílání do kasy je vypnuté (Client → Nastavení).');
-    if (pos.tables > 0 && pos.tablesPaired === 0) vady.push(`Žádný z ${pos.tables} stolů není spárovaný s pokladnou (Client → Stoly → Načíst z pokladny).`);
-    else if (pos.tablesPaired < pos.tables) vady.push(`${pos.tables - pos.tablesPaired} z ${pos.tables} stolů není spárovaných s pokladnou.`);
-    if (pos.items > 0 && pos.itemsLinked < pos.items) vady.push(`${pos.items - pos.itemsLinked} z ${pos.items} položek menu nemá produkt v kase (Client → Menu → Tisk na terminálu).`);
+    if (pos.autoPos === false) vady.push(t('Automatické odesílání do kasy je vypnuté (Client → Nastavení).'));
+    if (pos.tables > 0 && pos.tablesPaired === 0) vady.push(t('Žádný z {n} stolů není spárovaný s pokladnou (Client → Stoly → Načíst z pokladny).', { n: pos.tables }));
+    else if (pos.tablesPaired < pos.tables) vady.push(t('{n} z {celkem} stolů není spárovaných s pokladnou.', { n: pos.tables - pos.tablesPaired, celkem: pos.tables }));
+    if (pos.items > 0 && pos.itemsLinked < pos.items) vady.push(t('{n} z {celkem} položek menu nemá produkt v kase (Client → Menu → Tisk na terminálu).', { n: pos.items - pos.itemsLinked, celkem: pos.items }));
   }
   const radek = (o: any) => (
     <RadekObjednavky key={o.id} o={o} busy={busy === o.id} vyridi={vyridi}
@@ -194,7 +220,7 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
           <Icon name={k.ok ? 'check' : 'close'} size={14} className={`shrink-0 mt-0.5 ${k.ok ? 'text-ok-ink' : 'text-bad-ink'}`} />
           <span className="min-w-0">
             <span className="font-semibold text-[#16181A]">{k.krok}:</span> <span className="text-black/70">{k.detail}</span>
-            {k.kde && <span className="block t-meta mt-0.5">Kde: {k.kde}</span>}
+            {k.kde && <span className="block t-meta mt-0.5">{t('Kde:')} {k.kde}</span>}
           </span>
         </li>
       ))}
@@ -205,16 +231,16 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
     <div className="space-y-4">
       {!compact && vady.length > 0 && (
         <div className="note note-wait space-y-2" role="status">
-          <p className="font-semibold flex items-center gap-2"><Icon name="warning" size={16} className="shrink-0" />Objednávky se nevytisknou na terminálu</p>
+          <p className="font-semibold flex items-center gap-2"><Icon name="warning" size={16} className="shrink-0" />{t('Objednávky se nevytisknou na terminálu')}</p>
           <ul className="space-y-1 list-disc pl-5">{vady.map((v, i) => <li key={i}>{v}</li>)}</ul>
           {vysledkyZkousky}
-          <Button size="sm" variant="secondary" icon="refresh" loading={testuji} onClick={() => { void zkouska(); }}>{test ? 'Zkusit znovu' : 'Vyzkoušet spojení s kasou'}</Button>
+          <Button size="sm" variant="secondary" icon="refresh" loading={testuji} onClick={() => { void zkouska(); }}>{test ? t('Zkusit znovu') : t('Vyzkoušet spojení s kasou')}</Button>
         </div>
       )}
       {!compact && vady.length === 0 && (
         <div className="space-y-2">
           <Button size="sm" variant="ghost" icon="refresh" loading={testuji} onClick={() => { void zkouska(); }}>
-            {testuji ? 'Zkouším spojení s kasou…' : test ? 'Zkusit spojení s kasou znovu' : 'Vyzkoušet spojení s kasou'}
+            {testuji ? t('Zkouším spojení s kasou…') : test ? t('Zkusit spojení s kasou znovu') : t('Vyzkoušet spojení s kasou')}
           </Button>
           {test && <Card pad="sm">{vysledkyZkousky}</Card>}
         </div>
@@ -223,7 +249,7 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
           jeden řádek, který se rozbalí, když někdo kartičku opravdu drží v ruce. */}
       <details className="group">
         <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
-          <Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
+          <Icon name="card" size={16} />{t('Kartička hosta u kasy')}<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
         </summary>
         <div className="mt-2"><CardScan onToast={toast} onChange={compact ? undefined : reload} seznamParovani={false} onParovani={() => setObnovaParovani(n => n + 1)} /></div>
       </details>
@@ -233,7 +259,7 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
         // Bílá karta s počtem v Chipu: tónovaná plocha by na stránce s „Čeká na tebe" byla druhá (DP §6.3).
         <Card pad="none" aria-labelledby="h-nove">
           <h2 id="h-nove" className="t-card flex items-center gap-2 px-5 pt-4">
-            <Icon name="bell" size={17} className="text-wait-ink" />{news.length === 1 ? 'Nová objednávka od stolu' : `${czCount(news.length, NOVA_OBJEDNAVKA)} od stolu`}
+            <Icon name="bell" size={17} className="text-wait-ink" />{news.length === 1 ? t('Nová objednávka od stolu') : t('{n, plural, one {# nová objednávka} few {# nové objednávky} other {# nových objednávek}} od stolu', { n: news.length })}
             <Chip tone="wait" size="sm">{news.length}</Chip>
           </h2>
           <ul className="list px-5">{news.map(radek)}</ul>
@@ -241,19 +267,19 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
       )}
       {inProgress.length > 0 && (
         <Card pad="none" aria-labelledby="h-priprava">
-          <h2 id="h-priprava" className="t-card px-5 pt-4">Připravuje se</h2>
+          <h2 id="h-priprava" className="t-card px-5 pt-4">{t('Připravuje se')}</h2>
           <ul className="list px-5">{inProgress.map(radek)}</ul>
         </Card>
       )}
       {!compact && reservations.length > 0 && (
         <Card pad="none" aria-labelledby="h-rez">
-          <h2 id="h-rez" className="t-card px-5 pt-4">Dnešní rezervace</h2>
+          <h2 id="h-rez" className="t-card px-5 pt-4">{t('Dnešní rezervace')}</h2>
           <ul className="list px-5">
             {reservations.map(r => (
-              <ListRow key={r.id} value={String(r.time ?? '').slice(0, 5)} title={r.customer_name || 'Host'}
+              <ListRow key={r.id} value={String(r.time ?? '').slice(0, 5)} title={r.customer_name || t('Host')}
                 // Ručně zapsaný host (telefon, u dveří) nemá účet — jméno nese rezervace (API: COALESCE s guest_name).
-                meta={[czCount(Number(r.party) || 1, OSOBA), r.table_name, r.manual ? 'zapsáno ručně' : null].filter(Boolean).join(' · ')}
-                right={<Chip tone={TON_REZERVACE[r.status as StavRezervace] ?? 'wait'} size="sm">{RES_STATUS[r.status]?.label ?? r.status}</Chip>} />
+                meta={[t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: Number(r.party) || 1 }), r.table_name, r.manual ? t('zapsáno ručně') : null].filter(Boolean).join(' · ')}
+                right={<Chip tone={TON_REZERVACE[r.status as StavRezervace] ?? 'wait'} size="sm">{stavRezervace(r.status, t)}</Chip>} />
             ))}
           </ul>
         </Card>
@@ -261,21 +287,21 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
       {!compact && recent.length > 0 && (
         <details className="group">
           <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
-            Vyřízené za poslední tři hodiny ({recent.length})<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
+            {t('Vyřízené za poslední tři hodiny ({n})', { n: recent.length })}<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
           </summary>
           <Card pad="none" className="mt-2"><ul className="list px-5">{recent.map(o => <RadekObjednavky key={o.id} o={o} busy={false} vyridi={false} />)}</ul></Card>
         </details>
       )}
       {!compact && orders.length === 0 && reservations.length === 0 && (
-        <Card><EmptyState icon="inbox" title="Nic k vyřízení" hint="Objednávky od stolu a dnešní rezervace se objeví tady." compact /></Card>
+        <Card><EmptyState icon="inbox" title={t('Nic k vyřízení')} hint={t('Objednávky od stolu a dnešní rezervace se objeví tady.')} compact /></Card>
       )}
       {odmitam && (
-        <Modal open onClose={() => setOdmitam(null)} size="sm" title="Odmítnout objednávku?"
+        <Modal open onClose={() => setOdmitam(null)} size="sm" title={t('Odmítnout objednávku?')}
           footer={<>
-            <Button variant="secondary" onClick={() => setOdmitam(null)}>Zrušit</Button>
-            <Button variant="danger-solid" onClick={() => { const o = odmitam; setOdmitam(null); void act(o.id, 'declined'); }}>Odmítnout</Button>
+            <Button variant="secondary" onClick={() => setOdmitam(null)}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" onClick={() => { const o = odmitam; setOdmitam(null); void act(o.id, 'declined'); }}>{t('Odmítnout')}</Button>
           </>}>
-          <p className="text-sm text-black/70 text-pretty">{odmitam.table_name ? `Host u stolu ${odmitam.table_name}` : 'Host'} dostane zprávu, že objednávka nebyla přijata.</p>
+          <p className="text-sm text-black/70 text-pretty">{odmitam.table_name ? t('Host u stolu {stul} dostane zprávu, že objednávka nebyla přijata.', { stul: odmitam.table_name }) : t('Host dostane zprávu, že objednávka nebyla přijata.')}</p>
         </Modal>
       )}
       {toastEl}
@@ -289,20 +315,21 @@ function RadekObjednavky({ o, busy, vyridi, onStav, onKasa, onOdmitnout }: {
 }) {
   // Cena z menu smí mít haléře (4,50 €) — money() by ji zaokrouhlilo na celé.
   const cena = usePrice();
+  const t = useT('sprava');
   const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.new;
   const kasa = !o.storyous_order_id && o.status !== 'declined' && !!onKasa;
   const dalsi: MenuItem[] = vyridi ? [
-    ...(kasa ? [{ label: 'Poslat do kasy', icon: 'receipt', onClick: () => onKasa?.() }] : []),
-    ...(o.status === 'new' && onOdmitnout ? [{ label: 'Odmítnout…', icon: 'close', danger: true, onClick: onOdmitnout }] : []),
+    ...(kasa ? [{ label: t('Poslat do kasy'), icon: 'receipt', onClick: () => onKasa?.() }] : []),
+    ...(o.status === 'new' && onOdmitnout ? [{ label: t('Odmítnout…'), icon: 'close', danger: true, onClick: onOdmitnout }] : []),
   ] : [];
-  const stul = o.table_name ?? 'bez stolu';
+  const stul = o.table_name ?? t('bez stolu');
   return (
     <li className="list-row items-start flex-wrap sm:flex-nowrap">
       <div className="min-w-0 flex-1 basis-56">
         <p className="flex items-center gap-2 flex-wrap text-[15px] font-medium leading-snug text-[#16181A]">
           <Chip tone="ink" size="sm">{stul}</Chip>
           <span className="truncate">{o.customer_name}</span>
-          <span className="t-meta">{kdy(o.created_at)}</span>
+          <span className="t-meta">{kdy(o.created_at, t)}</span>
         </p>
         <ul className="mt-1.5 text-sm">
           {(o.items ?? []).map((l: any, i: number) => (
@@ -312,10 +339,10 @@ function RadekObjednavky({ o, busy, vyridi, onStav, onKasa, onOdmitnout }: {
         {o.note && <p className="t-meta mt-1">„{o.note}"</p>}
         <div className="mt-2 flex items-center gap-1.5 flex-wrap">
           <span className="font-bold tabular-nums mr-1">{cena(o.total)}</span>
-          <Chip tone={st.tone} size="sm">{st.label}</Chip>
+          <Chip tone={st.tone} size="sm">{stavObjednavky(o.status, st.label, t)}</Chip>
           <Overeni o={o} />
           <StavKasy o={o} />
-          {o.pos_state && !PRIJATO_V_KASE.test(String(o.pos_state)) && <span className="t-meta">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}
+          {o.pos_state && !PRIJATO_V_KASE.test(String(o.pos_state)) && <span className="t-meta">{stavVKase(String(o.pos_state), t) ?? POS_STATE[o.pos_state] ?? t('kasa: {stav}', { stav: o.pos_state })}</span>}
         </div>
         {o.pos_note && o.status !== 'declined' && !PRIJATO_V_KASE.test(String(o.pos_state ?? '')) && (
           <p className="mt-1 text-[13px] text-wait-ink leading-snug">{o.pos_note}</p>
@@ -324,9 +351,9 @@ function RadekObjednavky({ o, busy, vyridi, onStav, onKasa, onOdmitnout }: {
       {vyridi && onStav && (o.status === 'new' || o.status === 'confirmed' || dalsi.length > 0) && (
         <div className="flex gap-1.5 shrink-0 ml-auto">
           {/* Stůl v přístupném názvu — tři „Přijmout" za sebou by odečítač nerozlišil. */}
-          {o.status === 'new' && <Button size="sm" variant="primary" icon="check" loading={busy} onClick={() => onStav('confirmed')} aria-label={`Přijmout: ${stul}, ${o.customer_name}`}>Přijmout</Button>}
-          {o.status === 'confirmed' && <Button size="sm" variant="primary" loading={busy} onClick={() => onStav('done')} aria-label={`Hotovo: ${stul}, ${o.customer_name}`}>Hotovo</Button>}
-          {dalsi.length > 0 && <Menu size="sm" label={`Další akce s objednávkou ${stul}`} items={dalsi} />}
+          {o.status === 'new' && <Button size="sm" variant="primary" icon="check" loading={busy} onClick={() => onStav('confirmed')} aria-label={t('{krok}: {host}, {cas}', { krok: t('Přijmout'), host: stul, cas: o.customer_name })}>{t('Přijmout')}</Button>}
+          {o.status === 'confirmed' && <Button size="sm" variant="primary" loading={busy} onClick={() => onStav('done')} aria-label={t('{krok}: {host}, {cas}', { krok: t('Hotovo'), host: stul, cas: o.customer_name })}>{t('Hotovo')}</Button>}
+          {dalsi.length > 0 && <Menu size="sm" label={t('Další akce s objednávkou {stul}', { stul })} items={dalsi} />}
         </div>
       )}
     </li>

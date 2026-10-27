@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -30,7 +31,7 @@ for (const [popis, rychlost] of [['bez omezení', null], ['pomalá 3G', { downlo
   });
   const p = await ctx.newPage();
   if (rychlost) { const cdp = await ctx.newCDPSession(p); await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', { offline: false, ...rychlost }); }
-  await p.goto('http://localhost:3000/employer/overview?view=overview', { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
+  await p.goto(BASE + '/employer/overview?view=overview', { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
   await p.waitForTimeout(1500);
   console.log(`\n=== ${popis} ===`);
   for (const z of ZALOZKY) {

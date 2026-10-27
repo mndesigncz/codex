@@ -19,7 +19,7 @@ const pripady = [
 ];
 
 for (const [jm, url, prihlaseniProjde, predvybrano, cekamPokladnu] of pripady) {
-  const ctx = await b.newContext({ viewport: { width: 430, height: 1000 } });
+  const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: 430, height: 1000 } });
   let registrace = null; let checkout = null;
   await ctx.route('**/api/register', r => { registrace = JSON.parse(r.request().postData() || '{}'); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, joinCode: 'ABCD12' }) }); });
   if (prihlaseniProjde) await ctx.route('**/api/auth/callback/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: BASE + '/' }) }));

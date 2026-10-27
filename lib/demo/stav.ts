@@ -97,6 +97,10 @@ export interface DemoStav {
   pozvanky: PozvankaDemo[];
   /** Hodnocení směn vedením (Odměny, widget Ohodnotit směny). */
   hodnoceni: HodnoceniSmeny[];
+  /** Hodnocení směny jako celku (lib/hodnoceniSmeny) — založí se líně (routy/hodnoceniSmeny). */
+  hodnoceniSmen?: unknown[];
+  /** Pravidlo „po uzávěrce připomenout ohodnocení směny“ (výchozí vypnuté). */
+  hodnoceniPripominat?: boolean;
   /** Pochvaly s body (kolo 5) — v ukázce jen v paměti relace. */
   pochvaly: { id: number; userId: number; points: number; reason: string | null; givenBy: number; createdAt: string }[];
   /** Receptury: id produktu z kasy → suroviny skladu (množství na jeden prodej). */

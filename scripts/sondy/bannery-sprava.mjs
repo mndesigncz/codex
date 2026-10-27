@@ -9,6 +9,7 @@
 //   NEXTAUTH_SECRET=… SONDY_ZAKLAD=http://localhost:3414 node scripts/sondy/bannery-sprava.mjs
 import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, otevri, FIX_DOMU, roleMine, DIR } from './k68-spolecne.mjs';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
 const nacti = (j) => JSON.parse(readFileSync(DIR + j + '.json', 'utf8'));
 const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
@@ -38,7 +39,7 @@ for (const sirka of [1280, 390]) {
   };
   const { ctx, p, chyby } = await kontext({ viewport: { width: sirka, height: 950 }, mobil: sirka < 500, fix: nacti('k69-b8-rozlozeni-klient'), dalsi });
   // Kolo 92: bannery jsou kanál kampaně — Kampaně → Bannery (dřív Vzhled).
-  await p.goto((process.env.SONDY_ZAKLAD ?? 'http://localhost:3000') + '/employer/overview?mode=client&tab=campaigns', { waitUntil: 'networkidle' });
+  await p.goto((process.env.SONDY_ZAKLAD ?? BASE) + '/employer/overview?mode=client&tab=campaigns', { waitUntil: 'networkidle' });
   await p.getByRole('tab', { name: 'Bannery' }).click();
   await p.getByRole('heading', { name: 'Bannery' }).waitFor({ timeout: 15000 });
   await p.waitForTimeout(500);

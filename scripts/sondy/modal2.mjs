@@ -1,6 +1,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -21,7 +22,7 @@ await ctx.route('**/api/**', async route => {
 const p = await ctx.newPage();
 const errs = []; p.on('pageerror', e => errs.push(e.message.slice(0, 120)));
 for (const [name, url] of [['suggestions', '/employer/overview?view=suggestions'], ['inventory', '/employer/inventory']]) {
-  await p.goto('http://localhost:3000' + url, { waitUntil: 'networkidle' });
+  await p.goto(BASE + url, { waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
 }
 console.log(errs.length ? `✗ ${errs[0]}` : '✓ obrazovky s převedenými okny bez chyb');

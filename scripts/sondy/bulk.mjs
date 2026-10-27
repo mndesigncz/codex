@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -24,7 +25,7 @@ async function open(url, w = 1280, dark = false) {
     const u = route.request().url();
     if (u.includes('/api/auth/')) return route.continue();
     if (route.request().method() !== 'GET') {
-      sent.push(`${route.request().method()} ${u.replace('http://localhost:3000', '')}`);
+      sent.push(`${route.request().method()} ${u.replace(BASE, '')}`);
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
     }
     // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
@@ -46,7 +47,7 @@ async function open(url, w = 1280, dark = false) {
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(String(e).slice(0, 120)));
-  await p.goto('http://localhost:3000' + url, { waitUntil: 'networkidle', timeout: 30000 });
+  await p.goto(BASE + url, { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(1600);
   return { ctx, p, errs, sent };
 }

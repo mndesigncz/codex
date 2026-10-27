@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -37,7 +38,7 @@ for (const [jmeno, role, path, otevrit, jinam] of CILE) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
   await p.waitForTimeout(1300);
   if (otevrit) {
     const btn = p.locator('button:visible', { hasText: otevrit }).first();
@@ -53,9 +54,9 @@ for (const [jmeno, role, path, otevrit, jinam] of CILE) {
   await p.waitForTimeout(400);
   if (!(await pole.inputValue().catch(() => '')).includes('koncept')) { console.log(`  ? ${jmeno}: text se nezapsal`); nedosazeno++; await ctx.close(); continue; }
 
-  await p.goto('http://localhost:3000' + jinam, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await p.goto(BASE + jinam, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
   await p.waitForTimeout(800);
-  await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
   await p.waitForTimeout(1500);
 
   const viditelny = await p.locator(POLE).first().inputValue().catch(() => '');

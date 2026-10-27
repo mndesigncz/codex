@@ -2,6 +2,7 @@
 // zvolil. Měří se skutečný kontrast vykresleného textu, ne to, co říká kód.
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -27,7 +28,7 @@ for (const [jm, barva] of BARVY) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/client/kavarna-u-lipy', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/client/kavarna-u-lipy', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1200);
   const m = await p.evaluate(() => {
     const el = [...document.querySelectorAll('button')].find(x => /Stát se členem/.test(x.textContent || ''));

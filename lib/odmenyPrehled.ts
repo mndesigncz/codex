@@ -184,6 +184,51 @@ export interface DenHodnoceni {
   /** Je v ten den celkové hodnocení směny (ne jen hodnocení položek)? */
   maHodnoceni: boolean;
   polozky: PolozkaHodnoceni[];
+  /**
+   * Hodnocení celé směny (lib/hodnoceniSmeny), na které člověk ten den byl: pochvala, kritika, štítky.
+   * Jen u dnů, kde nějaké je. Body z něj jsou mezi položkami (druh `smena`), ať se nepočítají dvakrát.
+   */
+  smeny?: SmenaVeDni[];
+}
+
+/** Hodnocení celé směny, jak ho vidí člen osádky (/api/rewards → smeny). */
+export interface SmenaVeDni {
+  id: number;
+  nazev: string | null;
+  od: string | null;
+  do: string | null;
+  hvezdy: number;
+  dobre: string | null;
+  kritika: string | null;
+  stitky: Record<string, 'plus' | 'minus'>;
+  kNaprave: boolean;
+  foto: string | null;
+  mojeBody: number;
+  mojePoznamka: string | null;
+  videno: boolean;
+  lidi: number;
+  /** Jména kolegů ze směny (bez jejich bodů). */
+  kolegove: string[];
+}
+
+/** Hodnocení celých směn člena (/api/rewards → smeny), nejnovější první; s dnem. */
+export function vyberSmenyClena(raw: any): (SmenaVeDni & { den: string })[] {
+  return seznam(raw?.smeny).map((r: any) => ({ ...smenaZ(r), den: denZ(r?.den) }))
+    .filter(x => !!x.den).sort((a, b) => b.den.localeCompare(a.den) || b.id - a.id);
+}
+
+function smenaZ(r: any): SmenaVeDni {
+  const stitky: Record<string, 'plus' | 'minus'> = {};
+  if (r?.stitky && typeof r.stitky === 'object') {
+    for (const [k, v] of Object.entries(r.stitky)) if (v === 'plus' || v === 'minus') stitky[k] = v;
+  }
+  return {
+    id: cele(r?.id), nazev: text(r?.nazev), od: text(r?.od), do: text(r?.do),
+    hvezdy: Math.max(0, Math.min(5, cele(r?.hvezdy))), dobre: text(r?.dobre), kritika: text(r?.kritika), stitky,
+    kNaprave: r?.kNaprave === true, foto: text(r?.foto), mojeBody: cele(r?.mojeBody), mojePoznamka: text(r?.mojePoznamka),
+    videno: r?.videno !== false, lidi: cele(r?.lidi),
+    kolegove: seznam(r?.kolegove).filter((x: unknown): x is string => typeof x === 'string' && !!x.trim()).map((x: string) => x.trim()),
+  };
 }
 
 /**
@@ -225,6 +270,18 @@ export function dnyHodnoceni(raw: any): DenHodnoceni[] {
     const druh = it.kind === 'award' && /^Navíc: /.test(nazev) ? 'navic' : it.kind === 'award' && /^Trest: /.test(nazev) ? 'trest' : String(it.kind ?? '');
     x.polozky.push({ druh, id: cele(it.refId), nazev, body: cele(it.points), poznamka: text(it.note), vytka });
     x.vytka = x.vytka || vytka;
+  }
+  // Hodnocení celé směny: kritika „k nápravě" je výtka dne, nepotvrzené je „nové".
+  for (const r of seznam(raw?.smeny)) {
+    const d = denZ(r?.den);
+    if (!d) continue;
+    const x = den(d);
+    const sm = smenaZ(r);
+    (x.smeny ??= []).push(sm);
+    x.vytka = x.vytka || sm.kNaprave;
+    if (!sm.videno) x.videno = false;
+    // Den bez osobního hodnocení ukáže hvězdy celé směny.
+    if (!x.maHodnoceni && sm.hvezdy > x.hvezdy) x.hvezdy = sm.hvezdy;
   }
   return Array.from(mapa.values()).sort((a, b) => b.den.localeCompare(a.den));
 }

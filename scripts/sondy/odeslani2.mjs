@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -12,8 +13,13 @@ const tok = execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-r
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 const ctx = await b.newContext({ viewport: { width: 810, height: 1080 }, locale: 'cs-CZ' });
 await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
+// Přerušení sítě: `setOffline` na požadavky, které obslouží `route.fulfill`, nedosáhne — podvržené API
+// odpovědělo „ok" i bez sítě, aplikace oznámení připnula a pole vyprázdnila, a sonda to (s exit 0)
+// hlásila jako ztrátu textu. Po vypnutí sítě se proto požadavky přeruší i tady (kolo 93).
+let bezSite = false;
 await ctx.route('**/api/**', async route => {
   const u = route.request().url();
+  if (bezSite) return route.abort('internetdisconnected');
   if (u.includes('/api/auth/')) return route.continue();
   // Kolo 68: formulář oznámení žije ve widgetu Nástěnka na Přehledu (AnnouncementsManager
   // a pohled „announcements" zmizely) — plocha dostane rozložení s Nástěnkou
@@ -26,7 +32,7 @@ await ctx.route('**/api/**', async route => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
 });
 const p = await ctx.newPage();
-await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1000);
 const pole = p.locator('textarea').first();
 await pole.click();
@@ -34,6 +40,7 @@ await pole.type('Zítra otevíráme až v deset.', { delay: 12 });
 await p.waitForTimeout(700);
 
 await ctx.setOffline(true);
+bezSite = true;
 await p.getByRole('button', { name: 'Připnout oznámení' }).click();
 await p.waitForTimeout(2500);
 
@@ -42,7 +49,12 @@ const stav = await p.evaluate(() => ({
   textVPoli: (document.querySelector('textarea') || {}).value || '',
   tvrdiUspech: /připnuto|odesláno|uloženo|hotovo/i.test(document.body.innerText),
 }));
-console.log(`řekla aplikace, že to selhalo: ${stav.chyba ? 'ano ✓ — „' + stav.chyba + '"' : 'NE ✗'}`);
-console.log(`text zůstal v poli:            ${stav.textVPoli.includes('deset') ? 'ano ✓' : 'NE ✗'}`);
-console.log(`tvrdila někde úspěch:          ${stav.tvrdiUspech ? 'ANO ✗' : 'ne ✓'}`);
+// Řádek začíná značkou (✓/✗), ať ho spouštěč pozná; nález = nenulový kód (kolo 93: dřív vždy 0).
+const vysledky = [
+  [!!stav.chyba, `aplikace řekla, že to selhalo${stav.chyba ? ` — „${stav.chyba}"` : ''}`],
+  [stav.textVPoli.includes('deset'), 'text zůstal v poli'],
+  [!stav.tvrdiUspech, 'nikde netvrdí úspěch'],
+];
+for (const [ok, popis] of vysledky) console.log(`${ok ? '✓' : '✗'} ${popis}`);
 await b.close();
+process.exit(vysledky.every(([ok]) => ok) ? 0 : 1);

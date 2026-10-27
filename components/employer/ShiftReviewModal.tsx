@@ -15,6 +15,7 @@ import { useNavrhyTrestu } from '../tresty-vedeni/data';
 import { TrestTlacitko } from '../tresty-vedeni/TrestyUzaverky';
 import { klicVytky } from '../tresty-vedeni/logika';
 import { BodyVstup } from './BodyVstup';
+import { TlacitkoHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 
 export interface ItemMark { id?: number | null; points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -314,6 +315,13 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Hodnocení směny jako celku (lib/hodnoceniSmeny): pochvala a kritika směně, kterou uvidí celá osádka —
+              tohle okno hodnotí člověka a to, co odvedl. */}
+          <div className="flex flex-wrap items-center justify-between gap-2" data-hodnoceni-smeny-z-cloveka="">
+            <p className="t-meta min-w-0 flex-1 basis-48 text-pretty">{t('Chceš pochválit nebo zkritizovat celou směnu?')}</p>
+            <TlacitkoHodnotitSmenu den={date} clovek={employee.id} label={t('Ohodnotit směnu jako celek')} />
           </div>
 
           {/* Who the verdict covers — first decision, so one shift is one job. */}

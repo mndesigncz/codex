@@ -17,6 +17,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -45,7 +46,7 @@ for (const w of WIDTHS) {
     });
     const p = await ctx.newPage();
     try {
-      await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 30000 });
+      await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 });
       await p.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 700) { scrollTo(0, y); await new Promise(r => setTimeout(r, 60)); } scrollTo(0, 0); });
       await p.waitForTimeout(500);
       const n = await p.evaluate(() => {

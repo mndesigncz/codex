@@ -7,16 +7,18 @@
 import { Button, PageHeader } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { otevriVeSystemu } from '@/lib/stahni';
+import { useT } from '@/lib/i18n/client';
 import CteckaKasa from '../CteckaKasa';
 
 export default function CteckaPanel() {
   const { role } = useOpravneni();
+  const t = useT('sprava');
   const trasa = role?.typ === 'zamestnanec' || role?.typ === 'kiosk' ? '/employee/ctecka' : '/employer/ctecka';
   return (
     <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 space-y-5 max-w-2xl">
-      <PageHeader hintId="clientadmin-ctecka" title="Čtečka u kasy" subtitle="Načti kartu hosta, kupon nebo poukaz. Kdo to je, co má a co si vybral."
-        secondary={<Button variant="secondary" icon="expand" onClick={() => otevriVeSystemu(trasa)}>Celá obrazovka</Button>}
-        menuMobile={[{ label: 'Celá obrazovka', icon: 'expand', onClick: () => otevriVeSystemu(trasa) }]} />
+      <PageHeader hintId="clientadmin-ctecka" title={t('Čtečka u kasy')} subtitle={t('Načti kartu hosta, kupon nebo poukaz. Kdo to je, co má a co si vybral.')}
+        secondary={<Button variant="secondary" icon="expand" onClick={() => otevriVeSystemu(trasa)}>{t('Celá obrazovka')}</Button>}
+        menuMobile={[{ label: t('Celá obrazovka'), icon: 'expand', onClick: () => otevriVeSystemu(trasa) }]} />
       <CteckaKasa />
     </div>
   );

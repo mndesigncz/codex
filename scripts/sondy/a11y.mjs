@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const SCREENS = JSON.parse(readFileSync(new URL('./screens.json', import.meta.url).pathname, 'utf8'));
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -96,7 +97,7 @@ for (const [name, role, path] of SCREENS) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
   await p.waitForTimeout(1500);
   const r = await p.evaluate(AUDIT);
   soucet.bezJmena += r.bezJmena.length;

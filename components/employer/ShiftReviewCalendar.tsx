@@ -20,10 +20,11 @@ import { useCurrency } from '../CurrencyProvider';
 import ShiftReviewModal from './ShiftReviewModal';
 import { pragueToday } from '@/lib/pragueTime';
 import { bunkyMesice } from '@/lib/uzaverkyPrehled';
-import { Avatar, Button, Card, Chip, ErrorState, ListRow, MonthNav, Skeleton } from '../ui';
+import { Avatar, Card, Chip, ErrorState, ListRow, MonthNav, Skeleton } from '../ui';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { TlacitkoHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 
 interface Clovek { id: number; name: string; avatar: string | null; reviewed: boolean; rating: number; flagged: boolean }
 interface Den { date: string; staff: Clovek[]; pending: number }
@@ -149,11 +150,15 @@ export default function ShiftReviewCalendar({ onSaved, den, smiHodnotit = true }
                   ? <Chip tone="wait" size="sm">{t('{n, plural, one {# nehodnocená směna} few {# nehodnocené směny} other {# nehodnocených směn}}', { n: detail.pending })}</Chip>
                   : <Chip tone="ok" size="sm" icon="check">{t('Vše ohodnoceno')}</Chip>}
               </div>
-              {smiHodnotit && detail.staff.length > 1 && (
-                <Button variant="secondary" size="sm" icon="users" className="mt-3"
-                  onClick={() => setHodnotim({ clovek: detail.staff[0], den: vybrany, cela: true })}>
-                  {t('Ohodnotit celou směnu ({n, plural, one {# člověk} few {# lidé} other {# lidí}})', { n: detail.staff.length })}
-                </Button>
+              {/* Celá směna = hodnocení směny jako celku (lib/hodnoceniSmeny): pochvala i kritika směně, volitelně body lidem.
+                  Dřív otevíralo hodnocení prvního člověka s verdiktem zkopírovaným všem. */}
+              {smiHodnotit && (
+                <div className="mt-3" data-hodnoceni-smeny-kalendar="">
+                  <TlacitkoHodnotitSmenu den={vybrany} onUlozeno={() => { data.reload(); onSaved?.(); }}
+                    label={detail.staff.length > 1
+                      ? t('Ohodnotit celou směnu ({n, plural, one {# člověk} few {# lidé} other {# lidí}})', { n: detail.staff.length })
+                      : t('Ohodnotit celou směnu')} />
+                </div>
               )}
               <ul className="list mt-2">
                 {detail.staff.map(p => {

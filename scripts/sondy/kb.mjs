@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -42,7 +43,7 @@ const bad = (msg) => { console.log('  ✗', msg); problems.push(msg); };
 {
   console.log('Menu „···" (Sklad):');
   const { ctx, p, errs } = await page();
-  await p.goto('http://localhost:3000/employer/overview?view=inventory', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/employer/overview?view=inventory', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1500);
   const trig = p.locator('button[aria-haspopup="menu"]').first();
   if (await trig.count() === 0) bad('tlačítko menu nenalezeno');
@@ -72,7 +73,7 @@ const bad = (msg) => { console.log('  ✗', msg); problems.push(msg); };
 {
   console.log('Zvonek oznámení:');
   const { ctx, p, errs } = await page();
-  await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1500);
   const bell = p.locator('button[title="Notifikace"]').first();
   if (await bell.count() === 0) bad('zvonek nenalezen');
@@ -95,7 +96,7 @@ const bad = (msg) => { console.log('  ✗', msg); problems.push(msg); };
 {
   console.log('Nová akce — Enter:');
   const { ctx, p, errs } = await page();
-  await p.goto('http://localhost:3000/employer/overview?view=events', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/employer/overview?view=events', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1500);
   const add = p.locator('button', { hasText: /Nová akce|Přidat akci|Založit akci/ }).first();
   if (await add.count() === 0) bad('tlačítko „Nová akce" nenalezeno');
@@ -127,7 +128,7 @@ const bad = (msg) => { console.log('  ✗', msg); problems.push(msg); };
     ['Odměny', '?view=rewards', '[role="button"]'],
   ]) {
     const { ctx, p, errs } = await page();
-    await p.goto('http://localhost:3000/employer/overview' + url, { waitUntil: 'networkidle' });
+    await p.goto(BASE + '/employer/overview' + url, { waitUntil: 'networkidle' });
     await p.waitForTimeout(1500);
     const n = await p.locator(`${sel}[tabindex="0"]`).count();
     n > 0 ? ok(`${name}: ${n} karet dosažitelných klávesnicí`) : console.log(`  · ${name}: žádné karty (prázdná data)`);
@@ -140,7 +141,7 @@ const bad = (msg) => { console.log('  ✗', msg); problems.push(msg); };
 {
   console.log('Účet (Managero client):');
   const { ctx, p, errs } = await page('customer');
-  await p.goto('http://localhost:3000/client', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/client', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1500);
   const acc = p.locator('button[aria-haspopup="menu"]').first();
   if (await acc.count() === 0) console.log('  · účet nenalezen (nepřihlášený pohled)');

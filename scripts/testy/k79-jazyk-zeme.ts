@@ -1,5 +1,5 @@
-// Jazyk podle země návštěvníka (lib/i18n/config.ts, jazykZeZeme): prodejní stránka
-// i aplikace se bez zvoleného jazyka ukážou v jazyce země, odkud je člověk otevřel.
+// Jazyk podle země návštěvníka (lib/i18n/config.ts, jazykZeZeme): bez zvoleného jazyka
+// a bez podporovaného jazyka prohlížeče se stránka ukáže v jazyce země (pořadí: k93-jazyk-navstevnika).
 import { jazykZeZeme } from '../../lib/i18n/config.ts';
 import type { Testy } from './_testy.ts';
 

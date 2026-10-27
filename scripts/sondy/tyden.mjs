@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -31,7 +32,7 @@ for (const zacatek of [1, 0]) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     });
     const p = await ctx.newPage();
-    await p.goto('http://localhost:3000' + cesta, { waitUntil: 'networkidle' });
+    await p.goto(BASE + cesta, { waitUntil: 'networkidle' });
     await p.waitForTimeout(1600);
     // První buňka hlavičky dnů: hledá se řada sedmi zkratek.
     const prvni = await p.evaluate(() => {

@@ -1,5 +1,7 @@
 // W6 — správa bannerů (plán s dny a hodinami, jazykové mutace) a hostovská strana (Moje poukazy, propadlá razítková
-// karta v Moje, „Přidat do mé aplikace“). Ruční sonda (MIMO v spust.mjs): API podvrhuje. Na 390 a 1280 px bez vodorovného scrollu.
+// karta a body, které propadnou, „Přidat do mé aplikace“). Po přestavbě hosta (kolo 92) jsou poukazy v Odměnách
+// (/client/me/odmeny) a stav karty podniku (propadlá razítka, body před propadnutím) na stránce podniku
+// (/client/<slug>, data z /api/client/b/<slug>) — sonda to od kola 93 hledá tam. Ruční sonda (MIMO v spust.mjs): API podvrhuje. Na 390 a 1280 px bez vodorovného scrollu.
 //   NEXTAUTH_SECRET=… SONDY_ZAKLAD=http://localhost:3414 node scripts/sondy/w6-poukazy-bannery.mjs
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'node:fs';
@@ -102,6 +104,13 @@ for (const sirka of [390, 1280]) {
     const json = (o, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(o) });
     if (u.pathname === '/api/client/me/poukazy' && route.request().method() === 'DELETE') { odebrano.push(route.request().postDataJSON()); return json({ ok: true }); }
     if (u.pathname === '/api/client/me') return json(DATA);
+    // Stránka podniku nese stav člena sama (me.campaigns, me.expiring) — stejná propadlá karta a body jako v DATA.
+    if (u.pathname.startsWith('/api/client/b/kavarna-u-lipy') && route.request().method() === 'GET') {
+      const fix = nacti('client_b_kavarna-u-lipy');
+      return json({ ...fix, signedIn: true, stampCampaigns: [{ id: 1, name: 'Osmá káva zdarma', description: '', required: 8, reward: 'Káva zdarma' }],
+        me: { ...fix.me, member: true, expiring: { points: 40, till: '2026-10-20' }, claims: [], reservations: [],
+          campaigns: [{ id: 1, name: 'Osmá káva zdarma', description: '', required: 8, reward: 'Káva zdarma', stamps: 0, completed: 0, expired: true, expiredStamps: 5, finishBy: null, daysLeft: null }] } });
+    }
     if (u.pathname === '/api/client/card') return json(nacti('client_card'));
     if (u.pathname === '/api/client/reviews') return json({ pending: [] });
     return json([]);
@@ -109,13 +118,19 @@ for (const sirka of [390, 1280]) {
   const chyby = [];
   const p = await ctx.newPage();
   p.on('pageerror', e => chyby.push(String(e)));
-  await p.goto(`${BASE}/client/me`, { waitUntil: 'networkidle' });
+  // Stránka podniku: stav karty člena (propadlá rozdělaná karta, body, které brzy propadnou).
+  await p.goto(`${BASE}/client/kavarna-u-lipy`, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(1200);
+  const tp = await p.locator('body').innerText();
+  tvrdi(`${L}: propadlá razítková karta`, /Rozdělaná karta vypršela, 5 razítek propadlo/.test(tp), tp.slice(0, 600));
+  tvrdi(`${L}: body, které brzy propadnou`, /40 bodů propadne do/.test(tp), tp.slice(0, 600));
+  tvrdi(`${L}: stránka podniku bez vodorovného scrollu`, await bezPreteceni(p));
+  // Odměny: Moje poukazy.
+  await p.goto(`${BASE}/client/me/odmeny`, { waitUntil: 'networkidle' });
   await p.getByRole('heading', { name: 'Moje poukazy' }).waitFor({ timeout: 15000 });
   const t = await p.locator('body').innerText();
   tvrdi(`${L}: poukaz s kódem, zůstatkem a platností`, /DP-ABCD-2345/.test(t) && /Zůstatek\s*300/.test(t) && /platí do/.test(t), t.slice(0, 400));
   tvrdi(`${L}: vyčerpaný poukaz zůstává vidět se stavem`, /Vyčerpaný/.test(t));
-  tvrdi(`${L}: propadlá razítková karta`, /Rozdělaná karta vypršela, 5 razítek propadlo/.test(t), t.slice(0, 600));
-  tvrdi(`${L}: body, které brzy propadnou`, /40 bodů propadne do/.test(t));
   tvrdi(`${L}: bez vodorovného scrollu`, await bezPreteceni(p));
   // Odebrání z aplikace: nejdřív potvrzení, teprve pak zápis.
   await p.getByRole('button', { name: 'Odebrat z aplikace' }).first().click();

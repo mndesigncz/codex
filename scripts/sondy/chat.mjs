@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -31,7 +32,7 @@ for (const w of [390, 1280]) {
   const ctx = await ctxFor(w);
   const p = await ctx.newPage();
   p.on('pageerror', e => errs.push(`${w}: ${String(e).slice(0, 120)}`));
-  await p.goto('http://localhost:3000/employer/overview?view=chat', { waitUntil: 'networkidle', timeout: 30000 });
+  await p.goto(BASE + '/employer/overview?view=chat', { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(1400);
   await p.screenshot({ path: `${OUT}chat-list-${w}.png` });
   console.log(w, 'seznam — konverzací:', await p.locator('text=Týmový chat').count(), '| filtr nepřečtené:', await p.locator('text=/Nepřečtené · /').count());
@@ -74,7 +75,7 @@ for (const w of [390, 1280]) {
   const ctx = await ctxFor(390);
   const p = await ctx.newPage();
   p.on('pageerror', e => errs.push(`togo: ${String(e).slice(0, 120)}`));
-  await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle', timeout: 30000 });
+  await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(1800);
   await p.screenshot({ path: `${OUT}chat-togo-390.png`, fullPage: true });
   console.log('TO GO — dlaždice Zprávy:', await p.locator('text=Zprávy').count(),

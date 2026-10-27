@@ -58,7 +58,7 @@ export default function ({ eq, ok }: Testy) {
   }
   const klient = cti('components/client/ClientAdmin.tsx');
   ok('ClientAdmin: Zpět má šipku doleva, ne otočený chevron ani swap',
-    !/icon="chevron"[^>]*rotate-90/.test(klient) && (klient.match(/icon="arrowLeft"/g) ?? []).length === 2 && klient.includes("label: 'Zpět do administrace', icon: 'arrowLeft'"));
+    !/icon="chevron"[^>]*rotate-90/.test(klient) && (klient.match(/icon="arrowLeft"/g) ?? []).length === 2 && klient.includes("label: t('Zpět do administrace'), icon: 'arrowLeft'"));
 
   // ---- 3) Avatar s iniciálami ----
   const avatar = cti('components/ui/Avatar.tsx');

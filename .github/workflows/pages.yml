@@ -207,7 +207,8 @@ jobs:
     # podvrhne fixturami ze scripts/sondy/fixtury a tvrdí, co má být vidět.
     # Databáze není potřeba — žádná stránka se na ni pod sondou neptá.
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # 60, ne 40: sada má přes 165 sond (k93-jazyk-ui, hodnoceni-smeny) a běží ~40 min.
+    timeout-minutes: 60
     env:
       DATABASE_URL: postgresql://u:p@localhost/db
       NEXTAUTH_SECRET: sondy-ci-secret-0123456789abcdef

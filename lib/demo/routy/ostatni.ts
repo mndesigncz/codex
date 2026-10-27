@@ -8,6 +8,7 @@ import type { DemoStav } from '../stav';
 import { computeAutoPoints, normalizePoints } from '@/lib/rewardLevels';
 import { nastaveniRezimu } from '@/lib/bodyRezim';
 import { mojeRole } from './zaklad';
+import { hodnoceniUkazky, smenyClena } from './hodnoceniSmeny';
 
 const UROVNE = [
   { name: 'Nováček', minPoints: 0, perks: '' },
@@ -65,6 +66,11 @@ export const ostatni: Obsluha = (p, k) => {
   const meId = KDO_JSEM[s.role];
   const opr = new Set(mojeRole(s).opravneni);
 
+  // „Beru na vědomí" ve Zpětné vazbě potvrdí i hodnocení celých směn (jako skutečné /api/rewards).
+  if (cesta === '/api/rewards' && metoda === 'POST' && p.telo?.markSeen === true) {
+    for (const h of hodnoceniUkazky(s)) if (h.osadka.includes(meId) && !h.videli.includes(meId)) h.videli.push(meId);
+    return ok({ ok: true });
+  }
   if (cesta === '/api/rewards' && metoda === 'GET') {
     const moje = BODY_LIDI[meId] ?? 0;
     const ja = { points: moje, breakdown: rozpis(moje), ...uroven(moje) };
@@ -72,7 +78,8 @@ export const ostatni: Obsluha = (p, k) => {
       { work_date: posunDen(s.dnes, -1), rating: 5, note: 'Skvěle zvládnutý páteční nával, díky!', points: 20, autoPoints: 0, flagged: false, scope: 'shift', seen_at: null, created_at: `${posunDen(s.dnes, -1)}T21:00:00Z` },
       { work_date: posunDen(s.dnes, -4), rating: 4, note: null, points: 16, autoPoints: 0, flagged: false, scope: 'individual', seen_at: `${posunDen(s.dnes, -3)}T08:00:00Z`, created_at: `${posunDen(s.dnes, -4)}T21:00:00Z` },
     ];
-    const telo: Record<string, unknown> = { role: s.role === 'vedeni' ? 'employer' : 'employee', levels: UROVNE, points: BODY, rezim: nastaveniRezimu(null), me: ja, reviews, items: [], unseenFlagged: 0 };
+    const telo: Record<string, unknown> = { role: s.role === 'vedeni' ? 'employer' : 'employee', levels: UROVNE, points: BODY, rezim: nastaveniRezimu(null), me: ja, reviews, unseenFlagged: 0, smeny: smenyClena(s, meId),
+      items: smenyClena(s, meId).filter(h => h.mojeBody !== 0).map(h => ({ work_date: h.den, kind: 'smena', refId: h.id, label: `Hodnocení směny — ${h.nazev ?? ''}`, points: h.mojeBody, note: h.mojePoznamka, flagged: false })) };
     if (opr.has('odmeny.zebricek') || s.role === 'vedeni') {
       telo.standings = LIDE.filter(l => l.role === 'employee').map(l => {
         const b = BODY_LIDI[l.id] ?? 0;

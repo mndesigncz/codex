@@ -3143,6 +3143,39 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS body_prepocty_team ON body_prepocty (team_id, id)`);
     // ---- konec kola 91 ----
 
+    // ---- Hodnocení směny jako celku (lib/hodnoceniSmeny.ts) ----
+    // Směna = den + skupina se stejným začátkem a koncem v rozvrhu (smena_klic 'HH:MM-HH:MM'), nebo celý den ('den').
+    // Hvězdy, co bylo dobře, co příště jinak (kritika), štítky {id: 'plus'|'minus'}, k nápravě, fotka. osadka = id lidí,
+    // kterým se hodnocení ukáže; videli = kdo z nich ho potvrdil („Beru na vědomí"). Body po lidech jsou ruční řádky
+    // shift_review_items (kind 'smena', ref_id = id) — body, ne peníze; nic tady nekrátí mzdu.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS smeny_hodnoceni (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        work_date TEXT NOT NULL,
+        smena_klic TEXT NOT NULL DEFAULT 'den',
+        nazev TEXT,
+        cas_od TEXT,
+        cas_do TEXT,
+        hvezdy INTEGER NOT NULL DEFAULT 0,
+        dobre TEXT,
+        kritika TEXT,
+        stitky JSONB NOT NULL DEFAULT '{}'::jsonb,
+        k_naprave BOOLEAN NOT NULL DEFAULT FALSE,
+        foto TEXT,
+        osadka JSONB NOT NULL DEFAULT '[]'::jsonb,
+        videli JSONB NOT NULL DEFAULT '[]'::jsonb,
+        created_by INTEGER,
+        updated_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, work_date, smena_klic)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS smeny_hodnoceni_den ON smeny_hodnoceni (team_id, work_date)`);
+    // Pravidlo „po uzávěrce připomenout ohodnocení směny" — vypnuté výchozí, zapíná vedení v okně hodnocení.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS smena_hodnoceni_pripominat BOOLEAN DEFAULT FALSE`);
+    // ---- konec hodnocení směny ----
+
     // ---- Host (přestavba Managero client): záměr hosta u kasy, živá odezva, schránka ----
     // Stejné příkazy jsou v lib/klient/schema.ts (lazy při prvním použití). Kontrakt se čtečkou:
     // docs v …/klient/kontrakt-ctecka.md; host si přibalí připravenou odměnu (claim) k příštímu

@@ -18,6 +18,7 @@ import { QR_DEFAULT, QR_SHEETS, QR_STYLES, contrast, normalizeQrDesign, type QrD
 import { okJson } from '@/lib/api';
 import { okText } from '@/lib/api';
 import { otevriNaTisk } from '@/lib/stahni';
+import { useT } from '@/lib/i18n/client';
 
 /** Barvy, které se na papíře osvědčí. Vlastní odstín jde nastavit vedle. */
 const INKS = ['#16181A', '#3E5406', '#0A5FC4', '#7A2E12', '#5B2A7A', '#0F5C52'];
@@ -40,6 +41,7 @@ function Swatches({ value, onChange, options, name }: { value: string; onChange:
 }
 
 export default function QrDesigner({ toast, tables, smiUlozit = true }: { toast: (m: string) => void; tables: { id: number; name: string }[]; smiUlozit?: boolean }) {
+  const t = useT('sprava');
   const [d, setD] = useState<QrDesign | null>(null);
   const [teamName, setTeamName] = useState('');
   const [hasLogo, setHasLogo] = useState(false);
@@ -85,7 +87,7 @@ export default function QrDesigner({ toast, tables, smiUlozit = true }: { toast:
     try {
       const r = await fetch('/api/client/admin/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qr_design: d }) });
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Nepovedlo se uložit.');
+      if (!r.ok) throw new Error(x.error || t('Nepovedlo se uložit.'));
       setD(normalizeQrDesign(x.profile?.qr_design));
       toast('Vzhled QR uložen. Tisk ho použije.');
     } catch (e: any) { toast(e.message); }
@@ -102,12 +104,12 @@ export default function QrDesigner({ toast, tables, smiUlozit = true }: { toast:
   return (
     <Card aria-labelledby="h-qr" className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <h2 id="h-qr" className="t-card flex items-center gap-2 min-w-0"><Icon name="print" size={17} className="shrink-0 text-black/40" />Vzhled QR na stůl</h2>
+        <h2 id="h-qr" className="t-card flex items-center gap-2 min-w-0"><Icon name="print" size={17} className="shrink-0 text-black/40" />{t('Vzhled QR na stůl')}</h2>
         <Button variant="ghost" size="sm" iconAfter="chevron" className={`sm:ml-auto ${open ? '[&>svg:last-child]:rotate-180' : ''}`}
-          aria-expanded={open} onClick={() => setOpen(v => !v)}>{open ? 'Skrýt' : 'Upravit a vytisknout'}</Button>
+          aria-expanded={open} onClick={() => setOpen(v => !v)}>{open ? t('Skrýt') : t('Upravit a vytisknout')}</Button>
       </div>
       {!open ? (
-        <p className="t-meta">Barva, text, logo uprostřed a formát archu. Vytištěná kartička je jediná část appky, kterou host drží v ruce.</p>
+        <p className="t-meta">{t('Barva, text, logo uprostřed a formát archu. Vytištěná kartička je jediná část appky, kterou host drží v ruce.')}</p>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,15rem)_1fr] gap-5">
           {/* Náhled */}
@@ -122,7 +124,7 @@ export default function QrDesigner({ toast, tables, smiUlozit = true }: { toast:
               ) : (
                 <Skeleton className="mx-auto h-[9rem] w-[9rem] rounded-xl" />
               )}
-              <p className="mt-3 text-base font-bold leading-tight break-words">{d.headline || teamName || 'Název podniku'}</p>
+              <p className="mt-3 text-base font-bold leading-tight break-words">{d.headline || teamName || t('Název podniku')}</p>
               {d.sub && <p className="text-xs opacity-65 leading-snug mt-0.5">{d.sub}</p>}
               {d.showTable && <p className="text-sm font-bold mt-1.5">Stůl {first?.name ?? '1'}</p>}
             </div>
@@ -133,7 +135,7 @@ export default function QrDesigner({ toast, tables, smiUlozit = true }: { toast:
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field id="qr-head" label="Nadpis">
-                <Input id="qr-head" value={d.headline} onChange={e => set({ headline: e.target.value.slice(0, 40) })} placeholder={teamName || 'Název podniku'} />
+                <Input id="qr-head" value={d.headline} onChange={e => set({ headline: e.target.value.slice(0, 40) })} placeholder={teamName || t('Název podniku')} />
               </Field>
               <Field id="qr-sub" label="Věta pod nadpisem">
                 <Input id="qr-sub" value={d.sub} onChange={e => set({ sub: e.target.value.slice(0, 80) })} placeholder="Naskenuj a objednej od stolu" />

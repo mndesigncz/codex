@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -19,7 +20,7 @@ const stavy = [
 ];
 
 for (const [jm, patch, cekano] of stavy) {
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: 1280, height: 900 } });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
   await ctx.route('**/api/**', async route => {
     const u = route.request().url();
@@ -34,7 +35,7 @@ for (const [jm, patch, cekano] of stavy) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?mode=client&tab=loyalty', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/employer/overview?mode=client&tab=loyalty', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1800);
   const tlacitka = await p.locator('button:has-text("Odemknout"), button:has-text("Přejít na")').allTextContents();
   const doNastaveni = await p.locator('a[href*="view=settings"]:has-text("Zjistit víc")').count();

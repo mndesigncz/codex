@@ -29,7 +29,7 @@ import './landing/landing.css';
 // ForceLight: aplikace v ukázce i tokeny tlačítek zůstávají ve světlém motivu;
 // tma stránky je jeviště z landing.css, ne tmavý motiv aplikace.
 export default async function Landing() {
-  // Jazyk stránky: přepínač (cookie), jinak země návštěvníka (lib/i18n/jazykPozadavku.ts).
+  // Jazyk stránky: přepínač (cookie), jinak jazyk prohlížeče, jinak země návštěvníka (lib/i18n/jazykPozadavku.ts).
   const t = await getT(['landing']);
   const f = firma();
   return (

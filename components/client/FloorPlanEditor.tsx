@@ -22,6 +22,7 @@ import { PlanCanvasContent, TableShape } from './TableMap';
 import type { FloorPlan, MapTable, Shape } from '@/lib/floorplan';
 import { EMPTY_PLAN, tableBox } from '@/lib/floorplan';
 import { okJson } from '@/lib/api';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 
 type Tool = 'select' | 'wall' | 'room' | 'label';
 type Sel = { kind: 'shape'; id: string } | { kind: 'table'; id: number } | null;
@@ -29,17 +30,24 @@ type Sel = { kind: 'shape'; id: string } | { kind: 'table'; id: number } | null;
 type Draft = Extract<Shape, { type: 'wall' }> | Extract<Shape, { type: 'room' }>;
 
 const TOOLS: { id: Tool; label: string; icon: string; hint: string }[] = [
-  { id: 'select', label: 'Vybrat', icon: 'pin', hint: 'Klepni na prvek a táhni ho.' },
-  { id: 'wall', label: 'Zeď', icon: 'pencil', hint: 'Táhni čáru tam, kde je zeď nebo bar.' },
-  { id: 'room', label: 'Plocha', icon: 'box', hint: 'Táhni obdélník — zahrádka, salonek, tatami.' },
-  { id: 'label', label: 'Popisek', icon: 'tag', hint: 'Klepni a napiš, co tam je.' },
+  { id: 'select', label: 'Vybrat', icon: 'pin', hint: 'Klepni na prvek a táhni ho.' }, // i18n-ok: překlad v textNastroje
+  { id: 'wall', label: 'Zeď', icon: 'pencil', hint: 'Táhni čáru tam, kde je zeď nebo bar.' }, // i18n-ok
+  { id: 'room', label: 'Plocha', icon: 'box', hint: 'Táhni obdélník — zahrádka, salonek, tatami.' }, // i18n-ok
+  { id: 'label', label: 'Popisek', icon: 'tag', hint: 'Klepni a napiš, co tam je.' }, // i18n-ok
 ];
+function textNastroje(t: PrekladFn, id: Tool): { label: string; hint: string } {
+  if (id === 'select') return { label: t('Vybrat'), hint: t('Klepni na prvek a táhni ho.') };
+  if (id === 'wall') return { label: t('Zeď'), hint: t('Táhni čáru tam, kde je zeď nebo bar.') };
+  if (id === 'room') return { label: t('Plocha'), hint: t('Táhni obdélník — zahrádka, salonek, tatami.') };
+  return { label: t('Popisek'), hint: t('Klepni a napiš, co tam je.') };
+}
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const snap = (v: number, on: boolean) => on ? Math.round(v / 2) * 2 : Math.round(v * 10) / 10;
 const clamp = (v: number) => Math.max(0, Math.min(100, v));
 
 export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: { toast: (m: string) => void; onSaved?: () => void; smiUpravit?: boolean }) {
+  const t = useT('sprava');
   const box = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [plan, setPlan] = useState<FloorPlan | null>(null);
@@ -184,7 +192,7 @@ export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: {
         body: JSON.stringify({ plan, tables: tables.map(t => ({ id: t.id, map_x: t.map_x, map_y: t.map_y, map_w: t.map_w, map_h: t.map_h, map_shape: t.map_shape, map_rot: t.map_rot })) }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || 'Uložení se nepovedlo.');
+      if (!r.ok) throw new Error(d.error || t('Uložení se nepovedlo.'));
       setBase(JSON.stringify({ p: plan, t: tables }));
       toast('Plánek uložen. Hosté ho uvidí při objednávce.');
       onSaved?.();
@@ -196,7 +204,7 @@ export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: {
 
   const selShape: any = sel?.kind === 'shape' ? plan.shapes.find(s => s.id === sel.id) : null;
   const selTable = sel?.kind === 'table' ? tables.find(t => t.id === sel.id) : null;
-  const hint = TOOLS.find(t => t.id === tool)!.hint;
+  const hint = textNastroje(t, tool).hint;
 
   // Kreslení půdorysu je nástroj, ke kterému se člověk vrací jednou za
   // čas — ne obsah, který má pod seznamem stolů viset pořád otevřený.
@@ -205,15 +213,15 @@ export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: {
     <Card className="space-y-3" aria-labelledby="h-planek">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <h2 id="h-planek" className="t-card flex items-center gap-2"><Icon name="location" size={17} className="shrink-0 text-black/40" />Plánek podniku</h2>
-          {open && <p className="t-meta mt-1 max-w-[60ch]">Nakresli zdi a plochy, nebo nahraj půdorys ze souboru. Pak rozmísti stoly tak, jak stojí v podniku — host je pozná i bez znalosti názvů.</p>}
+          <h2 id="h-planek" className="t-card flex items-center gap-2"><Icon name="location" size={17} className="shrink-0 text-black/40" />{t('Plánek podniku')}</h2>
+          {open && <p className="t-meta mt-1 max-w-[60ch]">{t('Nakresli zdi a plochy, nebo nahraj půdorys ze souboru. Pak rozmísti stoly tak, jak stojí v podniku — host je pozná i bez znalosti názvů.')}</p>}
         </div>
         <div className="flex items-center gap-2 ml-auto">
-          {dirty && <span className="t-meta text-wait-ink">Neuloženo</span>}
-          {open && smiUpravit && <Button size="sm" variant="primary" loading={busy} disabled={!dirty} onClick={save}>Uložit plánek</Button>}
+          {dirty && <span className="t-meta text-wait-ink">{t('Neuloženo')}</span>}
+          {open && smiUpravit && <Button size="sm" variant="primary" loading={busy} disabled={!dirty} onClick={save}>{t('Uložit plánek')}</Button>}
           {smiUpravit && (
             <Button variant="ghost" size="sm" iconAfter="chevron" className={open ? '[&>svg:last-child]:rotate-180' : ''}
-              aria-expanded={open} onClick={() => setOpen(v => !v)}>{open ? 'Skrýt' : 'Upravit plánek'}</Button>
+              aria-expanded={open} onClick={() => setOpen(v => !v)}>{open ? t('Skrýt') : t('Upravit plánek')}</Button>
           )}
         </div>
       </div>
@@ -221,7 +229,7 @@ export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: {
 
       <div className="flex items-center gap-2 flex-wrap">
         <Segmented size="sm" ariaLabel="Nástroj plánku" value={tool} onChange={v => { setTool(v); setSel(null); }}
-          options={TOOLS.map(t => ({ id: t.id, label: t.label, icon: t.icon }))} />
+          options={TOOLS.map(x => ({ id: x.id, label: textNastroje(t, x.id).label, icon: x.icon }))} />
         <span className="inline-flex items-center gap-2 text-sm text-black/65">
           <Switch checked={grid} onChange={setGrid} label="Mřížka" /><span aria-hidden>Mřížka</span>
         </span>
@@ -340,7 +348,7 @@ export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: {
                 <input type="range" min={3} max={40} value={Math.round(selShape.t * 10)} aria-label="Tloušťka zdi"
                   onChange={e => patchShape(selShape.id, x => ({ ...x, t: Number(e.target.value) / 10 }))} className="w-20 accent-[#8FB811]" /></label>
             )}
-            <Button size="sm" variant={sel.kind === 'table' ? 'secondary' : 'danger'} onClick={removeSel}>{sel.kind === 'table' ? 'Z plánku pryč' : 'Smazat'}</Button>
+            <Button size="sm" variant={sel.kind === 'table' ? 'secondary' : 'danger'} onClick={removeSel}>{sel.kind === 'table' ? t('Z plánku pryč') : t('Smazat')}</Button>
           </div>
         )}
       </div>
@@ -349,7 +357,7 @@ export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: {
         <Modal open onClose={() => setPojmenovat(null)} size="sm" title={pojmenovat.druh === 'popisek' ? 'Nový popisek' : 'Název plochy'}
           footer={<>
             <Button variant="secondary" onClick={() => setPojmenovat(null)}>Zrušit</Button>
-            <Button type="submit" form="planek-text" variant="primary">{pojmenovat.druh === 'popisek' ? 'Přidat' : 'Uložit'}</Button>
+            <Button type="submit" form="planek-text" variant="primary">{pojmenovat.druh === 'popisek' ? t('Přidat') : t('Uložit')}</Button>
           </>}>
           <form id="planek-text" onSubmit={e => {
             e.preventDefault();
@@ -362,7 +370,7 @@ export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: {
             }
             setPojmenovat(null);
           }}>
-            <Field id="planek-text-pole" label={pojmenovat.druh === 'popisek' ? 'Co tam je' : 'Název'} hint={pojmenovat.druh === 'popisek' ? 'Například Bar, Vchod, Zahrádka.' : 'Prázdné = bez názvu.'}>
+            <Field id="planek-text-pole" label={pojmenovat.druh === 'popisek' ? t('Co tam je') : t('Název')} hint={pojmenovat.druh === 'popisek' ? t('Například Bar, Vchod, Zahrádka.') : t('Prázdné = bez názvu.')}>
               <Input id="planek-text-pole" autoFocus maxLength={40} value={pojmenovat.text} onChange={e => setPojmenovat({ ...pojmenovat, text: e.target.value })} />
             </Field>
           </form>

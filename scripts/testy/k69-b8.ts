@@ -170,7 +170,7 @@ export default function ({ eq, ok }: Testy) {
   const admin = bezKomentaru(precti('components/client/ClientAdmin.tsx'));
   ok('ClientAdmin: papír z body (bez natvrdo #F1F3ED), bez vlastní funkce chip() a StatCard', !/F1F3ED/.test(admin) && !/const chip =/.test(admin) && !/function StatCard/.test(admin));
   ok('ClientAdmin: plochy stránek Clientu', STRANKY_B8.slice(0, 4).concat(['vedeni.klient_stoly']).every(id => admin.includes(`stranka="${id}"`)));
-  ok('ClientAdmin: záložky podle oprávnění a sdílený Dock s odznaky', /moje = TABS\.filter\(t => !t\.klice \|\| ma\(t\.klice\)\)/.test(admin) && /<Dock /.test(admin) && /badge: n/.test(admin));
+  ok('ClientAdmin: záložky podle oprávnění a sdílený Dock s odznaky', /moje = TABS\.filter\((\w) => !\1\.klice \|\| ma\(\1\.klice\)\)/.test(admin) && /<Dock /.test(admin) && /badge: n/.test(admin));
   ok('ClientAdmin: navigace z widgetů na záložky Clientu zůstává uvnitř', /NavigaceKontext\.Provider value=\{navigace\}/.test(admin));
   ok('ClientAdmin: jeden Toast místo limetkového proužku', /<Toast /.test(admin) && !/toast-in/.test(admin));
   ok('LoyaltyTabs: plocha vedeni.klient_vernost a jedno „Uložit" v hlavičce (atribut form)', /stranka="vedeni\.klient_vernost"/.test(precti('components/client/LoyaltyTabs.tsx'))
@@ -188,7 +188,7 @@ export default function ({ eq, ok }: Testy) {
     && /<PersonChip /.test(ev) && !/inputClass|#0A84FF|#0A5CC0|bg-white\/70|>\+<\/button>/.test(ev) && !/role="radiogroup"/.test(ev));
   ok('EventsView: pole detailu mají popisek (Název akce, Nový úkol k akci)', /label=(?:"Název akce"|\{t\('Název akce'\)\})/.test(ev) && /label=(?:"Nový úkol k akci"|\{t\('Nový úkol k akci'\)\})/.test(ev) && !/placeholder="Název akce"/.test(ev));
   ok('ClientAdmin: souhrn (odznaky) se obnoví při změně záložky a periodicky', /minulaZalozka\.current = tab;\s*obnovSouhrn\(\)/.test(admin) && /setInterval\(\(\) => \{ if \(document\.visibilityState === 'visible'\) obnovSouhrn\(\)/.test(admin));
-  ok('StaffInbox a widget Objednávky od stolu obnoví souhrn po změně objednávky', /onZmena\?\.\(\)/.test(precti('components/client/StaffInbox.tsx')) && /<StaffInbox onToast=\{t => oznam\(t\)\} onZmena=\{onZmena\} \/>/.test(admin)
+  ok('StaffInbox a widget Objednávky od stolu obnoví souhrn po změně objednávky', /onZmena\?\.\(\)/.test(precti('components/client/StaffInbox.tsx')) && /<StaffInbox onToast=\{(\w) => oznam\(\1\)\} onZmena=\{onZmena\} \/>/.test(admin)
     && /obnovDataWidgetu\('\/api\/client\/admin\/summary'\);\s*\}\s*\};\s*const vse = data\.data\?\.objednavky/.test(precti('components/widgety/oblasti/klient.tsx')));
   const clenoveUi = precti('components/client/loyalty/ClenoveSprava.tsx');
   ok('Členové: skupiny člena i bez vernost.zobrazit (deník bodů jen s ním)', /const rozbali = vidiDenik \|\| meniSkupiny/.test(clenoveUi) && /useLoad<any>\(vidiDenik \? /.test(precti('components/client/loyalty/ClenoveDetail.tsx')));
