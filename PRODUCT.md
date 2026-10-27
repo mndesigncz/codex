@@ -72,10 +72,15 @@ platba se strhne sama po 30 dnech. Odpovědi se uloží do `teams.onboarding`
 a průvodce nastavením začne krokem „podnik". V nativním obalu krok tarifu
 chybí (hlídá `check-obal`), sondy `trial` a `k77-obchody`.
 
-**Jazyk podle země** (kolo 79): kdo si jazyk nezvolil (cookie `managero-lang`),
-dostane ho podle země z hlavičky Vercelu `x-vercel-ip-country`
-(`jazykZeZeme` v `lib/i18n/config.ts`): CZ čeština, SK slovenština, PL polština,
-DE/AT/CH/LI/LU němčina, zbytek světa angličtina; bez hlavičky čeština. Prodejní
+**Jazyk podle prohlížeče, pak země** (kolo 79, pořadí kolo 93): kdo si jazyk
+nezvolil (cookie `managero-lang`), dostane první podporovaný jazyk prohlížeče
+z hlavičky `Accept-Language` (cs/en/de/sk/pl podle q-hodnot). Až když prohlížeč
+neřekne nic, čemu rozumíme, rozhodne země z hlavičky Vercelu `x-vercel-ip-country`
+(`jazykZeZeme`): CZ čeština, SK slovenština, PL polština, DE/AT/CH/LI/LU němčina,
+zbytek světa angličtina; bez obojího čeština (`jazykNavstevnika` v
+`lib/i18n/config.ts`). Prohlížeč má přednost, protože Čech na cestách nebo za VPN
+má český prohlížeč, ale IP mimo ČR. Přihlášenému pak jazyk z účtu (`users.lang`)
+dosadí `NastaveniSync`, pokud si na zařízení nezvolil jiný. Prodejní
 stránka má vlastní slovník `landing` (texty v `components/landing/obsah.ts`),
 celý ceník i krok tarifu v registraci se překládají; účtuje se dál v CZK.
 

@@ -104,10 +104,10 @@ export const STROJOVY_PREKLAD: readonly Jazyk[] = ['en', 'de', 'sk', 'pl'];
 
 /**
  * Jazyk podle země návštěvníka (dvoupísmenný kód ISO, na Vercelu z hlavičky
- * `x-vercel-ip-country`). Platí jen pro toho, kdo si jazyk ještě nezvolil:
- * volba v přepínači (cookie) má vždy přednost. Česko, Slovensko a Polsko mají
- * vlastní jazyk, německy mluvící země němčinu, zbytek světa angličtinu.
- * Bez známé země (lokální vývoj, sondy) undefined, a tedy čeština.
+ * `x-vercel-ip-country`). Je až třetí v pořadí (viz jazykNavstevnika): volba
+ * v přepínači (cookie) a jazyk prohlížeče mají přednost. Česko, Slovensko
+ * a Polsko mají vlastní jazyk, německy mluvící země němčinu, zbytek světa
+ * angličtinu. Bez známé země (lokální vývoj, sondy) undefined.
  */
 export function jazykZeZeme(zeme: string | null | undefined): Jazyk | undefined {
   const z = (zeme ?? '').trim().toUpperCase();
@@ -117,4 +117,25 @@ export function jazykZeZeme(zeme: string | null | undefined): Jazyk | undefined 
   if (z === 'PL') return 'pl';
   if (z === 'DE' || z === 'AT' || z === 'CH' || z === 'LI' || z === 'LU') return 'de';
   return 'en';
+}
+
+/**
+ * Jazyk návštěvníka, který neposlal nic jiného než hlavičky (serverové
+ * vykreslení, routy). Pořadí:
+ *   1. cookie `managero-lang`: výslovná volba v přepínači (nebo jazyk převzatý z účtu),
+ *   2. `Accept-Language`: první podporovaný jazyk prohlížeče podle q-hodnot,
+ *   3. země z IP (`x-vercel-ip-country`, jazykZeZeme),
+ *   4. čeština.
+ * Prohlížeč je před zemí schválně: Čech na cestách, za VPN nebo s IP mimo ČR
+ * má český prohlížeč a čekal by češtinu, ne angličtinu podle země. Země
+ * zůstává pojistkou pro prohlížeče, které neposílají nic, čemu rozumíme
+ * (fr, ja, nebo hlavička chybí). Přihlášenému pak NastaveniSync dosadí
+ * jazyk z účtu (users.lang), pokud si na zařízení nezvolil jiný.
+ */
+export function jazykNavstevnika(o: {
+  cookie?: string | null;
+  acceptLanguage?: string | null;
+  zeme?: string | null;
+}): Jazyk {
+  return cistyJazyk(o.cookie) ?? jazykZAccept(o.acceptLanguage) ?? jazykZeZeme(o.zeme) ?? VYCHOZI;
 }
