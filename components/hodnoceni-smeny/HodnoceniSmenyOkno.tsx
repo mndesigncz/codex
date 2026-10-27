@@ -231,7 +231,8 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
   const mimoOsadku = (data?.clenove ?? []).filter(c => !osadka.includes(c.id));
 
   return (
-    <Modal open onClose={onClose} size="md" title={t('Ohodnotit směnu')}
+    // nadOkny: okno se otevírá z jiných oken (detail uzávěrky má vlastní překryv z-80) — musí být nahoře.
+    <Modal open onClose={onClose} size="md" nadOkny title={t('Ohodnotit směnu')}
       subtitle={<span className="cz-sentence">{datumVetou}{skupina ? ` · ${nazevSkupiny(skupina)}` : ''}</span>}
       footer={smi ? <>
         <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
@@ -287,7 +288,7 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
 
             <div>
               <p className="field-label" id="stitky-smeny">{t('Štítky')}</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-labelledby="stitky-smeny" data-stitky-smeny="">
+              <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="stitky-smeny" data-stitky-smeny="">
                 {STITKY.map(s => {
                   const stav = stitky[s.id as IdStitku];
                   const nazev = nazevStitku(t, s.id);

@@ -529,7 +529,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <p className="t-meta py-4">{overeniAktivni && !q.trim() ? t('Všechno je ověřené — nic tu nečeká.') : t('Nikdo takový za tohle období nic neodpíchl.')}</p>
         ) : dny.map(d => (
           <section key={d.den} aria-label={d.nazev} className="pt-2">
-            <p className="t-label cz-sentence pt-2 flex items-center gap-2">
+            <p className="t-label cz-sentence pt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span>{d.nazev}</span>
               {d.zamek && <Chip tone="muted" size="sm" icon="lock">{t('uzavřeno')}</Chip>}
               {/* Hodnocení celé směny toho dne (pochvala i kritika) — jen kdo smí hodnotit. */}
