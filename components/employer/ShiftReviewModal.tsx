@@ -15,10 +15,7 @@ import { useNavrhyTrestu } from '../tresty-vedeni/data';
 import { TrestTlacitko } from '../tresty-vedeni/TrestyUzaverky';
 import { klicVytky } from '../tresty-vedeni/logika';
 import { BodyVstup } from './BodyVstup';
-<<<<<<< HEAD
-=======
 import { TlacitkoHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
->>>>>>> hodnoceni-smeny
 
 export interface ItemMark { id?: number | null; points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
