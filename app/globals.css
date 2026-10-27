@@ -2117,6 +2117,152 @@ html[data-obal] .jen-web { display: none !important; }
 /* Limetkové plochy zůstávají limetkové i v tmavém (inkoust na limetce je správně). */
 :root[data-theme="dark"] .h-raz-odmena.h-raz-plne { border-color: #C8F542; background: #C8F542; color: #16181A; }
 :root[data-theme="dark"] .h-plus { color: #16181A; }
+
+/* ---------- Host: sklo, rozostření a pozadí (korekce 2026-10-27) ----------
+   Martin: „Používej naše barvy a glass + blur efekty a pozadí.“ Host přebírá povrch prodejní stránky
+   (`.lgx`, `.lg-blob`, `.lg-bar`): za obsahem statické skvrny limetky a krému rozmazané 70 px, karty
+   a panely jako bílé sklo s odleskem na horní hraně, dok, lišta a list U kasy jako silnější sklo.
+   Barvy se nemění: inkoust, bílá a krém, limetka. Moje karta s QR zůstává jediná inkoustová plocha.
+   Tmavý režim, který landing nemá, je dodělaný tady: sklo = bílá 5–10 % s blurem, limetka 12 %
+   krytí, krém skoro pryč (na inkoustu by šedl).
+   Výkon: blur nese kontejner (karta, seznam v kartě, dok, list), řádky uvnitř ho nemají. Opakované
+   karty dlouhého seznamu (oddíly menu) mají `.h-sklo-tichy`: totéž sklo bez backdrop-filter — pod
+   nimi je jen rozmazané statické pozadí, takže vypadají stejně a telefon nepočítá blur za každou.
+   `.h-plocha` je kořen hosta (ClientShell) a rám náhledu ve správě (RamTelefonu); `.h-pozadi` jsou
+   skvrny pod ním (fixně k oknu, v rámu náhledu absolutně). */
+.h-plocha { position: relative; isolation: isolate; }
+.h-pozadi { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.h-pozadi-ram { position: absolute; }
+/* Tmavě: limetka 12 % a 7 % a o pětinu menší — víc by se na inkoustu slilo do olivové plochy (a tmavě
+   zelenou nepoužíváme); krém téměř neviditelný (teplý nádech, ne šedá skvrna). */
+:root[data-theme="dark"] .h-pozadi .lg-blob-lime   { background: rgba(200,245,66,0.12); transform: scale(0.8); transform-origin: 100% 0; }
+:root[data-theme="dark"] .h-pozadi .lg-blob-lime-2 { background: rgba(200,245,66,0.07); transform: scale(0.8); }
+:root[data-theme="dark"] .h-pozadi .lg-blob-cream  { background: rgba(240,233,214,0.035); }
+
+/* Sklo karty (= `.lgx`): průsvitný bílý přechod, blur 18 + saturate, odlesk na horní hraně. Bílý
+   rámeček na světlém plátně mizí, hranu proto drží i vlasový inkoustový prstenec ve stínu. */
+.h-sklo { border: 1px solid transparent; border-radius: var(--r-lg); }
+.h-sklo, .h-plocha :where(.card, .glass-card, .h-karta) {
+  background: linear-gradient(150deg, rgba(255,255,255,0.78), rgba(255,255,255,0.48));
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  border-color: rgba(255,255,255,0.72);
+  box-shadow: 0 0 0 1px rgba(22,24,26,0.035), 0 18px 44px -22px rgba(25,35,15,0.18), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+@media (min-width: 768px) {
+  .h-plocha .karta-od-md {
+    background: linear-gradient(150deg, rgba(255,255,255,0.78), rgba(255,255,255,0.48));
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    backdrop-filter: blur(18px) saturate(170%);
+    border-color: rgba(255,255,255,0.72);
+    box-shadow: 0 0 0 1px rgba(22,24,26,0.035), 0 18px 44px -22px rgba(25,35,15,0.18), inset 0 1px 0 rgba(255,255,255,0.9);
+  }
+}
+.h-plocha .h-sklo-tichy { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(150deg, rgba(255,255,255,0.84), rgba(255,255,255,0.6)); }
+/* List U kasy: silné sklo místo pevné bílé (`.modal-sheet`); pole QR v něm zůstává pevně bílé. */
+.h-list-sklo {
+  background: linear-gradient(160deg, rgba(255,255,255,0.96), rgba(255,255,255,0.86));
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
+  border-color: rgba(255,255,255,0.8);
+  box-shadow: var(--shadow-modal), inset 0 1px 0 rgba(255,255,255,0.95);
+}
+/* Spodní dok hosta: sklo nad obsahem. Krytí vyšší než u karty — pod popisky projíždí text stránky. */
+.h-dok {
+  background: linear-gradient(150deg, rgba(255,255,255,0.88), rgba(255,255,255,0.72));
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 0 0 1px rgba(22,24,26,0.04), 0 14px 38px -12px rgba(25,35,15,0.24), inset 0 1px 0 rgba(255,255,255,0.95);
+}
+/* Pole, dráha přepínače, čip a sekundární tlačítko nad skvrnami: 4,5–5,5 % inkoustu přímo na limetce
+   zešedlo do olivové (přihlášení, „Mám kód“, čipy menu, „Objednat od stolu“). Pod tón jde bílá — na
+   skleněné kartě vypadají jako dřív (jamka), na plátně jako světlé sklo.
+   Tmavé varianty (`:root[data-theme="dark"] …`) mají vyšší specifičnost a platí beze změny. */
+.h-plocha .field { background: linear-gradient(rgba(22,24,26,0.045), rgba(22,24,26,0.045)), rgba(255,255,255,0.7); }
+.h-plocha .field:focus, .h-plocha .field:focus-visible { background: var(--surface); }
+.h-plocha .seg-draha { background: linear-gradient(rgba(22,24,26,0.055), rgba(22,24,26,0.055)), rgba(255,255,255,0.6); }
+.h-plocha .btn-secondary { background: linear-gradient(rgba(22,24,26,0.055), rgba(22,24,26,0.055)), rgba(255,255,255,0.6); }
+@media (hover: hover) { :root:not([data-theme="dark"]) .h-plocha .btn-secondary:hover { background: linear-gradient(rgba(22,24,26,0.085), rgba(22,24,26,0.085)), rgba(255,255,255,0.6); } }
+:root:not([data-theme="dark"]) .h-plocha .h-cip:not([aria-pressed="true"]):not([aria-checked="true"]):not(:disabled) { background: linear-gradient(rgba(22,24,26,0.045), rgba(22,24,26,0.045)), rgba(255,255,255,0.6); }
+/* Neaktivní inkoustové tlačítko nad skvrnami: průhlednost 45 % by inkoust smíchala s limetkou pod sklem
+   do olivové (Odměny → „Použít“ bez kódu). Místo průhlednosti tlumená jamka a tlumené písmo. */
+.h-plocha .btn-primary:disabled, .h-plocha .btn-primary[aria-disabled="true"] { opacity: 1; background: rgba(22,24,26,0.07); color: rgba(22,24,26,0.42); }
+:root[data-theme="dark"] .h-plocha .btn-primary:disabled, :root[data-theme="dark"] .h-plocha .btn-primary[aria-disabled="true"] { background: rgba(255,255,255,0.08); color: rgba(237,242,228,0.42); }
+/* Kulaté tlačítko v liště hosta (Naskenovat / Zadat kód) nad skvrnami: bílé sklo s tónem, ne šedá jamka. */
+.h-tlacitko-sklo { background: linear-gradient(rgba(22,24,26,0.05), rgba(22,24,26,0.05)), rgba(255,255,255,0.6); color: rgba(22,24,26,0.78); }
+@media (hover: hover) { .h-tlacitko-sklo:hover { background: linear-gradient(rgba(22,24,26,0.08), rgba(22,24,26,0.08)), rgba(255,255,255,0.6); color: #16181A; } }
+:root[data-theme="dark"] .h-tlacitko-sklo { background: rgba(255,255,255,0.08); color: rgba(237,242,228,0.8); }
+@media (hover: hover) { :root[data-theme="dark"] .h-tlacitko-sklo:hover { background: rgba(255,255,255,0.14); color: #EDF2E4; } }
+/* Aktivní položka doku: limetková pilulka pod ikonou. V tmavém plná limetka s inkoustovou ikonou —
+   60 % limetky na tmavém skle dávalo olivovou. */
+.h-dok-on { background: rgba(200,245,66,0.6); color: #16181A; }
+:root[data-theme="dark"] .h-dok-on { background: #C8F542; color: #16181A; }
+/* Ikonové tlačítko 40 na světlém skle (hlavička stránky podniku). */
+.h-kruh-svetle { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 9999px; background: rgba(22,24,26,0.06); color: #16181A; }
+@media (hover: hover) { .h-kruh-svetle:hover { background: rgba(22,24,26,0.1); } }
+:root[data-theme="dark"] .h-kruh-svetle { background: rgba(255,255,255,0.1); color: #EDF2E4; }
+/* Moje karta: inkoust s jemným odleskem skla (bílý přechod v horním rohu, světlá horní hrana). */
+.h-moje { background-image: linear-gradient(150deg, rgba(255,255,255,0.09), rgba(255,255,255,0) 55%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 22px 46px -24px rgba(22,24,26,0.6); }
+:root[data-theme="dark"] .h-moje { background-image: linear-gradient(150deg, rgba(255,255,255,0.08), rgba(255,255,255,0) 55%); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.14), 0 22px 46px -24px rgba(0,0,0,0.8); }
+/* Hlavička hosta (lišta od md, lišta nepřihlášeného) = `.lg-bar`: nahoře bez pozadí, po posunu sklo.
+   Landing tmavou variantu nemá, host ano. */
+:root[data-theme="dark"] .lg-bar.posunuto {
+  background: rgba(22,24,26,0.72);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Tmavé sklo: bílá 5–10 % s blurem nad inkoustovým plátnem, horní hrana světlejší. */
+:root[data-theme="dark"] .h-sklo,
+:root[data-theme="dark"] .h-plocha :where(.card, .glass-card, .h-karta) {
+  background: linear-gradient(150deg, rgba(255,255,255,0.1), rgba(255,255,255,0.055));
+  border-color: rgba(255,255,255,0.09);
+  box-shadow: 0 18px 44px -22px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+@media (min-width: 768px) {
+  :root[data-theme="dark"] .h-plocha .karta-od-md {
+    background: linear-gradient(150deg, rgba(255,255,255,0.1), rgba(255,255,255,0.055));
+    border-color: rgba(255,255,255,0.09);
+    box-shadow: 0 18px 44px -22px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+}
+:root[data-theme="dark"] .h-plocha .h-sklo-tichy { background: linear-gradient(150deg, rgba(255,255,255,0.09), rgba(255,255,255,0.06)); }
+:root[data-theme="dark"] .h-list-sklo {
+  background: linear-gradient(160deg, rgba(40,43,46,0.9), rgba(28,31,34,0.86));
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+:root[data-theme="dark"] .h-dok {
+  background: linear-gradient(150deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05)), rgba(22,24,26,0.74);
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: 0 14px 38px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* Méně průhlednosti: pevné plochy z tokenů, žádný blur (jako `.lgx`); skvrny schová `.lg-blob`. */
+@media (prefers-reduced-transparency: reduce) {
+  .h-sklo, .h-list-sklo, .h-dok, .h-plocha :where(.card, .glass-card, .h-karta),
+  :root[data-theme="dark"] .h-sklo, :root[data-theme="dark"] .h-list-sklo,
+  :root[data-theme="dark"] .h-dok, :root[data-theme="dark"] .h-plocha :where(.card, .glass-card, .h-karta) {
+    background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .h-plocha .h-sklo-tichy, :root[data-theme="dark"] .h-plocha .h-sklo-tichy { background: var(--surface); }
+  :root[data-theme="dark"] .lg-bar.posunuto { background: #16181A; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-reduced-transparency: reduce) and (min-width: 768px) {
+  .h-plocha .karta-od-md, :root[data-theme="dark"] .h-plocha .karta-od-md { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+/* Více kontrastu: sklo dostane zřetelný okraj jako `.card`. */
+@media (prefers-contrast: more) {
+  .h-sklo, .h-dok, .h-plocha :where(.card, .glass-card, .h-karta) { border-color: rgba(0,0,0,0.45); }
+  :root[data-theme="dark"] .h-sklo, :root[data-theme="dark"] .h-dok,
+  :root[data-theme="dark"] .h-plocha :where(.card, .glass-card, .h-karta) { border-color: rgba(255,255,255,0.5); }
+}
+:root[data-contrast="high"] .h-sklo, :root[data-contrast="high"] .h-dok,
+:root[data-contrast="high"] .h-plocha :where(.card, .glass-card, .h-karta) { border-color: rgba(0,0,0,0.45); }
+:root[data-contrast="high"][data-theme="dark"] .h-sklo,
+:root[data-contrast="high"][data-theme="dark"] .h-dok,
+:root[data-contrast="high"][data-theme="dark"] .h-plocha :where(.card, .glass-card, .h-karta) { border-color: rgba(255,255,255,0.5); }
 /* Audit 2026-10 (průřez 9): „Skrýt tenhle popis" u podtitulku PageHeader se ukazoval jen
    na hover (opacity-0 → group-hover) — na telefonu a tabletu ho nikdo neviděl. Na
    dotykových zařízeních je křížek vidět tlumeně pořád (cíl 44 drží .tap-target-sm). */
