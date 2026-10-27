@@ -9,7 +9,8 @@ import { denSmeny } from '@/lib/staleShifts';
 import { parseDbTime, pragueDayOf, pragueHM } from '@/lib/pragueTime';
 import { hlaskaZamku, zamekDne } from '@/lib/dochazkaZaznamy';
 import { MAX_FRONTA, overPolozkuSync, type PolozkaSync } from '@/lib/kioskOffline';
-import type { ZamekObdobi } from '@/lib/dochazkaPrehled';
+import type { SmenaClena, ZamekObdobi } from '@/lib/dochazkaPrehled';
+import { smenyClenu } from '@/lib/smenaPauzyDb';
 
 // Píchnutí z tabletu doručená po výpadku internetu (kolo 8, R8-2).
 //
@@ -100,7 +101,25 @@ async function zapis(teamId: number, p: PolozkaSync): Promise<NextResponse> {
     return NextResponse.json({ ok: true, action: 'in', entry: row });
   }
   // odchod
-  if (!open) return NextResponse.json({ error: 'Žádný otevřený příchod k odpíchnutí.' }, { status: 409 });
+  // Směna s pauzou je jedna směna: den směny (noční přes půlnoc) se bere od prvního příchodu (lib/smenaPauzyDb).
+  let smena: SmenaClena | undefined;
+  try { smena = (await smenyClenu(teamId, [p.employeeId], p.cas.getTime())).get(p.employeeId); } catch { smena = undefined; }
+  if (!open) {
+    // Odchod rovnou z pauzy (jako online POST): záznam po pauze se smaže, směna skončila odchodem záznamu před ní.
+    let pauza: { id: number; clock_in: string } | undefined;
+    try {
+      [pauza] = await sql`
+        SELECT id, clock_in FROM time_entries
+        WHERE employee_id = ${p.employeeId} AND team_id = ${teamId} AND source = 'break' AND clock_out = clock_in
+          AND clock_in >= NOW() - INTERVAL '12 hours'
+        ORDER BY clock_in DESC LIMIT 1` as { id: number; clock_in: string }[];
+    } catch { pauza = undefined; }
+    if (!pauza) return NextResponse.json({ error: 'Žádný otevřený příchod k odpíchnutí.' }, { status: 409 });
+    await sql`DELETE FROM time_entries WHERE id = ${pauza.id} AND employee_id = ${p.employeeId}`;
+    const denZPauzy = await denSmeny(teamId, p.employeeId, smena?.zacatek ?? parseDbTime(pauza.clock_in) ?? p.cas);
+    try { await sql`UPDATE shifts SET end_time = ${hm(parseDbTime(pauza.clock_in) ?? p.cas)} WHERE employee_id = ${p.employeeId} AND date = ${denZPauzy} AND auto_created = TRUE`; } catch { /* not migrated */ }
+    return NextResponse.json({ ok: true, action: 'out', entry: null });
+  }
   const od = parseDbTime(open.clock_in) ?? p.cas;
   if (p.cas.getTime() <= od.getTime()) return NextResponse.json({ error: 'Odchod musí být po příchodu.' }, { status: 409 });
   let row: any;
@@ -113,7 +132,7 @@ async function zapis(teamId: number, p: PolozkaSync): Promise<NextResponse> {
       UPDATE time_entries SET clock_out = ${casIso} WHERE id = ${open.id}
       RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
   }
-  const shiftDay = await denSmeny(teamId, p.employeeId, od);
+  const shiftDay = await denSmeny(teamId, p.employeeId, smena && String(smena.zaznam.id) === String(open.id) ? smena.zacatek : od);
   try { await sql`UPDATE shifts SET end_time = ${hm(p.cas)} WHERE employee_id = ${p.employeeId} AND date = ${shiftDay} AND auto_created = TRUE`; } catch { /* not migrated */ }
   return NextResponse.json({ ok: true, action: 'out', entry: row });
 }

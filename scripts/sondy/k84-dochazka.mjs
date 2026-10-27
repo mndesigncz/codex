@@ -323,6 +323,41 @@ const otevriTablet = async (p) => {
   await ctx.close();
 }
 
+// Kolo 93 (Martin: „Když si někdo zapne pauzu a pak ji ukončí, tak se mu to zapne jako nová směna"): Petr přišel
+// před 5 h, 30 min měl pauzu a od její konce (před hodinou) běží záznam po pauze. Tablet ukazuje směnu od
+// příchodu (shiftSince), dobu bez pauzy (4 h 30 min) a souhrn odchodu za celou směnu s pauzou.
+{
+  const roster = rosterTabletu();
+  roster.roster = roster.roster.map(m => m.id === 7 ? { ...m, openSince: isoPred(60), openEntryId: 777, shiftSince: isoPred(300), breakMs: 30 * 60_000, shiftStart: prahaHMS(-300), shiftEnd: prahaHMS(200) } : m);
+  const podvrh = (req, json, stav) => {
+    const path = new URL(req.url()).pathname;
+    if (path === '/api/attendance' && req.method() === 'GET') return json(roster);
+    if (path === '/api/attendance' && req.method() === 'POST') {
+      (stav.dochazka ??= []).push(req.postDataJSON());
+      return json({ ok: true, action: 'out', closingDone: true, entry: { id: 777, clockIn: isoPred(60), clockOut: new Date(TED).toISOString(), shiftStart: isoPred(300), breakMs: 30 * 60_000 } });
+    }
+    return podvrhTabletu(req, json, stav);
+  };
+  const { ctx, p, stav, chyby } = await kontext({ role: 'kiosk', viewport: TABLET, mobil: true, fix: FIX_SMENA, mineData: KIOSK, posunCasu: POSUN, dalsi: podvrh });
+  await ctx.addInitScript(() => { try { localStorage.removeItem('managero-kiosk-fronta'); localStorage.setItem('managero-kiosk-active', '7'); } catch { /* */ } });
+  await otevriTablet(p);
+  const n = nastrojTabletu(p);
+  const hm = (min) => new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(TED - min * 60000));
+  const radek = (await text(n.locator('ul.list > li', { hasText: 'Petr Novák' }))).replace(/\n/g, ' | ');
+  tvrdi(`K5 (768): po konci pauzy „od ${hm(300)} · 4 h 30 min" (začátek směny, bez pauzy), ne od konce pauzy`, radek.includes(`od ${hm(300)}`) && /4 h 30 min/.test(radek) && !radek.includes(`od ${hm(60)}`), radek);
+  await n.getByRole('button', { name: 'Odchod – Petr Novák' }).click();
+  const okno = p.getByRole('dialog', { name: 'Petr Novák' });
+  tvrdi(`K5 (768): okno „Na směně od ${hm(300)} · 4:30:xx"`, await dokud(() => okno.getByText(new RegExp(`Na směně od ${hm(300)} · 4:3\\d:\\d\\d`)).isVisible(), 3000), await text(okno));
+  await okno.getByRole('button', { name: 'Odpíchnout odchod' }).click();
+  const souhrn = p.locator('[data-souhrn-odchodu]');
+  await dokud(() => souhrn.isVisible(), 4000);
+  const ts = (await text(souhrn)).replace(/\n/g, ' | ');
+  tvrdi(`K5 (768): souhrn odchodu za celou směnu — příchod ${hm(300)}, odpracováno 4 h 30 min, pauza 30 min`, ts.includes(hm(300)) && /4 h 30 min/.test(ts) && /pauza 30 min/.test(ts), ts);
+  await p.screenshot({ path: SNIMKY + 'k93-tablet-souhrn-po-pauze.png' });
+  tvrdi('K5: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
 // Offline: pás nahoře, příchod Lucie (PIN proti otisku) do fronty, špatný PIN, po připojení sync.
 {
   const { ctx, p, stav, chyby } = await kontext({ role: 'kiosk', viewport: TABLET, mobil: true, fix: FIX_SMENA, mineData: KIOSK, posunCasu: POSUN, dalsi: podvrhTabletu });

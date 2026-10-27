@@ -1755,6 +1755,7 @@
   "dnes ještě chybí": "still missing today",
   "dnes ještě chybí ({podniky})": "still missing today ({podniky})",
   "dnes odpracováno {delka}": "worked today {delka}",
+  "bez pauzy {delka}": "excl. {delka} break",
   "dnes poslední den": "last day today",
   "dnes zatím bez tržby": "no sales yet today",
   "dnes {cas}": "today {cas}",

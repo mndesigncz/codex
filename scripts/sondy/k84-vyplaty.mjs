@@ -328,6 +328,40 @@ for (const [sirka, jazyk] of [[390, null], [320, 'de'], [320, 'pl']]) {
   await w.screenshot({ path: SNIMKY + 'k84-vyplaty-pauza-390.png' });
   await ctx.close();
 }
+// Kolo 93 (Martin: „Když si někdo zapne pauzu a pak ji ukončí, tak se mu to zapne jako nová směna"): po Konci
+// pauzy běží záznam od 12:30, ale Píchačky pokračují ve směně od 08:00 — „Příchod 08:00", stopky 7:30 bez pauzy
+// (16:00 − 08:00 − 30 min), ne „Příchod 12:30" od nuly ani „+270 min po začátku" proti plánu 08:00.
+{
+  const poPauze = { ...ZAM, roster: [{ ...ZAM.roster[0], openSince: prahaISO(DNES, '12:30'), shiftSince: prahaISO(DNES, '08:00'), breakMs: 30 * 60_000, breakSince: null, shiftStart: '08:00:00', shiftEnd: '16:30:00', shiftDate: DNES }],
+    entries: [
+      { id: 722, employeeId: 16, clockIn: prahaISO(DNES, '12:30'), clockOut: null, source: 'break', breakAfter: 720, note: null, updatedBy: null },
+      { id: 720, employeeId: 16, clockIn: prahaISO(DNES, '08:00'), clockOut: prahaISO(DNES, '12:00'), source: 'self', note: null, updatedBy: null },
+      ...ZAM.entries.map(e => (e.id === 701 ? { ...e, clockOut: prahaISO(den(1), '16:00') } : e)),
+    ] };
+  const { ctx, p } = await zam({ dochazka: poPauze, url: '/employee/shifts?view=home', plocha: 'zamestnanec.domu', fix: FIX_DOMU });
+  const w = widget(p, 'dochazka.moje_pichacky');
+  await dokud(() => w.getByRole('button', { name: 'Začít pauzu' }).isVisible().catch(() => false), 20000);
+  const t5 = await text(w);
+  tvrdi('P5 (390): po konci pauzy pokračuje směna — „Příchod 08:00", ne „Příchod 12:30"', /Příchod 08:00/.test(t5) && !/Příchod 12:30/.test(t5), t5);
+  tvrdi('P5: stopky ukazují odpracovanou směnu bez pauzy (7:30:xx), ne čas od konce pauzy (3:30:xx)', /\b7:3\d:\d\d\b/.test(t5) && !/\b3:3\d:\d\d\b/.test(t5), t5);
+  tvrdi('P5: poznámka „bez pauzy 30 min" a žádné „+… min po začátku" proti plánu 08:00', /bez pauzy 30 min/.test(t5) && !/min po začátku/.test(t5), t5);
+  await w.screenshot({ path: SNIMKY + 'k93-pichacky-po-pauze-390.png' });
+  await ctx.close();
+}
+// Pauza z rosteru (breakSince) bez záznamů dne — pauza začatá před půlnocí nebo vedení bez dochazka.zobrazit:
+// Píchačky musí nabídnout Konec pauzy, ne „Odpíchnout příchod" (nová směna).
+{
+  const naPauzeRoster = { ...ZAM, roster: [{ ...ZAM.roster[0], openSince: null, breakSince: prahaISO(DNES, '15:50'), shiftSince: prahaISO(DNES, '08:00'), breakMs: 0 }], entries: [] };
+  const { ctx, p, stav } = await zam({ dochazka: naPauzeRoster, url: '/employee/shifts?view=home', plocha: 'zamestnanec.domu', fix: FIX_DOMU });
+  const w = widget(p, 'dochazka.moje_pichacky');
+  const je = await dokud(() => w.getByRole('button', { name: 'Konec pauzy' }).isVisible().catch(() => false), 20000);
+  const t6 = await text(w);
+  tvrdi('P6 (390): pauza jen z rosteru → Konec pauzy, ne Odpíchnout příchod; „dnes odpracováno 7 h 50 min"', je && !(await w.getByRole('button', { name: 'Odpíchnout příchod' }).count()) && /Pauza od 15:50/.test(t6) && /7 h 50 min/.test(t6), t6);
+  await w.getByRole('button', { name: 'Konec pauzy' }).click();
+  tvrdi('P6: Konec pauzy pošle {action: end} (pokračování směny), žádný příchod', await dokud(() => (stav.zapisy ?? []).some(z => z.path === '/api/attendance/pauza' && z.telo.action === 'end'), 4000)
+    && !(stav.zapisy ?? []).some(z => z.path === '/api/attendance' && z.telo?.action === 'in'), JSON.stringify(stav.zapisy));
+  await ctx.close();
+}
 {
   const dlouha = { ...ZAM, roster: [{ ...ZAM.roster[0], openSince: prahaISO(DNES, '08:30') }],
     entries: [{ id: 720, employeeId: 16, clockIn: prahaISO(DNES, '08:30'), clockOut: null, source: 'self', note: null, updatedBy: null }, ...ZAM.entries.map(e => (e.id === 701 ? { ...e, clockOut: prahaISO(den(1), '16:00') } : e))] };
