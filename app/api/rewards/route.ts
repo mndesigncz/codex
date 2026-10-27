@@ -8,6 +8,7 @@ import { clenovePodniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { nastaveniDiku } from '@/lib/podekovani';
 import { nastaveniAuto } from '@/lib/automatickeBody';
+import { hodnoceniClena, oznacVideno } from '@/lib/hodnoceniSmenyDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +97,15 @@ async function itemsFor(teamId: number, userId: number) {
       WHERE i.employee_id = ${userId} AND i.team_id = ${teamId} AND i.kind = 'closing'
       ORDER BY i.work_date DESC LIMIT 50`;
     push(rows, 'closing', 'Uzávěrka', l => `Uzávěrka — ${l}`);
+  } catch { /* ignore */ }
+  // Body z hodnocení celé směny (lib/hodnoceniSmeny) — každý vidí jen svůj řádek rozpisu.
+  try {
+    const rows = await sql`
+      SELECT i.work_date, i.ref_id, i.points, i.note, i.flagged, h.nazev AS label
+      FROM shift_review_items i LEFT JOIN smeny_hodnoceni h ON h.id = i.ref_id AND h.team_id = i.team_id
+      WHERE i.employee_id = ${userId} AND i.team_id = ${teamId} AND i.kind = 'smena'
+      ORDER BY i.work_date DESC LIMIT 50`;
+    push(rows, 'smena', 'Hodnocení směny', l => `Hodnocení směny — ${l}`);
   } catch { /* ignore */ }
   // Pochvaly (point_awards) jdou do stejného seznamu jako položky — zaměstnanec
   // je vidí ve zpětné vazbě u dne, kdy přišly. Den podle pražského času.
@@ -209,7 +219,12 @@ async function vlastni(teamId: number, meId: number, levels: ReturnType<typeof n
     unseenFlagged = r?.n ?? unseenFlagged;
   } catch { /* columns not migrated */ }
 
+  // Hodnocení celé směny, na které člověk byl (pochvala i kritika; z bodů jen jeho).
+  const smeny = await hodnoceniClena(c.teamId, c.meId, 20);
+  unseenFlagged += smeny.filter(h => h.kNaprave && !h.videno).length;
+
   return {
+    smeny,
     me: {
       points: total, breakdown: b,
       levelName: st.level.name, levelIndex: st.levelIndex, perks: st.level.perks,
@@ -237,5 +252,6 @@ export async function POST(req: NextRequest) {
   try {
     await sql`UPDATE shift_reviews SET seen_at = NOW() WHERE employee_id = ${c.meId} AND team_id = ${c.teamId} AND seen_at IS NULL`;
   } catch { /* column not migrated — nothing to acknowledge */ }
+  await oznacVideno(c.teamId, c.meId);
   return NextResponse.json({ ok: true });
 }

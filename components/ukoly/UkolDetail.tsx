@@ -19,6 +19,7 @@ import { jeHotovy, jePoTerminu, type Ukol } from '@/lib/ukolyPrehled';
 import { postupChecklistu, poCase } from '@/lib/ukolyFiltr';
 import { dayPlus, pragueDaySafe, pragueHM } from '@/lib/pragueTime';
 import { fmtHM } from '@/lib/i18n/format';
+import { TlacitkoHodnotitSmenu, useSmiHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 
 const prioTon = (p: string): 'bad' | 'wait' | 'muted' => (p === 'high' ? 'bad' : p === 'medium' ? 'wait' : 'muted');
 
@@ -45,7 +46,13 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
   const loc = aktualniJazyk();
   const smi = useSmi();
   const [navic, setNavic] = useState(false);
+  // Hodnocení směny, na které se úkol dělal (den splnění, jinak termín — jen dnešní a starší).
+  const smiHodnotitSmenu = useSmiHodnotitSmenu();
   const hotovo = jeHotovy(ukol);
+  const denSmeny = (() => {
+    const d = (hotovo && ukol.completedAt && pragueDaySafe(ukol.completedAt)) || ukol.dueDate || null;
+    return d && d <= dnes ? d : null;
+  })();
   const poTerminu = jePoTerminu(ukol, dnes);
   // Kolo 7: dnešní úkol, jehož čas termínu minul (okno je otevřené krátce — stačí čas při vykreslení).
   const poCasu = poCase(ukol, dnes, pragueHM());
@@ -141,9 +148,10 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
         <Poznamky typ="task" id={ukol.id} className="pt-2" />
 
         {/* Tiché akce na konci obsahu jako řádková tlačítka ½ + ½ (V5: destruktivní poslední, červený text). */}
-        {(onSmazat || smi('navic.zapsat')) && (
+        {(onSmazat || smi('navic.zapsat') || (smiHodnotitSmenu && denSmeny)) && (
           <Rada vyska="m" className="pt-2">
             {smi('navic.zapsat') && <Button variant="ghost" icon="sparkle" onClick={() => setNavic(true)} data-ukol-navic>{t('Zapsat jako navíc')}</Button>}
+            {smiHodnotitSmenu && denSmeny && <TlacitkoHodnotitSmenu den={denSmeny} clovek={ukol.completedBy ?? ukol.assignedTo ?? null} variant="ghost" size="md" />}
             {onSmazat && <Button variant="ghost" icon="trash" className="!text-[var(--bad-ink)]" onClick={onSmazat}>{t('Smazat')}</Button>}
           </Rada>
         )}

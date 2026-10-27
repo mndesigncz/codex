@@ -36,6 +36,7 @@ import { Poznamky } from '../Poznamky';
 import { NavicUzaverky } from '../navic-vedeni/NavicUzaverky';
 import { TrestTlacitko, TrestyUzaverky } from '../tresty-vedeni/TrestyUzaverky';
 import { textNavrhu } from '@/lib/tresty';
+import { TlacitkoHodnotitSmenu, useSmiHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -114,6 +115,8 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
 }) {
   const loc = useLocale();
   const t = useT('sprava');
+  // Hodnocení celé směny (lib/hodnoceniSmeny): pochvala i kritika směny, ke které uzávěrka patří.
+  const smiHodnotitSmenu = useSmiHodnotitSmenu();
   const tRef = useRef(t); tRef.current = t; // callbacky nesmí držet starý jazyk po přepnutí
   const money = useMoney();
   const symbol = useSymbol();
@@ -621,6 +624,14 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       ))}
                     </div>
                   )}
+                </Section>
+              )}
+
+              {smiHodnotitSmenu && (
+                <Section title={t('Hodnocení směny')} hint={t('Pochval nebo zkritizuj celou směnu — uvidí to všichni, kdo na ní byli.')}>
+                  <div data-hodnoceni-smeny-uzaverky="">
+                    <TlacitkoHodnotitSmenu den={String(c.shift_date ?? c.date).slice(0, 10)} clovek={c.created_by != null ? Number(c.created_by) : null} onUlozeno={onChanged} />
+                  </div>
                 </Section>
               )}
 

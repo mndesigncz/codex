@@ -75,6 +75,7 @@ import {
   type FiltrRozvrhu, type RazeniVytizeni, type SmenaFiltru, type PohledRozvrhu,
 } from '@/lib/rozvrhFiltr';
 import { ListaFiltru, PasLidi, PasTypu, PrehledLidi, StavFiltru } from './RozvrhFiltr';
+import { TlacitkoHodnotitSmenu, useSmiHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -3235,6 +3236,8 @@ function DayModal({
   };
 
   const nadpis = dayLabel(date, jazyk);
+  // Hodnocení celé směny z okna dne v rozvrhu (lib/hodnoceniSmeny) — jen dnešní a minulé dny, ne v návrhu.
+  const smiHodnotitSmenu = useSmiHodnotitSmenu() && !navrh && date <= pragueToday();
   // S Týmem na den se přidává z řádku člověka. Formulář s vlastním časem je
   // pak jen doplněk pod rozbalením a jeho tlačítko je u něj — lepivá patička
   // s „Přidat do návrhu" mířila na vzdálený select pod dlouhým seznamem
@@ -3259,6 +3262,12 @@ function DayModal({
         {tlacitkoPridat}
       </>}>
       <div className="space-y-5">
+        {smiHodnotitSmenu && shifts.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2" data-hodnoceni-smeny-rozvrh="">
+            <p className="t-meta min-w-0 flex-1 basis-40 text-pretty">{t('Jak směna dopadla? Pochval nebo zkritizuj celou směnu.')}</p>
+            <TlacitkoHodnotitSmenu den={date} />
+          </div>
+        )}
         {filtrAktivni && (
           // Okno dne je místo, kde se den opravuje: potřebuje vidět všechny
           // (kdo už stojí, kdo může) — filtr by tu schoval právě ty, kým se díra zaplní.

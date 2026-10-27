@@ -189,6 +189,8 @@ export const ZELENE = [
   'preteceni-host',
   // redesign v4 „skladba" (spec §8): hrany, řady, výšky, šířky, dvojice karet — 24 obrazovek, 390 + 1280, světle i tmavě
   'skladba',
+  // kolo 94: hodnocení směny jako celku (kritika i pochvala, rozpis bodů na osádku)
+  'hodnoceni-smeny',
   // ověření kola 92: čtečka u kasy ↔ host (přibalená odměna, jedna akce, živá odezva +2 a uplatnění)
   'k92-ctecka-host',
 ];

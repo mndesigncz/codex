@@ -21,6 +21,7 @@ import type { ZdrojDne } from '@/lib/denUdalost';
 import { denUzaverky, jeHlavni, maSkrytouTrzbu, rozdilUzaverky, type RadekUzaverky } from '@/lib/uzaverkyPrehled';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { useLocale } from './jazyk';
+import { TlacitkoHodnotitSmenu, useSmiHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 
 function vyberSeznam(raw: any): RadekUzaverky[] {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.closings)) throw new Error('Uzávěrky přišly v nečekaném tvaru.'); // i18n-ok: překládá apiMessage
@@ -51,6 +52,8 @@ export default function DenDetail({ den, zdroj = 'obecne', onDen, onClose }: { d
   const smiUzaverky = smi('uzaverky.zobrazit_vse');
   const smiFinance = smi('finance.zobrazit');
   const smiSmeny = smi('rozvrh.nahled');
+  // Hodnocení celé směny (lib/hodnoceniSmeny) — z detailu dne vždy, i když den nemá rozvrh.
+  const smiHodnotitSmenu = useSmiHodnotitSmenu();
   const pos = useDataWidgetu(smiTrzby ? urlDne(den) : null, vyberDenniPokladnu);
   const pred = useDataWidgetu(smiTrzby ? urlDne(minuly) : null, vyberDenniPokladnu);
   const uz = useDataWidgetu(smiUzaverky ? '/api/closings' : null, vyberSeznam);
@@ -214,11 +217,19 @@ export default function DenDetail({ den, zdroj = 'obecne', onDen, onClose }: { d
     </Cast>
   );
 
+  // Ohodnotit směnu dne (pochvala i kritika celé směny). Budoucí den se hodnotit nedá.
+  const oddilHodnoceni = smiHodnotitSmenu && den <= dnes && (
+    <Cast nadpis={t('Hodnocení směny')}>
+      <p className="t-meta text-pretty">{t('Pochval nebo zkritizuj celou směnu — uvidí to všichni, kdo na ní byli.')}</p>
+      <div className="rada rada-rovne rada-m" data-hodnoceni-smeny-dne=""><TlacitkoHodnotitSmenu den={den} size="md" /></div>
+    </Cast>
+  );
+
   const poradi = zdroj === 'uzaverky'
-    ? [oddilUzaverky, oddilTrzba, oddilOtevrene, oddilVydaje, oddilSmeny, oddilPlatby, oddilHodiny, oddilProdej, oddilObsluha]
+    ? [oddilUzaverky, oddilHodnoceni, oddilTrzba, oddilOtevrene, oddilVydaje, oddilSmeny, oddilPlatby, oddilHodiny, oddilProdej, oddilObsluha]
     : zdroj === 'finance'
-      ? [oddilTrzba, oddilOtevrene, oddilPlatby, oddilHodiny, oddilProdej, oddilObsluha, oddilUzaverky, oddilVydaje, oddilSmeny]
-      : [oddilTrzba, oddilSmeny, oddilUzaverky, oddilOtevrene, oddilVydaje, oddilPlatby, oddilHodiny, oddilProdej, oddilObsluha];
+      ? [oddilTrzba, oddilOtevrene, oddilPlatby, oddilHodiny, oddilProdej, oddilObsluha, oddilUzaverky, oddilVydaje, oddilSmeny, oddilHodnoceni]
+      : [oddilTrzba, oddilSmeny, oddilHodnoceni, oddilUzaverky, oddilOtevrene, oddilVydaje, oddilPlatby, oddilHodiny, oddilProdej, oddilObsluha];
 
   return (
     <Modal open onClose={onClose} size="lg" title={nazev} subtitle={<span className="cz-sentence">{datumVetou}</span>}

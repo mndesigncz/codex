@@ -15,6 +15,8 @@ import { delka, type PrubehApi } from '@/lib/postupyPrehled';
 import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
 import { fmtCislo } from '@/lib/i18n/format';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+import { pragueDaySafe } from '@/lib/pragueTime';
+import { TlacitkoHodnotitSmenu, useSmiHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 
 /** Důvod přeskočení kroku podle id (id se ukládá, text se překládá až na obrazovce). */
 export function duvodPreskoceni(id: string | null | undefined, t: PrekladFn): string {
@@ -45,9 +47,13 @@ export default function DetailPrubehu({ prubeh, kroky, kdy, onClose }: {
   const preskocene: number[] = Array.isArray(prubeh.skipped_items) ? prubeh.skipped_items as number[] : [];
   const duvody = prubeh.skip_reasons && typeof prubeh.skip_reasons === 'object' ? prubeh.skip_reasons as Record<string, { reason?: string; note?: string }> : {};
   const trvani = delka(prubeh.duration_seconds ?? null);
+  // Den průběhu → hodnocení směny, na které postup běžel (pochvala i kritika celé směny).
+  const smiHodnotitSmenu = useSmiHodnotitSmenu();
+  const denPrubehu = pragueDaySafe(prubeh.completed_at ?? prubeh.started_at ?? null);
 
   return (
     <Modal open onClose={onClose} title={String(prubeh.procedure_name ?? t('Postup'))}
+      footer={smiHodnotitSmenu && denPrubehu ? <TlacitkoHodnotitSmenu den={denPrubehu} clovek={prubeh.user_id ?? null} size="lg" /> : undefined}
       subtitle={<span className="inline-flex items-center gap-1.5 min-w-0">
         <Avatar emoji={prubeh.user_avatar} size="xs" />
         <span className="truncate">{[prubeh.user_name, kdy, trvani].filter(Boolean).join(' · ')}</span>

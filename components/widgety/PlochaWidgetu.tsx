@@ -35,6 +35,7 @@ import { HYSTEREZE_PX, NASTROJ, TOAST_S_AKCI_MS } from '@/lib/widgety/konstanty'
 import { jeCilVPrekryvu, jeInteraktivniCil, jePrekryvOtevreny, smiKlepnutiNavigovat, type StiskKlid } from '@/lib/widgety/klik';
 import { PLAN_ENFORCED } from '@/lib/plan';
 import { DenHost } from './DenHost';
+import { HodnoceniSmenyHost } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 import { KontextWidgetuCtx, KostraWidgetu, PojistkaWidgetu, SchematickyWidget, type KontextWidgetu } from './Widget';
 import { ListaVypadku, VypadekProvider } from './Vypadek';
 import { lineWidget, maCoNastavit, predstahni } from './registr';
@@ -1453,6 +1454,8 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     </div>
     {/* Mimo kořen plochy: událost z oken (React je bublá stromem komponent) by jinak došla do obsluhy plochy. */}
     {!vychoziRezim && <DenHost />}
+    {/* Okno hodnocení směny z odkazu oznámení (?hodnotitSmenu=den) nebo z otevriHodnoceniSmeny(...). */}
+    {!vychoziRezim && <Suspense fallback={null}><HodnoceniSmenyHost /></Suspense>}
     {velky && !vychoziRezim && (() => {
       const pol = polozky.find(x => x.id === velky);
       const def = pol ? najdiWidget(pol.widget) : undefined;

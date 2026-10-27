@@ -82,6 +82,7 @@ import { dbTimeDayHM, dbTimeHM, dayPlus, parseDbTime, pragueDayOf, pragueToday }
 import { agreguj, hrubostProRozmezi, obdobiZPresetu, platneRozmezi, pocetDni, predchoziRozmezi, zmenaPct, type Slot } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
+import { TlacitkoHodnotitSmenu, useSmiHodnotitSmenu } from '../../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, obdobiMesice, mojeUpravyMesice, otevrenePrichody, podilMezd,
   sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech, zpozdeniPichacek,
@@ -1421,6 +1422,7 @@ function chipDne(r: RadekDne, t: PrekladFn): ReactNode {
 
 function DnesVPodniku(_: WidgetProps) {
   const t = useT('widgety');
+  const smiHodnotitSmenu = useSmiHodnotitSmenu();
   const brana = useBrana(['dochazka.zobrazit', 'dochazka.tablet']);
   const smi = useSmi();
   const data = useDataWidgetu<Dochazka>(brana ? URL_DNES : null, raw => vyberDochazku(raw, t));
@@ -1433,7 +1435,9 @@ function DnesVPodniku(_: WidgetProps) {
   return (
     <Widget nacteni={data}
       doplnek={chybi > 0 ? <Chip tone="wait" size="sm">{t('{n} bez příchodu', { n: chybi.toLocaleString('cs-CZ') })}</Chip> : undefined}
-      prazdno={radky.length === 0 ? <p className="t-meta">{t('Dnes nemá nikdo naplánovanou směnu.')}</p> : undefined}>
+      prazdno={radky.length === 0 ? <p className="t-meta">{t('Dnes nemá nikdo naplánovanou směnu.')}</p> : undefined}
+      // Hodnocení celé dnešní směny (pochvala i kritika) — jen kdo smí hodnotit (tlačítko se jinak nekreslí).
+      patka={radky.length > 0 && smiHodnotitSmenu ? <TlacitkoHodnotitSmenu den={pragueToday()} size="md" /> : undefined}>
       {/* v4 (V4): chip stavu na ose textu, ne pod avatarem. */}
       <ul className="list">
         {radky.slice(0, RADKU_DNES).map(r => (
