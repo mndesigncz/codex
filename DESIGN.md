@@ -1579,6 +1579,8 @@ Naměřeno na barvách, které si podnik reálně zvolí:
 `#F97316` oranžová → 2,80:1 · `#14B8A6` tyrkysová → 2,49:1 ·
 `#00FF00` zelená → 1,37:1. Kavárna s oranžovou tak měla na své vlastní
 stránce tlačítko „Stát se členem", které si její hosté nepřečtou.
+(Od korekce 2026-10-27 je „Stát se členem“ limetkové a barva podniku je jen na dlaždici loga
+a na kartě ve Wallet — pravidla níž platí pro ně.)
 
 - **Inkoust se vybírá podle skutečného kontrastu**, ne podle jasu:
   spočítat obě možnosti a vzít lepší. Selhání pod 4,5:1 tím klesne na
@@ -2157,8 +2159,8 @@ Rezervace · Čtečka · Hosté · Více. Id záložek (`tab=customers`…) zůs
 - **Co vidí host, má vedle sebe náhled.** Program věrnosti a Stránka podniku: formulář
   vlevo, `RamTelefonu` s kartou hosta vpravo (lg sticky); na telefonu náhled nahoře
   a sbalený. Karta hosta je jedna komponenta (HOST `components/client/karta/*`, ve správě
-  přes `components/client/sprava/NahledKarty.tsx`). Barva podniku jen na kartě a v hlavičce
-  jeho stránky; hlavní akce hosta zůstává limetková.
+  přes `components/client/sprava/NahledKarty.tsx`). Barva podniku jen na dlaždici loga
+  (viz „Host: barva podniku jen na dlaždici loga“); hlavní akce hosta zůstává limetková.
 - **Hosté = CRM:** segmenty jako čipy s počty (`lib/klientSprava/segmentyHostu.ts`), tabulka
   hodnoty na monitoru (čísla na R), řádky seznamu na telefonu, profil hosta jako panel vedle
   seznamu (lg) / okno zdola (telefon) s jednou časovou osou.
@@ -2202,12 +2204,13 @@ třídy `.h-*` v `app/globals.css` (každá s tmavou variantou).
 
 - **Motiv:** host jede podle telefonu (`window.__motivVychozi` ze skriptu v `app/layout.tsx`, volba
   Systém / Světlý / Tmavý v Moje → Jazyk a vzhled, jen na zařízení). Pole QR (`.h-qr-pole`) je bílé vždy.
-- **Karta podniku** (`KartaPodniku`, sdílená se správou jako živý náhled): plná barva značky (`--k-bg`),
-  písmo podle kontrastu (`onAccent` → `--k-ink`), logo v bílém čtverci, **jedno číslo** 34/600 tabular
-  (razítka X / N, nebo body), jedna věta, stav „Připraveno“ (`.h-pripraveno`, limetka) vpravo u čísla.
-  Bez barvy podniku grafit `#2B2F33`, nikdy limetka.
-- **Razítka s datem** (`RazitkaMrizka`): kolečka 5 v řadě, plné = datum návštěvy („2.9.“), prázdné
-  čárkované, poslední = odměna v limetkovém obrysu; právě připsané docvakne (`.h-pop`, 220 ms) s prstencem.
+- **Karta podniku** (`KartaPodniku`, sdílená se správou jako živý náhled): bílá karta s linkou
+  (`.h-karta` = `--surface`, `--surface-line`, `--shadow-card`; v tmavém `--surface`), dlaždice loga,
+  **jedno číslo** 34/600 tabular (razítka X / N, nebo body), jedna věta, stav „Připraveno“
+  (`.h-pripraveno`, limetka) vpravo u čísla. Lišta bodů: dráha v jamce, pokrok limetkou, rysky prahů inkoustem.
+- **Razítka s datem** (`RazitkaMrizka`): kolečka 5 v řadě, plné = inkoust s datem návštěvy („2.9.“;
+  v tmavém světlé), prázdné čárkované, poslední = odměna v limetkové jamce (plná = limetka); právě
+  připsané je limetkové s prstencem a docvakne (`.h-pop`, 220 ms).
 - **Dok hosta:** `Karta · Podniky · [U kasy] · Odměny · Aktivita`; U kasy je inkoustový kruh 56 s limetkovou
   ikonou QR (tmavě limetkový kruh), vystupuje nad dok. Aktivní položka = limetková pilulka pod ikonou.
   Profil („Moje“) je za avatarem (limetkový kruh s iniciálami) v hlavičce Karty a v liště od md.
@@ -2215,8 +2218,31 @@ třídy `.h-*` v `app/globals.css` (každá s tmavou variantou).
   se čtyřmi položkami, „Ukázat kartu“ (inkoust) a avatarem.
 - **U kasy / Razítko připsáno / Rezervace / Živý poukaz** jsou `<Modal>` (na telefonu zdola, U kasy na
   celou výšku). Odezva: `.h-plus` (limetkový kruh 72 s „+1“), karta razítek, dvě akce ½ + ½ × 52.
-- **Stránka podniku:** hlavička v barvě podniku přes šířku telefonu, pod ní karta s řadou akcí (`.h-akce`,
-  4 rovné díly, ikona v jamce 40 + popisek 13); od md dva sloupce (karta a odměny vlevo, menu a info vpravo).
+- **Stránka podniku:** inkoustová hlavička (`.h-moje`, sklo `.h-kruh-sklo` pro Zpět a Sdílet, dlaždice loga 64)
+  přes šířku telefonu, pod ní karta s řadou akcí (`.h-akce`, 4 rovné díly, ikona v jamce 40 + popisek 13);
+  od md dva sloupce (karta a odměny vlevo, menu a info vpravo). „Stát se členem“ je limetka (`btn-accent`),
+  tlačítko banneru inkoust (`btn-primary`, na fotce bílé `.h-cta-foto`), banner bez fotky je `.card`.
 - **Čipy dne a času** (`.h-cip`, výška 36, v rezervaci 44 `.h-cas`): vybraný inkoust, obsazený přeškrtnutý.
 - **Slovník:** Karta (ne Kartička), Odměny, Připraveno, Vyměnit, Mám kód, U kasy, Přijdu; žádné emoji.
+
+### Host: barva podniku jen na dlaždici loga (korekce 2026-10-27)
+
+Koncept B vyplnil barvou značky podniku karty na domově (tmavě zelená, hnědá), hlavičku stránky podniku
+i kartu razítek. Martin: „vypadalo to dost dobře, jen ses nedržel našich barev.“ Host je Managero, ne
+mozaika barev podniků — a s pěti podniky na domově se z barev stane pestrý seznam, ve kterém nic nevede.
+
+- **Barva značky podniku je jen na dlaždici loga** (`LogoPodniku`: logo na bílé s linkou; bez loga první
+  písmeno na barvě podniku, písmo podle `onAccent`; bez barvy grafit `#2B2F33`). Nikde jinde v aplikaci
+  hosta — ne karta, hlavička, razítka, tlačítko, banner ani tečky karuselu. `stylKarty`, `--k-bg` a `--k-ink`
+  jsou pryč; `barvyKarty` zůstává jen pro dlaždici.
+- **Jedna inkoustová plocha na obrazovku.** Domov: Moje karta s QR (`.h-moje`) — proto jsou karty podniků
+  pod ní bílé s linkou, ne inkoustové: QR zůstane nejvýraznější a karty se čtou jako seznam, jako karty
+  ve Správě. Stránka podniku: hlavička. U kasy a odezva: nic (bílý list, limetkové +1).
+- **Karta razítek** je bílá s inkoustovými razítky všude (domov, stránka podniku, odezva u kasy, náhledy
+  ve správě, čtečka) — stejná komponenta, stejné barvy.
+- **Limetka** zůstává tam, kde dřív: hlavní akce, „Připraveno“, pokrok, právě připsané razítko, odměna, +1.
+- **Kde barva značky žije mimo aplikaci hosta (neměněno):** pozadí karty v Apple a Google Wallet
+  (`lib/walletDb.ts` → `walletApple`/`walletGoogle`). Veřejné menu má vlastní motiv (`share_theme`,
+  `lib/menuTheme.ts`), e-maily a tisk barvu podniku nečtou. Vysvětluje to Stránka podniku → Barva značky.
+- Ukázka `/client/demo` má v datech barvy podniků dál (dlaždice loga je ukazuje); do ploch se nepropisují.
 
