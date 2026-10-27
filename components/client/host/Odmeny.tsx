@@ -335,7 +335,7 @@ function ZivyPoukaz({ odmena, onClose }: { odmena: Odmena; onClose: () => void }
   }, [uplatneno, odmena.id]);
   const hh = String(ted.getHours()).padStart(2, '0'); const mm = String(ted.getMinutes()).padStart(2, '0'); const ss = String(ted.getSeconds()).padStart(2, '0');
   return (
-    <Modal open onClose={onClose} size="md" className="h-vyjed" title={odmena.title} subtitle={odmena.business}>
+    <Modal open onClose={onClose} size="md" className="h-list-sklo h-plocha h-vyjed" title={odmena.title} subtitle={odmena.business}>
         <div className="flex justify-center">
           <LogoPodniku nazev={odmena.business} logoUrl={odmena.logoUrl} barva={odmena.accent} velikost={56} />
         </div>

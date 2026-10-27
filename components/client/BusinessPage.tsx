@@ -235,17 +235,19 @@ function Hlavicka({ b, today, onRezervovat, onMenu }: { b: any; today: string; o
   ];
   return (
     <div>
-      <section className="h-moje relative -mx-4 min-[360px]:-mx-5 sm:mx-0 -mt-[max(env(safe-area-inset-top),20px)] md:mt-0 !rounded-t-none sm:!rounded-t-[28px] !rounded-b-[28px] px-5 sm:px-7 pt-[calc(max(env(safe-area-inset-top),20px)+4px)] md:pt-6 pb-14">
+      {/* Hlavička jako sklo nad skvrnami pozadí (korekce 2026-10-27: „glass + blur a pozadí“), ne plná
+          inkoustová plocha — inkoust patří jen Moje kartě s QR. Text je inkoust na bílém skle, limetka prosvítá. */}
+      <section className="h-sklo relative -mx-4 !border-t-0 sm:!border-t min-[360px]:-mx-5 sm:mx-0 -mt-[max(env(safe-area-inset-top),20px)] md:mt-0 !rounded-t-none sm:!rounded-t-[28px] !rounded-b-[28px] px-5 sm:px-7 pt-[calc(max(env(safe-area-inset-top),20px)+4px)] md:pt-6 pb-14">
         <div className="flex items-center justify-between">
-          <Link href={cesta('/client')} className="tap-target h-kruh-sklo" aria-label={t('Zpět na podniky')}><Icon name="chevronLeft" size={18} /></Link>
-          <button type="button" onClick={sdilet} className="tap-target h-kruh-sklo" aria-label={t('Sdílet podnik')}><Icon name="share" size={17} /></button>
+          <Link href={cesta('/client')} className="tap-target h-kruh-svetle" aria-label={t('Zpět na podniky')}><Icon name="chevronLeft" size={18} /></Link>
+          <button type="button" onClick={sdilet} className="tap-target h-kruh-svetle" aria-label={t('Sdílet podnik')}><Icon name="share" size={17} /></button>
         </div>
         <div className="mt-5 flex items-end gap-4">
           <LogoPodniku nazev={b.name} logoUrl={b.logoUrl} barva={b.accent || null} velikost={64} />
         </div>
-        <h1 className="mt-4 text-[1.875rem] sm:text-[2.5rem] font-semibold leading-[1.05] tracking-[-0.025em] text-balance break-words text-white">{b.name}</h1>
-        <p className="mt-2 text-[14px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 h-moje-tlume">
-          <span className={`h-2 w-2 rounded-full shrink-0 ${o.otevreno ? 'bg-[#C8F542]' : 'bg-white/30'}`} aria-hidden />
+        <h1 className="mt-4 text-[1.875rem] sm:text-[2.5rem] font-semibold leading-[1.05] tracking-[-0.025em] text-balance break-words">{b.name}</h1>
+        <p className="mt-2 text-[14px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 h-karta-tlume">
+          <span className={`h-2 w-2 rounded-full shrink-0 ${o.otevreno ? 'bg-[#C8F542] ring-2 ring-[#C8F542]/30' : 'h-karta-ryska'}`} aria-hidden />
           <span>{popisOtevreni(o, t)}</span>
           {b.address && <span className="min-w-0 break-words">· {b.address}</span>}
         </p>
@@ -560,7 +562,7 @@ function Menu({ menu, currency }: { menu: any; currency: string }) {
         </div>
       )}
       {ukaz.map((s: any) => (
-        <section key={s.id} className="card px-4 sm:px-5 py-2">
+        <section key={s.id} className="card h-sklo-tichy px-4 sm:px-5 py-2">
           <h3 className="t-card pt-2.5 pb-1">{s.title}</h3>
           <ul className="list">
             {s.items.map((it: any) => (

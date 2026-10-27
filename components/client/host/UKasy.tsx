@@ -154,7 +154,7 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
   const vm = podnik ? kartaZClenstvi(podnik, odmeny, t) : null;
 
   return (
-    <Modal open onClose={onClose} size="md" className="h-vyjed min-h-[calc(100dvh-1rem)] sm:min-h-0"
+    <Modal open onClose={onClose} size="md" className="h-list-sklo h-plocha h-vyjed min-h-[calc(100dvh-1rem)] sm:min-h-0"
       title={udalosti ? souhrnOdezvy(udalosti, t).titul : t('Ukaž u kasy')}
       subtitle={udalosti ? souhrnOdezvy(udalosti, t).podtitul : umiDrzet ? t('Displej necháme svítit. Platí ve všech podnicích.') : t('Zvyš jas displeje. Platí ve všech podnicích.')}>
         {udalosti ? (
