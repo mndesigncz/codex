@@ -61,6 +61,10 @@ export interface ClenRosteru {
   avatar?: string | null;
   openSince?: string | null;
   openEntryId?: number | null;
+  /** Začátek běžící směny — první příchod před pauzami (kolo 93; po „Konec pauzy" je openSince konec pauzy). */
+  shiftSince?: string | null;
+  /** Skončené pauzy běžící směny v ms. */
+  breakMs?: number | null;
   shiftStart?: string | null;
   shiftEnd?: string | null;
   /** Jen s finance.mzdy (celý roster) nebo finance.moje_mzda (vlastní řádek). */
@@ -536,6 +540,7 @@ export function dnesVPodniku(roster: readonly ClenRosteru[], entries: readonly Z
     const k = String(e.employeeId ?? '');
     dnesni.set(k, [...(dnesni.get(k) ?? []), e]);
   }
+  const pokracovani = pokracovaniPoPauze(entries ?? []);
   const out: RadekDne[] = [];
   for (const r of roster) {
     const id = String(r.id);
@@ -544,7 +549,8 @@ export function dnesVPodniku(roster: readonly ClenRosteru[], entries: readonly Z
     if (!maPlan && !otevreny) continue;
     const plan = maPlan ? `${String(r.shiftStart).slice(0, 5)}–${String(r.shiftEnd ?? '').slice(0, 5)}` : null;
     const zaznamy = dnesni.get(id) ?? [];
-    const posledni = zaznamy.map(z => parseDbTime(z.clockIn)).filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    // Poslední příchod dne — záznam po pauze není příchod (pokračuje směnu), bere se příchod směny před ním.
+    const posledni = zaznamy.filter(z => !pokracovani.has(String(z.id ?? ''))).map(z => parseDbTime(z.clockIn)).filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
     let stav: StavDne;
     if (otevreny) stav = maPlan ? 'na_smene' : 'bez_planu';
     else if (zaznamy.length > 0) stav = 'odesel';
@@ -555,7 +561,8 @@ export function dnesVPodniku(roster: readonly ClenRosteru[], entries: readonly Z
       else if (entries == null && konec && ted > konec.getTime()) stav = 'po_smene';
       else stav = 'nedorazil';
     }
-    out.push({ id, jmeno: r.name ?? 'Bez jména', avatar: r.avatar ?? null, plan, stav, prichod: otevreny ?? posledni });
+    // Příchod směny: po pauze první příchod (shiftSince), ne konec pauzy.
+    out.push({ id, jmeno: r.name ?? 'Bez jména', avatar: r.avatar ?? null, plan, stav, prichod: (otevreny ? parseDbTime(r.shiftSince ?? null) ?? otevreny : null) ?? posledni });
   }
   const PORADI: Record<StavDne, number> = { nedorazil: 0, na_smene: 1, bez_planu: 2, ceka: 3, odesel: 4, po_smene: 5 };
   return out.sort((a, b) => PORADI[a.stav] - PORADI[b.stav] || (a.plan ?? '').localeCompare(b.plan ?? '') || a.jmeno.localeCompare(b.jmeno, 'cs'));

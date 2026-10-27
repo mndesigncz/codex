@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
-  mujMesic, odpracovanoVeSmene, pokracovaniPoPauze, radkyMojeDochazky, smenaClena, souhrnHodin, type ZaznamDochazky,
+  dnesVPodniku, mujMesic, odpracovanoVeSmene, pokracovaniPoPauze, radkyMojeDochazky, smenaClena, souhrnHodin, type ZaznamDochazky,
 } from '../../lib/dochazkaPrehled.ts';
 import { souhrnOdchodu } from '../../lib/kioskPrehled.ts';
 import { rosterSFrontou } from '../../lib/kioskOffline.ts';
@@ -75,6 +75,12 @@ export default function ({ eq, ok }: Testy) {
   eq('souhrn: bez záznamu před pauzou (jiné období) se pokračování počítá jako směna období', souhrnHodin([hotovaB], ted, new Map())[0].pocet, 1);
   eq('můj měsíc: jedna směna, 7 h 30 min', [mujMesic([A, hotovaB], 5, '2026-10', ted, null).pocet, mujMesic([A, hotovaB], 5, '2026-10', ted, null).ms], [1, 7.5 * H]);
   eq('moje docházka: jedna směna, jeden den s pauzou 30 min', (() => { const r = radkyMojeDochazky([A, hotovaB], 5, '2026-10', ted); return [r.pocet, r.dny.length, r.dny[0].pauzyMs]; })(), [1, 1, 30 * MIN]);
+
+  // ---- Dnes v podniku ----
+  const dvp = dnesVPodniku([{ id: 5, name: 'Eva', openSince: p(D, '12:30'), shiftSince: p(D, '08:00'), shiftStart: '08:00', shiftEnd: '16:30' }], [A, B], ted, D);
+  eq('dnes v podniku: běžící směna po pauze má příchod 08:00', dvp[0].prichod?.toISOString(), p(D, '08:00'));
+  const odesla = dnesVPodniku([{ id: 5, name: 'Eva', openSince: null, shiftStart: '08:00', shiftEnd: '16:30' }], [A, hotovaB], ted, D);
+  eq('dnes v podniku: odešla — příchod 08:00, ne 12:30 (záznam po pauze není příchod)', [odesla[0].stav, odesla[0].prichod?.toISOString()], ['odesel', p(D, '08:00')]);
 
   // ---- souhrn odchodu na tabletu ----
   eq('tablet: souhrn odchodu po pauze je za celou směnu 08:00–16:00, 7 h 30 min, pauza 30 min',
