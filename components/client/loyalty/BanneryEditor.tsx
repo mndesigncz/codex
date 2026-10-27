@@ -39,7 +39,7 @@ const PROKLIK: CzNoun = { one: 'proklik', few: 'prokliky', many: 'prokliků' };
 
 const iconBtn = 'tap-target-sm h-9 w-9 grid place-items-center rounded-full hover:bg-black/[0.06] disabled:opacity-30';
 
-export default function BanneryEditor({ toast, upload, accent }: { toast: (m: string) => void; upload: (f: File) => Promise<string>; accent: string }) {
+export default function BanneryEditor({ toast, upload }: { toast: (m: string) => void; upload: (f: File) => Promise<string> }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -310,7 +310,7 @@ export default function BanneryEditor({ toast, upload, accent }: { toast: (m: st
             <p className="field-label">Náhled</p>
             {nahled && nahled.ok ? (
               <>
-                <PromoBanners accent={accent || '#C8F542'} loyaltyOn onGoTab={() => {}}
+                <PromoBanners loyaltyOn onGoTab={() => {}}
                   banners={[{ id: -1, title: nahled.hodnoty.title, text: nahled.hodnoty.text, imageUrl: nahled.hodnoty.image_url, linkKind: nahled.hodnoty.link_kind, linkRef: nahled.hodnoty.link_ref }]} />
                 <p className="t-meta mt-2">Uvidí: {popisCile({ target_kind: nahled.hodnoty.target_kind, target_ref: nahled.hodnoty.target_ref }, nazvy).toLowerCase()}.
                   {procNeukazuje({ id: 0, active: nahled.hodnoty.active, valid_since: nahled.hodnoty.valid_since, valid_until: nahled.hodnoty.valid_until, days_of_week: nahled.hodnoty.days_of_week, hour_from: nahled.hodnoty.hour_from, hour_till: nahled.hodnoty.hour_till }, dnes, kdy) ? ' Teď se ale hostům neukazuje (vypnutý, mimo platnost nebo mimo plán).' : ''}</p>

@@ -1,9 +1,9 @@
 'use client';
 
-// Razítka s datem návštěvy (koncept B, 10a/6 Stamp Me): mřížka 5 × N koleček na barvě podniku.
-// Plné kolečko nese datum („2.9.“), prázdné je čárkované, poslední je odměna v limetkovém
-// obrysu. `dnes` zvýrazní právě připsané razítko (okamžitá odezva u kasy) a nechá ho docvaknout.
-// Leží uvnitř .h-karta (barvy z --k-bg / --k-ink).
+// Razítka s datem návštěvy (koncept B, 10a/6 Stamp Me): mřížka 5 × N koleček v bílé kartě.
+// Plné kolečko je inkoustové s datem („2.9.“), prázdné čárkované, poslední je odměna v limetkové
+// jamce (plná = limetka). `dnes` zvýrazní právě připsané razítko limetkovým prstencem (okamžitá
+// odezva u kasy) a nechá ho docvaknout. Leží uvnitř .h-karta; barva podniku sem nepatří.
 
 import { Icon } from '../../Icons';
 

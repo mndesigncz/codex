@@ -6,12 +6,13 @@
 // a další, tečky, tlačítko pozastavit; automatické otáčení je jen u hosta bez
 // „méně pohybu“, zastaví se při najetí, zaostření i na pokyn. Vidí se vždy
 // jeden banner (ostatní jsou skryté), takže stránka nikdy nescrolluje do strany.
+// Barvy z palety Managera: banner bez fotky je bílá karta s linkou, tlačítko inkoustové (na fotce
+// bílé), vybraná tečka inkoustem. Barva značky podniku sem nepatří (jen dlaždice loga).
 
 import { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { useT } from '@/lib/i18n/client';
 import { httpsOdkaz } from '@/lib/bannery';
-import { onAccent } from '@/lib/floorplan';
 
 export interface PromoBanner {
   id: number; title: string; text: string; imageUrl: string | null; linkKind: string; linkRef: string | null;
@@ -45,8 +46,8 @@ function jednouZobrazen(slug: string | undefined, id: number) {
   posliUdalost(slug, id, 'view');
 }
 
-export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab, slug }: {
-  banners: PromoBanner[]; accent: string; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void;
+export default function PromoBanners({ banners, loyaltyOn, onGoTab, slug }: {
+  banners: PromoBanner[]; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void;
   /** Slug podniku zapíná statistiku zobrazení a prokliků; bez něj (náhled v editoru) se nic neposílá. */
   slug?: string;
 }) {
@@ -86,7 +87,7 @@ export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab, slug
       {banners.map((b, k) => (
         <div key={b.id} role="group" aria-roledescription={t('snímek')} aria-label={t('Oznámení {n} z {total}', { n: k + 1, total: n })}
           hidden={k !== idx} data-banner={b.id}>
-          <Slide b={b} accent={accent} loyaltyOn={loyaltyOn} onGoTab={onGoTab} onClick={() => posliUdalost(slug, b.id, 'click')} />
+          <Slide b={b} loyaltyOn={loyaltyOn} onGoTab={onGoTab} onClick={() => posliUdalost(slug, b.id, 'click')} />
         </div>
       ))}
       {n > 1 && (
@@ -103,7 +104,7 @@ export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab, slug
             {banners.map((b, k) => (
               <button key={b.id} type="button" onClick={() => setI(k)} aria-label={t('Oznámení {n} z {total}', { n: k + 1, total: n })} aria-current={k === idx ? 'true' : undefined}
                 className="tap-target-sm h-6 w-6 grid place-items-center rounded-full">
-                <span className={`block h-2 rounded-full transition-[width] ${k === idx ? 'w-5' : 'w-2 bg-black/20'}`} style={k === idx ? { background: accent } : undefined} />
+                <span className={`block h-2 rounded-full transition-[width] ${k === idx ? 'w-5 h-tecka-on' : 'w-2 bg-black/20'}`} />
               </button>
             ))}
           </div>
@@ -118,7 +119,7 @@ export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab, slug
   );
 }
 
-function Slide({ b, accent, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; accent: string; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void; onClick?: () => void }) {
+function Slide({ b, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void; onClick?: () => void }) {
   const t = useT('klient-host');
   const foto = !!b.imageUrl;
   const url = b.linkKind === 'url' ? httpsOdkaz(b.linkRef) : null;
@@ -134,11 +135,10 @@ function Slide({ b, accent, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; acc
     const cil = b.linkKind === 'event' ? 'h-events' : b.linkKind === 'coupon' && b.linkRef ? `kupon-${b.linkRef}` : b.linkKind === 'campaign' && b.linkRef ? `karta-${b.linkRef}` : null;
     if (cil) setTimeout(() => document.getElementById(cil)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
   };
-  // Tvar tlačítka je společný (.btn), barvu dává podnik.
-  const cta = 'tap-target btn btn-sm !gap-1.5';
+  // Tlačítko banneru je druhá důležitá akce stránky (limetka patří „Stát se členem“): inkoustové, na fotce bílé.
+  const cta = `tap-target btn btn-sm !gap-1.5 ${foto ? 'h-cta-foto' : 'btn-primary'}`;
   return (
-    <div className={`relative overflow-hidden rounded-3xl border border-black/[0.06] ${foto ? 'bg-[#16181A] text-white' : ''}`}
-      style={foto ? undefined : { background: `${accent}22`, borderColor: `${accent}66` }}>
+    <div className={`relative overflow-hidden ${foto ? 'rounded-3xl bg-[#16181A] text-white' : 'card'}`}>
       {foto && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={b.imageUrl!} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -150,11 +150,11 @@ function Slide({ b, accent, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; acc
         {(url || vnitrni) && (
           <div className="mt-1">
             {url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer nofollow" onClick={onClick} className={cta} style={{ background: accent, color: onAccent(accent) }}>
+              <a href={url} target="_blank" rel="noopener noreferrer nofollow" onClick={onClick} className={cta}>
                 {popisek}<Icon name="external" size={14} />
               </a>
             ) : (
-              <button type="button" onClick={otevri} className={cta} style={{ background: accent, color: onAccent(accent) }}>
+              <button type="button" onClick={otevri} className={cta}>
                 {popisek}<Icon name="chevronRight" size={14} />
               </button>
             )}

@@ -1,6 +1,6 @@
 'use client';
 
-// Stránka podniku jako jeho mini-web (koncept B 2, audit C §6 4). Hlavička v barvě podniku
+// Stránka podniku jako jeho mini-web (koncept B 2, audit C §6 4). Inkoustová hlavička s dlaždicí loga
 // (logo, název, „Otevřeno do 20:00 · adresa“), pod ní řada čtyř akcí Rezervovat · Menu · Navigovat ·
 // Zavolat (bez telefonu Sdílet), pak moje karta razítek s daty návštěv (nebo vstup do členství
 // s tím, co host dostane hned), „Dnes“ (běžící bonus a bannery), žebříček odměn (co za razítka
@@ -13,7 +13,6 @@ import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Skeleton, EmptyState, ErrorState } from '../ui';
 import TableMap, { placedTables } from './TableMap';
-import { onAccent } from '@/lib/floorplan';
 import { RES_STATUS } from '@/lib/clientSlots';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum, fmtDenVTydnu, fmtMesic } from '@/lib/i18n/format';
@@ -31,7 +30,7 @@ import { SkonceneKarticky } from './loyalty/KartaRazitek';
 import HostHistorie from './loyalty/HostHistorie';
 import HostPravidla from './loyalty/HostPravidla';
 import { PlatnostKuponu } from './loyalty/HostPlatnost';
-import { LogoPodniku, barvyKarty, stylKarty } from './karta/KartaPodniku';
+import { LogoPodniku } from './karta/KartaPodniku';
 import RazitkaMrizka from './karta/RazitkaMrizka';
 import Rezervace from './host/Rezervace';
 import { useCesta } from './host/cesty';
@@ -92,7 +91,6 @@ export default function BusinessPage({ slug }: { slug: string }) {
   if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-[28px]" /><Skeleton className="h-20 rounded-3xl" /><Skeleton className="h-64 rounded-3xl" /></div>;
 
   const b = d.business; const me = d.me; const today: string = d.today; const signedIn = !!d.signedIn;
-  const accent: string = b.accent || '#C8F542';
   const lzeObjednat = !!b.orderingOn && (d.tables?.length ?? 0) > 0;
   const join = async () => {
     if (joining) return;
@@ -135,7 +133,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
         {/* Členství: karta podniku s razítky a daty návštěv, nebo vstup s tím, co host dostane hned. */}
         <section id="vernost" aria-label={t('Věrnost')} className="scroll-mt-6 space-y-3">
-          {me?.member ? <MojeKarta b={b} me={me} today={today} accent={b.accent} /> : b.loyaltyOn ? (
+          {me?.member ? <MojeKarta b={b} me={me} today={today} /> : b.loyaltyOn ? (
             <div className="card p-4 sm:p-5" data-vstup-clenstvi>
               <div className="flex items-start gap-3">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/[0.05]" aria-hidden><Icon name="gift" size={18} /></span>
@@ -147,8 +145,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
                   </p>
                 </div>
               </div>
-              <button type="button" onClick={join} disabled={joining} className="mt-4 tap-target btn w-full !h-[52px] disabled:opacity-60"
-                style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> {t('Stát se členem')}</button>
+              <button type="button" onClick={join} disabled={joining} className="mt-4 tap-target btn btn-accent w-full !h-[52px] disabled:opacity-60"><Icon name="plus" size={16} /> {t('Stát se členem')}</button>
               {/* Souhlas s novinkami je dobrovolný a po podnicích: výchozí NE, jde změnit v profilu. */}
               <label className="mt-1 min-h-[44px] flex items-center gap-2.5 text-sm cursor-pointer select-none text-black/70">
                 <input type="checkbox" checked={chciNovinky} onChange={e => setChciNovinky(e.target.checked)} className="h-5 w-5 shrink-0 accent-[#16181A]" />
@@ -161,8 +158,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
         {/* Dnes: běžící bonus („Dnes dvojnásobné body do 18:00“) a bannery podniku (data podniku). */}
         {((d.bonus && b.loyaltyOn) || (d.banners?.length ?? 0) > 0) && (
           <section aria-label={t('Dnes')} className="space-y-3">
-            {d.bonus && b.loyaltyOn && <BonusPruh bonus={d.bonus} accent={accent} />}
-            {(d.banners?.length ?? 0) > 0 && <PromoBanners banners={d.banners} accent={accent} loyaltyOn={!!b.loyaltyOn} onGoTab={tab => skok(tab === 'loyalty' ? 'odmeny-podniku' : 'menu')} slug={slug} />}
+            {d.bonus && b.loyaltyOn && <BonusPruh bonus={d.bonus} />}
+            {(d.banners?.length ?? 0) > 0 && <PromoBanners banners={d.banners} loyaltyOn={!!b.loyaltyOn} onGoTab={tab => skok(tab === 'loyalty' ? 'odmeny-podniku' : 'menu')} slug={slug} />}
           </section>
         )}
 
@@ -218,11 +215,11 @@ export default function BusinessPage({ slug }: { slug: string }) {
   );
 }
 
-/** Hlavička v barvě podniku + řada akcí. Na telefonu přes celou šířku až k hornímu okraji. */
+/** Hlavička (inkoustová plocha v paletě Managera; barva podniku jen na dlaždici loga) + řada akcí.
+ *  Na telefonu přes celou šířku až k hornímu okraji. */
 function Hlavicka({ b, today, onRezervovat, onMenu }: { b: any; today: string; onRezervovat: (() => void) | null; onMenu: () => void }) {
   const t = useT('klient-host');
   const cesta = useCesta();
-  const { bg, ink } = barvyKarty(b.accent);
   const o = stavOtevreni(b.hours, today, pragueHM());
   const mapa = b.address ? `https://mapy.cz/zakladni?q=${encodeURIComponent(`${b.name}, ${b.address}`)}` : null;
   const sdilet = () => {
@@ -238,18 +235,17 @@ function Hlavicka({ b, today, onRezervovat, onMenu }: { b: any; today: string; o
   ];
   return (
     <div>
-      <section className="h-karta -mx-4 min-[360px]:-mx-5 sm:mx-0 -mt-[max(env(safe-area-inset-top),20px)] md:mt-0 !rounded-t-none sm:!rounded-t-[28px] !rounded-b-[28px] !px-5 sm:!px-7 !pt-[calc(max(env(safe-area-inset-top),20px)+4px)] md:!pt-6 !pb-14"
-        style={{ ['--k-bg' as any]: bg, ['--k-ink' as any]: ink }}>
+      <section className="h-moje relative -mx-4 min-[360px]:-mx-5 sm:mx-0 -mt-[max(env(safe-area-inset-top),20px)] md:mt-0 !rounded-t-none sm:!rounded-t-[28px] !rounded-b-[28px] px-5 sm:px-7 pt-[calc(max(env(safe-area-inset-top),20px)+4px)] md:pt-6 pb-14">
         <div className="flex items-center justify-between">
-          <Link href={cesta('/client')} className="tap-target grid h-10 w-10 place-items-center rounded-full" style={{ background: 'color-mix(in srgb, var(--k-ink) 16%, transparent)' }} aria-label={t('Zpět na podniky')}><Icon name="chevronLeft" size={18} /></Link>
-          <button type="button" onClick={sdilet} className="tap-target grid h-10 w-10 place-items-center rounded-full" style={{ background: 'color-mix(in srgb, var(--k-ink) 16%, transparent)' }} aria-label={t('Sdílet podnik')}><Icon name="share" size={17} /></button>
+          <Link href={cesta('/client')} className="tap-target h-kruh-sklo" aria-label={t('Zpět na podniky')}><Icon name="chevronLeft" size={18} /></Link>
+          <button type="button" onClick={sdilet} className="tap-target h-kruh-sklo" aria-label={t('Sdílet podnik')}><Icon name="share" size={17} /></button>
         </div>
         <div className="mt-5 flex items-end gap-4">
-          <LogoPodniku nazev={b.name} logoUrl={b.logoUrl} velikost={64} />
+          <LogoPodniku nazev={b.name} logoUrl={b.logoUrl} barva={b.accent || null} velikost={64} />
         </div>
-        <h1 className="mt-4 text-[1.875rem] sm:text-[2.5rem] font-semibold leading-[1.05] tracking-[-0.025em] text-balance break-words" style={{ color: 'var(--k-ink)' }}>{b.name}</h1>
-        <p className="mt-2 text-[14px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 h-karta-tlume">
-          <span className={`h-2 w-2 rounded-full shrink-0 ${o.otevreno ? 'bg-[#C8F542]' : 'h-karta-linka'}`} aria-hidden />
+        <h1 className="mt-4 text-[1.875rem] sm:text-[2.5rem] font-semibold leading-[1.05] tracking-[-0.025em] text-balance break-words text-white">{b.name}</h1>
+        <p className="mt-2 text-[14px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 h-moje-tlume">
+          <span className={`h-2 w-2 rounded-full shrink-0 ${o.otevreno ? 'bg-[#C8F542]' : 'bg-white/30'}`} aria-hidden />
           <span>{popisOtevreni(o, t)}</span>
           {b.address && <span className="min-w-0 break-words">· {b.address}</span>}
         </p>
@@ -264,7 +260,7 @@ function Hlavicka({ b, today, onRezervovat, onMenu }: { b: any; today: string; o
 }
 
 /** Moje karta v podniku: razítka s daty návštěv (kampaně), body, úroveň, kredit a co propadá. */
-function MojeKarta({ b, me, today, accent }: { b: any; me: any; today: string; accent: string | null }) {
+function MojeKarta({ b, me, today }: { b: any; me: any; today: string }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
   const datum = (x: string) => fmtDatum(x, { jazyk, styl: 'kratce' });
@@ -287,7 +283,7 @@ function MojeKarta({ b, me, today, accent }: { b: any; me: any; today: string; a
   if (!kampane.length) {
     return (
       <div>
-        <div className="h-karta" style={stylKarty(accent)}>
+        <div className="h-karta">
           <p className="text-[15px] font-semibold">{b.stampTarget > 0 && !(me.campaigns?.length) ? t('Moje razítka') : t('Moje body')}</p>
           {b.stampTarget > 0 && !(me.campaigns?.length) ? (
             <div className="mt-3">
@@ -309,7 +305,7 @@ function MojeKarta({ b, me, today, accent }: { b: any; me: any; today: string; a
         const zbyva = Math.max(0, k.required - k.stamps);
         return (
           <div key={k.id} id={`karta-${k.id}`}>
-            <div className="h-karta" style={stylKarty(k.color || accent)}>
+            <div className="h-karta">
               <div className="flex items-baseline justify-between gap-3">
                 <p className="text-[15px] font-semibold min-w-0 truncate">{k.name || t('Moje razítka')}</p>
                 <p className="text-[13px] font-semibold tabular-nums h-karta-tlume shrink-0">{k.stamps} / {k.required}</p>
@@ -542,7 +538,7 @@ function Akce({ events, b, slug, signedIn }: { events: any[]; b: any; slug: stri
           </li>
         ))}
       </ul>
-      {evDetail && <EventSheet e={evDetail} currency={b.currency} ac={b.accent || '#C8F542'} slug={slug} signedIn={signedIn} businessName={b.name} address={b.address} onClose={() => setEvDetail(null)} />}
+      {evDetail && <EventSheet e={evDetail} currency={b.currency} slug={slug} signedIn={signedIn} businessName={b.name} address={b.address} onClose={() => setEvDetail(null)} />}
     </section>
   );
 }
@@ -644,7 +640,7 @@ const input = 'field text-sm';
 const label = 'field-label';
 
 /** Pruh s právě běžící bonusovou akcí podniku. */
-function BonusPruh({ bonus, accent }: { bonus: { name: string; multiplier: number; stampBonus: number; until: string | null }; accent: string }) {
+function BonusPruh({ bonus }: { bonus: { name: string; multiplier: number; stampBonus: number; until: string | null } }) {
   const t = useT('klient-host');
   const kdy = bonus.until ?? '';
   const nasobek = String(bonus.multiplier).replace('.', ',');
@@ -861,8 +857,8 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
 
 
 // ---- Detail akce pro hosta: fotky, menu, mapa, kalendář, sledování -------
-function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, onClose }: {
-  e: any; currency: string; ac: string; slug: string; signedIn: boolean; businessName: string; address: string; onClose: () => void;
+function EventSheet({ e, currency, slug, signedIn, businessName, address, onClose }: {
+  e: any; currency: string; slug: string; signedIn: boolean; businessName: string; address: string; onClose: () => void;
 }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();

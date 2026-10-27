@@ -1,10 +1,10 @@
 'use client';
 
 // Karta (domov hosta, koncept B 1 + audit C §6): pozdrav a avatar (→ Profil), MOJE KARTA s QR vždy
-// po ruce (jeden kód pro všechny podniky, „Zvětšit“ otevře U kasy), pod ní karta za každý podnik
-// v jeho barvě s jedním číslem a stavem „Připraveno“, a pod tím jen to, co je dnes: rezervace,
-// odměna, které končí platnost, rozpracovaná objednávka. Nic dalšího — účet, souhlasy a data
-// jsou v Profilu, historie v Odměnách, novinky v Aktivitě.
+// po ruce (jeden kód pro všechny podniky, „Zvětšit“ otevře U kasy) — jediná inkoustová plocha, pod ní
+// bílá karta za každý podnik (barva podniku jen na dlaždici loga) s jedním číslem a stavem
+// „Připraveno“, a pod tím jen to, co je dnes: rezervace, odměna, které končí platnost, rozpracovaná
+// objednávka. Nic dalšího — účet, souhlasy a data jsou v Profilu, historie v Odměnách, novinky v Aktivitě.
 
 import Link from 'next/link';
 import { useMemo } from 'react';

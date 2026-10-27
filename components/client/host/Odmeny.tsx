@@ -1,7 +1,7 @@
 'use client';
 
 // Odměny: jedna peněženka odměn přes všechny podniky (koncept B 5, audit C §6).
-//   K uplatnění — připravené odměny v barvě podniku s platností; „Uplatnit“ otevře živý poukaz
+//   K uplatnění — připravené odměny s dlaždicí loga podniku a platností; „Uplatnit“ otevře živý poukaz
 //                 (běžící hodiny + pulzující rám = není to snímek obrazovky, kód i QR pro čtečku).
 //                 Pod nimi dárkové poukazy se zůstatkem.
 //   Nabídky     — kupony za body nebo zdarma; „Vyměnit“, když body stačí, jinak „chybí 280 b.“.
