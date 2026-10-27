@@ -19,7 +19,7 @@ import { useT } from '@/lib/i18n/client';
 import { okJson } from '@/lib/api';
 import { useObal } from '../../ObalProvider';
 import { otevriVeSystemu } from '@/lib/stahni';
-import KartaPodniku, { stylKarty } from '../karta/KartaPodniku';
+import KartaPodniku from '../karta/KartaPodniku';
 import RazitkaMrizka from '../karta/RazitkaMrizka';
 import { useHostMe, useKartaHosta, obnovHosta } from './data';
 import { kartaZClenstvi, pripraveneOdmeny, type Odmena } from './model';
@@ -154,7 +154,7 @@ function UKasy({ slug, onClose }: { slug?: string; onClose: () => void }) {
   const vm = podnik ? kartaZClenstvi(podnik, odmeny, t) : null;
 
   return (
-    <Modal open onClose={onClose} size="md" className="h-vyjed min-h-[calc(100dvh-1rem)] sm:min-h-0"
+    <Modal open onClose={onClose} size="md" className="h-list-sklo h-plocha h-vyjed min-h-[calc(100dvh-1rem)] sm:min-h-0"
       title={udalosti ? souhrnOdezvy(udalosti, t).titul : t('Ukaž u kasy')}
       subtitle={udalosti ? souhrnOdezvy(udalosti, t).podtitul : umiDrzet ? t('Displej necháme svítit. Platí ve všech podnicích.') : t('Zvyš jas displeje. Platí ve všech podnicích.')}>
         {udalosti ? (
@@ -244,7 +244,6 @@ function Odezva({ udalosti, podnik, onHotovo, onDalsi, hodnotitHref }: { udalost
   const { raz, body, velke } = souhrnOdezvy(udalosti, t);
   const uplatneno = udalosti.filter(u => u.typ === 'uplatneno');
   const odmena = udalosti.find(u => u.typ === 'odmena');
-  const prvni = raz ?? udalosti[0];
   const k = raz?.karta;
   const plna = !!k && k.razitka >= k.cil;
   return (
@@ -253,7 +252,7 @@ function Odezva({ udalosti, podnik, onHotovo, onDalsi, hodnotitHref }: { udalost
         {velke ? <span className="h-plus h-pop">{velke}</span> : <span className="h-plus h-pop"><Icon name="check" size={30} strokeWidth={2.4} /></span>}
       </div>
       {k && k.cil > 0 && (
-        <div className="h-karta mt-5" style={stylKarty(prvni.accent ?? podnik?.accent)}>
+        <div className="h-karta mt-5">
           <RazitkaMrizka pocet={k.razitka} cil={k.cil} noveOd={Math.max(0, k.razitka - (raz?.delta ?? 1))}
             data={(podnik?.razitkaData?.[String(k.id)] ?? []) as string[]}
             popis={t('{n} z {cil} razítek', { n: k.razitka, cil: k.cil })} />

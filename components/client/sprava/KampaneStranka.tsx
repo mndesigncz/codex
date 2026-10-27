@@ -9,7 +9,7 @@
 // Dřív: Zákazníci → Zprávy členům, Zákazníci → Automatizace, Vzhled → Bannery.
 
 import { useEffect, useState } from 'react';
-import { Button, ErrorState, PageHeader, Segmented, Skeleton, useLoad } from '../../ui';
+import { Button, PageHeader, Segmented } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import type { Hlaska } from '../import/typy';
 import Automatizace from '../loyalty/Automatizace';
@@ -30,11 +30,10 @@ const POPIS: Record<CastKampani, string> = {
   bannery: 'Obrázek nebo akce nahoře na stránce podniku.',
 };
 
+// Náhled banneru je v paletě Managera (barva značky podniku na stránce hosta jen na dlaždici loga),
+// takže editor nepotřebuje profil podniku.
 function Bannery({ oznam }: { oznam: Hlaska }) {
-  const { data, error, reload } = useLoad<{ accent: string }>('/api/client/admin/profile', raw => ({ accent: String(raw?.profile?.accent ?? '') }));
-  if (error) return <ErrorState title="Bannery se nenačetly" onRetry={reload} detail={error} />;
-  if (!data) return <Skeleton className="h-48" />;
-  return <BanneryEditor toast={t => oznam(t)} upload={uploadImage} accent={data.accent} />;
+  return <BanneryEditor toast={t => oznam(t)} upload={uploadImage} />;
 }
 
 export default function KampaneStranka({ oznam, castKampani }: { oznam: Hlaska; castKampani: { id: CastKampani; n: number } | null }) {

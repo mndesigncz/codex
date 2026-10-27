@@ -23,8 +23,8 @@ První a referenční zákazník: Čajovna Pangea (Brno), pokladna Storyous.
 - **Host (customer):** vlastní účet na /client; členství ve víc podnicích.
   Informační architektura hosta (přestavba 2026-10-21, audit C + koncept B):
   dok `Karta · Podniky · [U kasy] · Odměny · Aktivita`, „Moje“ (profil, souhlasy, data,
-  smazání) za avatarem. Karta = domov (QR vždy po ruce, karta za každý podnik v jeho barvě
-  s jedním číslem), U kasy = QR přes celou výšku + „přibalit odměnu“ + okamžitá odezva po
+  smazání) za avatarem. Karta = domov (QR vždy po ruce, skleněná karta za každý podnik s dlaždicí loga
+  a jedním číslem), U kasy = QR přes celou výšku + „přibalit odměnu“ + okamžitá odezva po
   načtení, Odměny = K uplatnění / Nabídky / Výzvy / Historie + jedno pole „Mám kód“,
   stránka podniku = mini-web (Rezervovat · Menu · Navigovat · Zavolat), rezervace z volných
   časů (kapacita stolů), Aktivita = schránka. Přihlášení kódem z e-mailu nebo heslem.
@@ -43,8 +43,11 @@ První a referenční zákazník: Čajovna Pangea (Brno), pokladna Storyous.
   (rozhodnutí koordinátora 2026-10-21 podle auditu C — bílá stránka v tmavém podniku oslní).
   Jen tokeny a třídy s tmavou variantou, žádná natvrdo bílá plocha; pole QR je bílé vždy
   (čtečka). Správa Managero client v administraci (`?mode=client`) zůstává světlá.
-- Barva podniku jen na jeho kartě a v hlavičce jeho stránky; limetka jen hlavní akce
-  a stav „připraveno“. Ukázková data jen v ukázce `/client/demo`, nikdy v produkci.
+- Host je v paletě Managera (inkoust, bílá a krém, limetka jako jediný akcent: hlavní akce,
+  „připraveno“, pokrok, +1) a na povrchu prodejní stránky: statické skvrny limetky a krému za obsahem,
+  karty, dok, hlavička a list U kasy jako bílé sklo s blurem (korekce 2026-10-27, DESIGN.md „Host: sklo,
+  rozostření a pozadí“). Barva značky podniku se u hosta nepoužívá (jen na kartě ve Wallet) — dlaždice
+  bez loga je inkoustová s iniciálou, karty, hlavička ani razítka barvu podniku nenesou (korekce 2026-10-27). Ukázková data jen v ukázce `/client/demo`, nikdy v produkci.
 
 ## Předplatné a platby (Stripe)
 

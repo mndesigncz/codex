@@ -13,7 +13,10 @@
 //  Nepřihlášený: lišta se značkou, Podniky, kód podniku, jazyk a Přihlásit (beze změny).
 //
 // Motiv: host jede podle telefonu (světlý výchozí, tmavý večer v baru) — tokeny, žádná
-// natvrdo bílá. Barva podniku jen na jeho kartě a v hlavičce jeho stránky.
+// natvrdo bílá. Barva podniku se u hosta nepoužívá (jen dlaždice loga v inkoustu).
+// Povrch jako prodejní stránka (korekce 2026-10-27): kořen `.h-plocha` se skvrnami limetky a krému
+// za obsahem (`PozadiHosta`), karty jako sklo (globals.css „Host: sklo…“), dok `.h-dok`, lišta
+// `.lg-bar` — nahoře bez pozadí, sklo až po posunu.
 // Ukázka bez databáze (/client/demo…) běží v témže obalu s vymyšleným hostem.
 
 import Link from 'next/link';
@@ -30,6 +33,7 @@ import { okJson } from '@/lib/api';
 import { HostCestyProvider, DEMO_ZAKLAD, naDemo, zDema } from './host/cesty';
 import { UKasyProvider, useUKasy } from './host/UKasy';
 import { DEMO_HOST } from '@/lib/klient/demo/hostDemo';
+import PozadiHosta from './host/PozadiHosta';
 
 export interface ClientUser { id: number; name: string; email: string }
 
@@ -78,6 +82,16 @@ export default function ClientShell({ me: meServer, children }: { me: ClientUser
     return () => { zivy = false; };
   }, [me, path]);
   const kontext = useMemo<HostShell>(() => ({ me, otevriNajit: () => setNajit({ open: true, hned: true }), skenPopis, skenIkona, neprecteno, setNeprecteno }), [me, skenPopis, skenIkona, neprecteno]);
+  // Lišta dostane sklo, až pod ní začne projíždět obsah: hlídka na začátku stránky (bez posluchače scrollu).
+  const hlidka = useRef<HTMLDivElement>(null);
+  const [posunuto, setPosunuto] = useState(false);
+  useEffect(() => {
+    const el = hlidka.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([z]) => setPosunuto(!z.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const realna = zDema(path);
   const c = (x: string) => (demo ? naDemo(x) : x);
   const naStrance = (x: string) => realna === x;
@@ -95,9 +109,11 @@ export default function ClientShell({ me: meServer, children }: { me: ClientUser
     <HostCestyProvider demo={demo}>
       <HostShellKontext.Provider value={kontext}>
         <UKasyProvider prihlasen={!!me}>
-          <div className="min-h-[100dvh] flex flex-col">
+          <div className="h-plocha min-h-[100dvh] flex flex-col">
+            <PozadiHosta />
+            <div ref={hlidka} className="h-px -mb-px pointer-events-none" aria-hidden />
             {demo && <DemoPruh />}
-            {me ? <ListaPrihlaseny me={me} polozky={polozky} c={c} /> : <ListaHost />}
+            {me ? <ListaPrihlaseny me={me} polozky={polozky} c={c} posunuto={posunuto} /> : <ListaHost posunuto={posunuto} />}
             <main className={`flex-1 w-full mx-auto max-w-5xl px-4 min-[360px]:px-5 sm:px-6 ${me ? 'pt-[max(env(safe-area-inset-top),20px)] md:pt-10 pb-32 md:pb-12' : 'pt-6 sm:pt-10 pb-6 sm:pb-10'}`}>{children}</main>
             <footer className={`mx-auto max-w-5xl w-full px-4 min-[360px]:px-5 sm:px-6 pt-8 pb-8 text-xs text-black/55 flex-wrap items-center gap-x-4 gap-y-1 ${me ? 'hidden md:flex' : 'flex'}`}>
               <span>Managero client</span>
@@ -119,14 +135,14 @@ export default function ClientShell({ me: meServer, children }: { me: ClientUser
 type Polozka = { href: string; label: string; icon: string; on: boolean; badge?: number } | null;
 
 /** Lišta nepřihlášeného: značka, Podniky, kód podniku, jazyk, Přihlásit. */
-function ListaHost() {
+function ListaHost({ posunuto }: { posunuto: boolean }) {
   const t = useT('klient-host');
   const path = usePathname();
   const { otevriNajit, skenPopis, skenIkona } = useHostShell();
   const sken = skenIkona === 'camera';
   return (
-    <header className="sticky top-0 z-30 chrome-edge">
-      <div className="glass-strong !border-x-0 !border-t-0 !shadow-none border-b border-black/[0.06]">
+    <header className="sticky top-0 z-30">
+      <div className={`lg-bar !border-x-0 !border-t-0 ${posunuto ? 'posunuto' : ''}`}>
         <div className="mx-auto max-w-5xl px-4 min-[360px]:px-5 sm:px-6 h-16 flex items-center gap-2 sm:gap-3 min-w-0">
           <Link href="/client" className="tap-target flex items-center gap-2 shrink-0" aria-label="Managero client">
             <LogoMark size={32} />
@@ -136,7 +152,7 @@ function ListaHost() {
             <Link href="/client" aria-current={path === '/client' ? 'page' : undefined}
               className={`inline-flex tap-target-sm items-center h-10 rounded-full px-3 sm:px-3.5 text-sm font-medium transition ${path === '/client' ? 'bg-black/[0.06] text-[#16181A]' : 'seg-off'}`}>{t('Podniky')}</Link>
             <button type="button" onClick={otevriNajit} aria-label={sken ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}
-              className="tap-target inline-flex items-center justify-center gap-1.5 rounded-full h-10 min-w-10 px-2.5 sm:px-3.5 text-sm font-medium bg-black/[0.05] text-black/70 hover:bg-black/[0.08] hover:text-[#16181A] transition">
+              className="tap-target inline-flex items-center justify-center gap-1.5 rounded-full h-10 min-w-10 px-2.5 sm:px-3.5 text-sm font-medium h-tlacitko-sklo transition">
               <Icon name={skenIkona} size={17} aria-hidden />
               <span className="hidden sm:inline">{skenPopis}</span>
             </button>
@@ -150,12 +166,12 @@ function ListaHost() {
 }
 
 /** Lišta přihlášeného — jen od md (na telefonu nadpis obrazovky a dok). */
-function ListaPrihlaseny({ me, polozky, c }: { me: ClientUser; polozky: readonly Polozka[]; c: (x: string) => string }) {
+function ListaPrihlaseny({ me, polozky, c, posunuto }: { me: ClientUser; polozky: readonly Polozka[]; c: (x: string) => string; posunuto: boolean }) {
   const t = useT('klient-host');
   const { otevri } = useUKasy();
   return (
-    <header className="hidden md:block sticky top-0 z-30 chrome-edge">
-      <div className="glass-strong !border-x-0 !border-t-0 !shadow-none border-b border-black/[0.06]">
+    <header className="hidden md:block sticky top-0 z-30">
+      <div className={`lg-bar !border-x-0 !border-t-0 ${posunuto ? 'posunuto' : ''}`}>
         <div className="mx-auto max-w-5xl px-6 h-16 flex items-center gap-3 min-w-0">
           <Link href={c('/client/me')} className="tap-target flex items-center gap-2 shrink-0" aria-label="Managero client">
             <LogoMark size={32} />
@@ -195,7 +211,7 @@ function DokHosta({ polozky, c }: { polozky: readonly Polozka[]; c: (x: string) 
   }, []);
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-3 pb-[max(env(safe-area-inset-bottom),12px)]">
-      <nav ref={nav} className="dock-strong mx-auto max-w-md rounded-[28px] px-1.5 pt-1.5 pb-1.5 grid grid-cols-5 items-end shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label={t('Spodní navigace')}>
+      <nav ref={nav} className="h-dok mx-auto max-w-md rounded-[28px] px-1.5 pt-1.5 pb-1.5 grid grid-cols-5 items-end" aria-label={t('Spodní navigace')}>
         {polozky.map(p => p === null ? (
           <button key="kasa" type="button" onClick={() => otevri()} title={t('U kasy')} aria-label={t('U kasy: ukázat kartu')}
             className="flex flex-col items-center gap-1 -mt-6 pb-1 text-[#16181A]">
@@ -205,7 +221,7 @@ function DokHosta({ polozky, c }: { polozky: readonly Polozka[]; c: (x: string) 
         ) : (
           <Link key={p.href} href={c(p.href)} title={p.label} aria-current={p.on ? 'page' : undefined}
             className={`relative flex flex-col items-center gap-1 rounded-2xl py-2 min-h-[52px] justify-center transition duration-200 ${p.on ? 'text-[#16181A]' : 'text-black/55'}`}>
-            <span className={`grid place-items-center h-7 w-11 rounded-full transition ${p.on ? 'bg-[#C8F542]/60' : ''}`}>
+            <span className={`grid place-items-center h-7 w-11 rounded-full transition ${p.on ? 'h-dok-on' : ''}`}>
               <Icon key={p.on ? 'on' : 'off'} name={p.icon} size={21} strokeWidth={p.on ? 2 : 1.7} motion={p.on ? 'pop' : undefined} />
             </span>
             {!!p.badge && !p.on && <Badge count={p.badge} label={t('{n, plural, one {# nová zpráva} few {# nové zprávy} other {# nových zpráv}}', { n: p.badge })} className="absolute top-0.5 right-[18%]" />}

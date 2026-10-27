@@ -1,13 +1,15 @@
 'use client';
 
-// Karta podniku hosta (koncept B, 10a): plná barva značky podniku, logo v bílém čtverci, JEDNO
-// hlavní číslo (razítka X / N, nebo body), stav „Připraveno“ v limetce a jedna věta, co dál.
-// Tatáž komponenta je živý náhled karty ve správě (Věrnost) — SPRÁVA ji importuje odsud,
-// takže co podnik nastaví, to host uvidí. Čistě prezentační: žádná data, žádné fetch.
+// Karta podniku hosta (koncept B, 10a; barvy v paletě Managera 2026-10-27): bílá karta s linkou,
+// dlaždice loga, JEDNO hlavní číslo (razítka X / N, nebo body), stav „Připraveno“ v limetce
+// a jedna věta, co dál. Tatáž komponenta je živý náhled karty ve správě (Věrnost, Stránka
+// podniku, čtečka u kasy) — SPRÁVA ji importuje odsud, takže co podnik nastaví, to host uvidí.
+// Čistě prezentační: žádná data, žádné fetch.
 //
-// Čitelnost na barvě značky hlídá onAccent (lib/floorplan): text je inkoust nebo bílá podle
-// skutečného kontrastu. Bez barvy podniku je karta grafitová (ne limetková — limetka patří
-// jen hlavní akci a stavu „připraveno“).
+// Barvu značky podniku aplikace hosta nepoužívá vůbec (korekce 2026-10-27: „nepoužíváme ani
+// tmavě zelenou“) — host vidí jen paletu Managera. Dlaždice loga je logo na bílé, bez loga
+// první písmeno v inkoustu (třída .h-logo-pismeno). Jediná inkoustová plocha domova je Moje
+// karta s QR; karty podniků pod ní jsou střídmé, ať QR zůstane nejvýraznější.
 
 import Link from 'next/link';
 import { onAccent } from '@/lib/floorplan';
@@ -15,23 +17,19 @@ import { Icon } from '../../Icons';
 
 export const BARVA_BEZ_ZNACKY = '#2B2F33';
 
-/** Barva karty a písma na ní. */
+/** Barva dlaždice loga a písma na ní (bez barvy podniku grafit). */
 export function barvyKarty(accent?: string | null): { bg: string; ink: string } {
   const bg = /^#[0-9a-fA-F]{6}$/.test(String(accent ?? '').trim()) ? String(accent).trim() : BARVA_BEZ_ZNACKY;
   return { bg, ink: onAccent(bg) };
 }
 
-export function stylKarty(accent?: string | null): React.CSSProperties {
-  const { bg, ink } = barvyKarty(accent);
-  return { ['--k-bg' as any]: bg, ['--k-ink' as any]: ink };
-}
-
-/** Logo podniku v bílém čtverci; bez loga první písmeno názvu v barvě podniku. */
-export function LogoPodniku({ nazev, logoUrl, velikost = 36, barva, className = '' }: { nazev: string; logoUrl?: string | null; velikost?: number; /** Plná barva podniku (mimo kartu: seznamy, poukaz). */ barva?: string | null; className?: string }) {
+/** Dlaždice loga v paletě Managera: logo na bílé, bez loga první písmeno v inkoustu.
+ *  `barva` se přijímá kvůli volajícím, ale nevykresluje se (barva značky jen ve Wallet a menu). */
+export function LogoPodniku({ nazev, logoUrl, velikost = 36, barva, className = '' }: { nazev: string; logoUrl?: string | null; velikost?: number; /** Barva značky podniku (#RRGGBB). */ barva?: string | null; className?: string }) {
   const pismeno = (String(nazev || '').trim()[0] ?? '·').toUpperCase();
-  const plna = barva !== undefined && !logoUrl ? barvyKarty(barva) : null;
+  void barva;
   return (
-    <span className={`h-logo ${className}`} style={{ width: velikost, height: velikost, borderRadius: Math.round(velikost * 0.28), fontSize: Math.round(velikost * 0.42), ...(plna ? { background: plna.bg, color: plna.ink } : {}) }} aria-hidden>
+    <span className={`h-logo ${logoUrl ? '' : 'h-logo-pismeno'} ${className}`} style={{ width: velikost, height: velikost, borderRadius: Math.round(velikost * 0.28), fontSize: Math.round(velikost * 0.42) }} aria-hidden>
       {logoUrl
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={logoUrl} alt="" className="h-full w-full object-contain p-1" />
@@ -45,7 +43,7 @@ export interface PrahBodu { at: number; nazev: string }
 export interface KartaPodnikuProps {
   nazev: string;
   logoUrl?: string | null;
-  /** Barva značky podniku (#RRGGBB). */
+  /** Barva značky podniku (#RRGGBB) — jen na dlaždici loga. */
   barva?: string | null;
   /** Druhý řádek hlavičky („razítka · Stříbrný host“). */
   podtitul?: string;
@@ -73,7 +71,7 @@ export default function KartaPodniku(p: KartaPodnikuProps) {
   const obsah = (
     <>
       <div className="flex items-start gap-3 min-w-0">
-        <LogoPodniku nazev={p.nazev} logoUrl={p.logoUrl} />
+        <LogoPodniku nazev={p.nazev} logoUrl={p.logoUrl} barva={p.barva ?? null} />
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold leading-tight tracking-[-0.01em] truncate">{p.nazev}</p>
           {p.podtitul && <p className="h-karta-tlume text-[13px] leading-snug mt-0.5 truncate">{p.podtitul}</p>}
@@ -93,10 +91,9 @@ export default function KartaPodniku(p: KartaPodnikuProps) {
     </>
   );
   const cls = `h-karta block ${p.className ?? ''}`;
-  const styl = stylKarty(p.barva);
-  if (p.href) return <Link href={p.href} className={`${cls} active:scale-[0.99] transition`} style={styl} aria-label={p.ariaLabel}>{obsah}</Link>;
-  if (p.onClick) return <button type="button" onClick={p.onClick} className={`${cls} w-full text-left active:scale-[0.99] transition`} style={styl} aria-label={p.ariaLabel}>{obsah}</button>;
-  return <section className={cls} style={styl} aria-label={p.ariaLabel}>{obsah}</section>;
+  if (p.href) return <Link href={p.href} className={`${cls} active:scale-[0.99] transition`} aria-label={p.ariaLabel}>{obsah}</Link>;
+  if (p.onClick) return <button type="button" onClick={p.onClick} className={`${cls} w-full text-left active:scale-[0.99] transition`} aria-label={p.ariaLabel}>{obsah}</button>;
+  return <section className={cls} aria-label={p.ariaLabel}>{obsah}</section>;
 }
 
 /** Lišta bodů s ryskami prahů odměn; popisky prahů pod ní (zkrácené, ať se vejdou na 390). */
@@ -108,7 +105,7 @@ function LisaBodu({ body, prahy }: { body: number; prahy: PrahBodu[] }) {
       <div className="relative h-2 rounded-full h-karta-linka">
         <span className="absolute inset-y-0 left-0 rounded-full h-karta-plna" style={{ width: `${podil * 100}%` }} />
         {prahy.map(x => (
-          <span key={x.at} className="absolute -top-1 h-4 w-0.5 rounded-full h-karta-plna opacity-70" style={{ left: `calc(${(x.at / max) * 100}% - 1px)` }} />
+          <span key={x.at} className="absolute -top-1 h-4 w-0.5 rounded-full h-karta-ryska" style={{ left: `calc(${(x.at / max) * 100}% - 1px)` }} />
         ))}
       </div>
       <div className="mt-2 grid gap-2 text-[11px] leading-tight h-karta-tlume" style={{ gridTemplateColumns: `repeat(${prahy.length}, minmax(0, 1fr))` }}>

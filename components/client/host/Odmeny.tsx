@@ -1,7 +1,7 @@
 'use client';
 
 // Odměny: jedna peněženka odměn přes všechny podniky (koncept B 5, audit C §6).
-//   K uplatnění — připravené odměny v barvě podniku s platností; „Uplatnit“ otevře živý poukaz
+//   K uplatnění — připravené odměny s dlaždicí loga podniku a platností; „Uplatnit“ otevře živý poukaz
 //                 (běžící hodiny + pulzující rám = není to snímek obrazovky, kód i QR pro čtečku).
 //                 Pod nimi dárkové poukazy se zůstatkem.
 //   Nabídky     — kupony za body nebo zdarma; „Vyměnit“, když body stačí, jinak „chybí 280 b.“.
@@ -335,7 +335,7 @@ function ZivyPoukaz({ odmena, onClose }: { odmena: Odmena; onClose: () => void }
   }, [uplatneno, odmena.id]);
   const hh = String(ted.getHours()).padStart(2, '0'); const mm = String(ted.getMinutes()).padStart(2, '0'); const ss = String(ted.getSeconds()).padStart(2, '0');
   return (
-    <Modal open onClose={onClose} size="md" className="h-vyjed" title={odmena.title} subtitle={odmena.business}>
+    <Modal open onClose={onClose} size="md" className="h-list-sklo h-plocha h-vyjed" title={odmena.title} subtitle={odmena.business}>
         <div className="flex justify-center">
           <LogoPodniku nazev={odmena.business} logoUrl={odmena.logoUrl} barva={odmena.accent} velikost={56} />
         </div>
