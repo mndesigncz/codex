@@ -18,6 +18,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { zapisVerzi } from '@/lib/pravidlaVerze';
 import { pozadujTarif } from '@/lib/tarifServer';
+import { zajistiHosta } from '@/lib/klient/schema';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -28,6 +29,9 @@ export const fetchCache = 'force-no-store';
  * kontroluje podle polí, která požadavek posílá (obrazovky posílají jen
  * svoje pole — Nastavení, Vzhled, Věrnost).
  */
+/** Adresy stránek hosta, které podnik nesmí obsadit (/client/<slug> by je zakryl). */
+const VYHRAZENE_ADRESY = new Set(['demo', 'me', 'login', 'register', 'odhlasit', 'nove-heslo', 'zapomenute-heslo', 'podniky', 'odmeny', 'aktivita', 'profil', 'kod', 'api', 'admin']);
+
 const POLE_OPRAVNENI: Record<string, string> = {
   enabled: 'klient.nastaveni', slug: 'klient.nastaveni', reservations_on: 'klient.nastaveni', ordering_on: 'klient.nastaveni',
   max_party: 'klient.nastaveni', lead_days: 'klient.nastaveni', slot_minutes: 'klient.nastaveni', menu_slug: 'klient.nastaveni',
@@ -35,7 +39,7 @@ const POLE_OPRAVNENI: Record<string, string> = {
   geo_radius_m: 'klient.nastaveni', order_auto_pos: 'klient.nastaveni',
   auto_confirm: 'klient.nastaveni', auto_confirm_max_party: 'klient.nastaveni',
   // Texty a adresa se upravují na obrazovce Vzhled spolu s logem a galerií.
-  tagline: 'klient.vzhled', description: 'klient.vzhled', address: 'klient.vzhled', cover_url: 'klient.vzhled',
+  tagline: 'klient.vzhled', description: 'klient.vzhled', address: 'klient.vzhled', cover_url: 'klient.vzhled', phone: 'klient.vzhled',
   logo_url: 'klient.vzhled', gallery: 'klient.vzhled', accent: 'klient.vzhled', qr_design: 'klient.vzhled',
   loyalty_on: 'vernost.pravidla', points_per_100: 'vernost.pravidla', stamp_target: 'vernost.pravidla', stamp_reward: 'vernost.pravidla',
   birthday_points: 'vernost.pravidla', referral_points: 'vernost.pravidla', silver_at: 'vernost.pravidla', gold_at: 'vernost.pravidla',
@@ -113,6 +117,8 @@ export async function PUT(req: NextRequest) {
   }
   const slug = b.slug != null ? slugify(b.slug) : cur.slug;
   if (!slug) return NextResponse.json({ error: 'Adresa musí mít aspoň jedno písmeno nebo číslo.' }, { status: 400 });
+  // Kolo 92 (kontrakt HOST ↔ SPRÁVA §5): adresy, které patří stránkám hosta (/client/demo, /client/me…).
+  if (slug !== cur.slug && VYHRAZENE_ADRESY.has(slug)) return NextResponse.json({ error: 'Tahle adresa je vyhrazená pro aplikaci. Vyber jinou.' }, { status: 400 });
   if (slug !== cur.slug) {
     const [clash] = await sql`SELECT team_id FROM client_profiles WHERE slug = ${slug} AND team_id <> ${u.team_id}`;
     if (clash) return NextResponse.json({ error: 'Tuhle adresu už používá jiný podnik.' }, { status: 409 });
@@ -228,6 +234,17 @@ export async function PUT(req: NextRequest) {
         credit_expire_days = ${kreditDny},
         credit_expire_since = ${kreditOd}
       WHERE team_id = ${u.team_id} RETURNING *`;
+  }
+  // Kolo 92 (kontrakt HOST ↔ SPRÁVA §5): telefon podniku pro akci „Zavolat" na stránce hosta. Zvlášť a se
+  // sloupcem zajištěným přes zajistiHosta (jediný zdroj schématu hosta, zrcadlo v bloku Host v /api/init),
+  // ať uložení zbytku nezávisí na migraci.
+  if (b?.phone !== undefined) {
+    const tel = String(b.phone ?? '').replace(/[^\d+ ()-]/g, '').trim().slice(0, 30);
+    if (tel && tel.replace(/\D/g, '').length < 9) return NextResponse.json({ error: 'Telefon podniku má mít aspoň devět číslic.' }, { status: 400 });
+    try {
+      await zajistiHosta();
+      [pFinal] = await sql`UPDATE client_profiles SET phone = ${tel || null} WHERE team_id = ${u.team_id} RETURNING *`;
+    } catch (e) { console.error('[profil] telefon', e); }
   }
   // Automatické potvrzování rezervací: zvlášť, ať uložení ostatního nastavení nezávisí na migraci
   // sloupců. Hranice 0–40 osob (víc než „Nejvíc osob" nedává smysl), 0 = všechny velikosti.

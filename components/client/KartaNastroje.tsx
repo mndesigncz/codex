@@ -110,12 +110,12 @@ export default function KartaNastroje({ karta, podniky }: { karta: Karta; podnik
 
   const ulozObrazek = useCallback(async () => {
     try {
-      const blob = await kartaJakoPng(karta, karta.name ?? '', t('Kartička'));
-      if (!blob) { setZprava(t('Kartička se nenačetla.')); return; }
+      const blob = await kartaJakoPng(karta, karta.name ?? '', t('Karta'));
+      if (!blob) { setZprava(t('Karta se nenačetla.')); return; }
       const soubor = new File([blob], 'karta.png', { type: 'image/png' });
       // Na telefonu nabídne „Uložit do Fotek“ přes sdílení; jinde se stáhne.
       if ((navigator as any).canShare?.({ files: [soubor] })) {
-        try { await navigator.share({ files: [soubor], title: t('Kartička') }); return; } catch (e: any) { if (e?.name === 'AbortError') return; }
+        try { await navigator.share({ files: [soubor], title: t('Karta') }); return; } catch (e: any) { if (e?.name === 'AbortError') return; }
       }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = 'karta.png';
@@ -177,7 +177,7 @@ export default function KartaNastroje({ karta, podniky }: { karta: Karta; podnik
       )}
       {zprava && <p role="status" className="text-sm text-black/60">{zprava}</p>}
 
-      <Modal open={velky} onClose={() => setVelky(false)} title={t('Kartička')} size="sm">
+      <Modal open={velky} onClose={() => setVelky(false)} title={t('Karta')} size="sm">
         <div className="rounded-[22px] bg-white border border-black/[0.08] p-4 w-full aspect-square grid place-items-center [&_svg]:w-full [&_svg]:h-full">
           {karta.svg && <span dangerouslySetInnerHTML={{ __html: karta.svg }} className="block w-full h-full" aria-hidden />}
         </div>

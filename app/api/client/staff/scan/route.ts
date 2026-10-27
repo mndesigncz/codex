@@ -8,6 +8,7 @@
 // podruhé nepřipíše ani bez klíče.
 // Připsání z účtenky jde po krocích a hotové kroky se při opakování přeskočí.
 // Do deníku věrnosti se zapisuje i obsluha (staff_id).
+import { zamerHosta } from '@/lib/klient/zamer';
 import { NextRequest, NextResponse, after } from 'next/server';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { pripisUtratu, slevaClena } from '@/lib/urovneDb';
@@ -59,6 +60,14 @@ async function polozkyKampani(teamId: number, camps: StampCampaign[]): Promise<{
 }
 
 /** Co obsluha u kasy potřebuje vidět: kdo to je, co má a na co má nárok. */
+/** Název podniku na kartě hosta ve čtečce (jako ho vidí host: název ze sdíleného vzhledu, jinak tým). */
+async function nazevPodniku(teamId: number): Promise<string | null> {
+  try {
+    const [t] = await sql`SELECT COALESCE(NULLIF(share_theme->>'businessName', ''), name) AS nazev FROM teams WHERE id = ${teamId}` as any[];
+    return t?.nazev ? String(t.nazev) : null;
+  } catch { return null; }
+}
+
 async function summary(teamId: number, customerId: number, p?: any) {
   const m = await membership(customerId, teamId);
   const mena = await menaPodniku(teamId);
@@ -116,6 +125,12 @@ async function summary(teamId: number, customerId: number, p?: any) {
     nextTierAt: tier.nextAt, nextTierLabel: tier.nextLabel, nextTierUnit: tier.unit,
     stampedToday: !!last && pragueDayOf(last) === pragueToday(),
     openCoupons: claims, affordable,
+    // Kolo 92 (kontrakt HOST ↔ SPRÁVA, kontrakt-ctecka.md §2a): odměna, kterou si host v „U kasy" přibalil
+    // k tomuhle načtení. Čtečka z ní udělá hlavní akci („Razítko + uplatnit …"). Bez tabulky null.
+    zamer: await zamerHosta(teamId, customerId),
+    // Barva podniku pro kartu hosta ve čtečce (stejná karta, jakou host vidí v aplikaci).
+    accent: p?.accent ? String(p.accent) : null,
+    podnik: await nazevPodniku(teamId),
   };
 }
 

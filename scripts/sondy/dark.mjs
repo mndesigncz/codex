@@ -51,6 +51,9 @@ const MERENI = `(() => {
     const r = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
     if (r.width < 1 || r.height < 1 || cs.visibility === 'hidden' || cs.opacity === '0') continue;
+    // Jen pro odečítač (sr-only: 1 × 1 px s ořezem) — na obrazovce není, kontrast nemá smysl.
+    if (r.width <= 1 && r.height <= 1) continue;
+    if (cs.position === 'absolute' && (cs.clip === 'rect(0px, 0px, 0px, 0px)' || cs.clipPath === 'inset(50%)')) continue;
     if (r.top > innerHeight * 3 || r.bottom < 0) continue;
     const fg = parse(cs.color);
     if (!fg) continue;
@@ -69,9 +72,11 @@ const MERENI = `(() => {
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 let celkem = 0;
 const horsi = [];
-for (const [name, role, path] of SCREENS) {
-  // Hostovská část tmavý režim záměrně nemá (viz skript v layoutu).
-  if (path.startsWith('/client')) continue;
+// Host (Managero client) má od kola 92 vlastní tmavý motiv (výchozí podle systému) — měří se taky.
+const HOST = [['h-karta', 'customer', '/client/me'], ['h-odmeny', 'customer', '/client/me/odmeny'], ['h-aktivita', 'customer', '/client/me/aktivita'], ['h-profil', 'customer', '/client/me/profil'], ['h-podnik', 'customer', '/client/kavarna-u-lipy']];
+for (const [name, role, path] of [...SCREENS, ...HOST]) {
+  // Úvodní stránka a ukázka jsou záměrně vždy světlé (skript motivu v app/layout.tsx) — tmavý režim nemají.
+  if (path === '/' || path.startsWith('/demo') || /[?&]mode=client(&|$)/.test(path)) continue;
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, locale: 'cs-CZ', colorScheme: 'dark' });
   if (role) await ctx.addCookies([{ name: 'next-auth.session-token', value: tok(role), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
   await ctx.addInitScript(() => { try { localStorage.setItem('managero-theme', 'dark'); } catch {} });
@@ -88,6 +93,7 @@ for (const [name, role, path] of SCREENS) {
   const dark = await p.evaluate(() => document.documentElement.getAttribute('data-theme'));
   const nalezy = await p.evaluate(MERENI);
   celkem += nalezy.length;
+  if (dark !== 'dark') celkem++;
   if (nalezy.length) {
     const nej = nalezy.slice().sort((a, b2) => a.cr - b2.cr).slice(0, 3);
     console.log(`  ✗ ${name}${dark === 'dark' ? '' : ' [NENÍ TMAVÝ!]'}: ${nalezy.length} × málo kontrastu — ` +
@@ -95,11 +101,12 @@ for (const [name, role, path] of SCREENS) {
     horsi.push(...nalezy.map(x => ({ ...x, name })));
     await p.screenshot({ path: `${OUT}dark-${name}.png`, fullPage: true });
   } else {
-    console.log(`  ✓ ${name}${dark === 'dark' ? '' : ' [NENÍ TMAVÝ!]'}`);
+    console.log(`  ${dark === 'dark' ? '✓' : '✗'} ${name}${dark === 'dark' ? '' : ' [NENÍ TMAVÝ!]'}`);
   }
   await ctx.close();
 }
 console.log(`\nCelkem ${celkem} textů pod prahem kontrastu v tmavém režimu.`);
+if (celkem > 0) process.exitCode = 1;
 const podle = new Map();
 for (const h of horsi) podle.set(h.t, (podle.get(h.t) ?? 0) + 1);
 console.log('Nejčastější:', [...podle.entries()].sort((a, b2) => b2[1] - a[1]).slice(0, 8).map(([t, n]) => `${n}× „${t}"`).join(', '));

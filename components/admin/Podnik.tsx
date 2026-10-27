@@ -11,7 +11,7 @@ import { czCount } from '@/lib/czech';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { apiMessage } from '@/lib/api';
 import { PLAN_NAMES } from '@/lib/plan';
-import { STAV_NAZEV, STAV_TON, ROLE_NAZEV, ZASAH_NAZEV, zasah, iniciala, type Detail } from './spolecne';
+import { STAV_NAZEV, STAV_TON, ROLE_NAZEV, ZASAH_NAZEV, zasah, overDetail, iniciala, type Detail } from './spolecne';
 
 type Tarif = 'stripe' | 'free' | 'pro' | 'max';
 const TARIFY: SegmentedOption<Tarif>[] = [
@@ -19,7 +19,7 @@ const TARIFY: SegmentedOption<Tarif>[] = [
 ];
 
 export default function Podnik({ id }: { id: number }) {
-  const d = useLoad<Detail>(Number.isFinite(id) ? `/api/admin/teams/${id}` : null, r => r as Detail);
+  const d = useLoad<Detail>(Number.isFinite(id) ? `/api/admin/teams/${id}` : null, overDetail);
   const [chyba, setChyba] = useState<string | null>(null);
   const [bezi, setBezi] = useState<string | null>(null);
   const [blokOkno, setBlokOkno] = useState(false);
@@ -50,7 +50,7 @@ export default function Podnik({ id }: { id: number }) {
     <div className="space-y-6">
       <PageHeader
         title={t.name}
-        subtitle={<span className="flex flex-wrap items-center gap-2"><Chip tone={STAV_TON[t.stav]} size="sm">{STAV_NAZEV[t.stav]}</Chip><span>{t.owner ? `${t.owner.name ?? ''} · ${t.owner.email ?? ''}` : 'bez majitele'}</span><span className="t-meta">id {t.id}</span></span>}
+        subtitle={<span className="flex flex-wrap items-center gap-2"><Chip tone={STAV_TON[t.stav] ?? 'muted'} size="sm">{STAV_NAZEV[t.stav] ?? t.stav ?? '—'}</Chip><span>{t.owner ? `${t.owner.name ?? ''} · ${t.owner.email ?? ''}` : 'bez majitele'}</span><span className="t-meta">id {t.id}</span></span>}
         primary={t.blockedAt
           ? <Button variant="accent" disabled={zamek} onClick={() => proved('unblock', api('block'), { blocked: false })}>Obnovit podnik</Button>
           : <Button variant="danger" disabled={zamek} onClick={() => { setChyba(null); setBlokOkno(true); }}>Pozastavit podnik</Button>}
@@ -66,8 +66,8 @@ export default function Podnik({ id }: { id: number }) {
       )}
 
       <StatRow>
-        <Stat label="Tarif" value={t.planLabel} icon="award" tone={t.plan.effective === 'free' ? 'muted' : 'ok'} note={t.plan.override ? `ve Stripe: ${PLAN_NAMES[t.plan.plan]}` : undefined} />
-        <Stat label="Členů" value={t.members} icon="users" />
+        <Stat label="Tarif" value={t.planLabel ?? PLAN_NAMES[t.plan.effective] ?? '—'} icon="award" tone={t.plan.effective === 'free' ? 'muted' : 'ok'} note={t.plan.override ? `ve Stripe: ${PLAN_NAMES[t.plan.plan]}` : undefined} />
+        <Stat label="Členů" value={Number.isFinite(Number(t.members)) ? Number(t.members) : members.length} icon="users" />
         <Stat label="Předplatné" value={t.subscriptionStatus ?? 'bez Stripe'} icon="card" tone={t.plan.pastDue ? 'wait' : 'muted'} />
         <Stat label="Poslední aktivita" value={t.lastActivity ? dbTimeDayHM(t.lastActivity) : '—'} icon="clock" />
         <Stat label="Založeno" value={t.createdAt ? dbTimeDayHM(t.createdAt) : '—'} icon="calendar" />

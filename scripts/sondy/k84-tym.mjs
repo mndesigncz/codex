@@ -290,6 +290,9 @@ const ROZVRH = '/employer/overview?view=shifts';
   await otevriPlochu(p, ROZVRH, 'vedeni.rozvrh');
   const lista = p.locator('[data-varovani-limitu]');
   await dokud(async () => (await lista.count()) > 0, 10000);
+  // Audit 2026-10 (V06): na telefonu je výchozí seznam dnů; mřížka je za přepínačem vedle měsíce.
+  await p.locator('[data-prepinac-pohledu-tel]').click();
+  await dokud(() => p.getByLabel('Mřížka rozvrhu').isVisible(), 4000);
   const box = await lista.boundingBox();
   const mrizka = await p.getByLabel('Mřížka rozvrhu').boundingBox();
   tvrdi('P3 (390): souhrn varování je nad mřížkou', !!box && !!mrizka && box.y < mrizka.y, JSON.stringify({ box, mrizka }));

@@ -118,7 +118,7 @@ export async function GET() {
     });
   } catch (e) {
     // Never surface a 500 as "no team"; report a real error the UI can show.
-    return NextResponse.json({ error: 'Tým se nepodařilo načíst. Zkuste to prosím znovu.' }, { status: 500 });
+    return NextResponse.json({ error: 'Tým se nepodařilo načíst. Zkus to prosím znovu.' }, { status: 500 });
   }
 }
 

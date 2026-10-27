@@ -51,7 +51,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
-    stranky: ['vedeni.prehled', 'vedeni.klient'],
+    stranky: ['vedeni.prehled', 'vedeni.klient', 'vedeni.togo'],
     opravneni: {
       vse: [],
       nektere: [

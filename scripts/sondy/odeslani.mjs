@@ -15,6 +15,16 @@ const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || 
 const problems = []; const ok = m => console.log('  ✓', m); const bad = m => { console.log('  ✗', m); problems.push(m); };
 
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, locale: 'cs-CZ' });
+// Pevné „teď" (jako kiosk): dnes 10:30 v Praze. Časy rezervace na dnešek se počítají od teď a večer
+// (po zavírací hodině fixtury) by žádný nebyl — sonda by pak netestovala nic.
+const TED = (() => {
+  const den = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
+  const poledne = new Date(`${den}T12:00:00Z`);
+  const posun = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Prague', hour: 'numeric', hourCycle: 'h23' }).format(poledne)) - 12;
+  const [r, mes, d] = den.split('-').map(Number);
+  return Date.UTC(r, mes - 1, d, 10 - posun, 30);
+})();
+await ctx.clock.install({ time: TED });
 await ctx.addCookies([{ name: 'next-auth.session-token', value: tok('customer'), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
 // GET projde, POST rezervace spadne na výpadku spojení — přesně to, co se
 // stane, když host stojí ve sklepě kavárny s jednou čárkou signálu.
@@ -32,12 +42,13 @@ await p.goto('http://localhost:3000/client/cafe-am-ring?tab=reserve', { waitUnti
 await p.waitForTimeout(2000);
 
 console.log('Rezervace, když uprostřed odesílání vypadne spojení:');
-const cas = p.locator('button', { hasText: /^\d{1,2}:\d{2}$/ }).first();
+const okno = p.getByRole('dialog');
+const cas = okno.locator('button', { hasText: /^\d{1,2}:\d{2}$/ }).first();
 if (await cas.count() === 0) { bad('nejsou nabídnuté časy — fixture?'); }
 else {
   await cas.click();
   await p.waitForTimeout(400);
-  const odeslat = p.getByRole('button', { name: /Rezervovat|Odeslat/ }).first();
+  const odeslat = okno.getByRole('button', { name: /^(Rezervovat \d|Odeslat|Odesílám)/ }).first();
   if (await odeslat.count() === 0) { bad('tlačítko odeslat není'); }
   else {
     await odeslat.click();
@@ -54,3 +65,4 @@ if (errs.length) console.log('    [chyba stránky]', errs[0]);
 await ctx.close();
 console.log(problems.length ? `\nPROBLÉMŮ: ${problems.length}` : '\nVšechno prošlo.');
 await b.close();
+if (problems.length) process.exitCode = 1;

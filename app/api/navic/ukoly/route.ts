@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true, ukol: await ukolPro(c.teamId, n, termin, kdo) });
   } catch (e) {
-    if (predMigraci(e)) return chyba('Úkoly za body ještě nejsou připravené — spusť /api/init.', 503);
+    if (predMigraci(e)) return chyba('Úkoly za body se ještě připravují. Zkus to za chvíli znovu.', 503);
     console.error('navic/ukoly POST', e);
     return chyba('Úkol se nepodařilo uložit.', 500);
   }

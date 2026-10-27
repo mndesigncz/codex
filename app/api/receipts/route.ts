@@ -48,7 +48,7 @@ export async function GET() {
         ORDER BY r.created_at DESC LIMIT 100`;
     return NextResponse.json({ receipts: rows });
   } catch {
-    return NextResponse.json({ receipts: [], error: 'Účtenky nejsou dostupné — spusť /api/init.' });
+    return NextResponse.json({ receipts: [], error: 'Účtenky se ještě připravují. Zkus to za chvíli znovu.' });
   }
 }
 
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       `${supplier ?? 'Účtenka'}${amount ? ` · ${(await menaPodniku(u.team_id)).money(amount)}` : ''}`);
     return NextResponse.json({ ok: true, receipt: row });
   } catch {
-    return NextResponse.json({ error: 'Účtenky nejsou dostupné — spusť /api/init.' }, { status: 400 });
+    return NextResponse.json({ error: 'Účtenky se ještě připravují. Zkus to za chvíli znovu.' }, { status: 400 });
   }
 }
 

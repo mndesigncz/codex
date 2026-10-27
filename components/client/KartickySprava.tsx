@@ -42,7 +42,8 @@ async function posli(url: string, telo: object) {
   return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(telo) }).then(okJson);
 }
 
-export default function KartickySprava({ oznam }: { oznam: (text: string, ton?: 'ok' | 'bad') => void }) {
+/** `vlozene` = část stránky Kupony a poukazy (kolo 92): bez vlastního okraje a nadpisu, tisk dávky jako akce nad statistikou. */
+export default function KartickySprava({ oznam, vlozene = false }: { oznam: (text: string, ton?: 'ok' | 'bad') => void; vlozene?: boolean }) {
   const [stav, setStav] = useState<'vse' | StavKarty>('vse');
   const [davka, setDavka] = useState<number | null>(null);
   const [hledat, setHledat] = useState('');
@@ -130,10 +131,12 @@ export default function KartickySprava({ oznam }: { oznam: (text: string, ton?: 
   };
 
   return (
-    <div className="px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 space-y-5 max-w-4xl">
-      <PageHeader hintId="clientadmin-karticky" title="Kartičky"
-        subtitle="Plastové a papírové karty pro hosty bez aplikace. Vytiskni dávku, rozdej ji a u kasy kartu přiřaď hostovi. Pak funguje jako kartička v aplikaci."
-        primary={smi ? <Button variant="accent" icon="print" onClick={() => { setChybaOkna(''); setNova({ pocet: '50', nazev: '' }); }}>Vytisknout dávku</Button> : undefined} />
+    <div className={vlozene ? 'space-y-5 max-w-4xl' : 'px-4 min-[360px]:px-5 pt-3 pb-4 sm:p-6 space-y-5 max-w-4xl'}>
+      {vlozene
+        ? smi && <Button variant="primary" icon="print" className="w-full" onClick={() => { setChybaOkna(''); setNova({ pocet: '50', nazev: '' }); }}>Vytisknout dávku</Button>
+        : <PageHeader hintId="clientadmin-karticky" title="Kartičky"
+            subtitle="Plastové a papírové karty pro hosty bez aplikace. Vytiskni dávku, rozdej ji a u kasy kartu přiřaď hostovi. Pak funguje jako kartička v aplikaci."
+            primary={smi ? <Button variant="accent" icon="print" onClick={() => { setChybaOkna(''); setNova({ pocet: '50', nazev: '' }); }}>Vytisknout dávku</Button> : undefined} />}
 
       <Card>
         <StatRow>

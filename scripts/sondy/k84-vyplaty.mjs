@@ -286,6 +286,30 @@ for (const [sirka, jazyk] of [[390, null], [320, 'de'], [320, 'pl']]) {
   await w.screenshot({ path: SNIMKY + 'k84-vyplaty-pichacky-390.png' });
   await ctx.close();
 }
+// Odchod (ověření kola 92, B7): jediný vzor pojistky — 5 s odpočet s „Vrátit odchod",
+// žádné potvrzovací okno. Vrátit nic nezapíše, „Zapsat hned" pošle POST action out.
+{
+  const naSmene = { ...ZAM, roster: [{ ...ZAM.roster[0], openSince: prahaISO(DNES, '14:12') }],
+    entries: [{ id: 720, employeeId: 16, clockIn: prahaISO(DNES, '14:12'), clockOut: null, source: 'self', note: null, updatedBy: null }, ...ZAM.entries.map(e => (e.id === 701 ? { ...e, clockOut: prahaISO(den(1), '16:00') } : e))] };
+  const { ctx, p, stav } = await zam({ dochazka: naSmene, url: '/employee/shifts?view=home', plocha: 'zamestnanec.domu', fix: FIX_DOMU });
+  const w = widget(p, 'dochazka.moje_pichacky');
+  const odchod = w.getByRole('button', { name: 'Odpíchnout odchod' });
+  await dokud(() => odchod.isVisible().catch(() => false), 20000);
+  const postOut = () => (stav.zapisy ?? []).filter(z => z.path === '/api/attendance' && z.telo?.action === 'out');
+  await odchod.click();
+  tvrdi('P4 (390): Odchod rozběhne odpočet s „Vrátit odchod" a „Zapsat hned"', await dokud(() => w.getByRole('button', { name: 'Vrátit odchod' }).isVisible().catch(() => false), 3000)
+    && await w.getByRole('button', { name: 'Zapsat hned' }).isVisible() && await w.locator('[data-odpocet-odchodu]').isVisible());
+  tvrdi('P4: žádné potvrzovací okno „Odpíchnout odchod?" (jediný vzor = odpočet)', (await p.getByRole('dialog').count()) === 0);
+  tvrdi('P4: během odpočtu nic neodešlo', postOut().length === 0, JSON.stringify(stav.zapisy));
+  await w.screenshot({ path: SNIMKY + 'k84-vyplaty-odpocet-odchodu-390.png' });
+  await w.getByRole('button', { name: 'Vrátit odchod' }).click();
+  await p.waitForTimeout(5600);
+  tvrdi('P4: Vrátit odchod → zpátky Odchod + Pauza a po 5 s pořád žádný zápis', await odchod.isVisible() && await w.getByRole('button', { name: 'Začít pauzu' }).isVisible() && postOut().length === 0, JSON.stringify(stav.zapisy));
+  await odchod.click();
+  await w.getByRole('button', { name: 'Zapsat hned' }).click();
+  tvrdi('P4: „Zapsat hned" pošle právě jeden POST /api/attendance {action: out}', await dokud(() => postOut().length === 1, 4000) && (await p.waitForTimeout(400), postOut().length === 1), JSON.stringify(stav.zapisy));
+  await ctx.close();
+}
 {
   const naPauze = { ...ZAM, roster: [{ ...ZAM.roster[0], openSince: null }],
     entries: [

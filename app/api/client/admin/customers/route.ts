@@ -13,8 +13,9 @@ import { nactiClenyTymu, obnovDynamickeSkupiny, kontextFiltru, smazClenaZPodniku
 import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
 import { najdiDuplicity } from '@/lib/clenoveSeznam';
 import {
-  normalizujFiltr, normalizujRazeni, splnujeFiltr, seradCleny, strankuj, sestavCsvClenu, type FiltrClenu,
+  normalizujFiltr, normalizujRazeni, splnujeFiltr, seradCleny, strankuj, sestavCsvClenu, maNarozeninyVMesici, type FiltrClenu,
 } from '@/lib/clenoveFiltr';
+import { poctySegmentu } from '@/lib/klientSprava/segmentyHostu';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -102,6 +103,8 @@ export async function GET(req: NextRequest) {
     customers, total: strana.total, hasMore: strana.hasMore, nextOffset: strana.nextOffset,
     // Celkem členů bez filtru: rozlišuje „nikdo takový" od „zatím žádní členové".
     all: vsichni.length,
+    // Kolo 92: počty segmentů pro čipy nad seznamem (ze stejných dat, bez dalšího dotazu).
+    segmenty: poctySegmentu(vsichni.map(c => ({ ...c, narozeninyTentoMesic: maNarozeninyVMesici(c.birthday, k.mesic) })), k.now),
   });
 }
 

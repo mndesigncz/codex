@@ -37,6 +37,7 @@ import { URL_UKOLY, UDALOST_FILTR_UKOLU, KLIC_FILTRU_UKOLU, Zaskrtnuti, useTedHM
 import { pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 import { DraftNote } from '../ui/DraftNote';
 import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, stavPoOdskrtnuti, chceFotku, prazdnyFormularUkolu, type FormularUkolu, type StavZapisu, type Ukol } from '@/lib/ukolyPrehled';
 import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, poCase, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
@@ -107,6 +108,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const setWho = useCallback((kdo: FiltrUkolu['kdo'] | ((w: FiltrUkolu['kdo']) => FiltrUkolu['kdo'])) =>
     setFiltr(f => ({ ...f, kdo: typeof kdo === 'function' ? kdo(f.kdo) : kdo })), []);
   const [view, setView] = useState<'list' | 'week' | 'month' | 'prehled' | 'zabody'>('list');
+  const telefon = useJeTelefon();
   // Kolo 11: část Za body jen s právem vidět navíc týmu nebo spravovat nabídku (server /api/navic/offers totéž).
   const vidiZaBody = smi(['navic.zobrazit_tym', 'navic.nabidka']);
   const smiZaBody = smi('navic.nabidka');
@@ -749,6 +751,13 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     hodnotyKarty.poTerminu > 0 ? t('{n} po termínu', { n: hodnotyKarty.poTerminu }) : null,
   ].filter(Boolean).join(' · ');
   const novyUkol = () => (showForm && !editingId ? closeForm() : openNew());
+  // Telefon (audit 2026-10 V27): pět pohledů v pásu se na 390 px uřízlo („Za b…"). V segmentu zůstávají
+  // Seznam, Týden a Za body (a otevřený pohled), Měsíc a Přehled jsou v „···" — jako Rozvrh.
+  const pohledy = [{ id: 'list' as const, label: t('Seznam') }, { id: 'week' as const, label: t('Týden') }, { id: 'month' as const, label: t('Měsíc') }, { id: 'prehled' as const, label: t('Přehled') },
+    ...(vidiZaBody ? [{ id: 'zabody' as const, label: t('Za body') }] : [])];
+  const VEDLEJSI_TEL = ['month', 'prehled'];
+  const pohledySegmentu = telefon ? pohledy.filter(o => !VEDLEJSI_TEL.includes(o.id) || o.id === view) : pohledy;
+  const menuPohledu = telefon ? pohledy.filter(o => VEDLEJSI_TEL.includes(o.id) && o.id !== view).map(o => ({ label: o.label, icon: o.id === 'month' ? 'calendar' : 'chart', onClick: () => setView(o.id) })) : [];
   return (
     <>
       <PlochaWidgetu
@@ -766,11 +775,10 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           primaryTelefon: null,
           menuTelefon: [
             { label: t('Nový úkol'), icon: 'plus', onClick: novyUkol },
+            ...menuPohledu,
             ...(smiZaBody ? [{ label: t('Nový úkol za body'), icon: 'tag', onClick: () => { setView('zabody'); setZaBodyOkno({}); } }] : []),
           ],
-          aside: <Segmented ariaLabel={t('Zobrazení')} value={view} onChange={setView}
-            options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }, { id: 'prehled', label: t('Přehled') },
-              ...(vidiZaBody ? [{ id: 'zabody' as const, label: t('Za body') }] : [])]} />,
+          aside: <Segmented ariaLabel={t('Zobrazení')} value={view} onChange={setView} options={pohledySegmentu} />,
         }}
         nastroj={nastroj}
       />

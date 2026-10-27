@@ -27,7 +27,13 @@ const SNIMKY = process.env.SONDY_SNIMKY ? process.env.SONDY_SNIMKY.replace(/\/?$
 const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED3: praha(-3), PRED4: praha(-4), PRED5: praha(-5), PRED6: praha(-6), STARY: praha(-40) };
 const MESIC = DNY.DNES.slice(0, 7);
-const iso = (den, hm) => new Date(`${den}T${hm}:00+02:00`).toISOString();
+// Pražský čas se správným posunem podle data (letní +02:00, zimní +01:00) — pevné +02:00
+// po změně času na zimní posunulo příchody o hodinu a „pozdní příchod" zmizel.
+const iso = (den, hm) => {
+  const odhad = new Date(`${den}T${hm}:00Z`);
+  const tz = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Prague', timeZoneName: 'longOffset' }).formatToParts(odhad).find(x => x.type === 'timeZoneName')?.value ?? 'GMT+01:00';
+  return new Date(`${den}T${hm}:00${tz.replace('GMT', '') || '+00:00'}`).toISOString();
+};
 const nacti = (jmeno) => {
   let t = readFileSync(DIR + jmeno + '.json', 'utf8');
   t = t.replace(/"@([A-Z0-9]+)-(\d\d:\d\d)"/g, (_, k, hm) => `"${iso(DNY[k] ?? DNY.DNES, hm)}"`);

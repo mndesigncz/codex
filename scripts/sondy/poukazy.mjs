@@ -12,7 +12,8 @@ import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, otevri, browser, tokenPro, BASE, DIR, OUT } from './k68-spolecne.mjs';
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
-const VERNOST = '/employer/overview?mode=client&tab=loyalty';
+// Kolo 92: dárkové poukazy jsou Věrnost → Kupony a poukazy (dřív Věrnost → Poukazy).
+const VERNOST = '/employer/overview?mode=client&tab=cards';
 const DNES = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
 const plus = (d, n) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
@@ -96,8 +97,8 @@ async function sprava(viewport, mobil) {
     window.__tisk = [];
     window.open = () => ({ document: { write: (h) => window.__tisk.push(h), close() {} }, focus() {}, print() {} });
   });
-  await otevri(p, VERNOST, 'vedeni.klient_vernost');
-  await p.locator('[data-plocha]').getByRole('tab', { name: 'Poukazy' }).click();
+  await p.goto(BASE + VERNOST, { waitUntil: 'networkidle' });
+  await p.getByRole('tab', { name: 'Dárkové poukazy' }).click();
   await p.getByText('DP-ABCD-2349').first().waitFor({ timeout: 8000 });
   tvrdi(`${jm} seznam: 5 poukazů se stavy`, (await p.getByText(/^(Platný|Vyčerpaný|Propadlý|Zrušený)$/).count()) >= 5);
   tvrdi(`${jm} seznam: zůstatek 150 Kč a „z 500 Kč“ u částečně uplatněného`, /150\s*Kč/.test(await p.locator('main, body').first().innerText()) && /z\s*500\s*Kč/.test(await p.locator('body').innerText()));
@@ -220,8 +221,8 @@ async function sprava(viewport, mobil) {
 async function obsluha(viewport, mobil) {
   const jm = `${viewport.width}px`;
   const { ctx, p, stav, chyby } = await kontext({ viewport, mobil, fix: nacti('k69-b8-rozlozeni-vernost'), dalsi: podvrh });
-  await otevri(p, VERNOST, 'vedeni.klient_vernost');
-  await p.locator('[data-plocha]').getByRole('tab', { name: 'Poukazy' }).click();
+  await p.goto(BASE + VERNOST, { waitUntil: 'networkidle' });
+  await p.getByRole('tab', { name: 'Dárkové poukazy' }).click();
   await p.getByLabel('Kód poukazu').first().waitFor();
   // Uplatnění z karty „Uplatnit poukaz“ (nahoře) otevře detail.
   await p.getByLabel('Kód poukazu').fill('dp bcde 345s');
@@ -298,8 +299,9 @@ async function host(viewport, mobil) {
   p.on('pageerror', e => chyby.push(String(e)));
   p.on('console', msg => { if (msg.type() === 'error' && !/Failed to load resource/.test(msg.text())) chyby.push(msg.text()); });
 
-  // Moje
-  await p.goto(BASE + '/client/me', { waitUntil: 'networkidle' });
+  // Přestavba hosta (2026-10-21): Moje už pole „Mám poukaz“ nemá (Odměny mají jedno pole „Mám kód“, které
+  // poukaz rovnou přidá); ověření zůstatku bez účtu je na stránce podniku. Obě části proto jdou na podnik.
+  await p.goto(BASE + '/client/kavarna-u-lipy', { waitUntil: 'networkidle' });
   await p.getByLabel('Kód z poukazu').or(p.getByPlaceholder('Kód z poukazu')).first().waitFor({ timeout: 10000 });
   await p.getByPlaceholder('Kód z poukazu').fill('abcd 2345');
   tvrdi(`${jm} Moje: kód se formátuje`, (await p.getByPlaceholder('Kód z poukazu').inputValue()) === 'ABCD-2345');

@@ -128,5 +128,5 @@ export default async function ({ eq, ok }: Testy) {
     html.includes(`'${KLIC_KARTY}'`) && html.includes(KARTA_KOD.source) && html.includes(KARTA_SVG.source));
   ok('offline stránka vkládá kód přes textContent, ne HTML', html.includes("getElementById('host-karta-kod').textContent") && !/host-karta-kod'\)\.innerHTML/.test(html));
   ok('odhlášení smaže uloženou kartičku', zdroj('lib/odhlaseni.ts').includes('smazUlozenouKartu()'));
-  ok('Moje ukládá kartičku do telefonu', zdroj('components/client/MyPage.tsx').includes('ulozKartu(k)'));
+  ok('Karta hosta se ukládá do telefonu (mezipaměť hosta, mimo ukázku)', zdroj('components/client/host/data.ts').includes('ulozKartu(d)'));
 }

@@ -13,7 +13,7 @@ const NEPLATNY = 'Odkaz už neplatí. V aplikaci si pošlete nový.';
 
 export async function POST(request: Request) {
   const ip = await hit(`overeni-email-ip:${klientIp(request.headers)}`, 20, 15 * 60, { failClosed: true });
-  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkuste to později.' }, { status: 429 });
+  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkus to později.' }, { status: 429 });
   const b = await request.json().catch(() => ({}));
   if (!vypadaJakoToken(b?.token)) return NextResponse.json({ error: NEPLATNY }, { status: 400 });
   try {

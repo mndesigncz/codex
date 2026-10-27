@@ -147,7 +147,7 @@ export default function EventsView({ user, oznam }: { user: { id?: string }; ozn
     : !akce.data ? <div className="space-y-3"><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
     : (
       <div className="space-y-4">
-        {akce.data.notMigrated && <p className="note note-wait">{t('Akce budou dostupné po migraci (/api/init).')}</p>}
+        {akce.data.notMigrated && <p className="note note-wait">{t('Akce se ještě připravují. Zkus to za chvíli znovu.')}</p>}
         {upcoming.length === 0 ? (
           <Card>
             <EmptyState icon="calendarCheck" compact title={t('Žádná naplánovaná akce')}
@@ -236,13 +236,19 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
     <Modal open onClose={onClose} title={t('Nová akce')}
       footer={<>
         <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
-        <Button type="submit" form="akce-nova" variant="primary" loading={busy} disabled={!title.trim() || !date}>{t('Založit akci')}</Button>
+        <Button type="submit" form="akce-nova" variant="primary" loading={busy}>{t('Založit akci')}</Button>
       </>}>
       <div className="mb-3"><DraftNote koncept={koncept} co="rozepsanou akci" /></div>
       {err && <p className="note note-danger mb-3" role="alert">{err}</p>}
       {/* Opravdový <form>, ne jen tlačítko s onClick: po vyplnění názvu
           a data se čeká, že Enter akci založí. */}
-      <form id="akce-nova" className="space-y-4" onSubmit={ev => { ev.preventDefault(); if (!busy && title.trim() && date) void save(); }}>
+      <form id="akce-nova" className="space-y-4" onSubmit={ev => {
+        ev.preventDefault();
+        if (busy) return;
+        // Aktivní tlačítko a věta, co chybí (audit 2026-10 průřez 3), místo šedého „Založit akci".
+        if (!title.trim() || !date) { setErr(!title.trim() ? t('Napiš název akce.') : t('Vyber datum akce.')); return; }
+        void save();
+      }}>
         {/* Základní rozcestí: akce u nás (obsluha = kdo je na směně), nebo
             výjezd ven (vlastní směna k akci, balení skladu, uzávěrka za akci). */}
         <div className="min-w-0">

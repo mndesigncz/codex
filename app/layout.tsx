@@ -70,11 +70,11 @@ export default async function RootLayout({
   const jazyk = await getJazyk();
   const slovniky = jazyk === 'cs' ? undefined : await nactiSekce(jazyk, SEKCE_VZDY);
   return (
-    <html lang={jazyk} className={`${sans.variable} ${mono.variable}`} data-obal={obal ?? undefined}>
+    <html lang={jazyk} className={`${sans.variable} ${mono.variable}`} data-obal={obal ?? undefined} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var p=location.pathname;var c=p==='/'||p==='/demo'||p.indexOf('/demo/')===0||p==='/client'||p.indexOf('/client/')===0||/[?&]mode=client(&|$)/.test(location.search);var h=document.documentElement;var t=c?null:(localStorage.getItem('managero-theme')||localStorage.getItem('pangea-theme')||localStorage.getItem('managero-theme-server'));if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark'&&!c)h.setAttribute('data-theme','dark');var v=c?{}:JSON.parse(localStorage.getItem('managero-vzhled')||'{}');if(v.hustota==='kompaktni')h.setAttribute('data-density','compact');if(v.pismo==='vetsi')h.setAttribute('data-fontsize','large');if(v.pismo==='nejvetsi')h.setAttribute('data-fontsize','xlarge');if(v.pohyb===true)h.setAttribute('data-motion','reduce');if(v.kontrast===true)h.setAttribute('data-contrast','high');}catch(e){}`,
+            __html: `try{var p=location.pathname;var c=p==='/'||p==='/demo'||p.indexOf('/demo/')===0||/[?&]mode=client(&|$)/.test(location.search);var k=p==='/client'||p.indexOf('/client/')===0;var h=document.documentElement;if(k)window.__motivVychozi='system';var t=c?null:(localStorage.getItem('managero-theme')||localStorage.getItem('pangea-theme')||localStorage.getItem('managero-theme-server')||(k?'system':null));if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark'&&!c)h.setAttribute('data-theme','dark');var v=c?{}:JSON.parse(localStorage.getItem('managero-vzhled')||'{}');if(v.hustota==='kompaktni')h.setAttribute('data-density','compact');if(v.pismo==='vetsi')h.setAttribute('data-fontsize','large');if(v.pismo==='nejvetsi')h.setAttribute('data-fontsize','xlarge');if(v.pohyb===true)h.setAttribute('data-motion','reduce');if(v.kontrast===true)h.setAttribute('data-contrast','high');}catch(e){}`,
           }}
         />
       </head>

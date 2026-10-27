@@ -26,7 +26,7 @@ export async function GET() {
     return NextResponse.json(cards);
   } catch {
     // Před migrací (team_id ještě není) nebo výpadek: hláška, ne holá pětistovka.
-    return NextResponse.json({ error: 'Plánování se nepodařilo načíst. Zkuste to prosím znovu.' }, { status: 500 });
+    return NextResponse.json({ error: 'Plánování se nepodařilo načíst. Zkus to prosím znovu.' }, { status: 500 });
   }
 }
 

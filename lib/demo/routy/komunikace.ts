@@ -132,6 +132,14 @@ export const komunikace: Obsluha = (p, k) => {
           id: z.id, conversationId: z.conversationId, senderId: z.userId, content: z.content, attachmentUrl: null, attachmentType: null, attachmentName: null,
           createdAt: z.createdAt, senderName: clen(z.userId).name, senderAvatar: clen(z.userId).avatar,
         })),
+        // Členové vlákna s „naposledy četl" (skutečná routa je posílá kvůli „Viděli 3 z 5"):
+        // kdo psal, četl do své poslední zprávy; vedoucí četla před dvěma minutami.
+        members: LIDE.filter(l => l.role !== 'kiosk').map(l => {
+          const moje = s.zpravy.filter(z => z.conversationId === id && z.userId === l.id).map(z => z.createdAt).sort();
+          const posledni = moje[moje.length - 1] ?? null;
+          const lastReadAt = l.id === meId ? new Date().toISOString() : l.id === KDO_JSEM.vedeni ? new Date(Date.now() - 120_000).toISOString() : posledni;
+          return { id: l.id, name: l.name, lastReadAt };
+        }),
       });
     }
     if (metoda === 'POST') {

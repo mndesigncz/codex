@@ -69,7 +69,7 @@ export function telaZmen(f: FormularPravidel, profil: Record<string, unknown> | 
 
 /** Odkazy „Co přenést ručně“: kam v administraci co patří a jaké oprávnění to chce. */
 export const RUCNI_PRENOS: { id: string; nazev: string; popis: string; pohled: string; cast?: string; klice: readonly string[] }[] = [
-  { id: 'bannery', nazev: 'Bannery', popis: 'Obrázky a akce na stránce pro hosty.', pohled: 'klient:brand', klice: ['klient.vzhled'] },
+  { id: 'bannery', nazev: 'Bannery', popis: 'Obrázky a akce na stránce pro hosty.', pohled: 'klient:campaigns', cast: 'bannery', klice: ['klient.vzhled'] },
   { id: 'kupony', nazev: 'Kupony a promo kódy', popis: 'Slevy, kódy na leták nebo účtenku.', pohled: 'klient:loyalty', cast: 'coupons', klice: ['kupony.spravovat'] },
   { id: 'poukazy', nazev: 'Dárkové poukazy', popis: 'Vydané poukazy a jejich zůstatky.', pohled: 'klient:loyalty', cast: 'vouchers', klice: ['poukazy.zobrazit'] },
   { id: 'razitka', nazev: 'Další razítkové karty', popis: 'Karty za vybrané položky nebo za útratu.', pohled: 'klient:loyalty', cast: 'stamps', klice: ['vernost.zobrazit'] },

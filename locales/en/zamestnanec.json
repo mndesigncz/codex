@@ -447,5 +447,7 @@
   "Volitelné — kdo chce, vezme si. Body dostaneš po uznání.": "Optional — take one if you like. You get the points once approved.",
   "Za body navíc": "Extra for points",
   "Zapsat navíc": "Log extra",
-  "strop {strop} b — nasbíral/a {nasbirano}": "cap {strop} pts — earned {nasbirano}"
+  "strop {strop} b — nasbíral/a {nasbirano}": "cap {strop} pts — earned {nasbirano}",
+  "Napiš částku pohybu.": "Enter the amount.",
+  "Detail dne {den}": "Details for {den}"
 }

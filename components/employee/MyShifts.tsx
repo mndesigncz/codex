@@ -26,6 +26,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Button, Card, Chip, EmptyState, ErrorState, Field, ListRow, Modal, Skeleton, Textarea } from '../ui';
+import { otevriDen } from '@/lib/denUdalost';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
@@ -157,11 +158,16 @@ export default function MyShifts({ user }: Props) {
                 const d = den(s.date);
                 const nabidnuto = vBurze.has(Number(s.id));
                 return (
-                  <ListRow key={s.id}
+                  <ListRow key={s.id} className="relative" chevron
                     // v4 (V4, P15): stavový čip patří k titulku, akce má pevnou šířku (a prázdný řádek stejně
                     // široké místo) — časy jsou svislý sloupec u pravé hrany ve všech řádcích.
-                    title={<span className="flex items-center gap-2 min-w-0"><span className="cz-sentence truncate">{denKratce(d)}</span>
-                      {nabidnuto ? <Chip tone="info" size="sm" className="shrink-0">{t('V burze')}</Chip> : d === dnes ? <Chip tone="ok" size="sm" className="shrink-0">{t('Dnes')}</Chip> : null}</span>}
+                    // Audit Z03: celý řádek otevře detail dne (kdo je na směně, poznámky) — tlačítko v titulku
+                    // je roztažené přes řádek; „Nabídnout" leží nad ním (relative z-[1]). Čip „Dnes" vedle
+                    // titulku „Dnes" byl zdvojený — zůstává jen u Zítra a dál žádný, u burzy „V burze".
+                    title={<span className="flex items-center gap-2 min-w-0">
+                      <button type="button" onClick={() => otevriDen(d, 'obecne')} aria-label={t('Detail dne {den}', { den: denKratce(d) })}
+                        className="cz-sentence truncate text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] after:absolute after:inset-0 after:content-['']">{denKratce(d)}</button>
+                      {nabidnuto && <Chip tone="info" size="sm" className="shrink-0">{t('V burze')}</Chip>}</span>}
                     meta={<>
                       <span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />
                       {popisekTypu(s)}
@@ -181,7 +187,7 @@ export default function MyShifts({ user }: Props) {
                     // „···" s jednou položkou stálo tři klepnutí a dvě vrstvy za to, co se z telefonu
                     // dělá nejčastěji. Okno s poznámkou zůstává (nabídnout = dvě klepnutí).
                     actions={smiBurza ? (!nabidnuto ? (
-                      <Button variant="secondary" size="sm" icon="handover" className="max-sm:!w-9 max-sm:!px-0 sm:w-32"
+                      <Button variant="secondary" size="sm" icon="handover" className="relative z-[1] max-sm:!w-9 max-sm:!px-0 sm:w-32"
                         aria-label={t('Nabídnout do burzy směnu {den}', { den: denVeVete(d) })}
                         title={t('Kolega si ji může vzít, vedení výměnu schválí.')}
                         onClick={() => { setNabidnout(s); setPoznamka(''); setChyba(null); }}>

@@ -41,7 +41,7 @@ export default function NahlasenyObsah() {
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setAkceChyba(d.error ? tg(d.error) : t('Akci se nepodařilo provést.')); return; }
       setRadky(prev => (prev ?? []).map(x => x.id === r.id ? { ...x, status: d.status } : x));
-    } catch { setAkceChyba(t('Akci se nepodařilo provést. Zkontrolujte připojení.')); }
+    } catch { setAkceChyba(t('Akci se nepodařilo provést. Zkontroluj připojení.')); }
     finally { setBezi(null); }
   };
 
@@ -52,11 +52,11 @@ export default function NahlasenyObsah() {
     <section className="card p-6 space-y-4" aria-labelledby="h-nahlaseny">
       <div>
         <h2 id="h-nahlaseny" className="t-section">{t('Nahlášený obsah')}</h2>
-        <p className="t-meta mt-1 text-pretty">{t('Zprávy v chatu a nápady, které tým nahlásil. Odstraňte, co porušuje pravidla, nebo nahlášení zamítněte.')}</p>
+        <p className="t-meta mt-1 text-pretty">{t('Zprávy v chatu a nápady, které tým nahlásil. Odstraň, co porušuje pravidla, nebo nahlášení zamítni.')}</p>
       </div>
       {akceChyba && <p role="alert" className="note note-danger">{akceChyba}</p>}
       {radky.length === 0 ? (
-        <EmptyState compact icon="check" title={t('Nic nahlášeného')} hint={t('Až někdo něco nahlásí, uvidíte to tady a dostanete upozornění.')} />
+        <EmptyState compact icon="check" title={t('Nic nahlášeného')} hint={t('Až někdo něco nahlásí, uvidíš to tady a dostaneš upozornění.')} />
       ) : (
         <ul className="list">
           {radky.map(r => {

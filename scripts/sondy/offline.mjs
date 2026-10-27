@@ -34,11 +34,13 @@ for (const [jm, cesta, prihlas] of [['kiosk za barem', '/kiosk', true], ['menu n
   catch { nacetlo = false; }
   await p.waitForTimeout(1200);
   const text = (await p.evaluate(() => (document.body?.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 110))) || '(prázdno)';
-  const nase = await p.evaluate(() => !!document.querySelector('[class*="managero"], .kiosk-surface, .card, .glass-card, .menu-board') || /Managero/i.test(document.body?.innerText || ''));
+  // Naše obrazovka = cokoli kromě chybové stránky prohlížeče (lístek z cache nemá značku Managero).
+  const nase = nacetlo && await p.evaluate(() => !/ERR_INTERNET_DISCONNECTED|No internet|Žádné připojení k internetu/.test(document.body?.innerText || '') && (document.body?.innerText || '').trim().length > 20);
   console.log(`${jm}:`);
   console.log(`   service worker: ${sw}`);
   console.log(`   po výpadku se stránka načetla: ${nacetlo ? 'ano' : 'NE'}`);
   console.log(`   je to naše obrazovka: ${nase ? 'ano ✓' : 'NE ✗ (chybová stránka prohlížeče)'}`);
+  if (!nase) process.exitCode = 1;
   console.log(`   co je vidět: „${text}"`);
   await p.screenshot({ path: `shots/offline-${cesta.replace(/[^a-z]/gi, '') || 'root'}.png` });
   await ctx.close();

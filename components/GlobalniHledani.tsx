@@ -146,8 +146,12 @@ export function GlobalniHledani({ open, onClose, stranky, akce = [], onStranka, 
       pridej('sklad', t('Sklad'), (sklad.data ?? []).filter(x => obsahujeNekde(dotaz, x.name, x.category, x.supplier))
         .map<Vysledek>(x => ({ druh: 'stranka', klic: `p-${x.id}`, ikona: 'box', titulek: x.name, podtitulek: [x.category, `${x.quantity}${x.unit ? ` ${x.unit}` : ''}`].filter(Boolean).join(' · '),
           stranka: jeSkladStranka, arg: x.category ?? undefined })));
-      // Hosté (kolo 8): server už hledá podle jména, telefonu a — s právem na kontakty — e-mailu; tady se jen kreslí.
+      // Hosté (kolo 8): server už hledá podle jména, telefonu a — s právem na kontakty — e-mailu.
+      // Audit V03: pojistka i na klientovi — host bez shody (server, který vrátí všechny, třeba ukázka)
+      // se nekreslí. Telefon se porovnává jen číslicemi („777 123" najde „+420777123456").
+      const cislice = dotaz.replace(/\D/g, '');
       pridej('hoste', t('Hosté'), (dotazHostu && dotazHostu === dotaz ? hoste.data ?? [] : [])
+        .filter(h => obsahujeNekde(dotaz, h.name, h.email) || (cislice.length >= 3 && (h.phone ?? '').replace(/\D/g, '').includes(cislice)))
         .map<Vysledek>(h => ({ druh: 'stranka', klic: `h-${h.id}`, ikona: 'user', titulek: h.name,
           podtitulek: [h.phone, h.email, h.visits ? t('{n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { n: h.visits }) : ''].filter(Boolean).join(' · '),
           stranka: 'klient:customers', arg: `clen:${h.id}` })));

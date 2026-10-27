@@ -31,7 +31,7 @@ export function OvereniEmailuStranka({ token }: { token: string }) {
         setChyba(d?.error ? tg(d.error) : t('E-mail se nepodařilo potvrdit.'));
         setStav('chyba');
       })
-      .catch(() => { setChyba(t('E-mail se nepodařilo potvrdit. Zkontrolujte připojení.')); setStav('chyba'); });
+      .catch(() => { setChyba(t('E-mail se nepodařilo potvrdit. Zkontroluj připojení.')); setStav('chyba'); });
   }, [token, t]);
 
   return (
@@ -73,7 +73,7 @@ function useZnovu() {
       const d = await r.json().catch(() => ({}));
       setZprava(r.ok ? { ok: true, text: t('Poslali jsme nový odkaz. Platí 48 hodin.') } : { ok: false, text: d?.error ? tg(d.error) : t('Odkaz se nepodařilo poslat.') });
     } catch {
-      setZprava({ ok: false, text: t('Odkaz se nepodařilo poslat. Zkontrolujte připojení.') });
+      setZprava({ ok: false, text: t('Odkaz se nepodařilo poslat. Zkontroluj připojení.') });
     } finally { setBusy(false); }
   };
   return { busy, zprava, poslat };

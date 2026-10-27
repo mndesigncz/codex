@@ -12,15 +12,14 @@
 // jsou Button, popisy sekcí t-meta, pole Field/Input/Textarea.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { onAccent, staciKontrast } from '@/lib/floorplan';
 import { Icon } from '../Icons';
 import { Button, Card, Field, Input, PageHeader, Skeleton, ErrorState, Textarea } from '../ui';
-import BanneryEditor from './loyalty/BanneryEditor';
+import NahledStranky from './sprava/NahledStranky';
 
 /** Předvolené barvy značky — podnik si může vybrat i vlastní. */
 const ACCENTS = ['#C8F542', '#E8A33D', '#D9644A', '#7C9A6B', '#4A7DBF', '#9B6BAE', '#16181A'];
 
-async function uploadImage(f: File): Promise<string> {
+export async function uploadImage(f: File): Promise<string> {
   const { compressImage } = await import('@/lib/clientImage');
   const fd = new FormData();
   fd.append('file', await compressImage(f));
@@ -70,6 +69,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
   // stránku neobnovil. Teď se to přizná a nabídne další pokus.
   const [error, setError] = useState<string | null>(null);
   const galerieRef = useRef<HTMLInputElement>(null);
+  const [nahled, setNahled] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -100,7 +100,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
     try {
       const r = await fetch('/api/client/admin/profile', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logo_url: p.logo_url || '', cover_url: p.cover_url || '', gallery: p.gallery ?? [], accent: p.accent || '', tagline: p.tagline, description: p.description, address: p.address }),
+        body: JSON.stringify({ logo_url: p.logo_url || '', cover_url: p.cover_url || '', gallery: p.gallery ?? [], accent: p.accent || '', tagline: p.tagline, description: p.description, address: p.address, phone: p.phone ?? '' }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'Uložení se nepovedlo.');
@@ -114,11 +114,24 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
   const gallery: string[] = p.gallery ?? [];
 
   return (
-    <div className="space-y-6 max-w-3xl">
-    <form onSubmit={save} className="space-y-6">
-      <PageHeader hintId="brandtab" title="Vzhled" subtitle="Čím se podnik hostům představí: logo, fotky a pár vět o sobě."
-        primary={<Button type="submit" variant="accent" loading={busy === 'save'}>Uložit</Button>}
-        secondary={<Button type="button" variant="secondary" icon="external" onClick={() => url && window.open(url, '_blank')} disabled={!url}>Zobrazit</Button>} />
+    <div className="space-y-6">
+    <PageHeader hintId="brandtab" title="Stránka podniku" subtitle="Čím se podnik hostům představí. Náhled vpravo se mění hned, hosté to uvidí po uložení."
+      primary={<Button type="submit" form="vzhled-podniku" variant="accent" loading={busy === 'save'}>Uložit</Button>}
+      secondary={<Button type="button" variant="secondary" icon="external" onClick={() => url && window.open(url, '_blank')} disabled={!url}>Zobrazit jako host</Button>}
+      menuMobile={url ? [{ label: 'Zobrazit jako host', icon: 'external', onClick: () => window.open(url, '_blank') }] : undefined} />
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+    {/* Kolo 92: živý náhled stránky (koncept B „H") — na telefonu nahoře, na monitoru vpravo vedle formuláře. */}
+    <aside className="lg:order-2 lg:sticky lg:top-4 min-w-0" aria-label="Náhled stránky pro hosty">
+      {/* Na telefonu sbalený (dlouhý rám telefonu by odsunul formulář o dvě obrazovky). */}
+      <Button type="button" variant="secondary" icon={nahled ? 'chevronUp' : 'chevron'} className="w-full lg:hidden" aria-expanded={nahled} onClick={() => setNahled(v => !v)}>
+        {nahled ? 'Skrýt náhled' : 'Náhled pro hosty'}
+      </Button>
+      <div className={nahled ? 'mt-3 lg:mt-0' : 'max-lg:hidden'}>
+        <p className="t-label mb-2">Náhled · tak to uvidí host</p>
+        <NahledStranky p={p} />
+      </div>
+    </aside>
+    <form id="vzhled-podniku" onSubmit={save} className="space-y-6 min-w-0 lg:order-1">
 
       <Card className="grid gap-5 sm:grid-cols-[auto_1fr]">
         <Picker id="b-logo" title="Logo" hint="Čtverec, aspoň 200 px." value={p.logo_url ?? ''} busy={busy === 'logo_url'} onChange={v => pick('logo_url', v)} />
@@ -158,7 +171,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
       <Card className="grid gap-4">
         <div>
           <h2 className="t-card">Barva značky</h2>
-          <p className="t-meta mt-0.5">Použije se na stránce pro hosty. Bez výběru zůstane limetková jako ve zbytku aplikace.</p>
+          <p className="t-meta mt-0.5">Barva hlavičky stránky a karty hosta. Bez výběru bude karta grafitová.</p>
         </div>
         {/* v4 (P1, P2): vzorník je řada sedmi rovných dílů až k pravé hraně; vlastní barva a „Výchozí"
             pod ním v jedné řadě (popisek vlevo, akce na R) — dřív „Vlastní" spadlo samo na další řádek. */}
@@ -176,22 +189,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
           {p.accent && <Button type="button" size="sm" variant="ghost" className="-mr-2" onClick={() => setP({ ...p, accent: '' })}>Výchozí</Button>}
         </div>
 
-        {/* Ukázka i varování. Na některých barvách se čitelného textu prostě
-            dosáhnout nedá — barva je ale podniku, ne naše, takže ji
-            nepřepisujeme. Mlčet by ale znamenalo nechat ho vydat stránku,
-            kterou si hosté nepřečtou. */}
-        {p.accent && (
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center rounded-full px-5 py-2.5 text-sm font-semibold"
-              style={{ background: p.accent, color: onAccent(p.accent) }}>Stát se členem</span>
-            {staciKontrast(p.accent)
-              ? <span className="t-meta">Takhle uvidí hosté hlavní tlačítko.</span>
-              : <span className="text-[13px] text-wait-ink max-w-[42ch]">
-                  Na téhle barvě se text špatně čte — ani tmavý, ani bílý na ní nedosáhne
-                  doporučeného kontrastu. Zkus ji o kus ztmavit nebo zesvětlit.
-                </span>}
-          </div>
-        )}
+        {/* Kontrast barvy hlídá náhled vpravo (NahledStranky, staciKontrast) — barva je podniku, čitelnost naše. */}
       </Card>
 
       <Card className="grid gap-4">
@@ -199,10 +197,13 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
         <Field id="b-tag" label="Motto"><Input id="b-tag" value={p.tagline ?? ''} onChange={e => setP({ ...p, tagline: e.target.value })} placeholder="Čaj z lístků, ne z pytlíků." maxLength={120} /></Field>
         <Field id="b-desc" label="Pár vět"><Textarea id="b-desc" value={p.description ?? ''} onChange={e => setP({ ...p, description: e.target.value })} rows={3} placeholder="Malý podnik v přízemí starého domu. Sedí se u stolů i na baru." maxLength={1200} /></Field>
         <Field id="b-addr" label="Adresa"><Input id="b-addr" value={p.address ?? ''} onChange={e => setP({ ...p, address: e.target.value })} placeholder="Vodní 14, Brno" /></Field>
+        <Field id="b-tel" label="Telefon" hint="Host ho uvidí jako „Zavolat“ na stránce podniku. Prázdné = bez telefonu.">
+          <Input id="b-tel" type="tel" inputMode="tel" autoComplete="tel" value={p.phone ?? ''} onChange={e => setP({ ...p, phone: e.target.value })} placeholder="+420 777 123 456" maxLength={30} />
+        </Field>
       </Card>
     </form>
-    {/* Bannery se ukládají samy (vlastní tlačítka), proto stojí mimo formulář Vzhledu. */}
-    <BanneryEditor toast={toast} upload={uploadImage} accent={p.accent || ''} />
+    </div>
+    {/* Bannery se od kola 92 spravují v Kampaních (kanál kampaně), ne tady. */}
     </div>
   );
 }

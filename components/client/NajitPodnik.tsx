@@ -16,6 +16,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Button, Field, Input, Modal } from '../ui';
 import { cestaZKoduPodniku, cestaZQr } from '@/lib/nativni/most';
 import { useT } from '@/lib/i18n/client';
+import { useCesta } from './host/cesty';
 
 /** Umí tohle prostředí naskenovat QR? Nativní most (obal), nebo BarcodeDetector v prohlížeči. */
 export function useUmiSkenovat(jeObal: boolean): { nativni: boolean; kamera: boolean; umi: boolean } {
@@ -41,6 +42,8 @@ export default function NajitPodnik({ open, onClose, skenovatHned, jeObal }: {
 }) {
   const t = useT('klient-host');
   const router = useRouter();
+  // V ukázce (/client/demo) zůstane i sken v ukázce.
+  const vUkazce = useCesta();
   const { nativni, kamera, umi } = useUmiSkenovat(jeObal);
   const [kod, setKod] = useState('');
   const [chyba, setChyba] = useState('');
@@ -53,11 +56,12 @@ export default function NajitPodnik({ open, onClose, skenovatHned, jeObal }: {
   // stránkou podniku (Zpět pak vede na seznam) a okno se zavře, až se adresa opravdu změní.
   const aktualni = usePathname();
   const [cil, setCil] = useState<string | null>(null);
-  const otevri = useCallback((kam: string) => {
+  const otevri = useCallback((kamSkutecne: string) => {
+    const kam = vUkazce(kamSkutecne);
     if (kam.split(/[?#]/)[0] === aktualni) { onClose(); setTimeout(() => router.replace(kam), 350); return; }
     setCil(kam);
     router.replace(kam);
-  }, [aktualni, onClose, router]);
+  }, [aktualni, onClose, router, vUkazce]);
   useEffect(() => {
     if (!cil) return;
     if (aktualni === cil.split(/[?#]/)[0]) { setCil(null); onClose(); }

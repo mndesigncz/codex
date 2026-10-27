@@ -111,8 +111,10 @@ export default function HostHistorieOddil({ slug, showBusiness = false, classNam
   const [otevreno, setOtevreno] = useState(false);
   return (
     <details className={`group ${className}`} onToggle={e => { if ((e.currentTarget as HTMLDetailsElement).open) setOtevreno(true); }}>
-      <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
-        <Icon name="chevron" size={15} className="transition-transform group-open:rotate-180" />{t('Historie bodů a kuponů')}
+      {/* Řádek přes šířku s šipkou vpravo (jako řádek seznamu), ne osamělý textový odkaz uprostřed karty. */}
+      <summary className="flex w-full min-h-[44px] items-center justify-between gap-3 text-[15px] font-semibold text-[#16181A] cursor-pointer list-none">
+        <span className="min-w-0">{t('Historie bodů a kuponů')}</span>
+        <Icon name="chevron" size={16} className="shrink-0 text-black/45 transition-transform group-open:rotate-180" />
       </summary>
       <div className="mt-3 max-w-xl">{otevreno && <HostHistorie slug={slug} showBusiness={showBusiness} />}</div>
     </details>

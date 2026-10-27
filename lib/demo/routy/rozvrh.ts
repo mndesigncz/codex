@@ -35,8 +35,13 @@ function typLabel(s: DemoStav, x: Smena) {
   return { typeLabel: t?.name ?? x.type, typeColor: t?.color ?? '#64748B' };
 }
 
+/** Poznámka vedení před směnou (vzor MyToast „pre-shift note") — v ukázce u dnešní směny zaměstnankyně. */
+function poznamkaPredSmenou(s: DemoStav, x: Smena): string | null {
+  return x.date === s.dnes && x.employeeId === KDO_JSEM.zamestnanec ? 'Kolem 16:00 přijde dodávka mléka — převezmi ji a zapiš do skladu.' : null;
+}
+
 function tvarSmenyProShifts(s: DemoStav, x: Smena) {
-  return { id: x.id, teamId: 1, employeeId: x.employeeId, date: x.date, startTime: x.startTime, endTime: x.endTime, type: x.type, start_time: x.startTime, end_time: x.endTime, ...typLabel(s, x) };
+  return { id: x.id, teamId: 1, employeeId: x.employeeId, date: x.date, startTime: x.startTime, endTime: x.endTime, type: x.type, start_time: x.startTime, end_time: x.endTime, ...typLabel(s, x), note: poznamkaPredSmenou(s, x) };
 }
 
 export const rozvrh: Obsluha = (p, k) => {

@@ -368,15 +368,17 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   // třetím (dřív 105 px na řádek). Prázdný ocas ListRow na telefonu přidá jen mezeru řádku.
   const vysky = await widgetLi(p, 'rozvrh.dostupnost_tymu').locator('.list-row').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
   tvrdi('T1: Dostupnost týmu na telefonu — řádek na dva řádky textu (výška ≤ 80 px, dřív 105)', vysky.length > 0 && Math.max(...vysky) <= 80, JSON.stringify(vysky));
-  // Záložky Rozvrhu (šest položek) jsou jeden posuvný pás, ne dva řádky textu.
+  // Audit 2026-10 (V06): na telefonu je v segmentu jen Rozvrh | Kalendář — šest záložek v pásu
+  // se na 390 px uřízlo („Otevírací d…"). Nastavení rozvrhu (Typy směn, Otevírací doba, Pevné dny,
+  // Pravidla) je v „···" hlavičky; otevřená část se do segmentu přidá, ať je vidět, kde jsem.
   const pas = await p.getByRole('tablist', { name: 'Část rozvrhu' }).evaluate(el => {
-    const tabs = [...el.querySelectorAll('[role="tab"]')].map(t => t.getBoundingClientRect().top);
-    return { radku: new Set(tabs.map(Math.round)).size, posuvny: el.scrollWidth > el.clientWidth, sirka: Math.round(el.getBoundingClientRect().right), vw: document.documentElement.clientWidth };
+    const tabs = [...el.querySelectorAll('[role="tab"]')];
+    return { nazvy: tabs.map(t => t.textContent.trim()), radku: new Set(tabs.map(t => Math.round(t.getBoundingClientRect().top))).size, posuvny: el.scrollWidth > el.clientWidth + 1, sirka: Math.round(el.getBoundingClientRect().right), vw: document.documentElement.clientWidth };
   });
-  tvrdi('T1: záložky Rozvrhu na telefonu v jednom řádku, posuvné do strany a uvnitř obrazovky', pas.radku === 1 && pas.posuvny && pas.sirka <= pas.vw, JSON.stringify(pas));
-  await p.getByRole('tab', { name: 'Pravidla' }).click();
-  const vZaberu = await p.getByRole('tab', { name: 'Pravidla' }).evaluate(t => { const r = t.getBoundingClientRect(); const l = t.closest('[role="tablist"]').getBoundingClientRect(); return r.left >= l.left - 1 && r.right <= l.right + 1; });
-  tvrdi('T1: vybraná poslední záložka se posune do záběru', vZaberu);
+  tvrdi('T1: segment Rozvrhu na telefonu jen Rozvrh a Kalendář, v jednom řádku, nic se neuřízne', pas.nazvy.join('|') === 'Rozvrh|Kalendář' && pas.radku === 1 && !pas.posuvny && pas.sirka <= pas.vw, JSON.stringify(pas));
+  await p.getByRole('button', { name: /Další akce|Možnosti stránky/ }).first().click();
+  await p.getByRole('menuitem', { name: 'Pravidla' }).click();
+  tvrdi('T1: Pravidla z „···" otevřou záložku a segment ji ukáže vybranou', await dokud(async () => (await p.getByRole('tab', { name: 'Pravidla' }).getAttribute('aria-selected')) === 'true', 2000));
   await p.getByRole('tab', { name: 'Rozvrh' }).click();
   await p.screenshot({ path: OUT + 'k69-b1-rozvrh-tel.png', fullPage: true });
   await gen.click();
@@ -451,6 +453,10 @@ const vycuhuje = (p, sel) => p.locator(sel).first().evaluate(koren => [...koren.
 {
   const { ctx, p, chyby } = await kontext({ fix: FIX_VYCHOZI, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  // Audit 2026-10 (V06): na telefonu je výchozí seznam dnů; měsíční mřížka je za přepínačem
+  // (ikonové tlačítko vedle měsíce). K1 dál měří mřížku — přepne se na ni.
+  tvrdi('K1: na telefonu je výchozí seznam dnů', await dokud(() => widgetLi(p, 'nastroj').locator('[data-agenda-rozvrhu]').isVisible(), 6000));
+  await widgetLi(p, 'nastroj').locator('[data-prepinac-pohledu-tel]').click();
   await dokud(() => mrizka(p).isVisible(), 4000);
   tvrdi('K1: výchozí rozložení — Dostupnost týmu střední a hned za ní plánovač', JSON.stringify((await poradi(p)).slice(0, 2)) === JSON.stringify(['rozvrh-dostupnost-tymu', 'nastroj']), JSON.stringify(await poradi(p)));
   const top = await mrizka(p).evaluate(el => Math.round(el.getBoundingClientRect().top));

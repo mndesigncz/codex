@@ -13,6 +13,7 @@
 import { Segmented } from '../ui';
 import { useT } from '@/lib/i18n/client';
 import { AKCE_INVENTURA } from '@/lib/skladPredani';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 
 export type ZalozkaSkladu = 'polozky' | 'receptury';
 
@@ -25,16 +26,19 @@ export default function SkladZalozky({ aktivni, onNavigate, smiReceptury, smiInv
   onInventura?: () => void;
 }) {
   const t = useT('sklad');
+  const telefon = useJeTelefon();
   // Bez navigace (stránka vložená jinam) nemá přepínač kam vést.
   if (!onNavigate && !onInventura) return null;
   // v3: jeden segment „Položky · Receptury z kasy · Inventura". Dřív stál vedle segmentu
   // ještě samostatný knoflík Inventura — dva různé tvary pro tři sourozence a na telefonu
   // dvě řady pod hlavičkou. Inventura je okno nad Skladem: klepnutí ho otevře a vybraná
   // část zůstává, kde byla (segment je pohled, okno se nad ním jen otevře).
+  // Telefon (audit 2026-10 V20, průřez 5): s ikonami a „Receptury z kasy" se třetí záložka uřízla
+  // („Inventu…"). Na telefonu bez ikon a s krátkým názvem — tři díly se vejdou do 350 px.
   const options = [
-    { id: 'polozky' as const, label: t('Položky'), icon: 'archive' },
-    ...(smiReceptury && onNavigate ? [{ id: 'receptury' as const, label: t('Receptury z kasy'), icon: 'receipt' }] : []),
-    ...(smiInventura ? [{ id: 'inventura' as const, label: t('Inventura'), icon: 'clipboard' }] : []),
+    { id: 'polozky' as const, label: t('Položky'), icon: telefon ? undefined : 'archive' },
+    ...(smiReceptury && onNavigate ? [{ id: 'receptury' as const, label: telefon ? t('Receptury') : t('Receptury z kasy'), icon: telefon ? undefined : 'receipt' }] : []),
+    ...(smiInventura ? [{ id: 'inventura' as const, label: t('Inventura'), icon: telefon ? undefined : 'clipboard' }] : []),
   ];
   if (options.length < 2) return null;
   return (

@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   const email = normalizujEmail(b?.email);
   if (!vypadaJakoEmail(email)) return NextResponse.json({ error: 'E-mail nevypadá správně.' }, { status: 400 });
   const ip = await hit(`smazani-zadost-ip:${klientIp(request.headers)}`, 10, 60 * 60);
-  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho žádostí. Zkuste to později.' }, { status: 429 });
+  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho žádostí. Zkus to později.' }, { status: 429 });
   const adr = await hit(klicPoctadla('smazani-zadost', email), 3, 60 * 60);
 
   after(async () => {

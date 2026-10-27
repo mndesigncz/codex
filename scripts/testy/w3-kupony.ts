@@ -183,7 +183,7 @@ export default async function ({ eq, ok }: Testy) {
   const kusy = zdroj('lib/kuponyKusy.ts');
   ok('kusy: rezervace je jeden UPDATE s podmínkou', /SET issued = issued \+ 1\s+WHERE id = \$\{couponId\} AND \(max_total IS NULL OR issued < max_total\)/.test(kusy));
   ok('kusy: denní limit v jednom UPDATE', kusy.includes('daily_count < daily_limit') && kusy.includes('IS DISTINCT FROM'));
-  const promoRoute = zdroj('app/api/client/b/[slug]/promo/route.ts');
+  const promoRoute = zdroj('lib/klient/promo.ts') /* logika promo kódu přesunuta z routy (jedno pole „Mám kód“) */;
   ok('promo: uses se zvyšuje atomicky s podmínkou', /SET uses = uses \+ 1\s+WHERE id = \$\{promo\.id\} AND active = TRUE AND \(max_uses IS NULL OR uses < max_uses\)/.test(promoRoute));
   ok('promo: použití se zapisuje PŘED odměnou', promoRoute.indexOf('INSERT INTO client_promo_uses') < promoRoute.indexOf('award(teamId'));
   ok('promo: rezervace uses PŘED odměnou', promoRoute.indexOf('SET uses = uses + 1') < promoRoute.indexOf('award(teamId'));

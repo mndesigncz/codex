@@ -295,7 +295,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
           SET quantity = ${newQty}, open_amount = ${newOpen}, updated_by = ${authorId}, updated_at = NOW()
           WHERE id = ${id}`;
       } catch {
-        return NextResponse.json({ error: 'Sledování balení není dostupné — spusť /api/init.' }, { status: 400 });
+        return NextResponse.json({ error: 'Sledování balení se ještě připravuje. Zkus to za chvíli znovu.' }, { status: 400 });
       }
     } else {
       await sql`
@@ -311,7 +311,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
           UPDATE inventory_items SET archived = ${body.archived === true}, updated_by = ${authorId}, updated_at = NOW()
           WHERE id = ${id}`;
       } catch {
-        return NextResponse.json({ error: 'Označení „nevedeme" není dostupné — spusť /api/init.' }, { status: 400 });
+        return NextResponse.json({ error: 'Označení „nevedeme" se ještě připravuje. Zkus to za chvíli znovu.' }, { status: 400 });
       }
     }
 

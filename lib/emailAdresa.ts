@@ -61,3 +61,14 @@ export function htmlNaText(html: string): string {
     .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+/** Text do HTML e-mailu. Escapuje se i `&`, jinak se „R&D" rozpadne.
+ *  Je tady (ne v email.ts), aby ho šablony čtené i v prohlížeči nebraly
+ *  spolu s Resendem. */
+export function escHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}

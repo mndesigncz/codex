@@ -100,7 +100,7 @@
   "Směny|nav": "Schichten",
   "Současné heslo": "Aktuelles Passwort",
   "Spodní navigace": "Untere Navigation",
-  "Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.": "Verwalte dein Profil, deine Sprache, das Aussehen, Benachrichtigungen und die Sicherheit.",
+  "Tvůj profil, jazyk, vzhled, oznámení a zabezpečení.": "Dein Profil, Sprache, Darstellung, Benachrichtigungen und Sicherheit.",
   "Starší oznámení se nepodařilo načíst.": "Ältere Benachrichtigungen konnten nicht geladen werden.",
   "Stažení dat a smazání účtu": "Daten herunterladen und Konto löschen",
   "Strojový překlad": "Maschinelle Übersetzung",
@@ -114,7 +114,7 @@
   "Upozornění|druh": "Warnungen",
   "Uzávěrka|nav": "Kassenabschluss",
   "Uzávěrky|nav": "Kassenabschlüsse",
-  "Vyplňte všechna pole.": "Fülle alle Felder aus.",
+  "Vyplň všechna pole.": "Fülle alle Felder aus.",
   "Vzhled": "Darstellung",
   "Více": "Mehr",
   "Výchozí jazyk aplikace": "Standardsprache der App",
@@ -183,5 +183,12 @@
   "Za každý splněný krok +1 b, klíčový +2 b (vlastní body kroku mají přednost), nesplněný nic neubere.": "+1 P für jeden erledigten Schritt, +2 für einen wichtigen (eigene Punkte des Schritts gehen vor), ein offener zieht nichts ab.",
   "Za splněný úkol {z} b, položky checklistu se nepočítají.": "{z} P für eine erledigte Aufgabe, Checklistenpunkte zählen nicht.",
   "Za uzávěrku {z} b, povinné věci dne se nepočítají.": "{z} P für den Abschluss, Pflichtsachen des Tages zählen nicht.",
-  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} P für den Abschluss, −{s} P für jede offene Pflichtsache des Tages."
+  "Za uzávěrku {z} b, za každou nesplněnou povinnou věc dne −{s} b.": "{z} P für den Abschluss, −{s} P für jede offene Pflichtsache des Tages.",
+  "Tvůj účet a nastavení podniku.": "Dein Konto und die Einstellungen des Betriebs.",
+  "Dnes": "Heute",
+  "Včera": "Gestern",
+  "Dříve": "Früher",
+  "Nepřečtené · {n}": "Ungelesen · {n}",
+  "Všechno máš přečtené.": "Du hast alles gelesen.",
+  "Výchozí plocha, zámky a navigace": "Standardseiten, Sperren und Navigation"
 }

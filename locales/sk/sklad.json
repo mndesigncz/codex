@@ -34,7 +34,7 @@
   "Hledat v {kategorie}…": "Hľadať v {kategorie}…",
   "Hotovo — spočítáno: {polozky}, zapsáno: {rozdily}.": "Hotovo — spočítané: {polozky}, zapísané: {rozdily}.",
   "Inventura": "Inventúra",
-  "Inventura bude dostupná po dokončení migrace (/api/init).": "Inventúra bude dostupná po dokončení migrácie (/api/init).",
+  "Inventura se ještě připravuje. Zkus to za chvíli znovu.": "Inventúra sa ešte pripravuje. Skús to o chvíľu znova.",
   "Inventura skladu": "Inventúra skladu",
   "Inventura {datum}": "Inventúra {datum}",
   "Inventuru se nepodařilo načíst.": "Inventúru sa nepodarilo načítať.",

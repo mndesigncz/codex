@@ -242,5 +242,12 @@
   "PIN musí mít 6 číslic.": "PIN musí mať 6 číslic.",
   "Nový PIN má 6 číslic.": "Nový PIN má 6 číslic.",
   "Doporučujeme změnit PIN na 6 číslic.": "Odporúčame zmeniť PIN na 6 číslic.",
-  "Moc špatných PINů. Zkus to za {n} s.": "Priveľa nesprávnych PINov. Skús to o {n} s."
+  "Moc špatných PINů. Zkus to za {n} s.": "Priveľa nesprávnych PINov. Skús to o {n} s.",
+  "Přidat příchod": "Pridať príchod",
+  "Kolega přichází na směnu": "Kolega prichádza na zmenu",
+  "Kdo přichází?": "Kto prichádza?",
+  "Vyber se a odpíchni příchod PINem.": "Vyber sa a odpichni príchod PINom.",
+  "Co je dnes potřeba udělat. Ťukni na úkol, až je hotový.": "Čo treba dnes urobiť. Ťukni na úlohu, keď je hotová.",
+  "Co dochází a co jsi přivezl — zapiš to rovnou tady.": "Čo dochádza a čo si priviezol — zapíš to rovno tu.",
+  "Objednávky od stolu — přijmi je a dej vědět, až jsou hotové.": "Objednávky od stola — prijmi ich a daj vedieť, keď sú hotové."
 }

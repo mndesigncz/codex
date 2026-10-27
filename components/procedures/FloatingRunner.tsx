@@ -9,7 +9,7 @@
 // „Celkový čas" verzálkami ručně → t-label. „Dokončit" je primary vždy: běžec visí nad
 // stránkou, která svou limetku už má (DP: jedna limetka na obrazovce).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useProcedures } from './ProcedureProvider';
 import { parseSteps, cisloZTextu, mimoRozsah, rozsahKroku } from '@/lib/steps';
 import { SKIP_REASONS } from '@/lib/procedureScoring';
@@ -41,8 +41,35 @@ function useElapsed(startedAt?: string | null) {
 }
 
 
-const POZICE = 'fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] inset-x-3 md:inset-x-auto md:bottom-4 md:left-4 md:w-[340px]';
+// Na monitoru stál běžec na `left-4` přes boční pás a zakryl položky Sklad…Nápady —
+// dokud se nesbalil, nešlo na ně kliknout (audit 2026-10 B4). Teď začíná až za pásem
+// (`--runner-left` měří useOdsazeniZaPasem), na tabletu bez pásu zůstává u kraje.
+const POZICE = 'fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] inset-x-3 md:inset-x-auto md:bottom-4 md:left-[var(--runner-left,16px)] md:w-[360px]';
 const PANEL = 'overflow-hidden glass-strong rounded-3xl shadow-[shadow:var(--shadow-float)] pop-in';
+
+/** Levá hrana běžce na monitoru: 16 px za pravou hranou viditelného bočního pásu
+ *  (`<aside>` vedení i zaměstnance), jinak 16 px od kraje. Pás se dá zúžit
+ *  (w-64 ↔ w-[76px]), proto ResizeObserver, ne jednorázové měření. */
+function useOdsazeniZaPasem(aktivni: boolean) {
+  const [left, setLeft] = useState(16);
+  useEffect(() => {
+    if (!aktivni || typeof window === 'undefined') return;
+    let ro: ResizeObserver | null = null;
+    const zmer = () => {
+      const pas = [...document.querySelectorAll('aside')].find(a => {
+        const r = a.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.left < 40 && r.height > window.innerHeight / 2;
+      });
+      setLeft(pas ? Math.round(pas.getBoundingClientRect().right + 16) : 16);
+      return pas;
+    };
+    const pas = zmer();
+    if (pas && typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(() => zmer()); ro.observe(pas); }
+    window.addEventListener('resize', zmer);
+    return () => { ro?.disconnect(); window.removeEventListener('resize', zmer); };
+  }, [aktivni]);
+  return left;
+}
 
 export default function FloatingRunner() {
   const t = useT('postupy');
@@ -62,6 +89,8 @@ export default function FloatingRunner() {
   const [skipNote, setSkipNote] = useState('');
   const elapsed = useElapsed(active?.startedAt);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const odsazeni = useOdsazeniZaPasem(!!(active || justCompleted));
+  const stylPozice = { ['--runner-left' as string]: `${odsazeni}px` } as CSSProperties;
 
   // Běžec visí v `app/providers.tsx`, tedy nad vedením, zaměstnancem
   // i tabletem naráz, a sám neví, kde je. Na tabletu si otevírání přebírá
@@ -77,7 +106,7 @@ export default function FloatingRunner() {
   // ---- Celebration ----
   if (!active && justCompleted) {
     return (
-      <div className={POZICE}>
+      <div className={POZICE} style={stylPozice}>
         <div className={PANEL} role="status">
           <div className="px-6 py-6 text-center">
             <span aria-hidden className="chip-ok mx-auto grid h-11 w-11 place-items-center rounded-full"><Icon name="check" size={20} strokeWidth={2.2} /></span>
@@ -89,7 +118,7 @@ export default function FloatingRunner() {
               <Chip tone="ok" size="sm" icon="check">{t('{n, plural, one {# krok} few {# kroky} other {# kroků}} splněno', { n: justCompleted.done })}</Chip>
               {justCompleted.skipped > 0 && <Chip tone="wait" size="sm">{t('{n} přeskočeno', { n: justCompleted.skipped })}</Chip>}
             </div>
-            <Button variant="primary" block className="mt-5" onClick={dismissCelebration}>{t('Zavřít')}</Button>
+            <Button variant="primary" block className="mt-5 sm:w-full" onClick={dismissCelebration}>{t('Zavřít')}</Button>
           </div>
         </div>
       </div>
@@ -138,7 +167,8 @@ export default function FloatingRunner() {
   if (minimized) {
     return (
       <Button variant="primary" onClick={() => setMinimized(false)} aria-label={t('Otevřít průběh postupu {nazev}', { nazev: active.name })}
-        className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] left-4 md:bottom-4 shadow-[shadow:var(--shadow-float)]">
+        style={stylPozice}
+        className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] left-4 md:bottom-4 md:left-[var(--runner-left,16px)] shadow-[shadow:var(--shadow-float)]">
         <Icon name="play" size={14} />
         <span className="max-w-[140px] truncate">{active.name}</span>
         <span className="tabular-nums text-[#C8F542]">{done}/{total}</span>
@@ -148,7 +178,7 @@ export default function FloatingRunner() {
 
   // ---- Full floating window ----
   return (
-    <div className={POZICE}>
+    <div className={POZICE} style={stylPozice}>
       <div className={PANEL}>
         {/* Průběh: inkoust, ne limetka — limetka je akce. */}
         <div className="h-1 w-full bg-black/[0.06]" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={t('Hotové kroky')}>
@@ -187,8 +217,8 @@ export default function FloatingRunner() {
             <p className="text-sm font-semibold text-[#16181A]">{t('Zrušit tento průběh?')}</p>
             <p className="t-meta mt-1">{t('Odškrtnuté kroky se neuloží.')}</p>
             <div className="mt-4 flex gap-2">
-              <Button variant="secondary" block onClick={() => setConfirmClose(false)}>{t('Pokračovat')}</Button>
-              <Button variant="danger-solid" block onClick={doCancel}>{t('Zrušit průběh')}</Button>
+              <Button variant="secondary" block className="flex-1" onClick={() => setConfirmClose(false)}>{t('Pokračovat')}</Button>
+              <Button variant="danger-solid" block className="flex-1" onClick={doCancel}>{t('Zrušit průběh')}</Button>
             </div>
           </div>
         ) : confirmFinish ? (
@@ -200,8 +230,8 @@ export default function FloatingRunner() {
               {' '}{t('Vedení uvidí, co zůstalo nedokončené.')}
             </p>
             <div className="mt-4 flex gap-2">
-              <Button variant="secondary" block onClick={() => setConfirmFinish(false)} disabled={completing}>{t('Pokračovat')}</Button>
-              <Button variant="primary" block onClick={doComplete} loading={completing}>{t('Přesto dokončit')}</Button>
+              <Button variant="secondary" block className="flex-1" onClick={() => setConfirmFinish(false)} disabled={completing}>{t('Pokračovat')}</Button>
+              <Button variant="primary" block className="flex-1" onClick={doComplete} loading={completing}>{t('Přesto dokončit')}</Button>
             </div>
           </div>
         ) : (
@@ -300,7 +330,7 @@ export default function FloatingRunner() {
                   {remaining > 0 && <> · {t('{n} zbývá', { n: remaining })}</>}
                 </p>
               )}
-              <Button variant="primary" block icon="check" onClick={onFinishClick} loading={completing}>{t('Dokončit')}</Button>
+              <Button variant="primary" block icon="check" onClick={onFinishClick} loading={completing} className="sm:w-full">{t('Dokončit')}</Button>
             </div>
           </>
         )}

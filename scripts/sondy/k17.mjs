@@ -30,7 +30,7 @@ const text = p => p.evaluate(() => (document.body.innerText || '').replace(/\s+/
 
 console.log('Eurová kavárna — stránka pro hosty:');
 {
-  const { ctx, p, errs } = await open('/client/b/cafe-am-ring');
+  const { ctx, p, errs } = await open('/client/cafe-am-ring');
   const t = await text(p);
   !/EUR/.test(t) ? ok('nikde není holý kód „EUR"') : bad('pořád tiskne kód místo symbolu');
   /€/.test(t) ? ok('ceny mají symbol €') : bad('symbol € nikde: ' + t.slice(0, 140));
@@ -41,7 +41,7 @@ console.log('Eurová kavárna — stránka pro hosty:');
 }
 console.log('Korunová kavárna — nic se nerozbilo:');
 {
-  const { ctx, p, errs } = await open('/client/b/kavarna-u-lipy');
+  const { ctx, p, errs } = await open('/client/kavarna-u-lipy');
   const t = await text(p);
   /Kč/.test(t) ? ok('koruny zůstávají korunami') : bad('koruny zmizely: ' + t.slice(0, 140));
   !/CZK/.test(t) ? ok('žádný holý kód „CZK"') : bad('tiskne kód CZK');
@@ -51,3 +51,4 @@ console.log('Korunová kavárna — nic se nerozbilo:');
 }
 console.log(problems.length ? `\nPROBLÉMŮ: ${problems.length}` : '\nVšechno prošlo.');
 await b.close();
+if (problems.length) process.exitCode = 1;

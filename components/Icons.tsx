@@ -350,6 +350,27 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z" />
     </>
   ),
+  // Host (přestavba Managero client): kód u kasy, telefon, cesta, sdílení.
+  qr: (
+    <>
+      <rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="14" y="3.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="3.5" y="14" width="6.5" height="6.5" rx="1.5" />
+      <path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 18.5v2M18.5 14h2" />
+    </>
+  ),
+  phone: (
+    <path d="M6.6 3.5h2.6l1.4 4-2 1.3a11 11 0 0 0 6.6 6.6l1.3-2 4 1.4v2.6a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2Z" />
+  ),
+  navigate: (
+    <path d="M20.5 3.5 3.5 10.8l7 2.2 2.2 7 7.8-16.5Z" />
+  ),
+  share: (
+    <>
+      <path d="M12 3.5v12M7.5 8 12 3.5 16.5 8" />
+      <path d="M5 12.5v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof paths;

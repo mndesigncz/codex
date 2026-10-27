@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     audit(c.teamId, c.meId, 'tresty.navrh.zahodit', 'penalty', null, klic);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (predMigraci(e)) return chyba('Tresty ještě nejsou připravené — spusť /api/init.', 503);
+    if (predMigraci(e)) return chyba('Tresty se ještě připravují. Zkus to za chvíli znovu.', 503);
     console.error('tresty/navrhy POST', e);
     return chyba('Návrh se nepodařilo zahodit.', 500);
   }

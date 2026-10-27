@@ -25,7 +25,12 @@ export default function Podniky() {
   // serveru našeptávač.
   useEffect(() => { const t = setTimeout(() => setHledani(q.trim()), 250); return () => clearTimeout(t); }, [q]);
 
-  const prehled = useLoad<Prehled>('/api/admin/overview', r => r as Prehled);
+  // Čísla přehledu jen ze skutečných polí; chybějící pole = neúplná odpověď, ne „undefined" v dlaždici.
+  const prehled = useLoad<Prehled>('/api/admin/overview', r => {
+    const klice: (keyof Prehled)[] = ['celkem', 'aktivniTyden', 'placeny', 'zkusebni', 'zdarma', 'pozastaveny', 'poSplatnosti'];
+    if (!r || klice.some(k => !Number.isFinite(Number(r[k])))) throw new Error('Odpověď serveru je neúplná.');
+    return Object.fromEntries(klice.map(k => [k, Number(r[k])])) as unknown as Prehled;
+  });
   const seznam = useLoad<{ total: number; teams: PodnikRadek[] }>(
     `/api/admin/teams?q=${encodeURIComponent(hledani)}&stav=${filtr}&limit=200`,
     r => ({ total: Number(r.total ?? 0), teams: Array.isArray(r.teams) ? r.teams : [] }),
@@ -35,6 +40,7 @@ export default function Podniky() {
     <div className="space-y-6">
       <PageHeader title="Podniky" subtitle="Každý podnik na platformě — kdo ho vede, na jakém je tarifu a jestli běží." />
 
+      {prehled.error && <p className="note note-wait" role="status">Souhrnná čísla se nenačetla ({prehled.error}). Seznam níž platí.</p>}
       {prehled.data && (
         <StatRow>
           <Stat label="Podniků" value={prehled.data.celkem} icon="users" />
@@ -70,10 +76,10 @@ export default function Podniky() {
               title={t.name}
               meta={
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <Chip tone={STAV_TON[t.stav]} size="sm">{STAV_NAZEV[t.stav]}</Chip>
+                  <Chip tone={STAV_TON[t.stav] ?? 'muted'} size="sm">{STAV_NAZEV[t.stav] ?? t.stav ?? '—'}</Chip>
                   <span>{t.owner?.email ?? 'bez majitele'}</span>
                   <span aria-hidden>·</span>
-                  <span>{czCount(t.members, { one: 'člen', few: 'členové', many: 'členů' })}</span>
+                  <span>{czCount(Number(t.members) || 0, { one: 'člen', few: 'členové', many: 'členů' })}</span>
                 </span>
               }
               value={t.planLabel}

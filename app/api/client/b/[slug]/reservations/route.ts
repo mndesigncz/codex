@@ -7,6 +7,7 @@ import { clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { autoPotvrdit, NEDORAZENI_LIMIT, nejdriveDnes, zpravaHostoviORezervaci } from '@/lib/clientSlots';
 import { pragueToday, pragueHM, dayPlus } from '@/lib/pragueTime';
+import { overVolno } from '@/lib/klient/sloty';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -47,6 +48,9 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     return NextResponse.json({ error: 'Na tenhle čas už je pozdě, vyber pozdější.' }, { status: 400 });
   }
   const teamId = Number(p.team_id);
+  // Kapacita stolů (když je podnik v aplikaci má): obsazený čas se nerezervuje (stránka ho nabídne přeškrtnutý).
+  const plno = await overVolno(teamId, date, time, party);
+  if (plno) return NextResponse.json({ error: plno }, { status: 409 });
   await join(me.id, teamId);
   const [dup] = await sql`
     SELECT id FROM client_reservations WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date = ${date} AND time = ${time} AND status NOT IN ('cancelled','declined')`;

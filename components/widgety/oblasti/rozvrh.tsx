@@ -1300,10 +1300,12 @@ function TymNahled({ velikost, nastaveni }: WidgetProps<{ rozsah?: string }>) {
       <Sloupec mezera={2}>
       <ul className="list">
         {(velikost === 'L' ? dnyTymu : dnyTymu.slice(0, DNU_M)).map(({ den: d, smeny }) => (
-          <li key={d} className="sloupec sloupec-2 py-3 first:pt-0 last:pb-0">
-            {/* Štítek dne otevře detail dne (kdo měl směnu; s právy i tržba a uzávěrky). */}
+          <li key={d} className="relative sloupec sloupec-2 py-3 first:pt-0 last:pb-0">
+            {/* Štítek dne otevře detail dne (kdo měl směnu; s právy i tržba a uzávěrky).
+                Audit Z03: cíl byl jen 17 px vysoký štítek — teď je klikací celý den
+                (roztažená plocha tlačítka přes celý řádek, vzor „stretched link"). */}
             <button type="button" onClick={() => otevriDen(d, 'obecne')} aria-label={t('Detail dne {den}', { den: denKratce(d, dnes, t) })}
-              className="t-label cz-sentence inline-flex self-start items-center gap-1 rounded-lg hover:text-[#16181A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+              className="t-label cz-sentence inline-flex self-start items-center gap-1 rounded-lg hover:text-[#16181A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] after:absolute after:inset-0 after:content-['']">
               {denKratce(d, dnes, t)}<Icon name="chevronRight" size={12} className="opacity-50" />
             </button>
             {/* v4 (P15, V12): každý člověk na vlastním řádku — avatar a jméno vlevo, čas jako hodnota

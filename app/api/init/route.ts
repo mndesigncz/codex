@@ -2556,6 +2556,7 @@ export async function GET(request: Request) {
     // Propadání: po kolika dnech body propadnou (0 = nikdy) a od kdy se stáří počítá.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_expire_days INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_expire_since TEXT`);
+    // Telefon podniku (client_profiles.phone, kolo 92) zakládá jen blok Host níž — zrcadlo lib/klient/schema.ts.
     // Bonusové akce (Happy hour): násobič bodů a razítka navíc podle dne, hodin a data.
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_bonus_rules (
@@ -3141,6 +3142,41 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS body_prepocty_team ON body_prepocty (team_id, id)`);
     // ---- konec kola 91 ----
+
+    // ---- Host (přestavba Managero client): záměr hosta u kasy, živá odezva, schránka ----
+    // Stejné příkazy jsou v lib/klient/schema.ts (lazy při prvním použití). Kontrakt se čtečkou:
+    // docs v …/klient/kontrakt-ctecka.md; host si přibalí připravenou odměnu (claim) k příštímu
+    // načtení v podniku, čtečka ji ukáže jako hlavní akci a uplatní. Jeden záměr na hosta a podnik.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_host_zamery (
+        customer_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        claim_id INTEGER NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMP NOT NULL,
+        PRIMARY KEY (customer_id, team_id)
+      )`);
+    // Živá odezva u kasy a schránka hosta čtou deníky podle hosta a času (napříč podniky).
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_ledger_customer_time ON client_loyalty_ledger (customer_id, created_at DESC)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_coupon_claims_customer_redeemed ON client_coupon_claims (customer_id, redeemed_at)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_stamp_events_customer_time ON client_stamp_events (customer_id, created_at DESC)`);
+    // Schránka (Aktivita): kdy host naposledy otevřel schránku — z toho odznak nepřečtených v doku.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS host_aktivita_videno TIMESTAMP`);
+    // Telefon podniku pro akci „Zavolat“ na stránce podniku (vyplňuje správa ve Stránce a vzhledu).
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS phone TEXT`);
+    // Přihlášení hosta kódem z e-mailu (lib/klient/prihlaseniKodem.ts): v databázi jen otisk kódu.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_login_kody (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        hash TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        pokusy INTEGER NOT NULL DEFAULT 0,
+        used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_login_kody_email ON client_login_kody (email, created_at DESC)`);
+    // ---- konec Host ----
 
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku

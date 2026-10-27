@@ -224,6 +224,8 @@ for (const dir of ['schedule', 'inventory', 'stocktake', 'shift-types', 'fixed-a
   if (existsSync(cesta)) for (const f of walk(cesta)) apiZdroje.push(f);
 }
 apiZdroje.push('lib/api.ts', 'lib/blokace.ts', 'middleware.ts', 'lib/client.ts');
+// Host (přestavba Managero client): hlášky sdílené logiky rout (promo kód, Mám kód, záměr u kasy, volné časy).
+if (existsSync('lib/klient')) for (const f of walk('lib/klient')) if (!f.includes('/demo/')) apiZdroje.push(f);
 // Hlášky rout, které zobrazují společné komponenty (obnova hesla, smazání účtu, nahlášení, blokace, platby).
 apiZdroje.push(
   'app/api/account/route.ts', 'app/api/account/heslo/route.ts', 'app/api/account/heslo/obnovit/route.ts',

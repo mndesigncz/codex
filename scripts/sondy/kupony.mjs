@@ -8,7 +8,7 @@
 //  · promo kódy: dávka pošle davka=true, úprava pošle PATCH s odměnou.
 //   NEXTAUTH_SECRET=… SONDY_ZAKLAD=http://localhost:3414 node scripts/sondy/kupony.mjs
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, DIR } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, BASE, DIR } from './k68-spolecne.mjs';
 
 const nacti = (j) => JSON.parse(readFileSync(DIR + j + '.json', 'utf8'));
 const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
@@ -65,7 +65,8 @@ for (const sirka of [1280, 390]) {
     return undefined;
   };
   const { ctx, p, chyby } = await kontext({ viewport: { width: sirka, height: 950 }, mobil: sirka < 500, fix: nacti('k69-b8-rozlozeni-vernost'), dalsi });
-  await otevri(p, '/employer/overview?mode=client&tab=loyalty', 'vedeni.klient_vernost');
+  // Kolo 92: kupony jsou Věrnost → Kupony a poukazy (vlastní stránka bez plochy).
+  await p.goto(BASE + '/employer/overview?mode=client&tab=cards', { waitUntil: 'networkidle' });
   await p.getByRole('tab', { name: 'Kupony a kódy' }).click();
   await p.getByRole('heading', { name: 'Katalog kuponů' }).waitFor({ timeout: 15000 });
   await p.waitForTimeout(400);

@@ -85,8 +85,11 @@ console.log('K1 + K2 Telefon v obalu: Naskenovat a Zadat kód podniku');
 {
   const { ctx, p, chyby } = await otevri({ ua: UA_KLIENT, stub: true });
   await cekejMost(p);
-  const dok = p.getByRole('navigation', { name: 'Spodní navigace' }).getByRole('button', { name: 'Naskenovat' });
-  tvrdi('dok má uprostřed „Naskenovat"', await dok.count() === 1);
+  // Přestavba hosta (2026-10-21): uprostřed doku je „U kasy“ (QR karty přes celou výšku); sken stojánku
+  // nebo stolu se přestěhoval do hlavičky obrazovky Podniky (/client pro přihlášeného).
+  tvrdi('dok má uprostřed „U kasy"', await p.getByRole('navigation', { name: 'Spodní navigace' }).getByRole('button', { name: 'U kasy: ukázat kartu' }).count() === 1);
+  const dok = p.getByRole('button', { name: 'Naskenovat QR kód nebo zadat kód podniku' });
+  tvrdi('Podniky mají v hlavičce „Naskenovat"', await dok.count() === 1);
   const box = await dok.boundingBox();
   tvrdi('cíl „Naskenovat" je aspoň 44 × 44 px', !!box && box.width >= 44 && box.height >= 44, JSON.stringify(box));
   tvrdi('telefon 390: nic nepřetéká', !(await pretece(p)));
@@ -115,7 +118,7 @@ console.log('K1 + K2 Telefon v obalu: Naskenovat a Zadat kód podniku');
 
   // Cizí QR se neotevře.
   await p.evaluate(() => { window.__qr = 'https://evil.example/client/x'; });
-  await p.getByRole('button', { name: 'Naskenovat QR kód' }).click();
+  await p.getByRole('button', { name: 'Naskenovat QR kód', exact: true }).click();
   await p.getByText('Tohle není QR kód podniku z Managera').waitFor({ timeout: 10000 }).catch(() => {});
   tvrdi('cizí QR: hláška, žádné otevření', await p.getByText('Tohle není QR kód podniku z Managera').count() === 1 && new URL(p.url()).pathname === '/client');
 
@@ -129,7 +132,7 @@ console.log('K1 + K2 Telefon v obalu: Naskenovat a Zadat kód podniku');
   await cekejMost(p);
   await p.evaluate(() => { window.__qr = 'https://www.managero.app/client/kavarna-u-lipy?tab=order&table=3'; });
   await Promise.all([p.waitForURL(/\/client\/kavarna-u-lipy\?tab=order/, { timeout: 15000 }).catch(() => {}),
-    p.getByRole('navigation', { name: 'Spodní navigace' }).getByRole('button', { name: 'Naskenovat' }).click()]);
+    p.getByRole('button', { name: 'Naskenovat QR kód nebo zadat kód podniku' }).click()]);
   tvrdi('QR stolu ze skeneru otevřel objednávku u stolu', /\/client\/kavarna-u-lipy\?tab=order&table=3/.test(p.url()), p.url());
   tvrdi('bez chyb na stránce', chyby.length === 0, chyby.join(' | '));
   await ctx.close();

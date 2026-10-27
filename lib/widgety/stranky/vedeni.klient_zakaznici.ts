@@ -8,11 +8,12 @@ import type { DefiniceStranky } from '../typy.ts';
 export const STRANKA: DefiniceStranky = {
   id: 'vedeni.klient_zakaznici',
   rozhrani: 'vedeni',
-  nazev: 'Zákazníci',
+  nazev: 'Hosté',
   pohled: 'klient:customers',
   pristup: ['zakaznici.zobrazit', 'zakaznici.recenze', 'zakaznici.zpravy'],
   nastroj: { nazev: 'Zákazníci', ikona: 'user', popis: 'Členové, hodnocení a zprávy hostům.' },
   doporucene: ['klient.clenove', 'klient.hodnoceni', 'klient.vernost_30dni'],
-  vychozi: { 'typ:vedeni': [{ w: 'klient.clenove', s: 'M' }, { w: 'klient.hodnoceni', s: 'M' }, { w: 'nastroj' }] },
+  // Kolo 92: Hosté jsou CRM — nástroj (segmenty, tabulka hodnoty, profil) hned pod nadpisem; widgety jdou přidat z galerie.
+  vychozi: { 'typ:vedeni': [{ w: 'nastroj' }] },
   aktivni: true,
 };

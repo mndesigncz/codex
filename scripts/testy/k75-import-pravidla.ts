@@ -47,5 +47,6 @@ export default function ({ eq, ok }: Testy) {
   // ---- ruční přenos ----
   eq('ruční přenos: bannery, kupony, poukazy, razítka, úrovně', RUCNI_PRENOS.map(r => r.id), ['bannery', 'kupony', 'poukazy', 'razitka', 'urovne']);
   ok('ruční přenos: každý odkaz má pohled a oprávnění', RUCNI_PRENOS.every(r => r.pohled.startsWith('klient:') && r.klice.length > 0));
-  ok('ruční přenos: části Věrnosti jsou platné záložky', RUCNI_PRENOS.filter(r => r.cast).every(r => ['coupons', 'vouchers', 'stamps', 'points'].includes(r.cast!)));
+  // Kolo 92: bannery jsou část Kampaní (klient:campaigns, cast bannery), ostatní části Věrnosti.
+  ok('ruční přenos: části Věrnosti a Kampaní jsou platné záložky', RUCNI_PRENOS.filter(r => r.cast).every(r => (r.pohled === 'klient:campaigns' ? ['bannery'] : ['coupons', 'vouchers', 'stamps', 'points']).includes(r.cast!)));
 }

@@ -10,7 +10,7 @@
 //  * Text zprávy píše provozovatel, patička je v jazyce člena (lib/i18n/email.ts).
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { escHtml } from './email.ts';
+import { escHtml } from './emailAdresa.ts';
 import { emailText } from './i18n/email.ts';
 import type { Jazyk } from './i18n/config.ts';
 

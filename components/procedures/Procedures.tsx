@@ -421,7 +421,9 @@ export default function Procedures({ user }: Props) {
 
   if (tablet) {
     return (
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-5">
+      // Stejný kontejner jako Návody a Uzávěrka na tabletu: hrana L na 32 px jako
+      // ostatní záložky (dřív max-w-5xl mx-auto → obsah od 102 px, audit 2026-10 B12).
+      <div className="p-4 sm:p-6 space-y-5">
         <PageHeader title={hlavicka.title} subtitle={hlavicka.subtitle} hintId={hlavicka.hintId} primary={hlavicka.primary} />
         {telo}
         {okna}

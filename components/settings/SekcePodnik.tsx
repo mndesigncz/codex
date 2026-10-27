@@ -134,14 +134,19 @@ export default function SekcePodnik({ pravidelneNaklady }: {
           <Field id="nast-p-adresa" label={t('Adresa')}>
             <Input id="nast-p-adresa" value={adresa} maxLength={200} autoComplete="street-address" onChange={e => setAdresa(e.target.value)} />
           </Field>
-          <Field id="nast-p-ico" label={t('IČO')}>
-            <Input id="nast-p-ico" value={ico} inputMode="numeric" maxLength={12} disabled={!icoDic} onChange={e => setIco(e.target.value)} />
-          </Field>
-          <Field id="nast-p-dic" label={t('DIČ')}>
-            <Input id="nast-p-dic" value={dic} maxLength={16} autoCapitalize="characters" disabled={!icoDic} onChange={e => setDic(e.target.value)} />
-          </Field>
+          {/* Audit N08: dokud server IČO/DIČ uložit neumí, pole se neukazují — dřív byla
+              zašedlá s technickou větou „po aktualizaci databáze". */}
+          {icoDic && (
+            <>
+              <Field id="nast-p-ico" label={t('IČO')}>
+                <Input id="nast-p-ico" value={ico} inputMode="numeric" maxLength={12} onChange={e => setIco(e.target.value)} />
+              </Field>
+              <Field id="nast-p-dic" label={t('DIČ')}>
+                <Input id="nast-p-dic" value={dic} maxLength={16} autoCapitalize="characters" onChange={e => setDic(e.target.value)} />
+              </Field>
+            </>
+          )}
         </div>
-        {!icoDic && <p className="t-meta -mt-4">{t('IČO a DIČ půjdou uložit po aktualizaci databáze.')}</p>}
         {hlaska('profil')}
         {/* v4 (P2, P13): akce formuláře přes celou šířku karty, 16 pod obsahem. */}
         <Button type="submit" variant="accent" className="w-full -mt-2" loading={uklada === 'profil'}>{t('Uložit profil')}</Button>

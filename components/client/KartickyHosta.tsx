@@ -40,7 +40,7 @@ export default function KartickyHosta() {
       if (Array.isArray(x.karty)) setKarty(x.karty);
       setHotovo(x.stav === 'prevzata' ? t('Karta je připojená a body z ní jsou teď na tvém účtu.')
         : x.stav === 'uz_tvoje' ? t('Tahle karta už je tvoje.')
-        : t('Karta je připojená. U kasy teď funguje stejně jako kartička v aplikaci.'));
+        : t('Karta je připojená. U kasy teď funguje stejně jako karta v aplikaci.'));
       setKod(''); setOtevreno(false);
     } catch { setErr(t('Kartu se teď nepodařilo připojit. Zkus to za chvíli.')); }
     setBusy(false);
@@ -51,7 +51,7 @@ export default function KartickyHosta() {
       {karty.length > 0 && (
         <div className="card p-4 sm:p-5">
           <h2 id="h-plastove" className="t-card">{t('Plastové karty')}</h2>
-          <p className="t-meta mt-0.5">{t('U kasy fungují stejně jako kartička v aplikaci.')}</p>
+          <p className="t-meta mt-0.5">{t('U kasy fungují stejně jako karta v aplikaci.')}</p>
           <ul className="list mt-2">
             {karty.map(k => (
               <li key={k.id} className="list-row">

@@ -32,15 +32,34 @@ export default function Automatizace({ oznam, podnik = 'Tvůj podnik' }: { oznam
     raw => ({ pravidla: Array.isArray(raw?.pravidla) && raw.pravidla.length ? raw.pravidla : (() => { throw new Error('Nastavení automatizací má nečekaný tvar.'); })(), pocty: raw?.pocty ?? {}, log: Array.isArray(raw?.log) ? raw.log : [], kupony: raw?.kupony ?? [], muzePravidla: raw?.muzePravidla === true }),
   );
   const [filtrLogu, setFiltrLogu] = useState('');
+  const [otevreny, setOtevreny] = useState<DruhAutomatizace | null>(null);
   if (error) return <ErrorState title="Automatizace se nenačetly" onRetry={reload} detail={error} />;
   if (!d) return <div className="space-y-4"><Skeleton className="h-40" /><Skeleton className="h-40" /></div>;
   const log = filtrLogu ? d.log.filter(l => l.kind === filtrLogu) : d.log;
   return (
     <div className="space-y-4 max-w-3xl">
-      <p className="t-meta text-pretty">Zprávy, které odejdou samy, když se člen přidá, přijde poprvé, vysbírá kartu, slaví narozeniny nebo dlouho nechodí. Dostanou je členové, kteří souhlasili s novinkami. Kupon se připíše všem, zpráva jde jen těm se souhlasem. Pravidla platí pro členy od zapnutí, starším se nic nepřipomíná.</p>
+      <p className="t-meta text-pretty">Zprávu dostanou jen členové se souhlasem s novinkami, kupon se připíše všem. Platí pro členy od zapnutí.</p>
+      {/* Kolo 92 (koncept B „E"): recepty jako seznam s jednou větou a stavem; editor jednoho receptu
+          se rozbalí pod ním. Dřív pět plných formulářů pod sebou (přes 6 000 px). */}
+      <Card pad="none" aria-label="Recepty automatizací">
+        <ul className="list px-4 sm:px-5">
+          {DEFINICE.map(def => {
+            const p = d.pravidla.find(x => x.druh === def.id);
+            if (!p) return null;
+            const pocet = d.pocty[def.id];
+            return (
+              <ListRow key={def.id} title={def.nazev}
+                meta={`${def.kdy} · ${p.enabled ? (pocet?.mesic ? `tento měsíc ${pocet.mesic}×` : 'zapnuto, zatím nic neodešlo') : 'vypnuto'}`}
+                right={<Chip tone={p.enabled ? 'ok' : 'muted'} size="sm">{p.enabled ? 'Zapnuto' : 'Vypnuto'}</Chip>}
+                actions={<Button size="sm" variant={otevreny === def.id ? 'primary' : 'secondary'} aria-expanded={otevreny === def.id}
+                  onClick={() => setOtevreny(o => (o === def.id ? null : def.id))}>{otevreny === def.id ? 'Zavřít' : 'Nastavit'}</Button>} />
+            );
+          })}
+        </ul>
+      </Card>
       {DEFINICE.map(def => {
         const p = d.pravidla.find(x => x.druh === def.id);
-        return p ? <PravidloKarta key={def.id} pravidlo={p} pocty={d.pocty[def.id]} kupony={d.kupony} muzePravidla={d.muzePravidla} oznam={oznam} podnik={podnik} onUlozeno={reload} /> : null;
+        return p && otevreny === def.id ? <PravidloKarta key={def.id} pravidlo={p} pocty={d.pocty[def.id]} kupony={d.kupony} muzePravidla={d.muzePravidla} oznam={oznam} podnik={podnik} onUlozeno={reload} /> : null;
       })}
       <Card pad="none" aria-labelledby="au-log">
         <div className="flex items-center gap-3 flex-wrap px-5 pt-4">

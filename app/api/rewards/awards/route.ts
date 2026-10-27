@@ -181,7 +181,7 @@ async function podekovat(b: any) {
       VALUES (${c.teamId}, ${komu}, ${v.body}, ${v.veta}, ${c.meId}, 'kolega', ${v.hodnota})
       RETURNING id, user_id AS "userId", points, reason, created_at AS "createdAt", kind, value_tag AS "valueTag"`;
   } catch {
-    return NextResponse.json({ error: 'Poděkování se nepodařilo uložit — databáze ho ještě nezná (spusť /api/init).' }, { status: 503 });
+    return NextResponse.json({ error: 'Poděkování se teď nepodařilo uložit. Zkus to za chvíli znovu.' }, { status: 503 });
   }
   let jmeno = 'Kolega';
   try { const [u] = await sql`SELECT name FROM users WHERE id = ${c.meId}`; if (u?.name) jmeno = String(u.name); } catch { /* jen do oznámení */ }

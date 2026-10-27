@@ -343,6 +343,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, 
   // Komu jde výplata; null = ten, kdo zavírá (výchozí, žádné klepnutí navíc).
   const [komu, setKomu] = useState<number | null>(null);
   const [jiny, setJiny] = useState(false);
+  const [chybaCastky, setChybaCastky] = useState<string | null>(null);
 
   const kinds = MOVEMENT_KINDS.filter(k => k.kind !== 'payout' || payDailyCash);
   const naSmene = lide.filter(l => l.naSmene || l.id === jaId);
@@ -353,7 +354,9 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, 
 
   const add = () => {
     const v = Math.abs(Math.round(Number(amount)));
-    if (!Number.isFinite(v) || v === 0) return;
+    // Audit (průřez 3): Přidat je aktivní vždy; bez částky řekne proč, místo zašedlého tlačítka.
+    if (!Number.isFinite(v) || v === 0) { setChybaCastky(t('Napiš částku pohybu.')); return; }
+    setChybaCastky(null);
     const pohyb: Movement = { kind, amount: v, note: note.trim() || undefined };
     if (kind === 'payout' && prijemceId != null) {
       pohyb.userId = prijemceId;
@@ -437,7 +440,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, 
 
       <div className="flex gap-2 flex-wrap">
         <div className="relative w-32 shrink-0">
-          <input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)}
+          <input type="number" inputMode="numeric" value={amount} onChange={e => { setAmount(e.target.value); setChybaCastky(null); }}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
             aria-label={t('Částka pohybu v {mena}', { mena: symbol })}
             placeholder="0"
@@ -453,10 +456,11 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, 
         {kind === 'expense' && <FotkyDokladu kompaktni druhy={['vydaj']} strop={3} fotky={fotkyVydaju} onChange={setFotkyVydaju} />}
         {/* Vedlejší akce: limetka patří jen „Odeslat uzávěrku" (DP §4 D). */}
         {/* v4 (P7): v řadě jedna výška — pole i Přidat 44. */}
-        <Button variant="secondary" icon="plus" onClick={add} disabled={!amount} className="shrink-0 grow sm:grow-0 justify-center">
+        <Button variant="secondary" icon="plus" onClick={add} className="shrink-0 grow sm:grow-0 justify-center">
           {t('Přidat')}
         </Button>
       </div>
+      {chybaCastky && <p className="text-xs text-bad-ink" role="alert">{chybaCastky}</p>}
     </div>
   );
 }
@@ -1211,6 +1215,23 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   // V úpravách plochy je formulář schovaný (zůstává připojený) — lišta se pak nekreslí.
   const korenRef = useRef<HTMLDivElement>(null);
   const schovany = useSkrytyNastroj(korenRef);
+  // Audit Z06: pruh kroků visel nad dokem i tehdy, když byl formulář mimo obrazovku —
+  // přes zámek uzávěrky nahoře i přes „Moje uzávěrky" pod ním. Ukáže se, jen když
+  // je formulář aspoň kouskem nad dokem (vzor Square: ovládání kroku patří ke kroku).
+  const [formNaObrazovce, setFormNaObrazovce] = useState(true);
+  const sledovanyForm = useRef<{ el: HTMLFormElement; io: IntersectionObserver } | null>(null);
+  // Bez pole závislostí: formulář se vykreslí až po načtení, observer se pověsí na ten, který zrovna je.
+  useEffect(() => {
+    const el = formRef.current;
+    if (sledovanyForm.current?.el === el) return;
+    sledovanyForm.current?.io.disconnect();
+    sledovanyForm.current = null;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([z]) => setFormNaObrazovce(z.isIntersecting), { rootMargin: '0px 0px -140px 0px' });
+    io.observe(el);
+    sledovanyForm.current = { el, io };
+  });
+  useEffect(() => () => sledovanyForm.current?.io.disconnect(), []);
   const otevriKrok = (i: number) => {
     const k = Math.max(0, Math.min(totalSteps - 1, i));
     setAktivniKrok(k);
@@ -1931,7 +1952,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           formuláře (se zámkem „Dokončit: …" v zámku) a lišta nad dokem by
           s ní byla v jednom výřezu. „Další krok" je proto zvýrazněná tlumená
           pilulka a „Dokončit" na posledním kroku odešle totéž co ono tlačítko. */}
-      {jeTelefon && !schovany && (
+      {jeTelefon && !schovany && formNaObrazovce && (
         <PlovouciLista label={t('Kroky uzávěrky')}>
           <button type="button" onClick={() => otevriKrok(aktivniKrok - 1)} disabled={aktivniKrok === 0}
             // v3: Zpět tiše jako text, pilulku má jen krok dopředu — v liště je jedna akce.

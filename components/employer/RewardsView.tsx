@@ -57,6 +57,7 @@ import { METRIKY, MAX_NAZEV_VYZVY, MAX_ODMENA_BODY, MAX_ODMENA_TEXT, vyberVyzvy,
 import { dayPlus } from '@/lib/pragueTime';
 import { pragueToday } from '@/lib/pragueTime';
 import { useT } from '@/lib/i18n/client';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 import { useLocale } from './jazyk';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
@@ -103,6 +104,11 @@ function RewardsViewInner() {
   // Totéž pro Tresty (?view=rewards&arg=tresty — oznámení o nesouhlasu, fronta, hledání).
   useCastTresty(useCallback(() => setVolba('tresty'), []));
   const cast: Cast | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
+  // Telefon (audit 2026-10 V35): pět částí v pásu se na 390 px uřízlo. Nastavení (body, výzvy,
+  // katalog) je v „···" hlavičky; otevřené se do segmentu přidá, ať je vidět, kde jsem.
+  const telefon = useJeTelefon();
+  const castiSegmentu = telefon ? casti.filter(c => c.id !== 'settings' || c.id === cast) : casti;
+  const menuCastiTel = telefon ? casti.filter(c => c.id === 'settings' && c.id !== cast).map(c => ({ label: t('Nastavení odměn'), icon: 'settings', onClick: () => setVolba(c.id) })) : [];
   const [denKalendare, setDenKalendare] = useState<string | null>(null);
   const [hodnotim, setHodnotim] = useState<Poradi | null>(null);
   const [chvalim, setChvalim] = useState<Poradi | null>(null);
@@ -156,9 +162,10 @@ function RewardsViewInner() {
           title: t('Odměny'),
           subtitle: t('Úrovně, body a hodnocení směn týmu.'),
           hintId: 'rewardsview',
-          aside: casti.length > 1 && cast
-            ? <Segmented ariaLabel={t('Část stránky')} value={cast} onChange={setVolba} options={casti} />
+          aside: casti.length > 1 && castiSegmentu.length > 1 && cast
+            ? <Segmented ariaLabel={t('Část stránky')} value={cast} onChange={setVolba} options={castiSegmentu} />
             : undefined,
+          menuTelefon: menuCastiTel.length ? menuCastiTel : undefined,
         }}
         nastroj={nastroj}
       />

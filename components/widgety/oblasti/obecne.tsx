@@ -33,7 +33,7 @@
 // dokud neplatí brána; každá část widgetu se svým klíčem; prokliky jen tam,
 // kam divák smí (obal i smiPohled); v náhledu (galerie) se nic nezapisuje.
 
-import React, { useEffect, useId, useState } from 'react';
+import React, { Suspense, useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
@@ -51,7 +51,10 @@ import {
   Textarea, Well, type ChecklistItem, type MenuItem,
 } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
-import { Widget, useWidget, type StavNacteni } from '../Widget';
+import { KontextWidgetuCtx, PojistkaWidgetu, Widget, useWidget, type KontextWidgetu, type StavNacteni } from '../Widget';
+import { lineWidget } from '../registr';
+import { sNastavenimVychozimi } from '@/lib/widgety/rozlozeni';
+import type { DefiniceWidgetu } from '@/lib/widgety/typy';
 import { PrazdnoWidgetu } from '../PrazdnoWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { navigaceCile, rozeberCil, useNavigace, useSmi, type CilOdkazu } from '../NavigaceKontext';
@@ -216,14 +219,82 @@ const NAZVY_FRONT: ReadonlyMap<string, string> = (() => {
   return new Map(pole && pole.typ === 'vicevyber' ? pole.moznosti.map(m => [m.id, m.nazev] as const) : []);
 })();
 
+/**
+ * Schránka ke schválení (audit 2026-10 V09, vzor Homebase „Requests" / Deputy „Approvals"):
+ * fronta → widget, který o ní umí rozhodnout na místě (schválit, uznat, hromadně přes
+ * BulkBar). Okno skládá tyhle widgety pod sebe, takže volno, výměny, uzávěrky, navíc
+ * i nesouhlasy s tresty se vyřídí bez přecházení mezi pěti stránkami — a každý widget
+ * přitom drží svou logiku, oprávnění i „Vrátit". Hostovské fronty (rezervace, objednávky,
+ * hodnocení) sem nepatří: vyřizují se v Managero client.
+ */
+const WIDGET_FRONTY: Partial<Record<IdFronty, string>> = {
+  volno: 'rozvrh.zadosti_volno', vymeny: 'rozvrh.vymeny', uzaverky: 'uzaverky.ke_schvaleni',
+  navic: 'odmeny.navic_tymu', tresty: 'odmeny.tresty_tymu', odmeny: 'odmeny.zadosti',
+  navrhy_skladu: 'sklad.navrhy', hlaseni: 'sklad.hlaseni', postupy: 'postupy.navrhy', navody: 'navody.navrhy',
+};
+
+const NIC = () => {};
+
+/** Widget fronty vložený do okna schránky: bez karty a hlavičky, se všemi sloty (vOkne). */
+function VlozenyWidget({ def }: { def: DefiniceWidgetu }) {
+  const k = useWidget();
+  const Komponenta = useMemo(() => lineWidget(def.id, 0), [def.id]);
+  const nastaveni = useMemo(() => sNastavenimVychozimi(def.nastaveni, undefined), [def]);
+  const instance = `schranka-${def.id}`;
+  const kontext = useMemo<KontextWidgetu>(() => ({
+    instance, velikost: 'L', definice: def, nahled: false, upravy: false, inkoust: false, nahlasSkryti: NIC,
+    nahlasVyrizeno: NIC, mini: null, rozbal: NIC, pohledStranky: k.pohledStranky, rozhraniStranky: k.rozhraniStranky,
+    sbaleno: false, prepniSbaleni: NIC, zvetsit: null, vOkne: true, tarif: k.tarif,
+  }), [instance, def, k.pohledStranky, k.rozhraniStranky, k.tarif]);
+  return (
+    <KontextWidgetuCtx.Provider value={kontext}>
+      <PojistkaWidgetu resetKey={instance} onZnovu={NIC}>
+        <Suspense fallback={<Skeleton className="h-24" />}>
+          <Komponenta instance={instance} velikost="L" nastaveni={nastaveni} nahled={false} />
+        </Suspense>
+      </PojistkaWidgetu>
+    </KontextWidgetuCtx.Provider>
+  );
+}
+
+function SchrankaOkno({ fronty, onClose }: { fronty: { f: Fronta; pocet: number; def: DefiniceWidgetu }[]; onClose: () => void }) {
+  const t = useT('widgety');
+  const celkem = fronty.reduce((s, x) => s + x.pocet, 0);
+  const podtitul = celkem > 0
+    ? t('{n, plural, one {# věc čeká} few {# věci čekají} other {# věcí čeká}} na tvoje rozhodnutí — vyřídíš je tady, bez přecházení mezi stránkami.', { n: celkem })
+    : t('Všechno je vyřízené.');
+  return (
+    <NadPlochou>
+      <Modal open onClose={onClose} size="xl" title={t('Ke schválení')}
+        subtitle={podtitul}>
+        <Sloupec mezera={8}>
+          {fronty.map(({ f, pocet, def }) => (
+            <section key={f.id} aria-labelledby={`schranka-${f.id}`} data-schranka-fronta={f.id}>
+              <h3 id={`schranka-${f.id}`} className="t-section flex items-center gap-2 mb-3">
+                <Icon name={f.ikona} size={18} className="shrink-0 text-black/55" />
+                <span className="min-w-0 truncate">{t(def.nazev)}</span>
+                {pocet > 0 ? <Chip tone="wait" size="sm">{pocet}</Chip> : <Chip tone="ok" size="sm" icon="check">{t('vyřízeno')}</Chip>}
+              </h3>
+              <VlozenyWidget def={def} />
+            </section>
+          ))}
+        </Sloupec>
+      </Modal>
+    </NadPlochou>
+  );
+}
+
 function useFronta(f: Fronta, zapnuto: boolean) {
   return useDataWidgetu<number>(zapnuto ? ZDROJE_FRONT[f.id] ?? null : null, f.pocet);
 }
 
-function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
+function CekaNaTebe({ nastaveni, nahled }: WidgetProps<{ fronty?: unknown }>) {
   const t = useT('widgety');
   const smi = useSmi();
   const nav = useNavigace();
+  // Fronty v otevřené schránce se zafixují při otevření: vyřízená fronta zůstane v okně
+  // s „vyřízeno" (a s Vrátit svého widgetu), místo aby pod prstem zmizela.
+  const [schranka, setSchranka] = useState<IdFronty[] | null>(null);
   const { ceka } = useBrana([]);
   const vybrane = new Set(Array.isArray(nastaveni.fronty) ? nastaveni.fronty.map(String) : []);
   // Fronta se ptá serveru jen s vlastním klíčem (každá jiný, spec §6.1) a jen
@@ -263,13 +334,32 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
   // Když nic nečeká, v klidu se widget nekreslí (spec O5) — pojistkou zůstávají odznaky v navigaci.
   const prazdno = !ceka && !nacitaSe && cekaji.length === 0 && selhane.length === 0 ? null : undefined;
   const celkem = cekaji.reduce((s, x) => s + (x.s.data ?? 0), 0);
+  // Fronty, které jdou vyřídit přímo ve schránce: mají svůj widget a divák na něj smí.
+  const smiWidget = (d: DefiniceWidgetu) => d.opravneni.vse.every(k => smi(k)) && (d.opravneni.nektere.length === 0 || d.opravneni.nektere.some(k => smi(k)));
+  const doSchranky = cekaji.flatMap(({ f, s }) => {
+    const id = WIDGET_FRONTY[f.id];
+    const def = id ? widget(id) : undefined;
+    return def && def.stav === 'hotovo' && smiWidget(def) ? [{ f, pocet: s.data ?? 0, def }] : [];
+  });
+  const patka = !nahled && doSchranky.length > 0 ? (
+    <Button variant="secondary" icon="check" onClick={() => setSchranka(doSchranky.map(x => x.f.id))} data-schranka-otevrit="">
+      {t('Vyřídit na jednom místě')}
+    </Button>
+  ) : undefined;
 
   // Bílá karta, ne `ton="wait"`: jantarový podklad na velikosti L zabral na Přehledu 15–20 %
   // obsahu a na telefonu přes polovinu okna (ds/pokryti.py, kolo 69), přitom DP §5 dává tónům
   // celkem do ~5 %. Stav „něco čeká" nese jantarový chip s počtem u titulku — ten je vidět
   // i v menší velikosti a nepřebije jedinou limetku ani inkoustový widget peněz.
+  const vSchrance = schranka ? schranka.flatMap(id => {
+    const i = FRONTY.findIndex(f => f.id === id);
+    const def = widget(WIDGET_FRONTY[id] ?? '');
+    return i >= 0 && def ? [{ f: FRONTY[i], pocet: stavy[i].data ?? 0, def }] : [];
+  }) : [];
   return (
-    <Widget nacteni={nacteni} prazdno={prazdno}
+    <>
+    {schranka && <SchrankaOkno fronty={vSchrance} onClose={() => setSchranka(null)} />}
+    <Widget nacteni={nacteni} prazdno={prazdno} patka={patka}
       doplnek={celkem > 0 ? (
         // Holé „5" by nikdo nepřečetl: sčítá různé fronty (směny, objednávky…)
         // a odečítač by po titulku řekl jen „pět". Vidící dostanou „5 čeká",
@@ -306,6 +396,7 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
         )}
       </Sloupec>
     </Widget>
+    </>
   );
 }
 
@@ -376,7 +467,20 @@ function PrvniKroky({ velikost }: WidgetProps) {
     <Widget nacteni={ceka ? CEKA : kroky.map(k => k.s)}
       doplnek={polozky.length > 0 && !nacitaSe ? <Chip tone="muted" size="sm">{hotovo}/{polozky.length}</Chip> : undefined}
       prazdno={!ceka && (skryto || kroky.length === 0 || vseHotovo) ? null : undefined}>
-      <Checklist items={polozky} />
+      {/* Audit 2026-10 (V44, vzor Shopify setup guide / Toast „Jsi nastaven z 55 %"): pruh postupu nad
+          kroky — kolik zbývá, je vidět dřív, než člověk kroky přečte. Inkoust, ne limetka (stav, ne akce). */}
+      <Sloupec mezera={3}>
+        {polozky.length > 0 && !nacitaSe && (
+          <div className="flex items-center gap-3" data-prvni-kroky-postup>
+            <div className="h-1.5 flex-1 rounded-full bg-black/[0.07] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={polozky.length} aria-valuenow={hotovo}
+              aria-label={t('Nastaveno {hotovo} z {celkem}', { hotovo, celkem: polozky.length })}>
+              <div className="h-full rounded-full bg-[#16181A] dark:bg-white/80 transition-[width] duration-300" style={{ width: `${Math.round((hotovo / polozky.length) * 100)}%` }} />
+            </div>
+            <span className="t-meta tabular-nums shrink-0">{t('Nastaveno z {pct} %', { pct: Math.round((hotovo / polozky.length) * 100) })}</span>
+          </div>
+        )}
+        <Checklist items={polozky} />
+      </Sloupec>
     </Widget>
   );
 }

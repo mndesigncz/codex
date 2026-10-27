@@ -31,7 +31,7 @@ export function RegisterForm() {
   const t = useT('klient-host');
   const router = useRouter();
   const params = useSearchParams();
-  const next = mistniCesta(params.get('next'), '/client');
+  const next = mistniCesta(params.get('next'), '/client/me');
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [pw, setPw] = useState('');
   // Kód z pozvánky (?ref=…) se předvyplní; jde přepsat i vyplnit ručně.
   const [ref, setRef] = useState(() => (params.get('ref') ?? '').toUpperCase());
@@ -88,15 +88,16 @@ export function LoginForm() {
   const router = useRouter();
   const { jeObal } = useObal();
   const params = useSearchParams();
-  const next = mistniCesta(params.get('next'), '/client');
+  const next = mistniCesta(params.get('next'), '/client/me');
+  // Výchozí je kód e-mailem (u kasy nikdo heslo nepamatuje); heslo zůstává jako druhá cesta.
+  const [zpusob, setZpusob] = useState<'kod' | 'heslo'>('kod');
   const [email, setEmail] = useState(''); const [pw, setPw] = useState('');
+  const [kod, setKod] = useState(''); const [poslano, setPoslano] = useState(false);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); setErr(''); setBusy(true);
-    const s = await signIn('credentials', { email, password: pw, redirect: false });
-    if (s?.error) {
-      // Server v obalu vrací OBAL_ROLE jen po správném hesle: účet podniku v aplikaci pro hosty.
-      setErr(s.error === 'OBAL_ROLE' ? HLASKA_ROLE_V_CLIENTU : t('E-mail nebo heslo nesedí.'));
+  const poPrihlaseni = async (error: string | null | undefined, zprava: string) => {
+    if (error) {
+      // Server v obalu vrací OBAL_ROLE jen po správném hesle/kódu: účet podniku v aplikaci pro hosty.
+      setErr(error === 'OBAL_ROLE' ? HLASKA_ROLE_V_CLIENTU : zprava);
       setBusy(false); return;
     }
     // Kdo není host (vedení, zaměstnanec), v hostovské části nic nemá: na webu ho pošleme domů
@@ -109,19 +110,76 @@ export function LoginForm() {
     }
     router.push(next); router.refresh();
   };
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); setErr(''); setBusy(true);
+    const s = await signIn('credentials', { email, password: pw, redirect: false });
+    await poPrihlaseni(s?.error, t('E-mail nebo heslo nesedí.'));
+  };
+  const poslatKod = async (e?: React.FormEvent) => {
+    e?.preventDefault(); setErr('');
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setErr(t('Napiš e-mail, se kterým máš účet.')); return; }
+    setBusy(true);
+    try {
+      const r = await fetch('/api/client/login-kod', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const x = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(x.error ? t(x.error) : t('Kód se teď nepodařilo poslat. Zkus to za chvíli, nebo se přihlas heslem.')); return; }
+      setPoslano(true); setKod('');
+    } catch { setErr(t('Kód se teď nepodařilo poslat. Zkus to za chvíli, nebo se přihlas heslem.')); }
+    finally { setBusy(false); }
+  };
+  const overit = async (e: React.FormEvent) => {
+    e.preventDefault(); setErr('');
+    if (!/^\d{6}$/.test(kod)) { setErr(t('Kód má šest číslic.')); return; }
+    setBusy(true);
+    const s = await signIn('host-kod', { email, kod, redirect: false });
+    await poPrihlaseni(s?.error, t('Kód nesedí nebo už neplatí. Pošli si nový.'));
+  };
   return (
     <AuthCard title={t('Přihlásit se')} lead={t('Tvoje podniky, rezervace a body na jednom místě.')}>
-      <form onSubmit={submit} className="grid gap-4" noValidate>
-        <Field id="l-email" label={t('E-mail')}><input id="l-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
-        <Field id="l-pw" label={t('Heslo')}><input id="l-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" required /></Field>
-        <p className="-mt-2 text-sm"><Link href="/client/zapomenute-heslo" className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Zapomenuté heslo')}</Link></p>
-        {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-        <button type="submit" disabled={busy} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">
-          {busy ? t('Přihlašuji…') : t('Přihlásit se')}
-        </button>
-        <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
-        <p className="text-sm text-black/55 text-center">{t('Ještě účet nemáš?')} <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Založ si ho')}</Link></p>
-      </form>
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-full bg-black/[0.05] mb-5" role="tablist" aria-label={t('Způsob přihlášení')}>
+        {(['kod', 'heslo'] as const).map(z => (
+          <button key={z} type="button" role="tab" aria-selected={zpusob === z} onClick={() => { setZpusob(z); setErr(''); }}
+            className={`h-9 rounded-full text-sm font-medium transition ${zpusob === z ? 'seg-jezdec seg-vybrano' : 'seg-off'}`}>{z === 'kod' ? t('Kód e-mailem') : t('Heslo')}</button>
+        ))}
+      </div>
+      {zpusob === 'kod' ? (
+        poslano ? (
+          <form onSubmit={overit} className="grid gap-4" noValidate>
+            <p className="text-sm text-black/70 text-pretty">{t('Poslali jsme šestimístný kód na {email}. Platí 10 minut.', { email: email.trim() })}</p>
+            <Field id="l-kod" label={t('Kód z e-mailu')}>
+              <input id="l-kod" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={`${input} h-kod !text-[22px] !tracking-[0.4em] text-center`} value={kod}
+                onChange={e => setKod(e.target.value.replace(/\D/g, '').slice(0, 6))} autoFocus required />
+            </Field>
+            {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
+            <button type="submit" disabled={busy || kod.length !== 6} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">{busy ? t('Přihlašuji…') : t('Přihlásit se')}</button>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => { setPoslano(false); setErr(''); }} className="btn btn-secondary min-w-0">{t('Jiný e-mail')}</button>
+              <button type="button" onClick={() => void poslatKod()} disabled={busy} className="btn btn-secondary min-w-0">{t('Poslat znovu')}</button>
+            </div>
+            <p className="t-meta text-center text-pretty">{t('Kód nepřišel? Mrkni do spamu, nebo se přihlas heslem.')}</p>
+          </form>
+        ) : (
+          <form onSubmit={poslatKod} className="grid gap-4" noValidate>
+            <Field id="l-email" label={t('E-mail')} hint={t('Pošleme ti kód. Heslo si pamatovat nemusíš.')}><input id="l-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
+            {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
+            <button type="submit" disabled={busy} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">{busy ? t('Posílám…') : t('Poslat kód')}</button>
+            <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
+            <p className="text-sm text-black/55 text-center">{t('Ještě účet nemáš?')} <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Založ si ho')}</Link></p>
+          </form>
+        )
+      ) : (
+        <form onSubmit={submit} className="grid gap-4" noValidate>
+          <Field id="l-email" label={t('E-mail')}><input id="l-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
+          <Field id="l-pw" label={t('Heslo')}><input id="l-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" required /></Field>
+          <p className="-mt-2 text-sm"><Link href="/client/zapomenute-heslo" className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Zapomenuté heslo')}</Link></p>
+          {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
+          <button type="submit" disabled={busy} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">
+            {busy ? t('Přihlašuji…') : t('Přihlásit se')}
+          </button>
+          <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
+          <p className="text-sm text-black/55 text-center">{t('Ještě účet nemáš?')} <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Založ si ho')}</Link></p>
+        </form>
+      )}
     </AuthCard>
   );
 }

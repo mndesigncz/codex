@@ -31,10 +31,10 @@ export async function POST() {
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (me.role !== 'employer') return NextResponse.json({ error: 'Ověření e-mailu je jen pro vedení podniku.' }, { status: 403 });
   const brana = await hit(`overeni-email:${me.id}`, OVERENI_ZNOVU_ZA_HODINU, 60 * 60);
-  if (!brana.ok) return NextResponse.json({ error: 'Odkaz jsme poslali už několikrát. Zkuste to za hodinu.' }, { status: 429 });
+  if (!brana.ok) return NextResponse.json({ error: 'Odkaz jsme poslali už několikrát. Zkus to za hodinu.' }, { status: 429 });
   const r = await posliOvereni(me.id);
   if (r.odeslano) return NextResponse.json({ ok: true });
   if (r.duvod === 'overeno') return NextResponse.json({ ok: true, overeno: true });
   if (r.duvod === 'nenabizi') return NextResponse.json({ error: 'Odesílání e-mailů není nastavené.' }, { status: 503 });
-  return NextResponse.json({ error: 'E-mail se nepodařilo odeslat. Zkuste to později.' }, { status: 502 });
+  return NextResponse.json({ error: 'E-mail se nepodařilo odeslat. Zkus to později.' }, { status: 502 });
 }

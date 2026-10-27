@@ -167,7 +167,7 @@ export async function PUT(req: NextRequest) {
       RETURNING user_id`;
     if (!done.length) return NextResponse.json({ error: 'Nárok jde nastavit jen členovi s členstvím v podniku.' }, { status: 404 });
   } catch {
-    return NextResponse.json({ error: 'Nárok na dovolenou se nepodařilo uložit — databáze ho ještě nezná (spusť /api/init).' }, { status: 503 });
+    return NextResponse.json({ error: 'Nárok na dovolenou se teď nepodařilo uložit. Zkus to za chvíli znovu.' }, { status: 503 });
   }
   let jmeno = '';
   try { jmeno = String((await sql`SELECT name FROM users WHERE id = ${userId}`)[0]?.name ?? ''); } catch { /* jen do auditu */ }

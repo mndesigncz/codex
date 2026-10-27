@@ -57,7 +57,8 @@ const TON_IKONA: Record<TonPoznamky, { ikona: string; barva: string }> = {
  * tónovaná plocha přerostla limit DP T4.
  */
 export function RadyJakoSeznam({ rady, limit = Infinity }: {
-  rady: { tone: TonPoznamky; title: string; text?: string; ikona?: string; doplnek?: ReactNode }[];
+  /** `otevrit`: proklik tam, kde se rada udělá (audit 2026-10 V17, vzor Shopify Insights „Udělat"). */
+  rady: { tone: TonPoznamky; title: string; text?: string; ikona?: string; doplnek?: ReactNode; otevrit?: () => void }[];
   limit?: number;
 }) {
   const t = useT('sprava');
@@ -78,6 +79,8 @@ export function RadyJakoSeznam({ rady, limit = Infinity }: {
               title={<span className="block whitespace-normal text-pretty">{r.title}</span>}
               meta={r.text ? <span className="block whitespace-normal text-pretty">{r.text}</span> : undefined}
               right={r.doplnek}
+              onClick={r.otevrit}
+              chevron={!!r.otevrit}
             />
           );
         })}

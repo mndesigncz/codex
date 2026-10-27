@@ -59,10 +59,13 @@ for (const [sirka, mobil] of [[390, true], [1280, false]]) {
   };
   const { ctx, p, chyby } = await kontext({ viewport: { width: sirka, height: sirka < 500 ? 844 : 900 }, mobil, dalsi });
   await zachytOkna(ctx);
+  // Kolo 92: plastové karty jsou část Věrnost → Kupony a poukazy (dřív samostatná záložka Kartičky).
   await p.goto(BASE + '/employer/overview?mode=client&tab=cards', { waitUntil: 'networkidle' });
+  await p.getByRole('tab', { name: 'Plastové karty' }).click();
   await p.locator('[data-testid="karty-seznam"]').waitFor({ timeout: 20000 });
   const text = await p.locator('main').innerText();
-  tvrdi(`${jm}: jeden h1 „Kartičky“`, (await p.locator('h1').count()) === 1 && /Kartičky/.test(await p.locator('h1').innerText()));
+  // Kolo 92: karty jsou část stránky „Kupony a poukazy" (Věrnost), h1 nese stránka.
+  tvrdi(`${jm}: jeden h1 „Kupony a poukazy“`, (await p.locator('h1').count()) === 1 && /Kupony a poukazy/.test(await p.locator('h1').innerText()));
   tvrdi(`${jm}: počty podle stavu a převzaté z importu`, /Aktivní\s*3/i.test(text) && /Nepřiřazené\s*47/i.test(text) && /starých karet z importu Kartičky: 1 karta/.test(text), text.slice(0, 300));
   tvrdi(`${jm}: dávka s počty`, /Léto 2026/.test(text) && /50 karet/.test(text) && /Aktivní 2 · nepřiřazené 47 · zablokované 1/.test(text));
   tvrdi(`${jm}: karta s hostem bez aplikace, stará karta jen číslem`, /Klára Vojtíšková · bez aplikace/.test(text) && /100245/.test(text) && !/T5:100245/.test(text) && /stará karta/.test(text));
@@ -193,7 +196,8 @@ for (const [sirka, mobil] of [[390, true], [1280, false]]) {
   const chyby = [];
   p.on('pageerror', e => chyby.push(String(e)));
   p.on('console', msg => { if (msg.type() === 'error' && !/Failed to load resource/.test(msg.text())) chyby.push(msg.text()); });
-  await p.goto(BASE + '/client/me', { waitUntil: 'networkidle' });
+  // Přestavba hosta: plastové karty jsou na stránce Moje (profil) v části Karta a peněženka.
+  await p.goto(BASE + '/client/me/profil', { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: 'Mám plastovou kartu' }).waitFor({ timeout: 15000 });
   await p.getByRole('button', { name: 'Mám plastovou kartu' }).click();
   await p.getByLabel('Kód z plastové karty').fill('zzzz zzzz');

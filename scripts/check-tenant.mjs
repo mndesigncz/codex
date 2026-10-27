@@ -25,7 +25,6 @@ import { nactiSchema } from './ddl-schema.mjs';
  */
 export const VYJIMKY = {
   'app/api/billing/webhook/route.ts|billing_events': 'id je id události Stripe z podepsaného webhooku (idempotence), ne řádek podniku z požadavku',
-  'app/api/client/b/[slug]/promo/route.ts|client_promos': 'vratPouziti dostává promo.id z dotazu „code AND team_id" o pár řádků výš',
   'app/api/client/staff/scan/route.ts|client_scan_actions': 'akceId je z INSERT … RETURNING téhož požadavku (vrácení akce při kolizi účtenky)',
   'app/api/navic/route.ts|extra_work': 'id je z INSERT … RETURNING téhož požadavku (zápis navíc s team_id)',
 };

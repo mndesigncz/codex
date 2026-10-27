@@ -157,9 +157,10 @@ for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
 // ---------------------------------------------------------------------------
 for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
   const { ctx, p, stav, chyby } = await kontext({ viewport: vp, mobil, fix: nacti('k69-b8-rozlozeni-zakaznici'), posunCasu: posunNa(20, 0), dalsi: podvrh });
-  await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
-  await p.locator('[data-plocha]').getByRole('tab', { name: 'Hodnocení' }).click();
-  const nastroj = widgetLi(p, 'nastroj');
+  // Kolo 92: Hodnocení je vlastní stránka v oblasti Hosté (dřív část Zákazníků za přepínačem) — bez plochy widgetů.
+  await p.goto(BASE + CLIENT('reviews'), { waitUntil: 'networkidle' });
+  await p.getByRole('heading', { level: 1, name: 'Hodnocení' }).waitFor({ timeout: 15000 });
+  const nastroj = p.locator('main');
   tvrdi(`H ${jmeno}: pilulky „Vše · 4", „1–2 ★ · 2", „S komentářem · 3", „Nevyřízené · 1"`, await dokud(() => nastroj.getByRole('button', { name: 'Vše · 4' }).isVisible(), 5000)
     && await nastroj.getByRole('button', { name: '1–2 ★ · 2' }).isVisible() && await nastroj.getByRole('button', { name: 'S komentářem · 3' }).isVisible() && await nastroj.getByRole('button', { name: 'Nevyřízené · 1' }).isVisible());
   tvrdi(`H ${jmeno}: Jana má Chip „odpovězeno · Martin" a text odpovědi, Ota „vyřízeno", Petr „nevyřízené"`,
@@ -217,6 +218,8 @@ for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
     if (path === '/api/client/b/kavarna-u-lipy') return json(podnik());
     if (path === '/api/client/b/kavarna-u-lipy/reservations' && req.method() === 'PATCH') { (stav.potvrzeni ??= []).push(req.postDataJSON()); return json({ ok: true, id: 11, guestConfirmed: true }); }
     if (path === '/api/client/b/kavarna-u-lipy/reviews') return json(nacti('k84-klient-host-odpovedi'));
+    // Aktivita (schránka hosta): odpověď podniku na hodnocení.
+    if (path === '/api/client/me/aktivita') return json({ polozky: [{ id: 'A1', typ: 'odpoved', at: new Date().toISOString(), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: null, hodnoceni: 5, poznamka: 'Skvělá káva.', text: 'Děkujeme, Jano! Těšíme se zas.' }], neprecteno: 1, videno: null });
     // Moje stránka: obecná fixtura nemá dnešek ani adresu podniku u rezervace — doplní se tady.
     if (path === '/api/client/me' && req.method() === 'GET') return json({ ...nacti('client_me'), today: dnes, reservations: [{ id: 11, date: dnes, time: '19:00', party: 4, note: null, status: 'confirmed', slug: 'kavarna-u-lipy', business: 'Kavárna U Lípy' }] });
     return undefined;
@@ -235,13 +238,18 @@ for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
   tvrdi('G: „Potvrdit" pošle PATCH b/<slug>/reservations { id: 11, action: confirm }', await dokud(() => (stav.potvrzeni ?? []).some(b => b.id === 11 && b.action === 'confirm'), 3000), JSON.stringify(stav.potvrzeni));
   tvrdi('G: …ohlásí „Díky, podnik s tebou počítá." a ukáže „Potvrzeno tebou"', await dokud(() => p.getByText('Díky, podnik s tebou počítá.').isVisible(), 3000) && await dokud(() => radek.getByText('Potvrzeno tebou').isVisible(), 3000));
   tvrdi('G: žádost (requested) nemá „Potvrdit", jen „Zrušit"', await p.locator('#rezervace-12').getByRole('button', { name: /^Potvrdit/ }).count() === 0 && await p.locator('#rezervace-12').getByRole('button', { name: 'Zrušit' }).isVisible());
-  // Moje stránka: odpovědi na hodnocení a odkaz k rezervaci.
+  // Přestavba hosta (2026-10-21): Moje se rozdělila. Odpověď podniku je v Aktivitě (schránka),
+  // dnešní rezervace na Kartě (domov) vede na stránku podniku s ?rezervace=ID.
   await p.goto(`${BASE}/client/me`, { waitUntil: 'networkidle' });
-  tvrdi('G: Moje stránka má sekci „Odpovědi na tvoje hodnocení" s odpovědí podniku', await dokud(() => p.getByRole('heading', { name: 'Odpovědi na tvoje hodnocení' }).isVisible(), 15000) && await p.getByText('Děkujeme, Jano! Těšíme se zas.').isVisible());
-  tvrdi('G: u nadcházející rezervace odkaz „Potvrdit nebo zrušit" na stránku podniku', await dokud(() => p.getByRole('link', { name: /Potvrdit nebo zrušit/ }).first().isVisible(), 5000)
-    && /\/client\/kavarna-u-lipy\?tab=reserve&rezervace=\d+/.test((await p.getByRole('link', { name: /Potvrdit nebo zrušit/ }).first().getAttribute('href')) ?? ''));
-  tvrdi('G: Moje stránka bez přetečení', await bezPreteceni(p));
+  const odkazRez = p.locator('a[href*="/client/kavarna-u-lipy?tab=reserve&rezervace="]').first();
+  tvrdi('G: Karta ukazuje dnešní rezervaci s odkazem na potvrzení u podniku', await dokud(() => odkazRez.isVisible(), 15000)
+    && /\/client\/kavarna-u-lipy\?tab=reserve&rezervace=\d+/.test((await odkazRez.getAttribute('href')) ?? ''));
+  tvrdi('G: Karta bez přetečení', await bezPreteceni(p));
   await p.screenshot({ path: OUT + 'k84-klient-host-moje-tel.png', fullPage: true });
+  await p.goto(`${BASE}/client/me/aktivita`, { waitUntil: 'networkidle' });
+  tvrdi('G: Aktivita ukazuje odpověď podniku na hodnocení', await dokud(() => p.getByText('Odpověď na tvoje hodnocení').first().isVisible(), 15000) && await p.getByText(/Děkujeme, Jano! Těšíme se zas\./).first().isVisible());
+  tvrdi('G: Aktivita bez přetečení', await bezPreteceni(p));
+  await p.screenshot({ path: OUT + 'k84-klient-host-aktivita-tel.png', fullPage: true });
   tvrdi('G: bez chyb v konzoli', chybyBezHydratace(chyby).length === 0, chybyBezHydratace(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }

@@ -177,7 +177,8 @@ console.log('O3 Platby');
   for (const [popis, ua, ma] of [['provoz', UA_PROVOZ, false], ['web', UA_WEB, true]]) {
     const { ctx, p } = await kontext(ua, 'employer', { width: 1280, height: 950 });
     await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
-    await p.getByText('Zabezpečení').first().waitFor({ timeout: 15000 });
+    // Viditelná položka nabídky (dřív se náhodou chytil podtitul „…oznámení a zabezpečení." — audit N: podtitul vedení je jiný).
+    await p.getByText('Zabezpečení', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
     const t = await text(p);
     tvrdi(`nastavení (${popis}): položka Předplatné ${ma ? 'je' : 'není'}`, /Předplatné/.test(t) === ma, t.slice(0, 200));
     if (!ma) tvrdi('nastavení (provoz): žádná cena a Stripe', !ZAKAZANO.test(t), t.slice(0, 200));
@@ -259,8 +260,9 @@ console.log('O5 Smazání účtu');
   }
 
   // Host: Profil → Smazat účet → heslo → DELETE → odhlášení na /client.
+  // Přestavba hosta: účet a smazání jsou na stránce Moje (profil z avataru), /client/me/profil.
   {
-    const { ctx, p, smazani } = await ucet('customer', UA_KLIENT, '/client/me', [{ status: 200, body: { ok: true, smazanePodniky: 0 } }]);
+    const { ctx, p, smazani } = await ucet('customer', UA_KLIENT, '/client/me/profil', [{ status: 200, body: { ok: true, smazanePodniky: 0 } }]);
     await p.locator('#ucet').scrollIntoViewIfNeeded();
     await p.getByRole('button', { name: 'Smazat účet' }).first().click();
     const okno = p.getByRole('dialog');
@@ -276,7 +278,7 @@ console.log('O5 Smazání účtu');
   }
   // Špatné heslo: okno zůstane a řekne proč.
   {
-    const { ctx, p, smazani } = await ucet('customer', UA_KLIENT, '/client/me', [{ status: 400, body: { error: 'Heslo není správné.' } }]);
+    const { ctx, p, smazani } = await ucet('customer', UA_KLIENT, '/client/me/profil', [{ status: 400, body: { error: 'Heslo není správné.' } }]);
     await p.getByRole('button', { name: 'Smazat účet' }).first().click();
     const okno = p.getByRole('dialog');
     await okno.getByLabel('Heslo').fill('spatne-heslo-1');
@@ -295,10 +297,10 @@ console.log('O5 Smazání účtu');
     const okno = p.getByRole('dialog');
     await okno.getByLabel('Heslo').fill('Moje-Heslo-123');
     await okno.getByRole('button', { name: 'Smazat účet' }).click();
-    await okno.getByText('Napište SMAZAT').waitFor({ timeout: 5000 });
+    await okno.getByText('Napiš SMAZAT').waitFor({ timeout: 5000 });
     tvrdi('vlastník: server vysvětlí, že podnik má další členy, a chce potvrzení', /další lidé/.test(await okno.innerText()) && smazani.length === 1 && !('smazatPodnik' in smazani[0]));
     tvrdi('vlastník: bez slova SMAZAT je potvrzení zamčené', await okno.getByRole('button', { name: 'Smazat podnik i účet' }).isDisabled());
-    await okno.getByLabel('Napište SMAZAT').fill('SMAZAT');
+    await okno.getByLabel('Napiš SMAZAT').fill('SMAZAT');
     await okno.getByRole('button', { name: 'Smazat podnik i účet' }).click();
     await p.waitForURL(/\/login/, { timeout: 15000 });
     tvrdi('vlastník: druhý DELETE nese volbu podniku a potvrzení, pak odhlášení na přihlášení', smazani.length === 2 && smazani[1].smazatPodnik === true && smazani[1].potvrzeni === 'SMAZAT', JSON.stringify(smazani));
@@ -328,6 +330,8 @@ console.log('O6 Reset hesla a O8 souhlas s novinkami');
   });
   const p = await ctx.newPage();
   await p.goto(BASE + '/client/login', { waitUntil: 'networkidle' });
+  // Přestavba hosta: výchozí je přihlášení kódem z e-mailu, heslo je druhá záložka.
+  await p.getByRole('tab', { name: 'Heslo' }).click();
   tvrdi('přihlášení hosta nabízí Zapomenuté heslo', await p.getByRole('link', { name: 'Zapomenuté heslo' }).count() === 1);
   await p.getByRole('link', { name: 'Zapomenuté heslo' }).click();
   await p.waitForURL(/zapomenute-heslo/);
@@ -383,7 +387,7 @@ console.log('O6 Reset hesla a O8 souhlas s novinkami');
     return json({});
   });
   const q = await ctx2.newPage();
-  await q.goto(BASE + '/client/me', { waitUntil: 'networkidle' });
+  await q.goto(BASE + '/client/me/profil', { waitUntil: 'networkidle' }); // přestavba hosta: souhlasy jsou na stránce Moje (profil)
   const prepinac = q.getByRole('switch', { name: 'Novinky a akce od podniků' });
   tvrdi('souhlas s novinkami: v profilu je vypnutý, dokud ho host nezapne', await prepinac.count() === 1 && (await prepinac.getAttribute('aria-checked')) === 'false');
   await prepinac.click();

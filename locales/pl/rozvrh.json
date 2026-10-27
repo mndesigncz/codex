@@ -165,7 +165,7 @@
   "Počet lidí podle tržeb je zapnutý, ale chybí práh — nastav ho v záložce Pravidla.": "Liczba osób według utargu jest włączona, ale brakuje progu — ustaw go w zakładce Zasady.",
   "Počet lidí podle tržeb je zapnutý, ale na tržby nemáš oprávnění — generátor ho vynechal a řídil se jen otevírací směnou.": "Liczba osób według utargu jest włączona, ale nie masz uprawnień do utargu — generator ją pominął i kierował się tylko zmianą otwierającą.",
   "Počet lidí podle tržeb je zapnutý, ale za posledních 8 týdnů nejsou uzávěrky s tržbou — generátor se řídil jen otevírací směnou.": "Liczba osób według utargu jest włączona, ale z ostatnich 8 tygodni nie ma zamknięć kasy z utargiem — generator kierował się tylko zmianą otwierającą.",
-  "Počet lidí podle tržeb se neuložil — databáze ho ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.": "Liczba osób według utargu nie została zapisana — baza danych jeszcze jej nie zna (uruchom /api/init). Pozostałe zasady są zapisane.",
+  "Počet lidí podle tržeb se teď neuložil, zkus to za chvíli znovu. Ostatní pravidla jsou uložená.": "Liczba osób według utargu nie zapisała się — spróbuj za chwilę ponownie. Pozostałe zasady są zapisane.",
   "Pracovní dny": "Dni robocze",
   "Pravidla": "Zasady",
   "Pravidla se nenačetla": "Nie wczytano zasad",
@@ -483,7 +483,7 @@
   "Změněno od publikování": "Zmieniono od publikacji",
   "Nepublikováno": "Nieopublikowany",
   "Hodin za týden": "Godzin w tygodniu",
-  "Limity rozvrhu se neuložily — databáze je ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.": "Limity grafiku nie zostały zapisane – baza jeszcze ich nie zna (uruchom /api/init). Pozostałe zasady są zapisane.",
+  "Limity rozvrhu se teď neuložily, zkus to za chvíli znovu. Ostatní pravidla jsou uložená.": "Limity grafiku nie zapisały się — spróbuj za chwilę ponownie. Pozostałe zasady są zapisane.",
   "Mzdy / tržba": "Płace / utarg",
   "Nehlídat": "Nie pilnuj",
   "Nejdelší směna": "Najdłuższa zmiana",
@@ -506,5 +506,12 @@
   "{h} h odpočinku (nejméně {limit})": "{h} h odpoczynku (co najmniej {limit})",
   "{h} h směna (nejvýš {limit})": "{h} h zmiana (najwyżej {limit})",
   "{h} h týdně (nejvýš {limit})": "{h} h tygodniowo (najwyżej {limit})",
-  "{n, plural, one {# varování} few {# varování} other {# varování}} k limitům rozvrhu": "{n, plural, one {# ostrzeżenie} few {# ostrzeżenia} many {# ostrzeżeń} other {# ostrzeżenia}} dotyczące limitów grafiku"
+  "{n, plural, one {# varování} few {# varování} other {# varování}} k limitům rozvrhu": "{n, plural, one {# ostrzeżenie} few {# ostrzeżenia} many {# ostrzeżeń} other {# ostrzeżenia}} dotyczące limitów grafiku",
+  "Dřívější dny ({n})": "Wcześniejsze dni ({n})",
+  "Dnes": "Dziś",
+  "Bez směn": "Bez zmian",
+  "návrh": "projekt",
+  "Ukázat měsíc jako mřížku": "Pokaż miesiąc jako siatkę",
+  "Ukázat dny jako seznam": "Pokaż dni jako listę",
+  "Potvrdit a uložit rozvrh jen uloží — tým ho uvidí, až ho publikuješ. „Uložit a publikovat“ nahoře udělá obojí najednou.": "Potwierdź i zapisz tylko zapisuje grafik — zespół zobaczy go po opublikowaniu. „Zapisz i opublikuj” u góry zrobi obie rzeczy naraz."
 }

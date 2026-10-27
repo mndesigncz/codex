@@ -278,7 +278,7 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
   ].filter(Boolean).join(' · ');
   return (
     <section aria-labelledby={`${uid}-n`} className="rounded-2xl border border-black/[0.08]" data-prehled-lidi>
-      <button type="button" aria-expanded={otevreno} aria-controls={`${uid}-o`} onClick={() => onOtevreno(!otevreno)}
+      <button type="button" aria-expanded={otevreno} aria-controls={otevreno ? `${uid}-o` : undefined} onClick={() => onOtevreno(!otevreno)}
         className="w-full min-h-[44px] flex items-center justify-between gap-3 px-3 py-2.5 text-left rounded-2xl hover:bg-black/[0.03]">
         <span className="min-w-0">
           <span id={`${uid}-n`} className="block text-sm font-semibold text-[#16181A]">{t('Směny podle lidí')}</span>

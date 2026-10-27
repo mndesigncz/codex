@@ -295,7 +295,7 @@ export default async function ({ eq, ok }: Testy) {
     ok('oznámení o postupu: po návštěvě i po útratě', /oznamPostupUrovne\(teamId, customerId, \{ navstev: 1 \}\)/.test(bezKomentaru(precti('lib/client.ts'))) && /oznamPostupUrovne\(teamId, customerId, \{ utrata: n \}\)/.test(bezKomentaru(precti('lib/urovneDb.ts'))));
     ok('úroveň po pauze: všechna místa s tierForMember předávají lastVisitAt', [
       'app/api/client/b/[slug]/route.ts', 'app/api/client/b/[slug]/coupons/[id]/claim/route.ts', 'lib/clenoveDb.ts',
-      'app/api/client/staff/scan/route.ts', 'components/client/MyPage.tsx',
+      'app/api/client/staff/scan/route.ts', 'components/client/host/model.ts',
     ].every(f => /lastVisitAt:/.test(precti(f))));
   }
   {

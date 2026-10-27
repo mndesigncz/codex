@@ -21,6 +21,7 @@ import { Chip, Segmented, Well } from '../ui';
 import { RadyJakoSeznam, type TonPoznamky } from './LiveRevenue';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { useNavigace } from '../widgety/NavigaceKontext';
 
 export type SkupinaRady = 'revenue' | 'products' | 'people' | 'stock' | 'guests';
 
@@ -77,10 +78,21 @@ export function vyberDoporuceni(raw: any): Doporuceni {
 }
 
 /** Rada jako řádek: co se stalo, pod tím co udělat; částka „jde o …" a důkaz v chipech vpravo. */
+/** Kam rada vede (audit 2026-10 V17): stránka, kde se doporučení udělá. Tržby nikam — jsou to Finance samy. */
+const CIL_SKUPINY: Partial<Record<SkupinaRady, string>> = {
+  products: 'recipes', people: 'shifts', stock: 'inventory', guests: 'klient:customers',
+};
+
 function useRadky() {
   const t = useT('sprava');
   const money = useMoney();
+  const nav = useNavigace();
+  const cil = (g: SkupinaRady) => {
+    const pohled = CIL_SKUPINY[g];
+    return pohled && nav.smiPohled(pohled) ? { otevrit: () => nav.onNavigate(pohled) } : {};
+  };
   return (rady: Rada[]) => rady.map(a => ({
+    ...cil(a.group),
     tone: a.tone,
     ikona: a.icon,
     title: a.title,

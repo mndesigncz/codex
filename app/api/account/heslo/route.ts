@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   if (!vypadaJakoEmail(email)) return NextResponse.json({ error: 'E-mail nevypadá správně.' }, { status: 400 });
   // Limit podle IP PŘED čímkoli dalším (bcrypt tu není, ale e-maily stojí peníze a dají se zneužít ke spamu).
   const ip = await hit(`reset-ip:${klientIp(request.headers)}`, 10, 60 * 60);
-  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho žádostí. Zkuste to později.' }, { status: 429 });
+  if (!ip.ok) return NextResponse.json({ error: 'Příliš mnoho žádostí. Zkus to později.' }, { status: 429 });
   // Limit na adresu: další žádosti se tváří stejně, ale neodejdou (nikdo nespamuje cizí schránku).
   const adr = await hit(klicPoctadla('reset', email), 3, 60 * 60);
 

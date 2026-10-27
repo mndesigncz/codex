@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   const email = String(b.email ?? '').trim().toLowerCase();
   const password = String(b.password ?? '');
   if (!email || password.length < 4) {
-    return NextResponse.json({ error: 'Zadejte e-mail a heslo (min. 4 znaky).' }, { status: 400 });
+    return NextResponse.json({ error: 'Zadej e-mail a heslo (aspoň 4 znaky).' }, { status: 400 });
   }
 
   const [existing] = await sql`SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'kiosk' LIMIT 1`;
