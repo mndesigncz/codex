@@ -85,7 +85,7 @@ import { useUlozeno } from '@/lib/useUlozeno';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, obdobiMesice, mojeUpravyMesice, otevrenePrichody, podilMezd,
   sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech, zpozdeniPichacek,
-  radkyMojeDochazky, orizniSeznam, odchylkyZaznamu,
+  radkyMojeDochazky, orizniSeznam, odchylkyZaznamu, odpracovanoVeSmene,
   vyplatniListina, seradListinu, soucetListiny, csvVyplatniListiny, csvText, hMM, obdobiZamceno, mesiceVyplat, stavPauzy, priplatkyZaznamu, priplatkyVypnute,
   normalizujPravidlaDyska, normalizujPravidlaPriplatku, stavLimituHodin, nadHraniciOdvodu, nazevSmlouvy, TYPY_SMLUV, LIMIT_DPP_HODIN, PAUZA_MIN,
   type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UpravaMzdy, type UzaverkaSpropitne, type UzaverkaTrzby, type VolbaMesice,
@@ -107,6 +107,12 @@ interface ClenRosteru {
   shiftEnd?: string | null;
   /** Den směny (jen vlastní řádek zaměstnance, kolo 7): včerejšek u noční, která ještě běží. Vedení má dnešek. */
   shiftDate?: string | null;
+  /** Začátek běžící směny — první příchod před pauzami (po „Konec pauzy" je openSince konec pauzy). */
+  shiftSince?: string | null;
+  /** Skončené pauzy běžící směny v ms (odpracovaný čas je bez nich). */
+  breakMs?: number | null;
+  /** Běžící pauza od (na pauze je openSince null). */
+  breakSince?: string | null;
 }
 
 interface ZaznamDochazky {
@@ -233,6 +239,10 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   const openSince = muj?.openSince ?? null;
   const zacatek = parseDbTime(openSince);
   const naSmene = !!zacatek;
+  // Směna s pauzou je jedna směna: po „Konec pauzy" běží záznam od konce pauzy (openSince), ale „Příchod",
+  // stopky i zpoždění proti plánu se berou od prvního příchodu směny a bez pauz (shiftSince, breakMs z API).
+  const zacatekSmeny = parseDbTime(muj?.shiftSince ?? null) ?? zacatek;
+  const prichodSmeny = muj?.shiftSince ?? openSince;
   const S = velikost === 'S';
   // Dnešní směna z rozvrhu (kolo 7): API ji pošle na vlastním řádku rosteru — zaměstnanci
   // i s dnem (noční ze včerejška), vedení dnešní. „Začíná za…" se musí posouvat i bez
@@ -241,14 +251,20 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   const planDo = muj?.shiftEnd ? hm(muj.shiftEnd) : null;
   // Sekundy ukazuje jen střední velikost; malá má hodiny a minuty, stačí jí obnova po čtvrt minutě.
   // Stopky tikají i na pauze (stav pauzy se čte až níž — tady stačí „je dnes otevřená pauza v datech").
-  const pauzaVDatech = !!data.data?.entries.some(e => e.source === 'break' && !!e.clockOut && e.clockOut === e.clockIn && Number(e.employeeId) === ja.id);
+  const pauzaVDatech = !!muj?.breakSince || !!data.data?.entries.some(e => e.source === 'break' && !!e.clockOut && e.clockOut === e.clockIn && Number(e.employeeId) === ja.id);
   const ted = useTed(naSmene || pauzaVDatech || (!S && !!planOd), S ? 15_000 : naSmene || pauzaVDatech ? 1000 : 60_000);
-  const bezi = zacatek ? Math.max(0, ted - zacatek.getTime()) : 0;
-  const zapomenuty = naSmene && bezi > ZAPOMENUTY_MS;
-  const vuciPlanu = planOd ? zpozdeniPichacek(muj?.shiftDate || pragueToday(), planOd, openSince, ted) : null;
+  // Zapomenutý odchod se posuzuje na běžícím záznamu (jako rozeberZaznam), čas na hodinách je odpracovaná směna.
+  const zapomenuty = naSmene && !!zacatek && ted - zacatek.getTime() > ZAPOMENUTY_MS;
+  const bezi = naSmene ? odpracovanoVeSmene({ openSince, shiftSince: muj?.shiftSince, breakMs: muj?.breakMs }, ted) : 0;
+  const vuciPlanu = planOd ? zpozdeniPichacek(muj?.shiftDate || pragueToday(), planOd, zacatekSmeny, ted) : null;
   // Pauza (kolo 8): běžící pauza = dnešní záznam 'break' s odchodem rovným příchodu; po 6 h bez pauzy se odchod zeptá.
+  // Z rosteru (breakSince) i bez záznamů dne: vedení bez dochazka.zobrazit záznamy nedostane a pauzu začatou
+  // před půlnocí dnešní záznamy nevidí — Píchačky by jinak nabídly „Odpíchnout příchod" jako novou směnu.
   const pauza = useMemo(() => (ja.id != null && data.data ? stavPauzy(data.data.entries as ZaznamDochazkyLib[], ja.id, pragueToday(), ted) : null), [data.data, ja.id, ted]);
-  const naPauze = !!pauza?.naPauze && !naSmene;
+  const naPauze = (!!pauza?.naPauze || !!muj?.breakSince) && !naSmene;
+  const pauzaOd = parseDbTime(muj?.breakSince ?? null) ?? pauza?.pauzaOd ?? null;
+  // Na pauze: odpracováno ve směně do začátku pauzy (bez starších záznamů dne z jiné směny).
+  const odpracovanoNaPauze = muj?.shiftSince ? odpracovanoVeSmene({ openSince: null, shiftSince: muj.shiftSince, breakMs: muj.breakMs, breakSince: muj.breakSince ?? pauzaOd?.toISOString() }, ted) : pauza?.dnesMs ?? 0;
   const [ptamSe, setPtamSe] = useState(false);
   // Poloha při příchodu (spuštění, balík P): jen když ji podnik ověřuje; před prvním použitím informace.
   const [infoPolohy, setInfoPolohy] = useState(false);
@@ -265,7 +281,7 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
     try {
       const d = await fetch('/api/attendance/pauza', { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ action, minuty: PAUZA_MIN }) }).then(okJson);
       if (action === 'odchod' || action === 'doplnit' || action === 'bez_pauzy') poOdchodu(d);
-      if (action === 'start') { const zaklad = data.data; if (zaklad) data.set({ ...zaklad, roster: zaklad.roster.map(r => (Number(r.id) === ja.id ? { ...r, openSince: null } : r)) }); }
+      if (action === 'start') { const zaklad = data.data; if (zaklad) data.set({ ...zaklad, roster: zaklad.roster.map(r => (Number(r.id) === ja.id ? { ...r, openSince: null, breakSince: d?.pauzaOd ?? new Date().toISOString() } : r)) }); }
       data.reload(); obnovDochazku();
     } catch (e) {
       setChyba(apiMessage(e, t('Pauzu se nepodařilo zapsat. Zkus to znovu.')));
@@ -445,9 +461,9 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
           {zapomenuty ? (
             <p className="note note-wait !px-3 !py-2 text-[13px]">{t('Běží od {cas}', { cas: odKdy(openSince) })}</p>
           ) : naPauze ? (
-            <Stat label={t('Pauza od {cas}', { cas: dbTimeHM(pauza?.pauzaOd) })} value={stopky(pauza?.pauzaOd ? ted - pauza.pauzaOd.getTime() : 0, false)} />
+            <Stat label={t('Pauza od {cas}', { cas: dbTimeHM(pauzaOd) })} value={stopky(pauzaOd ? ted - pauzaOd.getTime() : 0, false)} />
           ) : naSmene ? (
-            <Stat label={t('Příchod {cas}', { cas: dbTimeHM(openSince) })} value={stopky(bezi, false)} />
+            <Stat label={t('Příchod {cas}', { cas: dbTimeHM(prichodSmeny) })} value={stopky(bezi, false)} />
           ) : (
             <p className="t-meta">{t('Teď nejsi na směně.')}</p>
           )}
@@ -457,13 +473,15 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
         <Sloupec mezera={3}>
           {zapomenuty ? (
             <p className="note note-wait">
-              {t('Příchod běží od {cas} — to je {delka}. Odpíchni odchod, ať docházka sedí.', { cas: odKdy(openSince), delka: delkaSlovy(t, bezi) })}
+              {t('Příchod běží od {cas} — to je {delka}. Odpíchni odchod, ať docházka sedí.', { cas: odKdy(openSince), delka: delkaSlovy(t, zacatek ? ted - zacatek.getTime() : 0) })}
             </p>
           ) : naPauze ? (
-            <Stat label={t('Pauza od {cas}', { cas: dbTimeHM(pauza?.pauzaOd) })} value={stopky(pauza?.pauzaOd ? ted - pauza.pauzaOd.getTime() : 0, true)} note={t('dnes odpracováno {delka}', { delka: delkaSlovy(t, pauza?.dnesMs ?? 0) })} />
+            <Stat label={t('Pauza od {cas}', { cas: dbTimeHM(pauzaOd) })} value={stopky(pauzaOd ? ted - pauzaOd.getTime() : 0, true)} note={t('dnes odpracováno {delka}', { delka: delkaSlovy(t, odpracovanoNaPauze) })} />
           ) : naSmene ? (
-            // „Na směně" už říká chip u titulku — štítek čísla nese čas příchodu.
-            <Stat label={t('Příchod {cas}', { cas: dbTimeHM(openSince) })} value={stopky(bezi, true)} />
+            // „Na směně" už říká chip u titulku — štítek čísla nese čas příchodu směny (i po pauze),
+            // číslo odpracovaný čas bez pauz; poznámka řekne, kolik pauzy se odečetlo.
+            <Stat label={t('Příchod {cas}', { cas: dbTimeHM(prichodSmeny) })} value={stopky(bezi, true)}
+              note={(muj?.breakMs ?? 0) >= 60_000 ? t('bez pauzy {delka}', { delka: delkaSlovy(t, muj?.breakMs ?? 0) }) : undefined} />
           ) : planOd ? null : (
             <p className="t-meta text-pretty">{t('Odpíchni si příchod, až začneš pracovat — čas se začne počítat hned.')}</p>
           )}
@@ -535,7 +553,7 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
             <li key={r.id} className="flex min-w-0 items-center gap-3">
               <Avatar emoji={r.avatar} name={r.name} size="xs" />
               <span className="min-w-0 flex-1 truncate text-[15px] leading-snug text-[#16181A]">{r.name ?? t('Bez jména')}</span>
-              <span className={`shrink-0 text-right text-[13px] tabular-nums ${jeZapomenuty(od) ? 'font-semibold text-wait-ink' : 'text-black/55'}`}>{t('od {cas}', { cas: odKdy(r.openSince) })}</span>
+              <span className={`shrink-0 text-right text-[13px] tabular-nums ${jeZapomenuty(od) ? 'font-semibold text-wait-ink' : 'text-black/55'}`}>{t('od {cas}', { cas: odKdy(r.shiftSince ?? r.openSince) })}</span>
             </li>
           ))}
         </ul>
@@ -552,8 +570,9 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
             <ListRow key={r.id}
               lead={<Avatar emoji={r.avatar} size="sm" />}
               title={r.name ?? t('Bez jména')}
-              meta={t('příchod {cas} · {smena}', { cas: odKdy(r.openSince), smena })}
-              value={zapomenuty ? undefined : delkaSlovy(t, ted - od.getTime())}
+              // Po pauze příchod směny (první), ne konec pauzy; délka je odpracovaná bez pauz.
+              meta={t('příchod {cas} · {smena}', { cas: odKdy(r.shiftSince ?? r.openSince), smena })}
+              value={zapomenuty ? undefined : delkaSlovy(t, odpracovanoVeSmene(r, ted))}
               right={zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod?')}</Chip> : undefined}
               actions={smiUkoncit && r.openEntryId ? (
                 <Button variant="secondary" size="sm" onClick={() => setUkoncit(r)}

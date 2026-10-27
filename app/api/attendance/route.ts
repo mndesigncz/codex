@@ -10,10 +10,11 @@ import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { pinKratky } from '@/lib/pinTabletu';
-import { vyberSmenuPichacek, type SmenaPichacek, type ZamekObdobi } from '@/lib/dochazkaPrehled';
+import { smenaClena, vyberSmenuPichacek, type SmenaPichacek, type ZamekObdobi, type ZaznamDochazky, type SmenaClena } from '@/lib/dochazkaPrehled';
 import { hlaskaZamku, zamekDne } from '@/lib/dochazkaZaznamy';
 import { VYCHOZI_PRAVIDLA_PICHANI, normalizujPravidlaPichani, overPolohu, parsePoloha, pravidloUcinne, type PravidlaPichani } from '@/lib/geoPichani';
 import { pozadujTarif } from '@/lib/tarifServer';
+import { smenyClenu, poleRosteru } from '@/lib/smenaPauzyDb';
 
 // Kolo 8 (R8-2): uzavřené výplatní období (payroll_locks) se v docházce nemění — PATCH, DELETE i ruční
 // POST končí 409 s hláškou, kam jít (Výplatní listina). GET nese `breakAfter` (pauza = dva záznamy),
@@ -269,6 +270,15 @@ export async function GET(req: NextRequest) {
       } catch { /* bez sloupce pin_delka se délka neukazuje */ }
     }
 
+    // Směna s pauzou je jedna směna: po „Konec pauzy" běží záznam, jehož příchod je konec pauzy (openSince).
+    // Píchačky a tablet z něj dřív ukazovaly „Příchod 12:30" se stopkami od nuly — jako novou směnu. Řádek
+    // nese i začátek směny (první příchod před pauzami) a skončené pauzy (lib/smenaPauzyDb, lib/dochazkaPrehled).
+    try {
+      const naSmene = (roster as any[]).filter(r => r.openSince || r.breakSince).map(r => Number(r.id));
+      const smeny = await smenyClenu(c.teamId, naSmene);
+      for (const r of roster as any[]) Object.assign(r, poleRosteru(smeny.get(Number(r.id))));
+    } catch { /* bez řetězu pauz ukáže widget příchod běžícího záznamu jako dřív */ }
+
     // Inline watchdog: the shop kiosk polls this endpoint all day, so every
     // roster load doubles as the hourly check that Vercel's daily-cron limit
     // won't give us. The daily cron stays as a backstop for quiet teams.
@@ -432,8 +442,14 @@ export async function GET(req: NextRequest) {
       ORDER BY date DESC, start_time ASC`;
     smena = vyberSmenuPichacek(smeny as { date: string; start_time: string; end_time: string }[], dnes, Date.now(), openSince);
   } catch { /* bez rozvrhu Píchačky jen neukážou plán */ }
+  // Běžící směna i s pauzami z vlastních záznamů (stejná funkce jako roster vedení): začátek směny, skončené
+  // pauzy a běžící pauza — Píchačky po „Konec pauzy" pokračují ve směně, ne od nuly; „Konec pauzy" nabídnou
+  // i u pauzy začaté před půlnocí (záznamy dne by ji neviděly).
+  const mojeSmena = smenaClena(entries as ZaznamDochazky[], c.meId, Date.now());
   const ja: Record<string, unknown> = {
     id: c.meId, openSince,
+    breakSince: mojeSmena?.naPauze ? mojeSmena.pauzaOd?.toISOString() ?? null : null,
+    ...poleRosteru(mojeSmena && (openSince || mojeSmena.naPauze) ? mojeSmena : undefined),
     shiftStart: smena?.shiftStart ?? null, shiftEnd: smena?.shiftEnd ?? null, shiftDate: smena?.shiftDate ?? null,
   };
   if (smiSazbu) ja.hourlyRate = await vlastniSazba(c.meId, c.teamId);
@@ -706,17 +722,25 @@ export async function POST(req: NextRequest) {
   let row: any;
   let zacatekSmeny: Date;
   if (open) {
+    // Odchod po pauze zavírá záznam po pauze: den směny (noční přes půlnoc) i souhrn na tabletu se berou od
+    // prvního příchodu směny a bez pauz — směna s pauzou je jedna směna (lib/smenaPauzyDb).
+    let smena: SmenaClena | undefined;
+    try { smena = (await smenyClenu(c.teamId, [employeeId])).get(employeeId); } catch { smena = undefined; }
+    if (smena && String(smena.zaznam.id) !== String(open.id)) smena = undefined;
     [row] = await sql`
       UPDATE time_entries SET clock_out = NOW() WHERE id = ${open.id}
       RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
-    zacatekSmeny = parseDbTime(open.clock_in) ?? new Date();
+    zacatekSmeny = smena?.zacatek ?? parseDbTime(open.clock_in) ?? new Date();
+    if (row && smena && smena.casti.length > 1) row = { ...row, shiftStart: smena.zacatek.toISOString(), breakMs: smena.pauzyMs };
   } else {
     // Odchod rovnou z pauzy (tablet): záznam po pauze se smaže, směna skončila odchodem záznamu před ní.
     const p = await otevrenaPauza(employeeId, c.teamId);
     if (!p) return NextResponse.json({ error: 'Žádný otevřený příchod k odpíchnutí.' }, { status: 409 });
+    let smena: SmenaClena | undefined;
+    try { smena = (await smenyClenu(c.teamId, [employeeId])).get(employeeId); } catch { smena = undefined; }
     await sql`DELETE FROM time_entries WHERE id = ${p.id} AND employee_id = ${employeeId}`;
     row = null;
-    zacatekSmeny = parseDbTime(p.clock_in) ?? new Date();
+    zacatekSmeny = (smena?.naPauze ? smena.zacatek : null) ?? parseDbTime(p.clock_in) ?? new Date();
   }
   // Směna patří dni, kdy začala. Kdo se odpíchne po půlnoci, hledal by jinak
   // svou směnu i uzávěrku pod zítřejším datem — a nenašel ani jedno. A „den,

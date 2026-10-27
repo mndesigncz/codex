@@ -11,6 +11,7 @@
 // Relativní importy s příponou: `npm test` pouští .ts přímo v Node.
 
 import { ocistiKlic } from './idempotenceKlic.ts';
+import { parseDbTime } from './pragueTime.ts';
 
 export type AkceFronty = 'in' | 'out';
 
@@ -42,16 +43,27 @@ export function pridejDoFronty(fronta: readonly PolozkaFronty[], p: PolozkaFront
 }
 
 /** Rozpis tak, jak bude vypadat po doručení fronty: příchod otevře, odchod zavře (v pořadí podle času). */
-export function rosterSFrontou<T extends { id: number; openSince: string | null }>(roster: readonly T[], fronta: readonly PolozkaFronty[]): T[] {
+export function rosterSFrontou<T extends { id: number; openSince: string | null; breakSince?: string | null; shiftSince?: string | null; breakMs?: number | null }>(roster: readonly T[], fronta: readonly PolozkaFronty[]): T[] {
   if (!fronta.length) return [...roster];
   const serazena = [...fronta].sort((a, b) => a.cas.localeCompare(b.cas));
   return roster.map(m => {
-    let openSince = m.openSince;
+    let x: T = m;
     for (const p of serazena) {
       if (p.employeeId !== m.id) continue;
-      openSince = p.action === 'in' ? p.cas : null;
+      const naPauze = !!x.breakSince && !x.openSince;
+      if (p.action === 'in' && naPauze) {
+        // Příchod během pauzy pauzu ukončí (server totéž) — směna pokračuje, pauza se přičte k pauzám.
+        const od = parseDbTime(x.breakSince ?? null)?.getTime(), doP = Date.parse(p.cas);
+        const pauza = od != null && doP > od ? doP - od : 0;
+        x = { ...x, openSince: p.cas, breakSince: null, breakMs: (Number(x.breakMs) || 0) + pauza };
+      } else if (p.action === 'in') {
+        x = { ...x, openSince: p.cas, breakSince: null, shiftSince: null, breakMs: 0 };
+      } else {
+        // Odchod — i rovnou z pauzy — směnu ukončí.
+        x = { ...x, openSince: null, breakSince: null, shiftSince: null, breakMs: 0 };
+      }
     }
-    return openSince === m.openSince ? m : { ...m, openSince };
+    return x.openSince === m.openSince && x.breakSince === m.breakSince ? m : x;
   });
 }
 
