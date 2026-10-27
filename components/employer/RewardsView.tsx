@@ -42,6 +42,7 @@ import { VolbaRezimu } from '../body-rezim/VolbaRezimu';
 import { HistoriePrepoctu, OknoNahledu, PrepocetZpetne, nactiNahled, provedPrepocet, type NahledPrepoctu, type RozsahPrepoctu } from '../body-rezim/Prepocet';
 import { nazevDruhu } from '../body-rezim/veta';
 import ShiftReviewModal from './ShiftReviewModal';
+import { BodyVstup } from './BodyVstup';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
 import EmployeeProfile from './EmployeeProfile';
 import { ProGate } from '../Pro';
@@ -396,12 +397,18 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
     const id = `body-${klic}`;
     return (
       <Field id={id} label={label} hint={hint}>
-        <Input id={id} type="number" inputMode="numeric" min={zaporne ? -100 : 0} max={100} value={body[klic]}
-          onChange={e => {
-            const n = Number.parseInt(e.target.value, 10);
-            setBody(p => ({ ...p, [klic]: Math.max(zaporne ? -100 : 0, Math.min(100, Number.isFinite(n) ? n : 0)) }));
-          }}
-          className={`tabular-nums ${zaporne && body[klic] < 0 ? 'text-bad-ink' : ''}`} />
+        {zaporne ? (
+          // Srážky: type=number + parseInt přepsalo rozepsané „-" na 0 a iPhone minus nemá — BodyVstup (krokovač, ±).
+          <BodyVstup id={id} value={body[klic]} min={zaporne ? -100 : 0} max={100}
+            onChange={n => setBody(p => ({ ...p, [klic]: n }))} />
+        ) : (
+          <Input id={id} type="number" inputMode="numeric" min={0} max={100} value={body[klic]}
+            onChange={e => {
+              const n = Number.parseInt(e.target.value, 10);
+              setBody(p => ({ ...p, [klic]: Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0)) }));
+            }}
+            className="tabular-nums" />
+        )}
       </Field>
     );
   };

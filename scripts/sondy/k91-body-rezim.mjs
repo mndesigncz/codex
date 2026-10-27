@@ -16,6 +16,7 @@
 //  R7 Okno postupu: „Body za postup“, „Za každý krok“ → u kroku plus body; přepočet → náhled →
 //     PATCH postupu bez bodyRezim a POST přepočtu { typ: postup }.
 //  R8 Telefon 390 × 844 s dotykem: nic nepřetéká (karta, okno náhledu, okno postupu).
+//  R10 (kolo 93) Záporné body v hodnocení směny („-15", ±, krokovač, POST points −16) a srážka v Nastavení bodů.
 //   SONDY_ZAKLAD=http://localhost:3445 node scripts/sondy/k91-body-rezim.mjs
 import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, dokud, DIR, OUT, BASE } from './k68-spolecne.mjs';
@@ -312,6 +313,60 @@ for (const tel of [false, true]) {
   const pr = await preteceni(p);
   tvrdi('R8 (390): hodnocení směny s ruční předností nepřetéká', pr.dokument <= 0 && pr.prvky.length === 0, JSON.stringify(pr));
   await p.screenshot({ path: OUT + 'k91-body-hodnoceni-390.png' });
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// R10 Záporné body v hodnocení (kolo 93, Martin: „V hodnocení nemůžu dávat mínusové body.")
+// Dřív type=number + parseInt || 0: rozepsané „-" se přepsalo na 0 a iPhone minus nemá. Teď text, krokovač a ±.
+// ---------------------------------------------------------------------------
+for (const tel of [false, true]) {
+  const sirka = tel ? 390 : 1280;
+  const { ctx, p, stav, chyby } = await kontext({ fix: FIX('vedeni.odmeny'), posunCasu: POSUN, dalsi: podvrh, ...(tel ? { viewport: TEL, mobil: true } : {}) });
+  await otevriPlochu(p, '/employer/overview?view=rewards', 'vedeni.odmeny');
+  await p.getByRole('button', { name: 'Ohodnotit: Eva Nováková' }).first().click();
+  const pole = p.locator('#hodnoceni-body');
+  await pole.waitFor({ timeout: 10000 });
+  await pole.scrollIntoViewIfNeeded();
+  const okno = p.getByRole('dialog').filter({ has: pole });
+  await pole.click();
+  await p.keyboard.press('ControlOrMeta+a');
+  await p.keyboard.type('-');
+  tvrdi(`R10 (${sirka}): rozepsané „-" v Body za směnu vydrží (dřív se přepsalo na 0)`, (await pole.inputValue()) === '-', await pole.inputValue());
+  await p.keyboard.type('15');
+  tvrdi(`R10 (${sirka}): „-15" → pole −15 a „· srážka"`, (await pole.inputValue()) === '-15' && /srážka/.test(await text(okno)), await pole.inputValue());
+  await okno.getByRole('button', { name: 'Otočit znaménko' }).click();
+  tvrdi(`R10 (${sirka}): ± otočí znaménko (iPhone nemá na číselné klávesnici minus): -15 → 15`, (await pole.inputValue()) === '15', await pole.inputValue());
+  await okno.getByRole('button', { name: 'Otočit znaménko' }).click();
+  await okno.getByRole('button', { name: 'Ubrat bod' }).click();
+  tvrdi(`R10 (${sirka}): ± zpět a krokovač „Ubrat bod" → -16`, (await pole.inputValue()) === '-16', await pole.inputValue());
+  const cile = await Promise.all(['Ubrat bod', 'Přidat bod', 'Otočit znaménko'].map(async n => (await okno.getByRole('button', { name: n }).boundingBox())?.height ?? 0));
+  tvrdi(`R10 (${sirka}): krokovač a ± mají cíle ≥ 44 px`, cile.every(v => v >= 44), JSON.stringify(cile));
+  const pr = await preteceni(p);
+  tvrdi(`R10 (${sirka}): okno hodnocení s bodovým polem nepřetéká`, pr.dokument <= 0 && pr.prvky.length === 0, JSON.stringify(pr));
+  await p.screenshot({ path: OUT + `k93-hodnoceni-minus-${sirka}.png` });
+  await okno.getByRole('button', { name: /Uložit/ }).last().click();
+  const post = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/shift-reviews' && z.m === 'POST'), 4000);
+  tvrdi(`R10 (${sirka}): uložení pošle "points":-16`, !!post && /"points":-16\b/.test(post.body), post?.body);
+  tvrdi(`R10 (${sirka}): bez chyb v konzoli`, skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+// R10: srážka v Nastavení bodů („Nesplněný úkol") jde napsat se znaménkem a uloží se záporná.
+{
+  const { ctx, p, stav } = await kontext({ fix: FIX('vedeni.odmeny'), posunCasu: POSUN, dalsi: podvrh });
+  await nastaveni(p);
+  const pole = p.locator('#body-taskMissed');
+  await pole.scrollIntoViewIfNeeded();
+  await pole.click();
+  await p.keyboard.press('ControlOrMeta+a');
+  await p.keyboard.type('-');
+  const rozepsano = await pole.inputValue();
+  await p.keyboard.type('7');
+  tvrdi('R10: srážka „Nesplněný úkol" — rozepsané „-" vydrží a „-7" zůstane', rozepsano === '-' && (await pole.inputValue()) === '-7', `${rozepsano} / ${await pole.inputValue()}`);
+  stav.zapisy = [];
+  await p.getByRole('button', { name: 'Uložit nastavení' }).click();
+  const patch = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/teams' && z.m === 'PATCH'), 4000);
+  tvrdi('R10: uložení nese "taskMissed":-7', !!patch && /"taskMissed":-7\b/.test(patch.body), patch?.body?.slice(0, 300));
   await ctx.close();
 }
 

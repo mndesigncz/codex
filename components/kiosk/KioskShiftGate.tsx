@@ -19,7 +19,7 @@ import { usePopover } from '@/lib/usePopover';
 import { useT } from '@/lib/i18n/client';
 import { fmtHM } from '@/lib/i18n/format';
 import { parseDbTime, dbTimeHM, pragueToday } from '@/lib/pragueTime';
-import { hodinyMinuty } from '@/lib/dochazkaPrehled';
+import { hodinyMinuty, odpracovanoVeSmene } from '@/lib/dochazkaPrehled';
 import {
   PRAH_HLEDANI_ROSTERU, rozdelRoster, hledejVRosteru, zpozdeniPrichodu, minutPoPlanu, souhrnOdchodu, SOUHRN_ZAVRIT_S, type SouhrnOdchodu,
 } from '@/lib/kioskPrehled';
@@ -47,6 +47,10 @@ export interface RosterMember {
   openSince: string | null;
   /** Od kdy běží pauza (záznam po pauze ještě bez konce); na pauze je openSince null. */
   breakSince?: string | null;
+  /** Začátek směny — první příchod před pauzami (po „Konec pauzy" je openSince konec pauzy). */
+  shiftSince?: string | null;
+  /** Skončené pauzy běžící směny v ms (doba na směně je bez nich). */
+  breakMs?: number | null;
   shiftStart?: string | null;
   shiftEnd?: string | null;
 }
@@ -119,7 +123,12 @@ export function elapsed(fromIso: string, now: number) {
   if (!now) return '—';
   const from = parseDbTime(fromIso)?.getTime();
   if (from == null) return '—';
-  const secs = Math.max(0, Math.round((now - from) / 1000));
+  return stopkyMs(now - from);
+}
+
+/** „1:02:03" / „4:05" z délky v ms. */
+function stopkyMs(ms: number) {
+  const secs = Math.max(0, Math.round(ms / 1000));
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
@@ -695,8 +704,8 @@ export function WhoIsWorking() {
           // Plán proti skutečnosti: od kolika · jak dlouho · plán do. Po plánu
           // chip „wait", bez rozpisu chip „info" — vedle stavu „Zapisuje se".
           const naPauze = !m.openSince && !!m.breakSince;
-          const od = parseDbTime(m.openSince ?? m.breakSince)?.getTime();
-          const doba = now && od != null ? hodinyMinuty(now - od) : '—';
+          // Směna s pauzou je jedna směna: od prvního příchodu, doba bez pauz (ne od konce pauzy).
+          const doba = now && (m.openSince || m.shiftSince) ? hodinyMinuty(odpracovanoVeSmene(m, now)) : '—';
           const poPlanu = naPauze ? null : minutPoPlanu(dnes, m.shiftStart, m.shiftEnd, now);
           return (
             // akceVRadku: na telefonu zůstane ikona odchodu v prvním řádku u jména
@@ -707,7 +716,7 @@ export function WhoIsWorking() {
               lead={<Avatar emoji={m.avatar} size="md" ring={false} />}
               title={m.name}
               meta={<span className="tabular-nums">
-                {naPauze ? t('na pauze od {cas}', { cas: dbTimeHM(m.breakSince) }) : <>{t('od {cas}', { cas: dbTimeHM(m.openSince) })} · {doba}</>}
+                {naPauze ? t('na pauze od {cas}', { cas: dbTimeHM(m.breakSince) }) : <>{t('od {cas}', { cas: dbTimeHM(m.shiftSince ?? m.openSince) })} · {doba}</>}
                 {m.shiftEnd && <span className="hidden md:inline"> · {t('plán do {cas}', { cas: fmtHM(m.shiftEnd) })}</span>}
               </span>}
               right={<span className="flex flex-wrap items-center justify-end gap-2">
@@ -988,7 +997,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   return (
     <Modal open onClose={onClose} size="sm" title={member.name}
       subtitle={on
-        ? t('Na směně od {cas} · {doba}', { cas: timeOf(member.openSince!), doba: elapsed(member.openSince!, now) })
+        ? t('Na směně od {cas} · {doba}', { cas: timeOf(member.shiftSince ?? member.openSince!), doba: now ? stopkyMs(odpracovanoVeSmene(member, now)) : '—' })
         : naPauze
           ? t('Na pauze od {cas} · {doba}', { cas: timeOf(member.breakSince!), doba: elapsed(member.breakSince!, now) })
           : t('Zaznamenej příchod na směnu')}
@@ -1120,7 +1129,8 @@ export function SouhrnPoOdchodu() {
         <StatRow podleKarty>
           <Stat label={t('Příchod')} value={data.prichod} />
           <Stat label={t('Odchod')} value={data.odchod} note={data.presPulnoc ? t('další den') : undefined} />
-          <Stat label={t('Odpracováno')} value={data.odpracovano} />
+          {/* Po pauze souhrn za celou směnu; odpracováno je bez pauzy, poznámka řekne kolik. */}
+          <Stat label={t('Odpracováno')} value={data.odpracovano} note={data.pauzaMin > 0 ? t('pauza {n} min', { n: data.pauzaMin }) : undefined} />
         </StatRow>
         {data.chybiUzaverka && (
           <p className="mt-4 flex flex-wrap items-center gap-2">

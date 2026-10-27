@@ -14,6 +14,7 @@ import { useOpravneni } from '../role/useOpravneni';
 import { useNavrhyTrestu } from '../tresty-vedeni/data';
 import { TrestTlacitko } from '../tresty-vedeni/TrestyUzaverky';
 import { klicVytky } from '../tresty-vedeni/logika';
+import { BodyVstup } from './BodyVstup';
 
 export interface ItemMark { id?: number | null; points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -519,10 +520,13 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder={t('Co bylo super, co příště zlepšit…')} className={`${inputCls} resize-none`} />
             </div>
             <div>
-              <label className="field-label">{t('Body za směnu')}</label>
+              <label className="field-label" htmlFor="hodnoceni-body">{t('Body za směnu')}</label>
+              {/* Záporné body = srážka za směnu (Martin: „V hodnocení nemůžu dávat mínusové body"). Dřív
+                  type=number + parseInt || 0: rozepsané „-" se přepsalo na 0 a iPhone minus nemá — BodyVstup
+                  drží text, má krokovač a ±. Server bere −500…500 (POST /api/shift-reviews). */}
               <div className="flex items-center gap-2 flex-wrap">
-                <input type="number" inputMode="numeric" value={pts} onChange={e => { setPtsTouched(true); setPts(parseInt(e.target.value) || 0); }} className={`${inputCls} !py-2.5 max-w-[130px] tabular-nums`} />
-                <span className="text-xs text-black/45">{t('bodů')} {!ptsTouched && rating > 0 && t('(návrh z hvězd)')}</span>
+                <BodyVstup id="hodnoceni-body" value={pts} min={-500} max={500} onChange={n => { setPtsTouched(true); setPts(n); }} />
+                <span className="text-xs text-black/45">{t('bodů')} {!ptsTouched && rating > 0 && t('(návrh z hvězd)')}{pts < 0 && <span className="text-bad-ink"> · {t('srážka')}</span>}</span>
                 {summary && !summary.den && summary.autoPoints.total !== 0 && (
                   <span className="text-xs text-black/45 tabular-nums">· {t('celkem s automatickými:')} <strong className="text-[#16181A]">{signed(pts + summary.autoPoints.total)}</strong></span>
                 )}

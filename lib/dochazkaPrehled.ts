@@ -61,6 +61,10 @@ export interface ClenRosteru {
   avatar?: string | null;
   openSince?: string | null;
   openEntryId?: number | null;
+  /** Začátek běžící směny — první příchod před pauzami (kolo 93; po „Konec pauzy" je openSince konec pauzy). */
+  shiftSince?: string | null;
+  /** Skončené pauzy běžící směny v ms. */
+  breakMs?: number | null;
   shiftStart?: string | null;
   shiftEnd?: string | null;
   /** Jen s finance.mzdy (celý roster) nebo finance.moje_mzda (vlastní řádek). */
@@ -112,7 +116,7 @@ export interface RadekSouhrnu {
   avatar: string | null;
   /** Započitatelný čas (bez zapomenutých a nad 24 h). */
   ms: number;
-  /** Počet záznamů (směn) v období, i těch nezapočtených. */
+  /** Počet směn v období, i nezapočtených; směna s pauzou (dva záznamy) je jedna (pokracovaniPoPauze). */
   pocet: number;
   bezi: boolean;
   /** Zapomenutý odchod nebo záznam nad 24 h — v hodinách chybí. */
@@ -216,12 +220,14 @@ export function souhrnHodin(entries: readonly ZaznamDochazky[], ted: number, saz
   const novy = (id: string, jmeno: string, avatar: string | null): RadekSouhrnu =>
     ({ id, jmeno, avatar, ms: 0, pocet: 0, bezi: false, vynechano: 0, mzda: null, spropitne: spropitne ? spropitne.get(id) ?? 0 : null, upravy: upravy?.get(id) ?? 0, priplatky: 0, priplatkyMs: { vikend: 0, noc: 0, svatek: 0 }, vyplata: null, planMs: 0, pozde: 0 });
   const plany = plan ? odchylkyZaznamu(entries, ted) : null;
+  // Směna s pauzou jsou dva záznamy — počítá se jednou (záznam po pauze jen pokračuje).
+  const pokracovani = pokracovaniPoPauze(entries);
   for (const e of entries) {
     const id = String(e.employeeId ?? '');
     if (!id) continue;
     const r = m.get(id) ?? novy(id, e.employeeName ?? 'Neznámý', e.employeeAvatar ?? null);
     const z = rozeberZaznam(e, ted);
-    r.pocet += 1;
+    if (!pokracovani.has(String(e.id ?? ''))) r.pocet += 1;
     if (z.druh === 'zapomenuty' || z.druh === 'dlouhy') r.vynechano += 1;
     r.ms += z.ms;
     if (z.druh === 'bezi') r.bezi = true;
@@ -534,6 +540,7 @@ export function dnesVPodniku(roster: readonly ClenRosteru[], entries: readonly Z
     const k = String(e.employeeId ?? '');
     dnesni.set(k, [...(dnesni.get(k) ?? []), e]);
   }
+  const pokracovani = pokracovaniPoPauze(entries ?? []);
   const out: RadekDne[] = [];
   for (const r of roster) {
     const id = String(r.id);
@@ -542,7 +549,8 @@ export function dnesVPodniku(roster: readonly ClenRosteru[], entries: readonly Z
     if (!maPlan && !otevreny) continue;
     const plan = maPlan ? `${String(r.shiftStart).slice(0, 5)}–${String(r.shiftEnd ?? '').slice(0, 5)}` : null;
     const zaznamy = dnesni.get(id) ?? [];
-    const posledni = zaznamy.map(z => parseDbTime(z.clockIn)).filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    // Poslední příchod dne — záznam po pauze není příchod (pokračuje směnu), bere se příchod směny před ním.
+    const posledni = zaznamy.filter(z => !pokracovani.has(String(z.id ?? ''))).map(z => parseDbTime(z.clockIn)).filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
     let stav: StavDne;
     if (otevreny) stav = maPlan ? 'na_smene' : 'bez_planu';
     else if (zaznamy.length > 0) stav = 'odesel';
@@ -553,7 +561,8 @@ export function dnesVPodniku(roster: readonly ClenRosteru[], entries: readonly Z
       else if (entries == null && konec && ted > konec.getTime()) stav = 'po_smene';
       else stav = 'nedorazil';
     }
-    out.push({ id, jmeno: r.name ?? 'Bez jména', avatar: r.avatar ?? null, plan, stav, prichod: otevreny ?? posledni });
+    // Příchod směny: po pauze první příchod (shiftSince), ne konec pauzy.
+    out.push({ id, jmeno: r.name ?? 'Bez jména', avatar: r.avatar ?? null, plan, stav, prichod: (otevreny ? parseDbTime(r.shiftSince ?? null) ?? otevreny : null) ?? posledni });
   }
   const PORADI: Record<StavDne, number> = { nedorazil: 0, na_smene: 1, bez_planu: 2, ceka: 3, odesel: 4, po_smene: 5 };
   return out.sort((a, b) => PORADI[a.stav] - PORADI[b.stav] || (a.plan ?? '').localeCompare(b.plan ?? '') || a.jmeno.localeCompare(b.jmeno, 'cs'));
@@ -607,13 +616,14 @@ export function mujMesic(entries: readonly ZaznamDochazky[], meId: number, mesic
     if (Number(u.userId) !== meId || String(u.day ?? '').slice(0, 7) !== mesic) continue;
     s.upravy += Number(u.amount) || 0;
   }
+  const pokracovani = pokracovaniPoPauze(entries);
   for (const e of entries) {
     if (Number(e.employeeId) !== meId) continue;
     const od = parseDbTime(e.clockIn);
     if (!od || pragueDayOf(od).slice(0, 7) !== mesic) continue;
     const z = rozeberZaznam(e, ted);
     if (z.druh === 'vadny') continue;
-    s.pocet += 1;
+    if (!pokracovani.has(String(e.id ?? ''))) s.pocet += 1;
     if (z.druh === 'zapomenuty') { s.zapomenuty = true; continue; }
     if (z.druh === 'dlouhy') { s.vynechano += 1; continue; }
     if (z.druh === 'bezi') s.bezi = true;
@@ -860,6 +870,7 @@ export function radkyMojeDochazky(entries: readonly ZaznamDochazky[], meId: numb
   const dny = new Map<string, DenMojeDochazky>();
   let ms = 0, pocet = 0;
   const pauzy = pauzyZeZaznamu(entries);
+  const pokracovani = pokracovaniPoPauze(entries);
   for (const e of entries) {
     if (Number(e.employeeId) !== meId) continue;
     const od = parseDbTime(e.clockIn);
@@ -868,7 +879,7 @@ export function radkyMojeDochazky(entries: readonly ZaznamDochazky[], meId: numb
     if (den.slice(0, 7) !== mesic) continue;
     const z = rozeberZaznam(e, ted);
     if (z.druh === 'vadny') continue;
-    pocet += 1;
+    if (!pokracovani.has(String(e.id ?? ''))) pocet += 1;
     ms += z.ms;
     const r = dny.get(den) ?? { den, useky: [], ms: 0, bezi: false, zapomenuty: false, dlouhy: false, rucne: false, poznamky: [], pauzyMs: 0 };
     r.useky.push({ od, do: parseDbTime(e.clockOut) });
@@ -1220,31 +1231,149 @@ export const PAUZA_MIN = 30;
  * Klíč = id záznamu po pauze (řádek dne si ji přičte). Otevřená (ještě běžící) pauza se nepočítá.
  */
 export function pauzyZeZaznamu(entries: readonly ZaznamDochazky[]): Map<string, number> {
-  const podleId = new Map<string, ZaznamDochazky>();
-  for (const e of entries) if (e.id != null) podleId.set(String(e.id), e);
+  const podleId = mapaPodleId(entries);
   const out = new Map<string, number>();
   for (const e of entries) {
     if (e.source !== 'break' || e.id == null || jeOtevrenaPauza(e)) continue;
-    const doD = parseDbTime(e.clockIn);
-    if (!doD) continue;
-    let pred = e.breakAfter != null ? podleId.get(String(e.breakAfter)) : undefined;
-    if (!pred) {
-      // Nejbližší předchozí odchod téhož člověka (do 12 h) — záznam před pauzou.
-      let nej: { e: ZaznamDochazky; od: number } | null = null;
-      for (const x of entries) {
-        if (x === e || String(x.employeeId ?? '') !== String(e.employeeId ?? '')) continue;
-        const odchod = parseDbTime(x.clockOut);
-        if (!odchod || odchod.getTime() > doD.getTime() || doD.getTime() - odchod.getTime() > 12 * 3600_000) continue;
-        if (!nej || odchod.getTime() > nej.od) nej = { e: x, od: odchod.getTime() };
-      }
-      pred = nej?.e;
-    }
-    const od = parseDbTime(pred?.clockOut ?? null);
-    if (!od) continue;
-    const ms = doD.getTime() - od.getTime();
-    if (ms > 0 && ms < 12 * 3600_000) out.set(String(e.id), ms);
+    const ms = delkaPauzyPred(e, zaznamPredPauzou(entries, e, podleId));
+    if (ms > 0) out.set(String(e.id), ms);
   }
   return out;
+}
+
+/** Nejdelší mezera, kterou ještě bereme jako pauzu (jako server: otevřená pauza platí 12 h). */
+const MAX_PAUZA_MS = 12 * 3600_000;
+/** Pojistka proti zacyklení řetězu záznamů (break_after ukazující do kruhu). */
+const MAX_CLANKU = 24;
+
+function mapaPodleId<T extends ZaznamDochazky>(entries: readonly T[]): Map<string, T> {
+  const m = new Map<string, T>();
+  for (const e of entries) if (e.id != null) m.set(String(e.id), e);
+  return m;
+}
+
+/**
+ * Záznam před pauzou k záznamu po ní (source 'break'): podle `breakAfter`, nebo — API ho dřív neposílalo —
+ * nejbližší předchozí odchod téhož člověka do 12 h. U jiného zdroje undefined.
+ */
+export function zaznamPredPauzou<T extends ZaznamDochazky>(entries: readonly T[], e: T, podleId: ReadonlyMap<string, T> = mapaPodleId(entries)): T | undefined {
+  if (e.source !== 'break') return undefined;
+  const pred = e.breakAfter != null ? podleId.get(String(e.breakAfter)) : undefined;
+  if (pred && pred !== e) return pred;
+  const doD = parseDbTime(e.clockIn);
+  if (!doD) return undefined;
+  let nej: { e: T; od: number } | null = null;
+  for (const x of entries) {
+    if (x === e || String(x.employeeId ?? '') !== String(e.employeeId ?? '')) continue;
+    const odchod = parseDbTime(x.clockOut);
+    if (!odchod || odchod.getTime() > doD.getTime() || doD.getTime() - odchod.getTime() > MAX_PAUZA_MS) continue;
+    // Nulová otevřená pauza (příchod = odchod) není záznam před pauzou.
+    if (jeOtevrenaPauza(x)) continue;
+    if (!nej || odchod.getTime() > nej.od) nej = { e: x, od: odchod.getTime() };
+  }
+  return nej?.e;
+}
+
+/** Délka skončené pauzy před záznamem `e` (mezera od odchodu `pred`); 0, když nedává smysl. */
+function delkaPauzyPred(e: ZaznamDochazky, pred: ZaznamDochazky | undefined): number {
+  if (!pred || jeOtevrenaPauza(e)) return 0;
+  const od = parseDbTime(pred.clockOut ?? null), doD = parseDbTime(e.clockIn);
+  if (!od || !doD) return 0;
+  const ms = doD.getTime() - od.getTime();
+  return ms > 0 && ms < MAX_PAUZA_MS ? ms : 0;
+}
+
+/**
+ * Ids záznamů, které jen POKRAČUJÍ směnu po pauze (záznam po pauze, jehož záznam před pauzou je v seznamu),
+ * a otevřených pauz (nulová délka). Počty směn je nepočítají: směna s pauzou je jedna směna, ne dvě.
+ * Záznam po pauze bez záznamu před ní v seznamu (ten padl do jiného období) se počítá jako směna období.
+ */
+export function pokracovaniPoPauze(entries: readonly ZaznamDochazky[]): Set<string> {
+  const podleId = mapaPodleId(entries);
+  const out = new Set<string>();
+  for (const e of entries) {
+    if (e.source !== 'break' || e.id == null) continue;
+    if (jeOtevrenaPauza(e) || zaznamPredPauzou(entries, e, podleId)) out.add(String(e.id));
+  }
+  return out;
+}
+
+export interface SmenaClena<T extends ZaznamDochazky = ZaznamDochazky> {
+  /** Záznam, který teď běží (odchod zavře jeho), nebo otevřená pauza. */
+  zaznam: T;
+  /** Právě běží pauza. */
+  naPauze: boolean;
+  /** Od kdy běží pauza (jen na pauze). */
+  pauzaOd: Date | null;
+  /** Začátek směny: první příchod před všemi pauzami. */
+  zacatek: Date;
+  /** Součet skončených pauz směny (běžící pauza ne). */
+  pauzyMs: number;
+  /** Odpracováno ve směně do `ted` — bez pauz, stejná pravidla jako hodiny (rozeberZaznam). */
+  odpracovanoMs: number;
+  /** Záznamy směny od prvního (příchod) po běžící. */
+  casti: T[];
+}
+
+/**
+ * Běžící směna člověka i s pauzami. Pauza v databázi je mezera mezi dvěma záznamy (záznam po pauze má zdroj
+ * 'break' a `breakAfter`), takže po „Konec pauzy" běží záznam, jehož příchod je konec pauzy. Píchačky a tablet
+ * z něj dřív ukazovaly „Příchod 12:30" se stopkami od nuly — jako novou směnu. Tady se řetěz projde zpátky
+ * k prvnímu příchodu: začátek směny, skončené pauzy a odpracovaný čas bez nich. Otevřená pauza platí 12 h
+ * (jako server). Bez běžící směny ani pauzy null.
+ */
+export function smenaClena<T extends ZaznamDochazky>(entries: readonly T[], employeeId: number | string, ted: number): SmenaClena<T> | null {
+  const kdo = String(employeeId);
+  let bezi: { e: T; od: number } | null = null;
+  for (const e of entries) {
+    if (String(e.employeeId ?? '') !== kdo) continue;
+    const od = parseDbTime(e.clockIn)?.getTime();
+    if (od == null) continue;
+    const pauza = jeOtevrenaPauza(e);
+    if (e.clockOut && !pauza) continue;
+    if (pauza && ted - od > MAX_PAUZA_MS) continue;
+    if (!bezi || od > bezi.od) bezi = { e, od };
+  }
+  if (!bezi) return null;
+  const podleId = mapaPodleId(entries);
+  const casti: T[] = [bezi.e];
+  let pauzyMs = 0;
+  let cur = bezi.e;
+  for (let i = 0; i < MAX_CLANKU; i++) {
+    const pred = zaznamPredPauzou(entries, cur, podleId);
+    if (!pred || casti.includes(pred)) break;
+    pauzyMs += delkaPauzyPred(cur, pred);
+    casti.unshift(pred);
+    cur = pred;
+  }
+  const naPauze = jeOtevrenaPauza(bezi.e);
+  const zacatek = parseDbTime(casti[0].clockIn) ?? new Date(bezi.od);
+  const odpracovanoMs = casti.reduce((a, x) => a + rozeberZaznam(x, ted).ms, 0);
+  return { zaznam: bezi.e, naPauze, pauzaOd: naPauze ? new Date(bezi.od) : null, zacatek, pauzyMs, odpracovanoMs, casti };
+}
+
+/** Řádek rosteru s běžící směnou (GET /api/attendance): příchod běžícího záznamu, začátek směny a pauzy. */
+export interface SmenaVRosteru {
+  openSince?: string | Date | null;
+  /** Začátek směny (první příchod před pauzami); starší server ho neposílá. */
+  shiftSince?: string | Date | null;
+  /** Skončené pauzy směny v ms. */
+  breakMs?: number | null;
+  /** Běžící pauza od (na pauze je openSince null). */
+  breakSince?: string | Date | null;
+}
+
+/**
+ * Odpracováno v běžící směně z řádku rosteru (Píchačky vedení, tablet): od začátku směny do teď — na pauze do
+ * začátku pauzy — bez skončených pauz. Bez `shiftSince` (starší server) od příchodu běžícího záznamu.
+ */
+export function odpracovanoVeSmene(r: SmenaVRosteru, ted: number): number {
+  const prichod = parseDbTime(r.openSince ?? null);
+  const pauzaOd = !prichod ? parseDbTime(r.breakSince ?? null) : null;
+  const od = parseDbTime(r.shiftSince ?? null) ?? prichod;
+  if (!od || (!prichod && !pauzaOd)) return 0;
+  const konec = pauzaOd ? pauzaOd.getTime() : ted;
+  return Math.max(0, konec - od.getTime() - Math.max(0, Number(r.breakMs) || 0));
 }
 
 export interface StavPauzy {

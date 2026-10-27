@@ -164,6 +164,8 @@ export interface SouhrnOdchodu {
   presPulnoc: boolean;
   /** Server řekl, že uzávěrka za tuhle směnu ještě není (closingDone === false). */
   chybiUzaverka: boolean;
+  /** Pauzy směny v minutách (0 = bez pauzy) — odpracováno je bez nich. */
+  pauzaMin: number;
 }
 
 /**
@@ -174,13 +176,16 @@ export interface SouhrnOdchodu {
  * `closingDone` chybí (starší server) → uzávěrka se nehlásí jako chybějící.
  */
 export function souhrnOdchodu(
-  entry: { clockIn?: string | Date | null; clockOut?: string | Date | null } | null | undefined,
+  entry: { clockIn?: string | Date | null; clockOut?: string | Date | null; shiftStart?: string | Date | null; breakMs?: number | null } | null | undefined,
   closingDone?: boolean | null,
 ): SouhrnOdchodu | null {
-  const od = parseDbTime(entry?.clockIn ?? null);
+  // Odchod po pauze zavírá záznam po pauze; server přibalí začátek směny (první příchod) a skončené pauzy,
+  // ať souhrn není jen za odpoledne („12:30–16:00") — směna s pauzou je jedna směna.
+  const od = parseDbTime(entry?.shiftStart ?? null) ?? parseDbTime(entry?.clockIn ?? null);
   const kdy = parseDbTime(entry?.clockOut ?? null);
   if (!od || !kdy) return null;
-  const ms = kdy.getTime() - od.getTime();
+  const pauzy = Math.max(0, Number(entry?.breakMs) || 0);
+  const ms = kdy.getTime() - od.getTime() - pauzy;
   if (ms < 0) return null;
   return {
     prichod: dbTimeHM(od),
@@ -189,6 +194,7 @@ export function souhrnOdchodu(
     ms,
     presPulnoc: pragueDayOf(od) !== pragueDayOf(kdy),
     chybiUzaverka: closingDone === false,
+    pauzaMin: Math.round(pauzy / 60_000),
   };
 }
 
