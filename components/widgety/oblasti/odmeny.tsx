@@ -71,7 +71,7 @@ import { dbTimeDayHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/prague
 import { apiMessage, okJson } from '@/lib/api';
 import {
   KLIC_KALENDAR, UDALOST_KALENDAR,
-  bodyDne, cekajiciZadosti, dnyHodnoceni, minulyMesic, nabidka, nehodnocene, odkudBody, pochvalyMesice, urlZebricku, vyberKatalog, vyberOdmeny,
+  vyberSmenyClena, bodyDne, cekajiciZadosti, dnyHodnoceni, minulyMesic, nabidka, nehodnocene, odkudBody, pochvalyMesice, urlZebricku, vyberKatalog, vyberOdmeny,
   vyberPochvaly, vyberPoradi, vytkyTymu, zbyvaDoDalsi,
   type DenHodnoceni, type MojeUroven, type NabidkaOdmeny, type ObdobiZebricku, type Zadost,
 } from '@/lib/odmenyPrehled';
@@ -80,6 +80,7 @@ import {
   Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented, Select, SelectBox, Sloupec, Stat, StatRow, Toast, Well,
   runBulk, useSelection,
 } from '../../ui';
+import { SmenaProClena } from '../../hodnoceni-smeny/SmenaProClena';
 import { BODY_DIKU, MAX_VETA_DIKU, vyberZed } from '@/lib/podekovani';
 import { postupVyzvy, vyberVyzvy, vyzvyKZobrazeni, type MetrikaVyzvy, type Vyzva } from '@/lib/vyzvy';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -374,6 +375,8 @@ interface MojeOdmeny {
   vlastni: boolean;
   hodnoceni: Hodnoceni[];
   nepotvrzenychVytek: number;
+  /** Hodnocení celých směn, na kterých člověk byl (lib/hodnoceniSmeny) — pochvala i kritika směny. */
+  smeny: ReturnType<typeof vyberSmenyClena>;
 }
 
 function vyberMojeOdmeny(raw: any): MojeOdmeny {
@@ -389,6 +392,7 @@ function vyberMojeOdmeny(raw: any): MojeOdmeny {
       celaSmena: r.scope === 'shift',
     })).sort((a, b) => b.den.localeCompare(a.den)),
     nepotvrzenychVytek: Number(raw?.unseenFlagged) || 0,
+    smeny: vyberSmenyClena(raw),
   };
 }
 
@@ -410,8 +414,12 @@ function ZpetnaVazba({ velikost }: WidgetProps) {
   const tyden = pragueToday(-7);
   const nove = vse.filter(r => !r.videno && r.den >= tyden);
   const posledni = nove[0] ?? null;
-  const vytka = (data.data?.nepotvrzenychVytek ?? 0) > 0 || nove.some(r => r.vytka);
-  const neco = !!posledni || vytka;
+  // Hodnocení celé směny (pochvala i kritika směně) — nepotvrzené za poslední týden je taky „nové".
+  const noveSmeny = (data.data?.smeny ?? []).filter(s => !s.videno && s.den >= tyden);
+  const posledniSmena = noveSmeny[0] ?? null;
+  const vytka = (data.data?.nepotvrzenychVytek ?? 0) > 0 || nove.some(r => r.vytka) || noveSmeny.some(s => s.kNaprave);
+  const neco = !!posledni || vytka || !!posledniSmena;
+  const denNoveho = [posledni?.den, posledniSmena?.den].filter((d): d is string => !!d).sort().pop() ?? null;
 
   const beruNaVedomi = async () => {
     if (nahled || potvrzuji) return;
@@ -442,7 +450,7 @@ function ZpetnaVazba({ velikost }: WidgetProps) {
         </p>
         <p className="t-meta mt-1 text-pretty">
           {vytka ? t('Podívej se, co je potřeba probrat, a potvrď, že to víš.')
-            : posledni ? t('{den} — přečti si, co vedení napsalo.', { den: denVetou(posledni.den) }) : ''}
+            : denNoveho ? t('{den} — přečti si, co vedení napsalo.', { den: denVetou(denNoveho) }) : ''}
         </p>
       </div>
       {posledni && (posledni.hvezdy > 0 || posledni.body !== 0 || posledni.vytka) && (
@@ -455,6 +463,7 @@ function ZpetnaVazba({ velikost }: WidgetProps) {
         </div>
       )}
       {posledni?.poznamka && <p className="text-sm text-black/70 text-pretty line-clamp-3">„{posledni.poznamka}“</p>}
+      {posledniSmena && <SmenaProClena s={posledniSmena} kompaktni />}
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
     </Sloupec>
   );
@@ -737,11 +746,13 @@ function DetailDne({ den, onZavrit }: { den: DenHodnoceni; onZavrit: () => void 
             {den.automaticke !== 0 && <Chip tone="muted" size="sm">{t('z toho automaticky {body}', { body: sZnamenkem(den.automaticke) })}</Chip>}
           </div>
           {den.poznamka && <p className="text-sm text-black/70 whitespace-pre-line text-pretty">„{den.poznamka}“</p>}
-          {den.polozky.length > 0 && (
+          {/* Hodnocení celé směny (pochvala i kritika); jeho body jsou mezi položkami jen jednou — tady jako „Tvoje body". */}
+          {(den.smeny ?? []).map(sm => <div key={sm.id} className="well p-3.5"><SmenaProClena s={sm} /></div>)}
+          {den.polozky.filter(p => p.druh !== 'smena').length > 0 && (
             <div>
               <p className="t-label">{t('Hodnocené položky')}</p>
               <ul className="list mt-1">
-                {den.polozky.map(p => (
+                {den.polozky.filter(p => p.druh !== 'smena').map(p => (
                   <li key={`${p.druh}-${p.id}`} className="py-3">
                     <p className="flex items-start gap-2">
                       {p.vytka && <Icon name="warning" size={15} className="mt-0.5 shrink-0 text-wait-ink" />}
@@ -757,7 +768,7 @@ function DetailDne({ den, onZavrit }: { den: DenHodnoceni; onZavrit: () => void 
               </ul>
             </div>
           )}
-          {!den.poznamka && den.polozky.length === 0 && <p className="t-meta">{t('Bez poznámky.')}</p>}
+          {!den.poznamka && den.polozky.length === 0 && !(den.smeny ?? []).length && <p className="t-meta">{t('Bez poznámky.')}</p>}
         </div>
       </Modal>
     </NadPlochou>
@@ -782,7 +793,8 @@ function HodnoceniSmen({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: st
         <ul className="list">
           {videt.map(d => {
             const body = bodyDne(d);
-            const meta = d.poznamka ?? (d.polozky.length ? t('{n, plural, one {# hodnocená položka} few {# hodnocené položky} other {# hodnocených položek}}', { n: d.polozky.length }) : d.celaSmena ? t('Hodnocení celé směny') : t('Bez poznámky'));
+            const smena = d.smeny?.[0];
+            const meta = d.poznamka ?? smena?.kritika ?? smena?.dobre ?? (d.polozky.length ? t('{n, plural, one {# hodnocená položka} few {# hodnocené položky} other {# hodnocených položek}}', { n: d.polozky.length }) : d.celaSmena ? t('Hodnocení celé směny') : t('Bez poznámky'));
             return (
               <li key={d.den}>
                 <ListRow as="div" title={denVetou(d.den)} meta={meta}

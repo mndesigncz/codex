@@ -63,6 +63,7 @@ import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
 import { dayPlus } from '@/lib/pragueTime';
 import { useJazyk, useT } from '@/lib/i18n/client';
+import { TlacitkoHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 import { useLocale } from './jazyk';
 
 type Zaznam = ZaznamSeStavem & { id: number | string; employeeId: number | string };
@@ -531,6 +532,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
             <p className="t-label cz-sentence pt-2 flex items-center gap-2">
               <span>{d.nazev}</span>
               {d.zamek && <Chip tone="muted" size="sm" icon="lock">{t('uzavřeno')}</Chip>}
+              {/* Hodnocení celé směny toho dne (pochvala i kritika) — jen kdo smí hodnotit. */}
+              <span className="ml-auto normal-case"><TlacitkoHodnotitSmenu den={d.den} variant="ghost" size="sm" label={t('Ohodnotit směnu')} /></span>
             </p>
             <ul className="list">
               {d.list.map(x => {

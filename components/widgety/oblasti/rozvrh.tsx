@@ -62,6 +62,7 @@ import { tg, aktualniJazyk } from '@/lib/i18n/stav';
 import { fmtDatum, fmtHM, fmtMesic } from '@/lib/i18n/format';
 import { parseDbTime, pragueDayOf, pragueHM, pragueToday } from '@/lib/pragueTime';
 import { useJeTelefon } from '@/lib/useJeTelefon';
+import { TlacitkoHodnotitSmenu, useSmiHodnotitSmenu } from '../../hodnoceni-smeny/TlacitkoHodnotitSmenu';
 import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA,
   den, denKratce as denKratceCs, dnySDirou, hm, hodinyLidi, hodinyText, kategorieBarvy, kolizeVolna, poptavkaTop,
@@ -226,6 +227,8 @@ function minuty(t: string): number {
 
 function DnesniSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ den?: string }>) {
   const t = useT('widgety');
+  // Hodnocení celé směny (lib/hodnoceniSmeny) přímo z Dnešních směn — jen dnes a jen kdo smí hodnotit.
+  const smiHodnotitSmenu = useSmiHodnotitSmenu();
   const brana = useBrana(['rozvrh.zobrazit', 'rozvrh.nahled', 'dochazka.tablet', 'dochazka.zobrazit']);
   const { nacteno } = useOpravneni();
   const smi = useSmi();
@@ -342,6 +345,7 @@ function DnesniSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ den?: string
       odkaz={S ? undefined : cil}
       otevrit={S && !nahled && nav.smiPohled(cil.pohled) ? () => nav.onNavigate(cil.pohled) : undefined}
       prazdno={prazdno}
+      patka={!S && !zitra && !nahled && smiHodnotitSmenu && smeny.length > 0 ? <TlacitkoHodnotitSmenu den={cilovyDen} size="md" /> : undefined}
     >
       {S ? (
         <Stat label={kdy} value={pocet}
