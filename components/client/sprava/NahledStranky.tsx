@@ -3,12 +3,9 @@
 // Podnik → Stránka podniku: živý náhled stránky pro hosty (kolo 92, koncept B „H", audit C §7).
 // Mění se při každé úpravě vlevo (logo, fotka, barva, motto, adresa) ještě před uložením.
 // Paleta Managera (korekce 2026-10-27): hlavička bez fotky je inkoustová jako na stránce hosta,
-// karta hosta bílá s linkou; barva značky podniku je jen na dlaždici loga. Hlavní akce hosta
-// zůstává limetková. Otevírací doba je z Rozvrhu (jen ke čtení). Kontrast barvy se měří
-// (staciKontrast), ne odhaduje.
+// karta hosta bílá s linkou; barvu značky podniku host nevidí (korekce 2026-10-27). Hlavní akce
+// hosta zůstává limetková. Otevírací doba je z Rozvrhu (jen ke čtení).
 
-import { Icon } from '../../Icons';
-import { staciKontrast } from '@/lib/floorplan';
 import { hoursLabel, vOteviraciDobe, type OpeningHours } from '@/lib/clientSlots';
 import { pragueHM, pragueToday } from '@/lib/pragueTime';
 import { KartaPodniku, LogoPodniku, RamTelefonu } from './NahledKarty';
@@ -53,14 +50,6 @@ export default function NahledStranky({ p }: { p: any }) {
           </div>
         </div>
       </RamTelefonu>
-      {p.accent && (
-        <p className={`text-[13px] flex items-start gap-1.5 ${staciKontrast(p.accent) ? 'text-black/60' : 'text-wait-ink'}`}>
-          <Icon name={staciKontrast(p.accent) ? 'check' : 'warning'} size={14} className="mt-0.5 shrink-0" />
-          {staciKontrast(p.accent)
-            ? 'Kontrast: písmeno na dlaždici loga je na této barvě čitelné.'
-            : 'Na této barvě se písmeno na dlaždici loga špatně čte. Zkus ji o kus ztmavit nebo zesvětlit.'}
-        </p>
-      )}
     </div>
   );
 }

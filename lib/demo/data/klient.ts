@@ -15,7 +15,7 @@ import { vychoziKonfigurace } from '@/lib/automatizace';
 
 export const SLUG = 'kavarna-u-lipy';
 export const NAZEV = 'Kavárna U Lípy (ukázka)';
-export const BARVA = '#2E5E4E';
+export const BARVA = '#16181A';
 
 /** Host ukázky: dny jsou posuny od dneška (záporné = v minulosti). */
 export interface HostDema {

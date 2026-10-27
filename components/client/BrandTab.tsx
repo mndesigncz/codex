@@ -171,7 +171,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
       <Card className="grid gap-4">
         <div>
           <h2 className="t-card">Barva značky</h2>
-          <p className="t-meta mt-0.5 text-pretty">V aplikaci hosta jen dlaždice s logem (bez loga s prvním písmenem názvu), stránka a karty zůstávají v barvách Managera. Celou barvou je karta v Apple a Google Wallet. Bez výběru grafitová.</p>
+          <p className="t-meta mt-0.5 text-pretty">V aplikaci hosta se barva značky nepoužívá, host vidí stránku i karty v barvách Managera. Barva se projeví na kartě v Apple a Google Wallet. Bez výběru grafitová.</p>
         </div>
         {/* v4 (P1, P2): vzorník je řada sedmi rovných dílů až k pravé hraně; vlastní barva a „Výchozí"
             pod ním v jedné řadě (popisek vlevo, akce na R) — dřív „Vlastní" spadlo samo na další řádek. */}
@@ -190,7 +190,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
         </div>
 
         {/* Kontrast barvy hlídá náhled vpravo (NahledStranky, staciKontrast) — barva je podniku, čitelnost naše.
-            Kde se barva projeví: dlaždice loga u hosta (LogoPodniku) a pozadí karty ve Wallet (lib/walletDb). */}
+            Kde se barva projeví: pozadí karty ve Wallet (lib/walletDb); u hosta ne (korekce 2026-10-27). */}
       </Card>
 
       <Card className="grid gap-4">

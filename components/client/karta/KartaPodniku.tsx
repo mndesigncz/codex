@@ -6,9 +6,10 @@
 // podniku, čtečka u kasy) — SPRÁVA ji importuje odsud, takže co podnik nastaví, to host uvidí.
 // Čistě prezentační: žádná data, žádné fetch.
 //
-// Barva značky podniku je JEN na dlaždici loga (LogoPodniku) — kartu nevyplňuje. Jediná
-// inkoustová plocha domova je Moje karta s QR; karty podniků pod ní jsou střídmé, ať QR zůstane
-// nejvýraznější. Čitelnost iniciály na barvě značky hlídá onAccent (lib/floorplan).
+// Barvu značky podniku aplikace hosta nepoužívá vůbec (korekce 2026-10-27: „nepoužíváme ani
+// tmavě zelenou“) — host vidí jen paletu Managera. Dlaždice loga je logo na bílé, bez loga
+// první písmeno v inkoustu (třída .h-logo-pismeno). Jediná inkoustová plocha domova je Moje
+// karta s QR; karty podniků pod ní jsou střídmé, ať QR zůstane nejvýraznější.
 
 import Link from 'next/link';
 import { onAccent } from '@/lib/floorplan';
@@ -22,13 +23,13 @@ export function barvyKarty(accent?: string | null): { bg: string; ink: string } 
   return { bg, ink: onAccent(bg) };
 }
 
-/** Dlaždice loga — jediné místo, kde má host barvu značky podniku. Logo na bílé; bez loga
- *  první písmeno názvu na barvě podniku (`barva`; null = grafit, bez parametru = inkoust na bílé). */
+/** Dlaždice loga v paletě Managera: logo na bílé, bez loga první písmeno v inkoustu.
+ *  `barva` se přijímá kvůli volajícím, ale nevykresluje se (barva značky jen ve Wallet a menu). */
 export function LogoPodniku({ nazev, logoUrl, velikost = 36, barva, className = '' }: { nazev: string; logoUrl?: string | null; velikost?: number; /** Barva značky podniku (#RRGGBB). */ barva?: string | null; className?: string }) {
   const pismeno = (String(nazev || '').trim()[0] ?? '·').toUpperCase();
-  const plna = barva !== undefined && !logoUrl ? barvyKarty(barva) : null;
+  void barva;
   return (
-    <span className={`h-logo ${className}`} style={{ width: velikost, height: velikost, borderRadius: Math.round(velikost * 0.28), fontSize: Math.round(velikost * 0.42), ...(plna ? { background: plna.bg, color: plna.ink } : {}) }} aria-hidden>
+    <span className={`h-logo ${logoUrl ? '' : 'h-logo-pismeno'} ${className}`} style={{ width: velikost, height: velikost, borderRadius: Math.round(velikost * 0.28), fontSize: Math.round(velikost * 0.42) }} aria-hidden>
       {logoUrl
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={logoUrl} alt="" className="h-full w-full object-contain p-1" />

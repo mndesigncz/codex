@@ -16,10 +16,10 @@ const HODINY_KAVARNA = { '0': { open: '09:00', close: '18:00' }, '1': { open: '0
 const HODINY_BISTRO = { '0': { closed: true as const }, '1': { open: '11:00', close: '22:00' }, '2': { open: '11:00', close: '22:00' }, '3': { open: '11:00', close: '22:00' }, '4': { open: '11:00', close: '23:00' }, '5': { open: '11:00', close: '23:00' }, '6': { open: '12:00', close: '22:00' } };
 
 export const DEMO_PODNIKY: DemoPodnik[] = [
-  { slug: 'kavarna-u-lipy', teamId: 1, name: 'Kavárna U Lípy', tagline: 'Výběrová káva, snídaně a klid na práci', description: 'Malá kavárna v přízemí starého domu na Lipové. Pražíme si sami, pečeme každé ráno a u okna se dá v klidu pracovat.', address: 'Lipová 12, Brno', accent: '#2E5E4E', phone: '+420 777 100 200', hours: HODINY_KAVARNA, reservationsOn: true, orderingOn: true, loyaltyOn: true, pointsPer100: 5, stampTarget: 10, stampReward: 'Káva podle výběru', member: true, members: 214 },
-  { slug: 'bistro-orech', teamId: 2, name: 'Bistro Ořech', tagline: 'Polední menu a večeře z lokálních surovin', description: 'Sezónní kuchyně, denní menu od jedenácti a večery s vínem z Moravy.', address: 'Kounicova 8, Brno', accent: '#7A3E2B', phone: '+420 777 300 400', hours: HODINY_BISTRO, reservationsOn: true, orderingOn: false, loyaltyOn: true, pointsPer100: 10, stampTarget: 0, stampReward: '', member: true, members: 389 },
-  { slug: 'bar-pod-vezi', teamId: 3, name: 'Bar Pod Věží', tagline: 'Koktejly, víno a malé talíře', description: 'Malý bar se sklepem, domácími sirupy a jazzem ve čtvrtek.', address: 'Starobrněnská 4, Brno', accent: '#3B5BA9', phone: '+420 777 500 600', hours: HODINY_KAVARNA, reservationsOn: true, orderingOn: false, loyaltyOn: true, pointsPer100: 5, stampTarget: 8, stampReward: 'Koktejl dle výběru', member: false, members: 96 },
-  { slug: 'pekarna-kvasek', teamId: 4, name: 'Pekárna Kvásek', tagline: 'Kváskový chléb a croissanty od šesti ráno', description: 'Kváskový chléb, máslové croissanty a filtr s sebou.', address: 'Údolní 21, Brno', accent: '#B9862F', phone: '+420 777 700 800', hours: HODINY_KAVARNA, reservationsOn: false, orderingOn: false, loyaltyOn: true, pointsPer100: 5, stampTarget: 6, stampReward: 'Croissant', member: false, members: 152 },
+  { slug: 'kavarna-u-lipy', teamId: 1, name: 'Kavárna U Lípy', tagline: 'Výběrová káva, snídaně a klid na práci', description: 'Malá kavárna v přízemí starého domu na Lipové. Pražíme si sami, pečeme každé ráno a u okna se dá v klidu pracovat.', address: 'Lipová 12, Brno', accent: '#16181A', phone: '+420 777 100 200', hours: HODINY_KAVARNA, reservationsOn: true, orderingOn: true, loyaltyOn: true, pointsPer100: 5, stampTarget: 10, stampReward: 'Káva podle výběru', member: true, members: 214 },
+  { slug: 'bistro-orech', teamId: 2, name: 'Bistro Ořech', tagline: 'Polední menu a večeře z lokálních surovin', description: 'Sezónní kuchyně, denní menu od jedenácti a večery s vínem z Moravy.', address: 'Kounicova 8, Brno', accent: '#16181A', phone: '+420 777 300 400', hours: HODINY_BISTRO, reservationsOn: true, orderingOn: false, loyaltyOn: true, pointsPer100: 10, stampTarget: 0, stampReward: '', member: true, members: 389 },
+  { slug: 'bar-pod-vezi', teamId: 3, name: 'Bar Pod Věží', tagline: 'Koktejly, víno a malé talíře', description: 'Malý bar se sklepem, domácími sirupy a jazzem ve čtvrtek.', address: 'Starobrněnská 4, Brno', accent: '#16181A', phone: '+420 777 500 600', hours: HODINY_KAVARNA, reservationsOn: true, orderingOn: false, loyaltyOn: true, pointsPer100: 5, stampTarget: 8, stampReward: 'Koktejl dle výběru', member: false, members: 96 },
+  { slug: 'pekarna-kvasek', teamId: 4, name: 'Pekárna Kvásek', tagline: 'Kváskový chléb a croissanty od šesti ráno', description: 'Kváskový chléb, máslové croissanty a filtr s sebou.', address: 'Údolní 21, Brno', accent: '#16181A', phone: '+420 777 700 800', hours: HODINY_KAVARNA, reservationsOn: false, orderingOn: false, loyaltyOn: true, pointsPer100: 5, stampTarget: 6, stampReward: 'Croissant', member: false, members: 152 },
 ];
 
 const MENU_KAVARNA = [
@@ -111,14 +111,14 @@ export function vytvorStavDema(): DemoStav {
     ],
     aktivitaVideno: iso(d(-3), '12:00'),
     aktivita: [
-      { id: 'S1', typ: 'razitko', at: iso(d(-2), '08:12'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#2E5E4E', delta: 1, karta: { nazev: 'Káva podle výběru', razitka: 8, cil: 10 } },
-      { id: 'O1', typ: 'odmena', at: iso(d(-2), '08:12'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#2E5E4E', nazev: 'Káva podle výběru' },
-      { id: 'R31', typ: 'rezervace', at: iso(d(-3), '15:04'), slug: 'bistro-orech', podnik: 'Bistro Ořech', accent: '#7A3E2B', stav: 'confirmed', date: dnes, time: hm < '19:00' ? '19:30' : '20:30', party: 2, odkaz: { rezervace: 31 } },
-      { id: 'N1', typ: 'novinka', at: iso(d(-4), '09:00'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#2E5E4E', titul: 'Nová sezónní nabídka', text: 'Od pátku dýňové latte a jablečný štrúdl s vanilkovou šlehačkou.' },
-      { id: 'A1', typ: 'odpoved', at: iso(d(-5), '17:20'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#2E5E4E', hodnoceni: 5, poznamka: 'Skvělý flat white a klid na práci.', text: 'Díky, Jano! Příští týden máme novou Etiopii, přijď ochutnat.' },
-      { id: 'L1', typ: 'body', at: iso(d(-6), '12:41'), slug: 'bistro-orech', podnik: 'Bistro Ořech', accent: '#7A3E2B', delta: 42, zustatek: 640 },
-      { id: 'H29', typ: 'hodnotit', at: iso(d(-9), '11:30'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#2E5E4E', ref: 'res:29', kind: 'reservation' },
-      { id: 'N2', typ: 'novinka', at: iso(d(-11), '10:00'), slug: 'bistro-orech', podnik: 'Bistro Ořech', accent: '#7A3E2B', titul: 'Svatomartinské menu', text: 'Od 10. listopadu husa, lokše a mladé víno. Rezervace doporučujeme.' },
+      { id: 'S1', typ: 'razitko', at: iso(d(-2), '08:12'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#16181A', delta: 1, karta: { nazev: 'Káva podle výběru', razitka: 8, cil: 10 } },
+      { id: 'O1', typ: 'odmena', at: iso(d(-2), '08:12'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#16181A', nazev: 'Káva podle výběru' },
+      { id: 'R31', typ: 'rezervace', at: iso(d(-3), '15:04'), slug: 'bistro-orech', podnik: 'Bistro Ořech', accent: '#16181A', stav: 'confirmed', date: dnes, time: hm < '19:00' ? '19:30' : '20:30', party: 2, odkaz: { rezervace: 31 } },
+      { id: 'N1', typ: 'novinka', at: iso(d(-4), '09:00'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#16181A', titul: 'Nová sezónní nabídka', text: 'Od pátku dýňové latte a jablečný štrúdl s vanilkovou šlehačkou.' },
+      { id: 'A1', typ: 'odpoved', at: iso(d(-5), '17:20'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#16181A', hodnoceni: 5, poznamka: 'Skvělý flat white a klid na práci.', text: 'Díky, Jano! Příští týden máme novou Etiopii, přijď ochutnat.' },
+      { id: 'L1', typ: 'body', at: iso(d(-6), '12:41'), slug: 'bistro-orech', podnik: 'Bistro Ořech', accent: '#16181A', delta: 42, zustatek: 640 },
+      { id: 'H29', typ: 'hodnotit', at: iso(d(-9), '11:30'), slug: 'kavarna-u-lipy', podnik: 'Kavárna U Lípy', accent: '#16181A', ref: 'res:29', kind: 'reservation' },
+      { id: 'N2', typ: 'novinka', at: iso(d(-11), '10:00'), slug: 'bistro-orech', podnik: 'Bistro Ořech', accent: '#16181A', titul: 'Svatomartinské menu', text: 'Od 10. listopadu husa, lokše a mladé víno. Rezervace doporučujeme.' },
     ],
     zamery: [],
     fronta: [],
