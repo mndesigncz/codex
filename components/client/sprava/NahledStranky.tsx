@@ -2,8 +2,8 @@
 
 // Podnik → Stránka podniku: živý náhled stránky pro hosty (kolo 92, koncept B „H", audit C §7).
 // Mění se při každé úpravě vlevo (logo, fotka, barva, motto, adresa) ještě před uložením.
-// Paleta Managera (korekce 2026-10-27): hlavička bez fotky je inkoustová jako na stránce hosta,
-// karta hosta bílá s linkou; barvu značky podniku host nevidí (korekce 2026-10-27). Hlavní akce
+// Paleta Managera (korekce 2026-10-27): hlavička bez fotky je sklo nad skvrnami jako na stránce
+// hosta, karta hosta sklo (rám `.h-plocha`); barvu značky podniku host nevidí (korekce 2026-10-27). Hlavní akce
 // hosta zůstává limetková. Otevírací doba je z Rozvrhu (jen ke čtení).
 
 import { hoursLabel, vOteviraciDobe, type OpeningHours } from '@/lib/clientSlots';
@@ -22,7 +22,7 @@ export default function NahledStranky({ p }: { p: any }) {
     <div className="space-y-3">
       <RamTelefonu popisek="Náhled stránky podniku v telefonu hosta">
         <div>
-          <div className={`relative h-36 ${p.cover_url ? '' : 'h-moje !rounded-none'}`}>
+          <div className={`relative h-36 ${p.cover_url ? '' : 'h-sklo !rounded-none !border-x-0 !border-t-0'}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {p.cover_url && <img src={p.cover_url} alt="" className="h-full w-full object-cover" />}
             <div className="absolute left-4 -bottom-6"><LogoPodniku nazev={nazev} logoUrl={p.logo_url || null} velikost={56} barva={p.accent || null} /></div>
@@ -39,7 +39,7 @@ export default function NahledStranky({ p }: { p: any }) {
             </div>
             <div className="grid grid-cols-3 gap-1.5 text-[12px] font-medium text-center">
               {['Menu', p.reservations_on ? 'Rezervace' : null, p.loyalty_on ? 'Věrnost' : 'Info'].filter(Boolean).map((x, i) => (
-                <span key={String(x)} className={`h-8 rounded-full grid place-items-center ${i === 0 ? 'bg-white shadow-[0_0_0_1px_var(--surface-line)]' : 'bg-black/[0.05] text-black/60'}`}>{x}</span>
+                <span key={String(x)} className={`h-8 rounded-full grid place-items-center ${i === 0 ? 'h-sklo !rounded-full' : 'bg-black/[0.05] text-black/60'}`}>{x}</span>
               ))}
             </div>
             {p.loyalty_on && cil > 0 && (
