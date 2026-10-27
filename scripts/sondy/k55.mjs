@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -20,7 +21,7 @@ await ctx.route('**/api/**', async route => {
   const u = route.request().url();
   if (u.includes('/api/auth/')) return route.continue();
   if (route.request().method() !== 'GET') {
-    posty.push({ url: u.replace('http://localhost:3000', ''), body: route.request().postData() });
+    posty.push({ url: u.replace(BASE, ''), body: route.request().postData() });
     if (u.includes('/api/teams/switch')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, teamId: 2, role: 'employer', teamName: 'Kavárna Karlín' }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   }
@@ -34,7 +35,7 @@ const p = await ctx.newPage();
 let fails = 0;
 const tvrdi = (popis, cond, co = '') => { console.log(`${cond ? '✓' : '✗'} ${popis}${cond ? '' : `  ← ${co}`}`); if (!cond) fails++; };
 
-await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const prepinac = p.locator('button[title^="Podnik: Kavárna Vinohrady"]').filter({ visible: true }).first();
 tvrdi('v hlavičce je vidět aktivní podnik', await prepinac.count() > 0, 'přepínač s názvem podniku chybí');
@@ -56,7 +57,7 @@ if (await prepinac.count() > 0) {
 
 // networkidle v CI občas nedoběhne do 30 s (pomalý runner, dlouhé dotazy nastavení) —
 // stačí načtená stránka a pak čekat, až se karta organizace opravdu vykreslí.
-await p.goto('http://localhost:3000/employer/overview?view=settings&tab=organizace', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.goto(BASE + '/employer/overview?view=settings&tab=organizace', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await p.locator('main').getByText(/organizace: moje kavárny/i).first().waitFor({ timeout: 30000 }).catch(() => {});
 // Kolo 7 (R7-7): organizace je vlastní sekce Nastavení (?tab=organizace), ne karta v Tým › Podnik.
 await p.waitForTimeout(600);

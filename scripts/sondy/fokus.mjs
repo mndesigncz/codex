@@ -12,6 +12,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const VSE = [
   ...JSON.parse(readFileSync(new URL('./screens.json', import.meta.url).pathname, 'utf8')),
@@ -28,10 +29,15 @@ const tok = (r) => execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "d
 const ZNAK = `(() => {
   const el = document.activeElement;
   if (!el || el === document.body || el === document.documentElement) return null;
+  // Fokus uvnitř vloženého rámu (ukázka na prodejní stránce): označení kreslí prvek v rámu, ne <iframe>.
+  if (el.tagName === 'IFRAME') return null;
+  const znak = cs => (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0
+    && !/rgba\\(0,\\s*0,\\s*0,\\s*0\\)|transparent/.test(cs.outlineColor))
+    || (cs.boxShadow !== 'none' && /0px 0px 0px [1-9]/.test(cs.boxShadow));
   const cs = getComputedStyle(el);
-  const obrys = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0
-    && !/rgba\\(0,\\s*0,\\s*0,\\s*0\\)|transparent/.test(cs.outlineColor);
-  const prstenec = cs.boxShadow !== 'none' && /0px 0px 0px [1-9]/.test(cs.boxShadow);
+  const obrys = znak(cs);
+  // Řádek seznamu kreslí prstenec přes celý řádek na ::after (Procedures, Guides) — i to je vidět.
+  const prstenec = znak(getComputedStyle(el, '::after')) || znak(getComputedStyle(el, '::before'));
   const kde = (el.className || '').toString().replace(/\\s+/g, ' ').slice(0, 46) || el.tagName.toLowerCase();
   return { ok: obrys || prstenec, kde, tag: el.tagName.toLowerCase(),
            jmeno: (el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\\s+/g,' ').slice(0, 24) };
@@ -51,7 +57,11 @@ for (const [name, role, path] of SCREENS) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  // Prstenec fokusu se od redesignu v3 rozsvěcí přechodem (Button `transition duration-200`): hned po
+  // Tabu je stín ještě na nule a sonda ho (s exit 0) hlásila jako chybějící u 78 prvků. Měří se konečný
+  // stav, proto přechody a animace vypnout — stejně jako k68-design čeká na dojetí animací (kolo 93).
+  await p.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' }).catch(() => {});
   await p.waitForTimeout(900);
   let naObrazovce = 0, bezTady = 0;
   const videno = new Set();
@@ -72,3 +82,4 @@ for (const [name, role, path] of SCREENS) {
 console.log(`\nProšlo Tabem ${celkem} prvků. Bez viditelného označení: ${bez}.`);
 for (const [v, n] of [...vzorky.entries()].sort((a, b2) => b2[1] - a[1]).slice(0, 10)) console.log(`  ${String(n).padStart(4)}×  ${v}`);
 await b.close();
+process.exit(bez ? 1 : 0);

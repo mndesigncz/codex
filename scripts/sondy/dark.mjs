@@ -4,6 +4,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const SCREENS = JSON.parse(readFileSync(new URL('./screens.json', import.meta.url).pathname, 'utf8'));
@@ -88,7 +89,7 @@ for (const [name, role, path] of [...SCREENS, ...HOST]) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
   await p.waitForTimeout(1800);
   const dark = await p.evaluate(() => document.documentElement.getAttribute('data-theme'));
   const nalezy = await p.evaluate(MERENI);

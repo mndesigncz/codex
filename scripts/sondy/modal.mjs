@@ -1,6 +1,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -21,7 +22,7 @@ for (const w of [1280, 390]) {
   });
   const p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message.slice(0, 100)));
-  await p.goto('http://localhost:3000/employer/planning', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/employer/planning', { waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
   // otevřít „···" na první kartě a zvolit Upravit kartu
   const more = p.locator('button[aria-label*="Další"], button:has-text("···")').first();

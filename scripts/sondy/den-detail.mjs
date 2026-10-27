@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, fixtura, roleMine, DIR, OUT } from './k68-spolecne.mjs';
 import { dayPlus, pragueToday } from '../../lib/pragueTime.ts';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
 const dnes = pragueToday();
 const mesic = dnes.slice(0, 7);
@@ -75,7 +76,7 @@ for (const w of [1280, 390]) {
   const bez = roleMine('barista');
   const fix = { ...fixtura('k69-b5b-rozlozeni-finance'), polozky: [{ id: 'otevrene', widget: 'trzby.otevrene', velikost: 'M' }] };
   const { ctx, p, stav } = await kontext({ viewport: { width: 1280, height: 900 }, mineData: { ...bez, opravneni: bez.opravneni.filter(k => k !== 'finance.trzby') }, fix, dalsi });
-  await p.goto(`${process.env.SONDY_ZAKLAD ?? 'http://localhost:3000'}/employer/overview?view=finance`, { waitUntil: 'networkidle' }).catch(() => {});
+  await p.goto(`${process.env.SONDY_ZAKLAD ?? BASE}/employer/overview?view=finance`, { waitUntil: 'networkidle' }).catch(() => {});
   await p.waitForTimeout(1500);
   tvrdi('1: bez finance.trzby se pokladna neptá', dotazyNa(stav, ['/api/pos/daily']).length === 0);
   await ctx.close();
@@ -112,7 +113,7 @@ for (const w of [1280, 390]) {
 {
   const fix = { ...fixtura('k68-rozlozeni-domu'), polozky: [{ id: 'kdo', widget: 'rozvrh.tym_nahled', velikost: 'M' }] };
   const { ctx, p } = await kontext({ viewport: { width: 390, height: 900 }, role: 'employee', mobil: true, mineData: roleMine('barista'), fix, dalsi });
-  await p.goto(`${process.env.SONDY_ZAKLAD ?? 'http://localhost:3000'}/employee/shifts`, { waitUntil: 'networkidle' });
+  await p.goto(`${process.env.SONDY_ZAKLAD ?? BASE}/employee/shifts`, { waitUntil: 'networkidle' });
   await p.locator('[data-plocha] li[data-instance]').first().waitFor({ timeout: 15000 });
   const stitek = p.locator('[data-instance="kdo"]').getByRole('button', { name: /^Detail dne/ }).first();
   await stitek.waitFor({ timeout: 8000 });

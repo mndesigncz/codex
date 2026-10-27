@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -23,7 +24,7 @@ async function open(url, role, down = [], w = 1280) {
     if (u.includes('/api/auth/')) return route.continue();
     if (down.some(d => u.includes(d))) return route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"vypadek"}' });
     if (route.request().method() !== 'GET') {
-      sent.push({ m: route.request().method(), u: u.replace('http://localhost:3000','') });
+      sent.push({ m: route.request().method(), u: u.replace(BASE,'') });
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
     }
     const k = keyFor(u);
@@ -32,7 +33,7 @@ async function open(url, role, down = [], w = 1280) {
   });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(String(e).slice(0, 120)));
-  await p.goto('http://localhost:3000' + url, { waitUntil: 'networkidle', timeout: 30000 });
+  await p.goto(BASE + url, { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(2000);
   return { ctx, p, errs, sent };
 }

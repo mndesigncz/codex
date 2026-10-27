@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -24,7 +25,7 @@ async function open(url, w = 1280) {
     const u = route.request().url();
     if (u.includes('/api/auth/')) return route.continue();
     if (route.request().method() !== 'GET') {
-      sent.push(`${route.request().method()} ${u.replace('http://localhost:3000', '')}`);
+      sent.push(`${route.request().method()} ${u.replace(BASE, '')}`);
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"id":9}' });
     }
     const k = keyFor(u);
@@ -35,7 +36,7 @@ async function open(url, w = 1280) {
   const errs = [];
   p.on('pageerror', e => errs.push(String(e).slice(0, 120)));
   p.on('dialog', d => d.accept());
-  await p.goto('http://localhost:3000' + url, { waitUntil: 'networkidle', timeout: 30000 });
+  await p.goto(BASE + url, { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(1600);
   return { ctx, p, errs, sent };
 }
@@ -93,10 +94,21 @@ console.log('Hledání v seznamech:');
 }
 
 // 3) Uložit a přidat další
+// Kolo 93: zapisování nových věcí po jedné žije od přestavby skladu na plochy (kolo 69) ve widgetu
+// „Zapsat novou věc" na Skladu zaměstnance (NewStockEntry). „Přidat položku" vedení je katalogový
+// formulář položky (díly, limity, výroba, kasa) — „Uložit a přidat další" tam nikdy nebylo, sonda
+// ho tam hledala jen proto, že regex chytil „Přidat položku" dřív než „Zapsat". Smysl kontroly
+// (zapsat víc věcí za sebou bez zavírání okna) zůstává.
 console.log('Sklad — uložit a přidat další:');
 {
-  const { ctx, p, errs, sent } = await open('/employer/overview?view=inventory');
-  const add = p.locator('button', { hasText: /Přidat položku|Nová položka|Zapsat do skladu/ }).first();
+  const { kontext: k68, roleMine, fixtura } = await import('./k68-spolecne.mjs');
+  const { ctx, p, stav } = await k68({ role: 'employee', fix: fixtura('k69-b3-rozlozeni-sklad-zam'), mineData: roleMine('barista') });
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  const sent = { get length() { return stav.dotazy.filter(d => d.m !== 'GET').length; } };
+  await p.goto(BASE + '/employee/shifts?view=inventory', { waitUntil: 'networkidle' });
+  await p.locator('[data-plocha="zamestnanec.sklad"] li[data-instance]:not([hidden])').first().waitFor({ timeout: 15000 }).catch(() => {});
+  await p.waitForTimeout(900);
+  const add = p.locator('li[data-widget="sklad.zapsat_novou"]').getByRole('button', { name: /Zapsat/ }).first();
   if (await add.count() === 0) { bad('tlačítko pro novou položku nenalezeno'); }
   else {
     await add.click();
@@ -124,3 +136,4 @@ console.log('Sklad — uložit a přidat další:');
 
 console.log(problems.length ? `\nPROBLÉMŮ: ${problems.length}` : '\nVšechno prošlo.');
 await b.close();
+process.exit(problems.length ? 1 : 0);

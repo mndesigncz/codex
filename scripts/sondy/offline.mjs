@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -23,7 +24,7 @@ for (const [jm, cesta, prihlas] of [['kiosk za barem', '/kiosk', true], ['menu n
   });
   const p = await ctx.newPage();
   // 1) Normální návštěva — ať se stihne zaregistrovat service worker a naplnit cache.
-  await p.goto('http://localhost:3000' + cesta, { waitUntil: 'networkidle' });
+  await p.goto(BASE + cesta, { waitUntil: 'networkidle' });
   await p.waitForTimeout(2500);
   const sw = await p.evaluate(() => navigator.serviceWorker?.controller ? 'řídí' : (navigator.serviceWorker?.getRegistration ? 'registrovaný, neřídí' : 'žádný'));
 

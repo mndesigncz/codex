@@ -1,7 +1,7 @@
 // Texty prodejní stránky na jednom místě. Česká věta je klíč do slovníku
 // `landing` (locales/<jazyk>/landing.json): komponenty je kreslí přes
 // `t(…)` z useT('landing'), takže se stránka ukáže v jazyce návštěvníka
-// (cookie z přepínače, jinak podle země, lib/i18n/jazykPozadavku.ts).
+// (cookie z přepínače, jinak jazyk prohlížeče, jinak podle země, lib/i18n/jazykPozadavku.ts).
 //
 // Pravidla, která tu platí a hlídá je scripts/check-landing-obsah.mjs:
 //  - žádná vymyšlená jména zákazníků, loga, hodnocení ani čísla o zákaznících;

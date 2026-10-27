@@ -16,20 +16,31 @@
 import { useEffect, useState } from 'react';
 import { greeting, firstName } from '@/lib/greeting';
 import { pragueToday } from '@/lib/pragueTime';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK, type Jazyk } from '@/lib/i18n/config';
+import { fmtDatum } from '@/lib/i18n/format';
 import { nactiTeamsMine } from './role/useOpravneni';
 
-/** „Sobota 26. září" — pražský den, ne den prohlížeče ani serveru. */
-function dnesVetou(): string {
-  // Poledne UTC a formát v UTC: den z pragueToday() se tak při převodu
-  // nikdy nepřehoupne na vedlejší (hodina zařízení nehraje roli).
-  const s = new Date(`${pragueToday()}T12:00:00Z`)
-    .toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+/** „Sobota 26. září" / „Tuesday 27 October" — pražský den v jazyce uživatele, ne den prohlížeče ani serveru. */
+function dnesVetou(jazyk: Jazyk): string {
+  // Den „RRRR-MM-DD" fmtDatum formátuje bez posunu pásma, takže se nikdy nepřehoupne na vedlejší.
+  const s = fmtDatum(pragueToday(), { jazyk, styl: 'denDlouze' });
   // Začátek věty velkým písmenem (jako třída cz-sentence) — podtitulek
   // PageHeader bere text, ne prvek, a hlavička je věta, ne tvar data.
-  return s.charAt(0).toLocaleUpperCase('cs-CZ') + s.slice(1);
+  return s.charAt(0).toLocaleUpperCase(LOCALE_PRO_JAZYK[jazyk]) + s.slice(1);
+}
+
+/** Pozdrav podle pražské hodiny (lib/greeting) v jazyce uživatele. */
+function pozdrav(t: PrekladFn): string {
+  const g = greeting();
+  if (g === 'Dobré ráno') return t('Dobré ráno');
+  if (g === 'Dobrý večer') return t('Dobrý večer');
+  return t('Dobrý den');
 }
 
 export function useHlavickaPrehledu(jmeno?: string | null): { title: string; subtitle: string } {
+  const t = useT();
+  const { jazyk } = useJazyk();
   const [podnik, setPodnik] = useState('');
   useEffect(() => {
     let zije = true;
@@ -44,7 +55,7 @@ export function useHlavickaPrehledu(jmeno?: string | null): { title: string; sub
 
   const krestni = firstName(jmeno);
   return {
-    title: krestni ? `${greeting()}, ${krestni}` : greeting(),
-    subtitle: podnik ? `${dnesVetou()} · ${podnik}` : dnesVetou(),
+    title: krestni ? `${pozdrav(t)}, ${krestni}` : pozdrav(t),
+    subtitle: podnik ? `${dnesVetou(jazyk)} · ${podnik}` : dnesVetou(jazyk),
   };
 }

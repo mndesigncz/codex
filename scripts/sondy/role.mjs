@@ -4,6 +4,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -45,7 +46,7 @@ async function kontext(viewport, { mineData = VLASTNIK, roles = ROLE, postRoles,
   return ctx;
 }
 async function otevriRole(p) {
-  await p.goto('http://localhost:3000/employer/overview?view=settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
+  await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
   // Na telefonu jsou sekce Nastavení posuvný pás záložek (Segmented), na
   // počítači seznam tlačítek — sonda bere obojí.
   await p.getByRole('button', { name: /Role a oprávnění/ }).or(p.getByRole('tab', { name: /Role a oprávnění/ })).filter({ visible: true }).first().click(); await p.waitForTimeout(900);
@@ -136,7 +137,7 @@ const prepinac = (p, nazev) => p.getByRole('switch', { name: nazev, exact: true 
     return json({ ok: true });
   } });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=team-settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+  await p.goto(BASE + '/employer/overview?view=team-settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
   let t = norm(await p.locator('main').innerText());
   tvrdi('tým: u člena je název role', t.includes('barista / obsluha'), t.slice(0, 200));
   const radek = p.locator('li.list-row').filter({ hasText: 'Eva Testová' }).first();
@@ -160,7 +161,7 @@ const prepinac = (p, nazev) => p.getByRole('switch', { name: nazev, exact: true 
   const u = sysRole('ucetni');
   const ctx = await kontext({ width: 1280, height: 950 }, { mineData: mine(u.opravneni, { klic: 'ucetni', roleId: null, nazev: u.nazev, typ: 'vedeni', jeVlastnik: false }) });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=shifts', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+  await p.goto(BASE + '/employer/overview?view=shifts', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
   const nav = norm(await p.locator('aside nav').innerText());
   tvrdi('navigace účetní: Finance a Uzávěrky ano, Rozvrh a Plánování ne', nav.includes('finance') && nav.includes('uzávěrky') && !nav.includes('rozvrh') && !nav.includes('plánování'), nav);
   tvrdi('pohled bez oprávnění: „Na tohle nemáš v tomto podniku oprávnění"', norm(await p.locator('main').innerText()).includes('na tohle nemáš v tomto podniku oprávnění'), 'jiný obsah');
@@ -170,7 +171,7 @@ const prepinac = (p, nazev) => p.getByRole('switch', { name: nazev, exact: true 
 {
   const ctx = await kontext({ width: 1280, height: 950 });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
+  await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   const nav = norm(await p.locator('aside nav').innerText());
   const chybi = ['rozvrh', 'sklad', 'receptury', 'postupy', 'úkoly', 'návody', 'plánování', 'uzávěrky', 'finance', 'nápady', 'docházka', 'moje směny', 'odměny'].filter(x => !nav.includes(x));
   tvrdi('navigace vedení: nic nechybí', chybi.length === 0, chybi.join(', '));

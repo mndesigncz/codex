@@ -1,5 +1,6 @@
 import { chromium } from 'playwright-core';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const tok = (r) => execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} ${r}`, { encoding: 'utf8' }).trim();
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, locale: 'cs-CZ' });
@@ -12,7 +13,7 @@ await ctx.route('**/api/**', async route => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
 });
 const p = await ctx.newPage();
-await p.goto('http://localhost:3000/employer/overview?view=finance', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview?view=finance', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1500);
 const txt = (await p.locator('body').innerText()).slice(0, 400);
 console.log('--- co je na obrazovce ---\n' + txt);

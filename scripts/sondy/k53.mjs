@@ -7,6 +7,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -52,7 +53,7 @@ const tvrdi = (popis, cond, co = '') => {
 };
 
 // ---- 1. + 2. Krok postupu ------------------------------------------------
-await p.goto('http://localhost:3000/employer/overview?view=procedures', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview?view=procedures', { waitUntil: 'networkidle' });
 await p.waitForTimeout(900);
 await p.getByText('Otevírací rutina', { exact: false }).first().click();
 await p.waitForTimeout(900);
@@ -82,7 +83,7 @@ if (await odkaz.count() > 0) {
 const tokZam = execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} employee`, { encoding: 'utf8' }).trim();
 await ctx.addCookies([{ name: 'next-auth.session-token', value: tokZam, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
 jeZam = true;
-await p.goto('http://localhost:3000/employee/shifts?view=closing', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employee/shifts?view=closing', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const telo = await p.locator('body').innerText();
 const jeUzaverka = telo.includes('Kontrola kasy');
@@ -100,7 +101,7 @@ if (jeUzaverka) {
 // ---- 4. Kdo nečetl -------------------------------------------------------
 await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
 jeZam = false;
-await p.goto('http://localhost:3000/employer/overview?view=guides&guide=1', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview?view=guides&guide=1', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const ctecka = p.locator('[role="dialog"]').first();
 // Kolo 69 (B6b): akce čtečky jsou v „···" (Akce s návodem), „Kdo četl" je položka menu.

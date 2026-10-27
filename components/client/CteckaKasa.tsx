@@ -17,7 +17,7 @@ import { Icon } from '../Icons';
 import { Button, Chip, Input, ListRow, Segmented, Well } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import { useMoney, useSymbol } from '../CurrencyProvider';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useT } from '@/lib/i18n/client';
 import { ApiError, okJson, apiMessage, isOffline, statusMessage } from '@/lib/api';
 import {
   rozpoznejKod, ocistiVstupCtecky, jeDvojitySken, psalaCtecka, pridejDoHistorie, navratSekundy, navratPopisek,
@@ -31,8 +31,6 @@ import CteckaHost, { hlavniKampan, type ZamerCtecky } from './sprava/CteckaHost'
 import KartickaAktivace from './KartickaAktivace';
 import { ciziCislo } from '@/lib/kartyFyzicke';
 
-const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
-const RAZITKO: CzNoun = { one: 'razítko', few: 'razítka', many: 'razítek' };
 const KLIC_NAVRAT = 'managero-ctecka-navrat';
 const KLIC_ZVUK = 'managero-ctecka-zvuk';
 /** Mezera mezi znaky, po které se rozepsaný kód zahodí jako zbytek. */
@@ -62,6 +60,7 @@ const jeRucniPole = (el: Element | null, skryte: Element | null): boolean =>
   !!el && el !== skryte && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el as HTMLElement).isContentEditable);
 
 export default function CteckaKasa() {
+  const t = useT('sprava');
   const money = useMoney();
   const symbol = useSymbol();
   const op = useOpravneni();
@@ -148,15 +147,15 @@ export default function CteckaKasa() {
   useEffect(() => {
     if (!potvrzeni?.ok || zustat || navrat <= 0) { setZbyva(null); return; }
     setZbyva(navrat);
-    const t = setInterval(() => setZbyva(z => (z == null ? z : z - 1)), 1000);
-    return () => clearInterval(t);
+    const c = setInterval(() => setZbyva(z => (z == null ? z : z - 1)), 1000);
+    return () => clearInterval(c);
   }, [potvrzeni, zustat, navrat]);
   useEffect(() => { if (zbyva === 0) dalsi(); }, [zbyva, dalsi]);
 
   const chyba = (e: unknown, kodCoMa: string): string => {
-    if (e instanceof ApiError && e.status === 404 && kodCoMa === 'karta') return 'Takovou kartičku neznáme.';
+    if (e instanceof ApiError && e.status === 404 && kodCoMa === 'karta') return t('Takovou kartičku neznáme.');
     if (e instanceof ApiError && e.status === 403) return e.message;
-    return isOffline(e) ? 'Bez připojení. Zkus to znovu, až bude síť.' : apiMessage(e, 'Nepovedlo se.');
+    return isOffline(e) ? t('Bez připojení. Zkus to znovu, až bude síť.') : apiMessage(e, t('Nepovedlo se.'));
   };
 
   /** Načte jeden kód ze čtečky (nebo z ručního pole): rozpozná druh a podle něj zavolá API. */
@@ -176,39 +175,39 @@ export default function CteckaKasa() {
       // Číslo staré karty převzaté z Kartičky (jiný tvar než osm znaků) se zkusí jako karta v tomhle podniku.
       const stare = r.typ === 'cizi' && smiKartu ? ciziCislo(ocistiVstupCtecky(raw)) : null;
       if (r.typ === 'cizi' && !stare) {
-        const text = /^[A-Za-z0-9 -]+$/.test(ocistiVstupCtecky(raw)) ? 'Kód kartičky má osm znaků, kód kuponu šest.' : 'Tohle není QR z Managera (kartička, kupon ani poukaz).';
+        const text = /^[A-Za-z0-9 -]+$/.test(ocistiVstupCtecky(raw)) ? t('Kód kartičky má osm znaků, kód kuponu šest.') : t('Tohle není QR z Managera (kartička, kupon ani poukaz).');
         setFaze({ druh: 'chyba', text }); zapis(text, false); pipni(false);
       } else if (r.typ === 'karta' || stare) {
         const kod = stare ?? r.kod;
-        if (!smiKartu) { const t = 'Pracovat s kartičkou hosta nemáš povoleno.'; setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
+        if (!smiKartu) { const zprava = t('Pracovat s kartičkou hosta nemáš povoleno.'); setFaze({ druh: 'chyba', text: zprava }); zapis(zprava, false); pipni(false); }
         else {
-          setFaze({ druh: 'nacitam', popis: 'Načítám kartičku' });
+          setFaze({ druh: 'nacitam', popis: t('Načítám kartičku') });
           try {
             const d = await fetch(`/api/client/staff/scan?code=${encodeURIComponent(kod)}`).then(okJson);
-            if (d.novaKarta) { setFaze({ druh: 'nova', kod: String(d.novaKarta.kod) }); zapis(`Nová karta ${d.novaKarta.kod}`, true, kod); pipni(true); }
+            if (d.novaKarta) { setFaze({ druh: 'nova', kod: String(d.novaKarta.kod) }); zapis(t('Nová karta {kod}', { kod: d.novaKarta.kod }), true, kod); pipni(true); }
             else {
               setFaze({ druh: 'host', kod, data: d }); zapis(d.customer?.name ?? kod, true, kod); pipni(true);
               if (d.parovani) setObnovaParovani(n => n + 1);
             }
-          } catch (e) { const t = chyba(e, 'karta'); setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
+          } catch (e) { const zprava = chyba(e, 'karta'); setFaze({ druh: 'chyba', text: zprava }); zapis(zprava, false); pipni(false); }
         }
       } else if (r.typ === 'kupon') {
-        if (!smiKupon) { const t = 'Uplatňovat kupony nemáš povoleno.'; setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
+        if (!smiKupon) { const zprava = t('Uplatňovat kupony nemáš povoleno.'); setFaze({ druh: 'chyba', text: zprava }); zapis(zprava, false); pipni(false); }
         else {
-          setFaze({ druh: 'nacitam', popis: 'Načítám kupon' });
+          setFaze({ druh: 'nacitam', popis: t('Načítám kupon') });
           try {
             const d = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: r.kod, preview: true }) }).then(okJson);
-            setFaze({ druh: 'kupon', data: d }); zapis(`Kupon ${d.title}`, true, r.kod); pipni(!d.problem);
-          } catch (e) { const t = chyba(e, 'kupon'); setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
+            setFaze({ druh: 'kupon', data: d }); zapis(t('Kupon {nazev}', { nazev: d.title }), true, r.kod); pipni(!d.problem);
+          } catch (e) { const zprava = chyba(e, 'kupon'); setFaze({ druh: 'chyba', text: zprava }); zapis(zprava, false); pipni(false); }
         }
       } else {
-        if (!smiPoukaz) { const t = 'Uplatňovat poukazy nemáš povoleno.'; setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
+        if (!smiPoukaz) { const zprava = t('Uplatňovat poukazy nemáš povoleno.'); setFaze({ druh: 'chyba', text: zprava }); zapis(zprava, false); pipni(false); }
         else {
-          setFaze({ druh: 'nacitam', popis: 'Načítám poukaz' });
+          setFaze({ druh: 'nacitam', popis: t('Načítám poukaz') });
           try {
             const d = await fetch(`/api/client/admin/vouchers/redeem?code=${encodeURIComponent(r.kod)}`).then(okJson);
-            setFaze({ druh: 'poukaz', data: d.poukaz }); zapis(`Poukaz ${r.kod}`, true, r.kod); pipni(true);
-          } catch (e) { const t = chyba(e, 'poukaz'); setFaze({ druh: 'chyba', text: t }); zapis(t, false); pipni(false); }
+            setFaze({ druh: 'poukaz', data: d.poukaz }); zapis(t('Poukaz {kod}', { kod: r.kod }), true, r.kod); pipni(true);
+          } catch (e) { const zprava = chyba(e, 'poukaz'); setFaze({ druh: 'chyba', text: zprava }); zapis(zprava, false); pipni(false); }
         }
       }
     } finally {
@@ -350,7 +349,7 @@ export default function CteckaKasa() {
     if (n <= 1 || !k) return;
     try {
       await fetch('/api/client/admin/stamps/member', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId: h.customer.id, campaignId: k.id, delta: n - 1, reason: `U kasy: ${n} razítka za jednu návštěvu` }) }).then(okJson);
+        body: JSON.stringify({ customerId: h.customer.id, campaignId: k.id, delta: n - 1, reason: `U kasy: ${n} razítka za jednu návštěvu` }) }).then(okJson); // i18n-ok: důvod v auditu podniku
     } catch (e) { ohlas(chyba(e, 'karta'), false); }
   };
   const razitko = async () => {
@@ -378,7 +377,7 @@ export default function CteckaKasa() {
       // Kupon s varováním (útrata pod minimem, 18+) se dokončí v okně, kde obsluha varování uvidí a potvrdí.
       if (r.status === 409 && x.needsConfirm === true) { setUplatnuji({ kod, jen: jenPoukazanyKupon }); setBusy(''); return; }
       if (!r.ok) throw new ApiError(r.status, typeof x.error === 'string' && x.error ? x.error : statusMessage(r.status));
-      const text = `Uplatněno: ${x.title}${x.benefit ? ` (${x.benefit})` : ''}.${x.badges?.length ? ` Zkontroluj: ${x.badges.join(', ')}.` : ''}`;
+      const text = `${t('Uplatněno: {nazev}', { nazev: x.title })}${x.benefit ? ` (${x.benefit})` : ''}.${x.badges?.length ? ` ${t('Zkontroluj: {co}.', { co: x.badges.join(', ') })}` : ''}`;
       if (jenPoukazanyKupon) setFaze({ druh: 'ceka' });
       else setFaze(f => f.druh === 'host' ? { ...f, data: { ...f.data, openCoupons: (f.data.openCoupons ?? []).filter((c: any) => c.code !== kod) } } : f);
       ohlas(text, true); zapis(text, true);
@@ -394,7 +393,7 @@ export default function CteckaKasa() {
       const x = await fetch('/api/client/admin/vouchers/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: p.code, amount: hodnota, ref: poukazRef.current }) }).then(okJson);
       poukazRef.current = null;
       setFaze({ druh: 'poukaz', data: x.poukaz }); setPoukazCastka('');
-      const text = x.opakovani ? `Už uplatněno: ${money(x.castka)}.` : `Uplatněno ${money(x.castka)}. Na poukazu zbývá ${money(x.poukaz.balance)}.`;
+      const text = x.opakovani ? t('Už uplatněno: {castka}.', { castka: money(x.castka) }) : t('Uplatněno {castka}. Na poukazu zbývá {zbytek}.', { castka: money(x.castka), zbytek: money(x.poukaz.balance) });
       ohlas(text, true); zapis(text, true);
     } catch (e) {
       if (!(e instanceof ApiError) || e.status < 500) poukazRef.current = null;
@@ -406,9 +405,9 @@ export default function CteckaKasa() {
   const nastavNavrat = (v: string) => { const s = navratSekundy(v); setNavrat(s); psat(KLIC_NAVRAT, String(s)); };
   const prepniZvuk = () => { const v = !zvuk; setZvuk(v); psat(KLIC_ZVUK, v ? '1' : '0'); if (v) pipni(true); };
 
-  const stav = offline ? { tone: 'bad' as const, text: 'Bez připojení' }
-    : !aktivni ? { tone: 'wait' as const, text: 'Čtečka neposlouchá, klepni do okna' }
-    : { tone: 'ok' as const, text: 'Čtečka připravena' };
+  const stav = offline ? { tone: 'bad' as const, text: t('Bez připojení') }
+    : !aktivni ? { tone: 'wait' as const, text: t('Čtečka neposlouchá, klepni do okna') }
+    : { tone: 'ok' as const, text: t('Čtečka připravena') };
 
   const h = faze.druh === 'host' ? faze.data : null;
   const rucneRozpoznano = rozpoznejKod(rucne).typ;
@@ -418,14 +417,14 @@ export default function CteckaKasa() {
   return (
     <div className="space-y-3 min-w-0" data-testid="ctecka">
       {/* Skryté pole čtečky: vždy zaostřené, nikdy nevidět. `fixed`, ať nenafoukne dokument. */}
-      <input ref={pole} type="text" aria-label="Pole čtečky kódů" autoFocus autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} inputMode="none"
+      <input ref={pole} type="text" aria-label={t('Pole čtečky kódů')} autoFocus autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} inputMode="none"
         tabIndex={-1} onInput={poVstupu} data-testid="ctecka-pole"
         className="fixed left-0 top-0 h-px w-px opacity-0 pointer-events-none" />
 
       {/* v4: stav vlevo, zvuk na pravé hraně v jednom řádku (nezalamuje se pod stav). */}
       <div className="flex items-center justify-between gap-2 min-w-0">
         <Chip tone={stav.tone} size="sm" icon={offline ? 'warning' : 'card'} className="min-w-0"><span data-testid="ctecka-stav">{stav.text}</span></Chip>
-        <Button size="sm" variant="ghost" aria-pressed={zvuk} onClick={prepniZvuk} icon={zvuk ? 'bell' : 'close'} className="shrink-0 -mr-2">{zvuk ? 'Zvuk zapnutý' : 'Zvuk vypnutý'}</Button>
+        <Button size="sm" variant="ghost" aria-pressed={zvuk} onClick={prepniZvuk} icon={zvuk ? 'bell' : 'close'} className="shrink-0 -mr-2">{zvuk ? t('Zvuk zapnutý') : t('Zvuk vypnutý')}</Button>
       </div>
 
       {/* Potvrzení po akci a odpočet návratu. Živá oblast, ať ji odečítač přečte. */}
@@ -435,7 +434,7 @@ export default function CteckaKasa() {
             <p className="font-semibold break-words">{potvrzeni.text}</p>
             {potvrzeni.ok && zbyva != null && (
               <div className="space-y-1.5">
-                <p className="text-[13px]">Čekám na další kartu za {zbyva} s.</p>
+                <p className="text-[13px]">{t('Čekám na další kartu za {n} s.', { n: zbyva })}</p>
                 <div className="h-1 rounded-full bg-black/10 overflow-hidden" aria-hidden>
                   <div className="h-full bg-[#16181A]/60 rounded-full" style={{ width: `${Math.max(0, Math.min(100, (zbyva / navrat) * 100))}%`, transition: mene ? 'none' : 'width 1s linear' }} />
                 </div>
@@ -443,8 +442,8 @@ export default function CteckaKasa() {
             )}
             {potvrzeni.ok && (
               <div className="rada rada-rovne rada-l">
-                {zbyva != null && <Button size="lg" variant="secondary" onClick={() => setZustat(true)}>Zůstat u hosta</Button>}
-                <Button size="lg" variant="primary" onClick={dalsi}>Další karta</Button>
+                {zbyva != null && <Button size="lg" variant="secondary" onClick={() => setZustat(true)}>{t('Zůstat u hosta')}</Button>}
+                <Button size="lg" variant="primary" onClick={dalsi}>{t('Další karta')}</Button>
               </div>
             )}
           </div>
@@ -452,19 +451,19 @@ export default function CteckaKasa() {
         {potvrzeni?.ok && <UpozorneniRazitek expiredCount={upoz?.expiredCount} lost={upoz?.lost} />}
       </div>
 
-      <Well pad="md" as="div" className="space-y-4" aria-label="Načtený kód" role="group">
+      <Well pad="md" as="div" className="space-y-4" aria-label={t('Načtený kód')} role="group">
         {faze.druh === 'ceka' && (
           <div className="text-center py-6 space-y-2" data-testid="ctecka-ceka">
             <Icon name="card" size={36} className="mx-auto text-black/30" />
-            <p className="text-lg font-semibold">Čekám na další kartu</p>
-            <p className="t-meta">Přilož ke čtečce kartičku hosta, kupon nebo poukaz. Čtečka se musí tvářit jako klávesnice a na konci poslat Enter. Nastav jí anglické rozložení, ať se číslice přečtou správně.</p>
+            <p className="text-lg font-semibold">{t('Čekám na další kartu')}</p>
+            <p className="t-meta">{t('Přilož ke čtečce kartičku hosta, kupon nebo poukaz. Čtečka se musí tvářit jako klávesnice a na konci poslat Enter. Nastav jí anglické rozložení, ať se číslice přečtou správně.')}</p>
           </div>
         )}
         {faze.druh === 'nacitam' && <p className="text-center py-6 t-meta" role="status">{faze.popis}…</p>}
         {faze.druh === 'chyba' && (
           <div className="space-y-3" data-testid="ctecka-chyba">
             <p role="alert" className="note note-danger font-semibold break-words">{faze.text}</p>
-            <Button size="lg" variant="primary" className="w-full" onClick={dalsi}>Čekám na další kartu</Button>
+            <Button size="lg" variant="primary" className="w-full" onClick={dalsi}>{t('Čekám na další kartu')}</Button>
           </div>
         )}
 
@@ -475,14 +474,14 @@ export default function CteckaKasa() {
 
         {faze.druh === 'host' && h && (
           <div className="space-y-4" data-testid="ctecka-host">
-            <CteckaHost h={h} nazevPodniku={h.podnik ?? 'Tvůj podnik'} busy={busy} pocet={pocetRazitek} setPocet={setPocetRazitek}
+            <CteckaHost h={h} nazevPodniku={h.podnik ?? t('Tvůj podnik')} busy={busy} pocet={pocetRazitek} setPocet={setPocetRazitek}
               smiRazitko={smiKartu} smiKupon={smiKupon} smiNavic={op.ma('vernost.razitka_upravit')}
               onRazitko={() => { void razitko(); }} onKombinace={z => { void kombinace(z); }} onJiny={dalsi} />
 
             {!h.member && (
               <div className="space-y-2">
-                <p className="note note-wait">Host není členem tohoto podniku. Přidej ho jedním klepnutím, nebo mu rovnou dej razítko.</p>
-                <Button size="lg" variant="primary" icon="plus" className="w-full" loading={busy === 'join'} onClick={() => akce('join')}>Přidat jako člena</Button>
+                <p className="note note-wait">{t('Host není členem tohoto podniku. Přidej ho jedním klepnutím, nebo mu rovnou dej razítko.')}</p>
+                <Button size="lg" variant="primary" icon="plus" className="w-full" loading={busy === 'join'} onClick={() => akce('join')}>{t('Přidat jako člena')}</Button>
               </div>
             )}
 
@@ -491,38 +490,38 @@ export default function CteckaKasa() {
 
             {/* Účtenky a body z částky pod hlavními akcemi. */}
             <div className="space-y-2">
-              {h.bills?.length > 0 && h.parovani && <p className="t-label pt-1">Nebo vyber účet hned</p>}
+              {h.bills?.length > 0 && h.parovani && <p className="t-label pt-1">{t('Nebo vyber účet hned')}</p>}
               {h.bills?.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {h.bills.map((bl: any) => (
                     <Button key={bl.bill_id} size="lg" variant="secondary" icon="receipt" loading={busy === 'bill' + bl.bill_id} disabled={bl.awarded} onClick={() => akce('bill', { billId: bl.bill_id })}>
-                      {bl.awarded ? `Účtenka ${money(Math.round(Number(bl.final_price)))} už je připsaná` : `Připsat z účtenky ${money(Math.round(Number(bl.final_price)))}`}
+                      {bl.awarded ? t('Účtenka {castka} už je připsaná', { castka: money(Math.round(Number(bl.final_price))) }) : t('Připsat z účtenky {castka}', { castka: money(Math.round(Number(bl.final_price))) })}
                     </Button>
                   ))}
                 </div>
               )}
               {smiBody && (h.rules?.pointsPer100 > 0 || h.campaigns?.some((c: any) => c.ruleType === 'min_value')) && (
                 <form onSubmit={e => { e.preventDefault(); if (cislo > 0) void akce('points', { amount: cislo }); }} className="rada rada-pruzna rada-l">
-                  <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={castka} onChange={e => setCastka(e.target.value)} placeholder={`Útrata ${symbol}`} className="text-center min-w-0" />
-                  <Button type="submit" size="lg" variant="secondary" loading={busy === 'points'} disabled={!(cislo > 0)}>Body z částky</Button>
+                  <Input aria-label={t('Útrata v {mena}', { mena: symbol })} type="number" inputMode="numeric" min={0} step={1} value={castka} onChange={e => setCastka(e.target.value)} placeholder={t('Útrata {mena}', { mena: symbol })} className="text-center min-w-0" />
+                  <Button type="submit" size="lg" variant="secondary" loading={busy === 'points'} disabled={!(cislo > 0)}>{t('Body z částky')}</Button>
                 </form>
               )}
               {smiKredit && h.credit > 0 && (
                 <form onSubmit={e => { e.preventDefault(); if (cislo >= 1) void akce('credit', { amount: cislo }); }} className="rada rada-pruzna rada-l">
-                  <Input aria-label="Kolik kreditu uplatnit" type="number" inputMode="numeric" min={1} max={h.credit} value={castka} onChange={e => setCastka(e.target.value)} placeholder={`Max ${h.credit}`} className="text-center min-w-0" />
-                  <Button type="submit" size="lg" variant="secondary" icon="card" loading={busy === 'credit'} disabled={!(cislo >= 1)}>Uplatnit kredit</Button>
+                  <Input aria-label={t('Kolik kreditu uplatnit')} type="number" inputMode="numeric" min={1} max={h.credit} value={castka} onChange={e => setCastka(e.target.value)} placeholder={`Max ${h.credit}`} className="text-center min-w-0" />
+                  <Button type="submit" size="lg" variant="secondary" icon="card" loading={busy === 'credit'} disabled={!(cislo >= 1)}>{t('Uplatnit kredit')}</Button>
                 </form>
               )}
             </div>
 
             {h.openCoupons?.length > 0 && (
               <div>
-                <p className="t-label mb-1">Kupony k uplatnění</p>
+                <p className="t-label mb-1">{t('Kupony k uplatnění')}</p>
                 <ul className="list">
                   {h.openCoupons.map((c: any) => (
                     <ListRow key={c.code} title={c.title}
-                      meta={<>{c.fromStamps ? 'Odměna za plnou kartu' : c.benefit}{c.validUntil ? ` · platí do ${c.validUntil}` : ''} · <span className="font-mono">{c.code}</span></>}
-                      actions={<Button size="lg" variant="secondary" loading={busy === 'kupon:' + c.code} disabled={!smiKupon} onClick={() => uplatniKupon(c.code)}>Uplatnit</Button>} />
+                      meta={<>{c.fromStamps ? t('Odměna za plnou kartu') : c.benefit}{c.validUntil ? ` · ${t('platí do {den}', { den: c.validUntil })}` : ''} · <span className="font-mono">{c.code}</span></>}
+                      actions={<Button size="lg" variant="secondary" loading={busy === 'kupon:' + c.code} disabled={!smiKupon} onClick={() => uplatniKupon(c.code)}>{t('Uplatnit')}</Button>} />
                   ))}
                 </ul>
               </div>
@@ -536,20 +535,20 @@ export default function CteckaKasa() {
               </>
             )}
             {!h.campaigns?.length && h.member && h.rules?.stampTarget > 0 && (
-              <p className="t-meta tabular-nums">Razítka {h.stamps}/{h.rules.stampTarget}{h.rules.stampReward ? ` do odměny „${h.rules.stampReward}"` : ''}.</p>
+              <p className="t-meta tabular-nums">{t('Razítka')} {h.stamps}/{h.rules.stampTarget}{h.rules.stampReward ? ` ${t('do odměny „{odmena}"', { odmena: h.rules.stampReward })}` : ''}.</p>
             )}
 
             {h.affordable?.length > 0 && (
               <div>
-                <p className="t-label mb-1">Za body teď dosáhne na</p>
+                <p className="t-label mb-1">{t('Za body teď dosáhne na')}</p>
                 <ul className="list">
-                  {h.affordable.map((a: any) => <ListRow key={a.id} title={a.title} value={`${a.cost_points} b.`} />)}
+                  {h.affordable.map((a: any) => <ListRow key={a.id} title={a.title} value={t('{n} b.', { n: a.cost_points })} />)}
                 </ul>
-                <p className="t-meta mt-1">Kupon si vezme sám na své stránce, pak ho uvidíš tady.</p>
+                <p className="t-meta mt-1">{t('Kupon si vezme sám na své stránce, pak ho uvidíš tady.')}</p>
               </div>
             )}
             {h.member && h.nextTierAt && (
-              <p className="t-meta">Do úrovně „{h.nextTierLabel}" ještě {h.nextTierUnit === 'spend' ? money(Math.max(0, h.nextTierAt - (h.spend ?? 0))) : czCount(Math.max(0, h.nextTierAt - h.visits), NAVSTEVA)}.</p>
+              <p className="t-meta">{t('Do úrovně „{uroven}" ještě {kolik}.', { uroven: h.nextTierLabel, kolik: h.nextTierUnit === 'spend' ? money(Math.max(0, h.nextTierAt - (h.spend ?? 0))) : t('{n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { n: Math.max(0, h.nextTierAt - h.visits) }) })}</p>
             )}
           </div>
         )}
@@ -557,21 +556,21 @@ export default function CteckaKasa() {
         {faze.druh === 'kupon' && (
           <div className="space-y-3" data-testid="ctecka-kupon">
             <div className="min-w-0">
-              <p className="t-label mb-0.5">Kupon</p>
+              <p className="t-label mb-0.5">{t('Kupon')}</p>
               <p className="text-lg font-bold leading-tight break-words">{faze.data.title}</p>
               {faze.data.benefit && <p className="t-meta mt-0.5">{faze.data.benefit}</p>}
-              <p className="t-meta mt-1">Drží ho: <span className="font-semibold text-[#16181A]">{faze.data.customer}</span> · kód <span className="font-mono">{faze.data.code}</span></p>
+              <p className="t-meta mt-1">{t('Drží ho:')} <span className="font-semibold text-[#16181A]">{faze.data.customer}</span> · {t('kód')} <span className="font-mono">{faze.data.code}</span></p>
             </div>
             {(faze.data.badges?.length > 0 || faze.data.validUntil) && (
               <div className="flex flex-wrap gap-1.5">
                 {(faze.data.badges ?? []).map((b: string) => <Chip key={b} tone="muted" size="sm">{b}</Chip>)}
-                {faze.data.validUntil && <Chip tone="muted" size="sm">do {faze.data.validUntil}</Chip>}
+                {faze.data.validUntil && <Chip tone="muted" size="sm">{t('do {den}', { den: faze.data.validUntil })}</Chip>}
               </div>
             )}
             {faze.data.problem && <p role="alert" className="note note-danger">{faze.data.problem}</p>}
             <div className="rada rada-rovne rada-l">
-              <Button size="lg" variant="primary" icon="check" loading={busy === 'kupon:' + faze.data.code} disabled={!faze.data.usable} onClick={() => uplatniKupon(faze.data.code, true)}>Uplatnit</Button>
-              <Button size="lg" variant="secondary" onClick={dalsi}>Zrušit</Button>
+              <Button size="lg" variant="primary" icon="check" loading={busy === 'kupon:' + faze.data.code} disabled={!faze.data.usable} onClick={() => uplatniKupon(faze.data.code, true)}>{t('Uplatnit')}</Button>
+              <Button size="lg" variant="secondary" onClick={dalsi}>{t('Zrušit')}</Button>
             </div>
           </div>
         )}
@@ -579,53 +578,53 @@ export default function CteckaKasa() {
         {faze.druh === 'poukaz' && (
           <div className="space-y-3" data-testid="ctecka-poukaz">
             <div className="min-w-0">
-              <p className="t-label mb-0.5">Dárkový poukaz</p>
+              <p className="t-label mb-0.5">{t('Dárkový poukaz')}</p>
               <p className="text-lg font-bold font-mono tracking-wider">{faze.data.code}</p>
               <p className="text-2xl font-bold tabular-nums leading-tight mt-1">{money(faze.data.balance)}</p>
-              <p className="t-meta tabular-nums">z {money(faze.data.value_amount)}{faze.data.valid_until ? ` · platí do ${faze.data.valid_until}` : ''}{faze.data.recipient_name ? ` · pro ${faze.data.recipient_name}` : ''}</p>
+              <p className="t-meta tabular-nums">{t('z {castka}', { castka: money(faze.data.value_amount) })}{faze.data.valid_until ? ` · ${t('platí do {den}', { den: faze.data.valid_until })}` : ''}{faze.data.recipient_name ? ` · ${t('pro {jmeno}', { jmeno: faze.data.recipient_name })}` : ''}</p>
             </div>
             {faze.data.stav === 'active' ? (
               <form onSubmit={e => { e.preventDefault(); if (poukazOk) void uplatniPoukaz(Number(poukazCastka)); }} className="sloupec sloupec-2">
                 <div className="rada rada-pruzna rada-l">
-                  <Input aria-label={`Částka k uplatnění v ${symbol}`} type="number" inputMode="numeric" min={1} max={faze.data.balance} step={1} value={poukazCastka}
+                  <Input aria-label={t('Částka k uplatnění v {mena}', { mena: symbol })} type="number" inputMode="numeric" min={1} max={faze.data.balance} step={1} value={poukazCastka}
                     onChange={e => { setPoukazCastka(e.target.value); poukazRef.current = null; }} placeholder={`Max ${faze.data.balance}`} className="text-center min-w-0" />
-                  <Button type="submit" size="lg" variant="primary" icon="check" loading={busy === 'poukaz'} disabled={!poukazOk}>Uplatnit</Button>
+                  <Button type="submit" size="lg" variant="primary" icon="check" loading={busy === 'poukaz'} disabled={!poukazOk}>{t('Uplatnit')}</Button>
                 </div>
-                <Button type="button" size="lg" variant="secondary" className="w-full" disabled={busy === 'poukaz'} onClick={() => { setPoukazCastka(String(faze.data.balance)); poukazRef.current = null; void uplatniPoukaz(faze.data.balance); }}>Celý zůstatek</Button>
+                <Button type="button" size="lg" variant="secondary" className="w-full" disabled={busy === 'poukaz'} onClick={() => { setPoukazCastka(String(faze.data.balance)); poukazRef.current = null; void uplatniPoukaz(faze.data.balance); }}>{t('Celý zůstatek')}</Button>
               </form>
             ) : (
-              <p className="note note-wait">{faze.data.stav === 'expired' ? 'Platnost poukazu skončila, uplatnit ho nejde.' : faze.data.stav === 'used' ? 'Poukaz je vyčerpaný.' : 'Poukaz je zrušený.'}</p>
+              <p className="note note-wait">{faze.data.stav === 'expired' ? t('Platnost poukazu skončila, uplatnit ho nejde.') : faze.data.stav === 'used' ? t('Poukaz je vyčerpaný.') : t('Poukaz je zrušený.')}</p>
             )}
-            <Button size="lg" variant="secondary" className="w-full" onClick={dalsi}>Jiný kód</Button>
+            <Button size="lg" variant="secondary" className="w-full" onClick={dalsi}>{t('Jiný kód')}</Button>
           </div>
         )}
       </Well>
 
       {/* Ruční zadání: když čtečka nečte nebo host ukazuje kód na displeji. */}
       <form onSubmit={e => { e.preventDefault(); const t = rucne; setRucne(''); void nactiRef.current(t); }} className="rada rada-pruzna rada-l">
-        <Input aria-label="Kód opsaný ručně" value={rucne} onChange={e => setRucne(/[^A-Za-z0-9 -]/.test(e.target.value) ? e.target.value.slice(0, 200) : formatujPriPsani(e.target.value).slice(0, 12))}
-          placeholder="Opsat kód ručně" autoCapitalize="characters" autoComplete="off" className="font-mono tracking-[0.15em] min-w-0 uppercase placeholder:font-sans placeholder:tracking-normal placeholder:normal-case" />
-        <Button type="submit" size="lg" variant="secondary" icon="search" disabled={rucneRozpoznano === 'prazdny'}>Najít</Button>
+        <Input aria-label={t('Kód opsaný ručně')} value={rucne} onChange={e => setRucne(/[^A-Za-z0-9 -]/.test(e.target.value) ? e.target.value.slice(0, 200) : formatujPriPsani(e.target.value).slice(0, 12))}
+          placeholder={t('Opsat kód ručně')} autoCapitalize="characters" autoComplete="off" className="font-mono tracking-[0.15em] min-w-0 uppercase placeholder:font-sans placeholder:tracking-normal placeholder:normal-case" />
+        <Button type="submit" size="lg" variant="secondary" icon="search" disabled={rucneRozpoznano === 'prazdny'}>{t('Najít')}</Button>
       </form>
 
       {/* Čekající párování a spárované účty (jen s pokladnou Storyous). Hláška jde do historie, ať nepřeruší dalšího hosta. */}
       <CekaNaZaplaceni obnovit={obnovaParovani} velke onToast={t => { zapis(t, true); pipni(true); }} />
 
       <div className="sloupec sloupec-2">
-        <span className="t-label">Návrat na čekání</span>
-        <Segmented size="sm" ariaLabel="Za jak dlouho se po akci vrátit na čekání" value={String(navrat)} onChange={nastavNavrat}
-          options={NAVRAT_MOZNOSTI.map(s => ({ id: String(s), label: navratPopisek(s) }))} />
+        <span className="t-label">{t('Návrat na čekání')}</span>
+        <Segmented size="sm" ariaLabel={t('Za jak dlouho se po akci vrátit na čekání')} value={String(navrat)} onChange={nastavNavrat}
+          options={NAVRAT_MOZNOSTI.map(s => ({ id: String(s), label: s === 0 ? t('Zůstat') : navratPopisek(s) }))} />
       </div>
 
       {historie.length > 0 && (
         <div data-testid="ctecka-historie">
-          <p className="t-label mb-1">Poslední načtení</p>
+          <p className="t-label mb-1">{t('Poslední načtení')}</p>
           <ul className="list">
             {historie.map(z => (
               <ListRow key={z.id} title={<span className="break-words">{z.popis}</span>}
                 meta={casZaznamu(z.cas)}
-                right={<Chip tone={z.ok ? 'ok' : 'bad'} size="sm">{z.ok ? 'Načteno' : 'Chyba'}</Chip>}
-                actions={z.ok && z.kod ? <Button size="sm" variant="ghost" onClick={() => { posledniSken.current = null; void nactiRef.current(z.kod!); }}>Znovu</Button> : undefined} />
+                right={<Chip tone={z.ok ? 'ok' : 'bad'} size="sm">{z.ok ? t('Načteno') : t('Chyba')}</Chip>}
+                actions={z.ok && z.kod ? <Button size="sm" variant="ghost" onClick={() => { posledniSken.current = null; void nactiRef.current(z.kod!); }}>{t('Znovu')}</Button> : undefined} />
             ))}
           </ul>
         </div>

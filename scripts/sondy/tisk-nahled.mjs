@@ -13,7 +13,7 @@ const html = printHtml({ title: 'Rozvrh ' + dlouhe, subtitle: 'Týden ' + dlouhe
 
 const b = await browser();
 for (const [w, media] of [[390, 'screen'], [360, 'screen'], [794, 'print']]) {
-  const ctx = await b.newContext({ viewport: { width: w, height: 800 }, isMobile: media === 'screen', hasTouch: media === 'screen' });
+  const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: w, height: 800 }, isMobile: media === 'screen', hasTouch: media === 'screen' });
   const p = await ctx.newPage();
   await p.emulateMedia({ media });
   await p.setContent(html);

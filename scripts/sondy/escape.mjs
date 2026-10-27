@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const VSE = [
   ...JSON.parse(readFileSync(new URL('./screens.json', import.meta.url).pathname, 'utf8')),
@@ -32,7 +33,7 @@ for (const [name, role, path] of SCREENS) {
   });
   const p = await ctx.newPage();
   p.on('dialog', d => d.dismiss().catch(() => {}));
-  await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
   await p.waitForTimeout(1200);
 
   // Kandidáti na otevření okna: viditelná tlačítka se smysluplným jménem.

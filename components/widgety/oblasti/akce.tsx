@@ -30,6 +30,7 @@ import { widget } from '@/lib/widgety/katalog';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { apiMessage } from '@/lib/api';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { akceKPriprave, posledniProbehla, prepniBod, vyberAkceSouhrn, vysledekAkce } from '@/lib/klientPrehled';
 import { useMoney } from '../../CurrencyProvider';
 import { Avatar, Chip, ListRow, Stat, StatRow } from '../../ui';
@@ -113,7 +114,7 @@ function denAkce(datum: string, dnes: string, t: PrekladFn): string {
   if (datum === dayPlus(dnes, 1)) return t('zítra');
   // Poledne, ne půlnoc: datum bez času se tak nepřehoupne do vedlejšího dne v žádné zóně.
   const d = new Date(`${datum}T12:00:00`);
-  return Number.isNaN(d.getTime()) ? datum : d.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
+  return Number.isNaN(d.getTime()) ? datum : d.toLocaleDateString(LOCALE_PRO_JAZYK[t.jazyk], { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 function kdyAKde(a: Akce, dnes: string, t: PrekladFn): string {

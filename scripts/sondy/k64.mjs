@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -42,7 +43,7 @@ async function kontext(viewport) {
 // 1) Návody: tlačítko → okno → výběr → kopie → výsledek
 {
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
+  await p.goto(BASE + '/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   const btn = p.getByRole('button', { name: /Z jiného podniku/ }).first();
   tvrdi('návody: tlačítko „Z jiného podniku" je vidět', await btn.isVisible(), 'chybí');
   await btn.click(); await p.waitForTimeout(900);
@@ -67,12 +68,12 @@ async function kontext(viewport) {
 // 2) Postupy a menu: tlačítko existuje
 {
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=procedures', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
+  await p.goto(BASE + '/employer/overview?view=procedures', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
   tvrdi('postupy: tlačítko „Z jiného podniku"', await p.getByRole('button', { name: /Z jiného podniku/ }).first().isVisible(), 'chybí');
   await otevriKopii(p); await p.waitForTimeout(800);
   tvrdi('postupy: okno nabízí postup ze zdroje', norm(await p.locator('body').innerText()).includes('zavírání'), '');
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
-  await p.goto('http://localhost:3000/employer/overview?view=menu', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
+  await p.goto(BASE + '/employer/overview?view=menu', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
   // Bez menu nabízí kopii prázdný stav („Zkopírovat z jiného podniku"), s menu dlaždice „Z jiného podniku" — obojí je tlačítko.
   tvrdi('menu: tlačítko „Z jiného podniku"', (await p.getByRole('button', { name: /z jiného podniku/i }).count()) >= 1, 'chybí');
   await ctx.close();
@@ -90,7 +91,7 @@ async function kontext(viewport) {
       : (body.ids || []).map((id, i) => ({ id, noveId: i === 0 ? null : 800 + id, nazev: 'N' + id, poznamky: i === 0 ? ['Kopie se nepovedla.'] : [] })) }) });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
+  await p.goto(BASE + '/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
   await otevriKopii(p); await p.waitForTimeout(900);
   const boxy = p.getByRole('dialog').locator('[role="checkbox"], input[type="checkbox"]');
   await boxy.nth(0).click(); await boxy.nth(1).click(); await p.waitForTimeout(200);
@@ -123,7 +124,7 @@ async function kontext(viewport) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, vysledky: [{ id: 41, noveId: 741, nazev: 'Letní nabídka', poznamky: ['Menu je po zkopírování vypnuté a má novou adresu /menu-akce.html?menu=letni-nabidka — zapni ho, až projdeš ceny.'] }] }) });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=menu', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
+  await p.goto(BASE + '/employer/overview?view=menu', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
   await p.getByRole('button', { name: /z jiného podniku/i }).first().click(); await p.waitForTimeout(900);
   await p.getByRole('dialog').locator('[role="checkbox"], input[type="checkbox"]').first().click(); await p.waitForTimeout(200);
   await p.getByRole('button', { name: /Zkopírovat \(1\)/ }).click(); await p.waitForTimeout(1800);
@@ -145,7 +146,7 @@ async function kontext(viewport) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
+  await p.goto(BASE + '/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   await otevriKopii(p); await p.waitForTimeout(700);
   const dlg = p.getByRole('dialog');
   let t = norm(await dlg.innerText());
@@ -166,7 +167,7 @@ async function kontext(viewport) {
 {
   const ctx = await kontext({ width: 390, height: 844 }); const p = await ctx.newPage();
   await ctx.addInitScript(() => { try { localStorage.setItem('managero-app-mode', 'full'); } catch {} });
-  await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
+  await p.goto(BASE + '/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   await otevriKopii(p); await p.waitForTimeout(800);
   const sirka = await p.evaluate(() => document.documentElement.scrollWidth);
   tvrdi('telefon: okno kopie nepřetéká šířku obrazovky', sirka <= 390, `scrollWidth ${sirka}`);

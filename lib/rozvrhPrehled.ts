@@ -12,6 +12,8 @@
 
 import { dayPlus, parseDbTime, pragueDayOf } from './pragueTime.ts';
 import { usek } from './rozvrhDen.ts';
+import { aktualniJazyk } from './i18n/stav.ts';
+import { LOCALE_PRO_JAZYK } from './i18n/config.ts';
 
 // ---------------------------------------------------------------------------
 // Předávání mezi widgetem a nástrojem
@@ -112,9 +114,12 @@ export function mesicPlanovace(dnes: string, smenyTohoMesice: readonly { date: u
   return smenyTohoMesice.some(s => den(s.date) > dnes) ? tento : posunMesice(tento, 1);
 }
 
-/** „2026-09-28" → „pondělí 28. září" (poledne UTC, ať den neuteče přes pásmo ani letní čas). */
+/**
+ * „2026-09-28" → „pondělí 28. září" (poledne UTC, ať den neuteče přes pásmo ani letní čas).
+ * V jazyce zvoleném v prohlížeči (en: „Monday 28 September"); na serveru a v testech česky.
+ */
 export function denVetou(d: string): string {
-  return new Date(`${d}T12:00:00Z`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+  return new Date(`${d}T12:00:00Z`).toLocaleDateString(LOCALE_PRO_JAZYK[aktualniJazyk()], { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 }
 
 /** Krátce do řádku: „Dnes", „Zítra", jinak „po 28. 9.". */

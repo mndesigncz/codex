@@ -10,6 +10,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -41,7 +42,7 @@ const tvrdi = (popis, podminka, co = '') => {
 };
 
 // ---- 1. Editor výroby u skladové položky --------------------------------
-await p.goto('http://localhost:3000/employer/overview?view=inventory', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview?view=inventory', { waitUntil: 'networkidle' });
 await p.waitForTimeout(700);
 // Otevřít detail položky „Domácí limonáda".
 // Název položky v seznamu — nad ním je souhrn „dochází", který jméno
@@ -65,7 +66,7 @@ tvrdi('textové pole „Postup" přizná, že ho návod přebíjí',
   'popisek pole se nezměnil');
 
 // ---- 2. + 3. Proklik na konkrétní návod otevře čtečku -------------------
-await p.goto('http://localhost:3000/employer/overview?view=guides&guide=2', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview?view=guides&guide=2', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1100);
 const ctecka = p.locator('[role="dialog"]').first();
 const cteckaOtevrena = await ctecka.isVisible().catch(() => false);
@@ -80,7 +81,7 @@ if (cteckaOtevrena) {
 }
 
 // ---- 4. Úkol „Vyrobit X" odkáže na návod --------------------------------
-await p.goto('http://localhost:3000/employer/overview?view=tasks', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview?view=tasks', { waitUntil: 'networkidle' });
 await p.waitForTimeout(900);
 const ukoly = await p.locator('main').innerText();
 tvrdi('výrobní úkol je vidět', ukoly.includes('Vyrobit Domácí limonáda'), ukoly.slice(0, 160));

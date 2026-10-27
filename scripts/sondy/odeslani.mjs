@@ -4,6 +4,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -38,7 +39,7 @@ await ctx.route('**/api/**', async route => {
 });
 const p = await ctx.newPage();
 const errs = []; p.on('pageerror', e => errs.push(String(e).slice(0, 100)));
-await p.goto('http://localhost:3000/client/cafe-am-ring?tab=reserve', { waitUntil: 'networkidle', timeout: 30000 });
+await p.goto(BASE + '/client/cafe-am-ring?tab=reserve', { waitUntil: 'networkidle', timeout: 30000 });
 await p.waitForTimeout(2000);
 
 console.log('Rezervace, když uprostřed odesílání vypadne spojení:');

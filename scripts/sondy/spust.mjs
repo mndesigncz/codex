@@ -1,7 +1,7 @@
 // Sondy v prohlížeči — spouštěč.
 //
-// Každá sonda (*.mjs v téhle složce) otevře aplikaci na localhost:3000
-// v Chromiu, API podvrhne fixturami z ./fixtury a tvrdí, co má být na
+// Každá sonda (*.mjs v téhle složce) otevře aplikaci na SONDY_ZAKLAD
+// (výchozí http://localhost:3000) v Chromiu, API podvrhne fixturami z ./fixtury a tvrdí, co má být na
 // obrazovce vidět. Dřív žily jen v pracovní složce jedné session a při
 // její ztrátě se musely skládat z historie; tady jsou v repu a v CI.
 //
@@ -10,8 +10,16 @@
 //   node scripts/sondy/spust.mjs k64 k60    # jen vybrané
 //   node scripts/sondy/spust.mjs --vse      # všechny (i rozpracované)
 //
-// Předpoklad: běží `next start -p 3000` se stejným NEXTAUTH_SECRET, jaký
-// má tenhle proces (sondy si podle něj razí session cookie).
+// Předpoklad: běží `next start -p 3000` (nebo jiný port a SONDY_ZAKLAD=http://localhost:<port>)
+// se stejným NEXTAUTH_SECRET, jaký má tenhle proces (sondy si podle něj razí session cookie).
+//
+// Jazyk: od kola 93 rozhoduje (bez cookie managero-lang) jazyk prohlížeče. Kontext Playwrightu bez
+// `locale` posílá Accept-Language en-US, takže aplikace odpoví anglicky — sonda, která tvrdí české
+// texty, si proto nastaví `locale: 'cs-CZ'` (nebo cookie managero-lang).
+//
+// Sonda spadla, když skončí nenulovým kódem, NEBO když její výpis má řádek
+// začínající „✗" (i odsazený). Pojistka pro sondy, které nález jen vypíšou
+// a skončí 0: dřív je spouštěč i CI měly za zelené (kolo 93).
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
@@ -193,6 +201,8 @@ export const ZELENE = [
   'hodnoceni-smeny',
   // ověření kola 92: čtečka u kasy ↔ host (přibalená odměna, jedna akce, živá odezva +2 a uplatnění)
   'k92-ctecka-host',
+  // kolo 93: v angličtině a němčině žádná čeština mimo data ukázky (/demo všechny role a záložky Managero client, /client/demo)
+  'k93-jazyk-ui',
 ];
 
 const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy', 'preteceni-jadro']);
@@ -218,7 +228,7 @@ mkdirSync(DIR + 'shots', { recursive: true });
 const SOUBEZNE = Number(env.SONDY_SOUBEZNE ?? 3);
 const LIMIT_MS = Number(env.SONDY_LIMIT_MS ?? 240_000);
 // Sondy, které měří desítky obrazovek ve čtyřech bězích (motiv × šířka), potřebují víc času.
-const LIMITY = { skladba: 900_000 };
+const LIMITY = { skladba: 900_000, 'k93-jazyk-ui': 900_000 };
 
 function spust(jmeno) {
   return new Promise(resolve => {
@@ -231,7 +241,9 @@ function spust(jmeno) {
     const casovac = setTimeout(() => { out += `\n(čas vypršel po ${limit / 1000} s)`; p.kill('SIGKILL'); }, limit);
     p.on('close', code => {
       clearTimeout(casovac);
-      resolve({ jmeno, ok: code === 0, sekund: Math.round((Date.now() - start) / 1000), out });
+      const krizek = /^\s*✗/m.test(out);
+      if (code === 0 && krizek) out += '\n(sonda skončila 0, ale vypsala ✗: bere se jako spadlá)';
+      resolve({ jmeno, ok: code === 0 && !krizek, sekund: Math.round((Date.now() - start) / 1000), out });
     });
   });
 }
@@ -252,9 +264,9 @@ for (const r of spadle) {
   // Neprošlé tvrzení napřed: dlouhý výpis (tabulka měření) by ho jinak
   // vytlačil z posledních řádků a v logu CI by chyběla příčina.
   const radky = r.out.split('\n');
-  const spadla = radky.filter(l => l.startsWith('✗'));
+  const spadla = radky.filter(l => /^\s*✗/.test(l));
   if (spadla.length) console.log(spadla.join('\n') + '\n…');
-  console.log(radky.filter(l => !l.startsWith('✓') && !l.startsWith('  ✓') && !l.startsWith('✗')).slice(-25).join('\n'));
+  console.log(radky.filter(l => !/^\s*[✓✗]/.test(l)).slice(-25).join('\n'));
 }
 // V GitHub Actions i jako anotace: ty jdou číst přes API (check-runs/…/annotations),
 // log jobu leží na externím úložišti a ne každý ho otevře.
@@ -265,7 +277,7 @@ if (process.env.GITHUB_ACTIONS === 'true') {
     // ✗ řádek i odsazené řádky pod ním (nálezy přetečení, viníci) — bez nich anotace neřekne kde.
     const pricina = [];
     radky.forEach((l, i) => {
-      if (!l.startsWith('✗') || pricina.length >= 30) return;
+      if (!/^\s*✗/.test(l) || pricina.length >= 30) return;
       pricina.push(l);
       for (let j = i + 1; j < radky.length && /^\s+\S/.test(radky[j]) && pricina.length < 30; j++) pricina.push(radky[j]);
     });

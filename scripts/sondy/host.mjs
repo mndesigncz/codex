@@ -2,6 +2,7 @@
 // a co uvidí, když mu vypadne připojení. Jsou to dvě různé věci.
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -25,7 +26,7 @@ async function otevri(stav) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
   const p = await ctx.newPage();
-  const r = await p.goto('http://localhost:3000/client/cafe-am-ring', { waitUntil: 'networkidle', timeout: 30000 });
+  const r = await p.goto(BASE + '/client/cafe-am-ring', { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(1800);
   const t = (await p.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').trim();
   return { ctx, p, status: r?.status(), t };

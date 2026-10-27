@@ -2,6 +2,7 @@
 // živá funkce s vlastním QR i service workerem — a žádná kontrola ani sonda
 // se jí dosud nedotkla. Měříme ji stejnými měřítky jako zbytek aplikace.
 import { chromium } from 'playwright-core';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 const problems = []; const ok = m => console.log('  ✓', m); const bad = m => { console.log('  ✗', m); problems.push(m); };
 
@@ -36,7 +37,7 @@ const MERENI = `(() => {
     if (el.children.length) continue;
     const t=(el.textContent||'').trim(); if(t.length<2||!vis(el)) continue;
     const cs=getComputedStyle(el); const px=parseFloat(cs.fontSize);
-    if (px<14) drobne.push(t.slice(0,26)+' '+Math.round(px)+'px');
+    if (px<11) drobne.push(t.slice(0,26)+' '+Math.round(px)+'px');
     const fg=parse(cs.color); if(!fg) continue;
     const bg=bgOf(el); const eff=fg.a<1?over(fg,bg):fg;
     const bold=parseInt(cs.fontWeight,10)>=700;
@@ -52,7 +53,7 @@ for (const [jmeno, w, h] of [['iPad na šířku', 1024, 768], ['telefon', 390, 8
   const ctx = await b.newContext({ viewport: { width: w, height: h }, locale: 'cs-CZ' });
   const p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(String(e).slice(0, 120)));
-  await p.goto('http://localhost:3000/menu-akce.html', { waitUntil: 'networkidle', timeout: 30000 });
+  await p.goto(BASE + '/menu-akce.html', { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(2500);
   const r = await p.evaluate(MERENI);
   console.log(`Venkovní menu · ${jmeno}:`);
@@ -62,8 +63,11 @@ for (const [jmeno, w, h] of [['iPad na šířku', 1024, 768], ['telefon', 390, 8
     : bad(`${r.bezJmena.length} bez jména: ` + r.bezJmena.slice(0, 4).join(' | '));
   r.malyCil.length === 0 ? ok('dotykové cíle mají 44 px')
     : bad(`${r.malyCil.length} cílů pod 44 px: ` + r.malyCil.slice(0, 4).join(' | '));
-  r.drobne.length === 0 ? ok('žádné písmo pod 14 px')
-    : bad(`${r.drobne.length} textů pod 14 px: ` + r.drobne.slice(0, 4).join(' | '));
+  // Spodní hranice písma je v celé aplikaci 11 px (DESIGN „Typografie", check-contrast-classes); 14 px platí
+  // jen pro kiosk. Cedule se `--fit` zmenšuje na výšku obrazovky a drží `max(11px, …)` — sonda dřív
+  // tvrdila 14 px a nález jen vypsala (exit 0), takže to nikdo neviděl (kolo 93).
+  r.drobne.length === 0 ? ok('žádné písmo pod 11 px')
+    : bad(`${r.drobne.length} textů pod 11 px: ` + r.drobne.slice(0, 4).join(' | '));
   r.slabe.length === 0 ? ok('kontrast všude nad normou')
     : bad(`${r.slabe.length} pod prahem: ` + r.slabe.slice(0, 4).join(' | '));
   if (errs.length) bad('chyba stránky: ' + errs[0]);
@@ -72,3 +76,4 @@ for (const [jmeno, w, h] of [['iPad na šířku', 1024, 768], ['telefon', 390, 8
 }
 console.log(problems.length ? `\nPROBLÉMŮ: ${problems.length}` : '\nVšechno prošlo.');
 await b.close();
+process.exit(problems.length ? 1 : 0);

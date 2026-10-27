@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, fixtura, roleMine, DIR, OUT } from './k68-spolecne.mjs';
 import { dayPlus, pragueToday } from '../../lib/pragueTime.ts';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
 const dnes = pragueToday();
 const vcera = dayPlus(dnes, -1);
@@ -177,7 +178,7 @@ for (const w of [1280, 390]) {
 {
   const bez = roleMine('barista');
   const { ctx, p, stav } = await kontext({ viewport: { width: 1280, height: 900 }, mineData: { ...bez, opravneni: bez.opravneni.filter(k => k !== 'finance.trzby') }, fix, dalsi });
-  await p.goto(`${process.env.SONDY_ZAKLAD ?? 'http://localhost:3000'}/employer/overview?view=finance`, { waitUntil: 'networkidle' }).catch(() => {});
+  await p.goto(`${process.env.SONDY_ZAKLAD ?? BASE}/employer/overview?view=finance`, { waitUntil: 'networkidle' }).catch(() => {});
   await p.waitForTimeout(1500);
   tvrdi('bez finance.trzby: na pokladnu se neptá', dotazyNa(stav, ['/api/pos/daily']).length === 0);
   await ctx.close();

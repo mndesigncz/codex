@@ -1,10 +1,10 @@
 // Překlad v serverových komponentách a routách.
 //
-// Jazyk požadavku = cookie `managero-lang`, jinak čeština. Hlavičku
-// Accept-Language tady schválně nečteme: český majitel s anglickým prohlížečem
-// by jinak otevřel aplikaci v angličtině. Jazyk prohlížeče se používá jen na
-// hostovských stránkách (klient) a v menu-akce.html, kde host nemá jiný způsob,
-// jak říct, čemu rozumí.
+// Jazyk požadavku (lib/i18n/jazykPozadavku.ts): cookie `managero-lang`, jinak
+// jazyk prohlížeče (Accept-Language), jinak země z IP, jinak čeština.
+// Přihlášený s jazykem na účtu ho dostane po načtení (NastaveniSync), takže
+// český majitel s anglickým prohlížečem skončí po přihlášení v češtině, pokud
+// ji má na účtu.
 
 import { type Jazyk } from './config.ts';
 import { jazykPozadavku } from './jazykPozadavku.ts';

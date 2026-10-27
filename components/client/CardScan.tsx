@@ -23,7 +23,7 @@ import { Button, Chip, Input, ListRow, Segmented, Well } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import { formatujPriPsani, overKod, STAV_POPISEK, type StavPoukazu } from '@/lib/poukazy';
 import { useMoney, useSymbol } from '../CurrencyProvider';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { rozpoznejQr } from '@/lib/kuponQr';
 import OdkazCtecka from './OdkazCtecka';
 import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
@@ -32,13 +32,14 @@ import CekaNaZaplaceni, { ParovaniHosta } from './CekaNaZaplaceni';
 import KartickaAktivace from './KartickaAktivace';
 import { ciziCislo } from '@/lib/kartyFyzicke';
 
-const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
+const navstev = (t: PrekladFn, n: number) => t('{n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { n });
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
 
 // seznamParovani: false = seznam „Čeká na zaplacení“ kreslí rodič (Příjem ho má vidět i se sbalenou kartičkou);
 // onParovani pak dá rodiči vědět, že se má seznam načíst hned (po skenu, po připsání z účtenky).
 export default function CardScan({ onToast, onChange, seznamParovani = true, onParovani }: { onToast: (m: string) => void; onChange?: () => void; seznamParovani?: boolean; onParovani?: () => void }) {
   const smiPoukaz = useOpravneni().ma('poukazy.uplatnit');
+  const t = useT('sprava');
   const [rezim, setRezim] = useState<'karta' | 'poukaz'>('karta');
   const money = useMoney();
   const symbol = useSymbol();
@@ -92,14 +93,14 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
     if (r.typ === 'kupon') { await previewCoupon(r.kod); return; }
     // Číslo staré karty převzaté z Kartičky (jiný tvar než osm znaků): hledá se v tomhle podniku.
     if (r.typ === 'cizi' && ciziCislo(text)) { await lookup(text); return; }
-    setErr(r.typ === 'prazdny' ? 'Zadej kód kartičky nebo kuponu, nebo naskenuj QR.' : /^[A-Za-z0-9 -]+$/.test(text.trim()) ? 'Kód kartičky má osm znaků, kód kuponu šest.' : 'Tohle není QR z Managera (kartička ani kupon). Opiš kód ručně.');
+    setErr(r.typ === 'prazdny' ? t('Zadej kód kartičky nebo kuponu, nebo naskenuj QR.') : /^[A-Za-z0-9 -]+$/.test(text.trim()) ? t('Kód kartičky má osm znaků, kód kuponu šest.') : t('Tohle není QR z Managera (kartička ani kupon). Opiš kód ručně.'));
   };
   const previewCoupon = async (kod: string) => {
     setBusy('lookup'); setErr(''); setCp(null);
     try {
       const r = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: kod, preview: true }) });
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
+      if (!r.ok) throw new Error(x.error || t('Nepovedlo se.'));
       setCp(x); setCode(kod);
     } catch (e: any) { setErr(e.message); }
     setBusy('');
@@ -108,12 +109,12 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
 
   const lookup = async (c: string) => {
     const norm = c.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (norm.length < 3) { setErr('Kód má osm znaků.'); return; }
+    if (norm.length < 3) { setErr(t('Kód má osm znaků.')); return; }
     setBusy('lookup'); setErr('');
     try {
       const r = await fetch(`/api/client/staff/scan?code=${encodeURIComponent(norm)}`);
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
+      if (!r.ok) throw new Error(x.error || t('Nepovedlo se.'));
       if (x.novaKarta) { setNova(String(x.novaKarta.kod)); setHit(null); setCode(String(x.novaKarta.kod)); setUpoz(null); }
       else {
         setNova(null); setHit(x); setCode(norm.length === 8 ? fmt(norm) : norm); setUpoz(null);
@@ -135,13 +136,13 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
       const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: hlavickyAkce(klic), body: JSON.stringify(telo) });
       status = r.status;
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
+      if (!r.ok) throw new Error(x.error || t('Nepovedlo se.'));
       klicAkce.hotovo();
       onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setAmount(''); setBill(null); setPredplaceno(''); setUctenka(''); setUpoz({ expiredCount: x.expiredCount, lost: x.lost }); onChange?.();
       if (action === 'bill') setObnovaParovani(n => n + 1);
     } catch (e: any) {
       klicAkce.pochybe(status);
-      setErr(status == null ? 'Nepodařilo se spojit se serverem. Zkontroluj, jestli akce neprošla, a zkus to znovu — nezdvojí se.' : e.message);
+      setErr(status == null ? t('Nepodařilo se spojit se serverem. Zkontroluj, jestli akce neprošla, a zkus to znovu — nezdvojí se.') : e.message);
     }
     setBusy('');
   };
@@ -153,11 +154,11 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
     // stolu, příjem na tabletu) a karta v kartě se nedělá (DP §3.2).
     <Well pad="md" as="div" className="space-y-3" aria-labelledby="h-scan" role="group">
       <div className="flex items-center gap-2 flex-wrap">
-        <h3 id="h-scan" className="t-card flex items-center gap-2"><Icon name="card" size={17} className="text-black/40" />{rezim === 'poukaz' && smiPoukaz ? 'Dárkový poukaz' : 'Kartička hosta'}</h3>
-        {smiPoukaz && !hit && <Segmented options={[{ id: 'karta', label: 'Karta' }, { id: 'poukaz', label: 'Poukaz' }]} value={rezim} onChange={v => { setRezim(v as 'karta' | 'poukaz'); setErr(''); setCam(false); }} size="sm" ariaLabel="Co se u kasy vyřizuje" />}
+        <h3 id="h-scan" className="t-card flex items-center gap-2"><Icon name="card" size={17} className="text-black/40" />{rezim === 'poukaz' && smiPoukaz ? t('Dárkový poukaz') : t('Kartička hosta')}</h3>
+        {smiPoukaz && !hit && <Segmented options={[{ id: 'karta', label: t('Karta') }, { id: 'poukaz', label: t('Poukaz') }]} value={rezim} onChange={v => { setRezim(v as 'karta' | 'poukaz'); setErr(''); setCam(false); }} size="sm" ariaLabel={t('Co se u kasy vyřizuje')} />}
         {!hit && !cp && !nova && <OdkazCtecka className="sm:ml-auto" />}
-        {hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>Jiný host</Button>}
-        {cp && !hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>Jiný kód</Button>}
+        {hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>{t('Jiný host')}</Button>}
+        {cp && !hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>{t('Jiný kód')}</Button>}
       </div>
       {rezim === 'poukaz' && smiPoukaz ? <PoukazKasa onToast={onToast} onChange={onChange} nativni={nativni} canScan={canScan} /> : !hit && nova ? (
         <KartickaAktivace kod={nova} onZrusit={reset}
@@ -170,7 +171,7 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
             {cp.benefit && <p className="t-meta mt-0.5">{cp.benefit}</p>}
             {cp.description && <p className="t-meta mt-0.5 break-words">{cp.description}</p>}
           </div>
-          <p className="t-meta">Drží ho: <span className="font-semibold text-[#16181A]">{cp.customer}</span> · kód <span className="font-mono">{cp.code}</span></p>
+          <p className="t-meta">{t('Drží ho:')} <span className="font-semibold text-[#16181A]">{cp.customer}</span> · {t('kód')} <span className="font-mono">{cp.code}</span></p>
           {(cp.badges?.length > 0 || cp.validSince || cp.validUntil) && (
             <div className="flex flex-wrap items-center gap-1.5">
               {(cp.badges ?? []).map((bd: string) => <Chip key={bd} tone="muted" size="sm">{bd}</Chip>)}
@@ -181,7 +182,7 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
           {/* P12: pár akcí 2 × ½. */}
           <div className="rada rada-rovne">
             <Button variant="primary" icon="check" disabled={!cp.usable} onClick={redeemPreview}>Uplatnit</Button>
-            <Button variant="secondary" onClick={reset}>Zrušit</Button>
+            <Button variant="secondary" onClick={reset}>{t('Zrušit')}</Button>
           </div>
         </div>
       ) : !hit ? (
@@ -189,26 +190,26 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
         // přes celou šířku. Dřív se Najít zalomilo pod pole na levý okraj.
         <form onSubmit={e => { e.preventDefault(); void resolve(code); }} className="sloupec sloupec-2">
           <div className="rada rada-pruzna rada-m">
-          <Input aria-label="Kód kartičky nebo kuponu" value={code} onChange={e => setCode(/[^A-Za-z0-9 -]/.test(e.target.value) ? e.target.value.slice(0, 200) : fmt(e.target.value))} placeholder="ABCD-EFGH" autoCapitalize="characters" autoComplete="off" inputMode="text"
+          <Input aria-label={t('Kód kartičky nebo kuponu')} value={code} onChange={e => setCode(/[^A-Za-z0-9 -]/.test(e.target.value) ? e.target.value.slice(0, 200) : fmt(e.target.value))} placeholder="ABCD-EFGH" autoCapitalize="characters" autoComplete="off" inputMode="text"
             className="font-mono tracking-[0.2em] uppercase min-w-0" />
-          <Button type="submit" variant="primary" icon="search" loading={busy === 'lookup'}>Najít</Button>
+          <Button type="submit" variant="primary" icon="search" loading={busy === 'lookup'}>{t('Najít')}</Button>
           </div>
-          {canScan && <Button type="button" variant="secondary" icon="camera" className="w-full" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
+          {canScan && <Button type="button" variant="secondary" icon="camera" className="w-full" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? t('Zavřít kameru') : t('Skenovat')}</Button>}
         </form>
       ) : (
         <div className="space-y-3">
           <div className="min-w-0">
             <p className="text-[15px] font-semibold leading-tight truncate text-[#16181A]">{hit.customer.name}</p>
             <p className="t-meta tabular-nums mt-0.5">{hit.member
-              ? (hit.campaigns?.length > 0 ? `${hit.points} b. · ${czCount(hit.visits, NAVSTEVA)}` : `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${czCount(hit.visits, NAVSTEVA)}`)
-              : 'Ještě není členem. Prvním razítkem se stane.'}</p>
+              ? (hit.campaigns?.length > 0 ? `${t('{n} b.', { n: hit.points })} · ${navstev(t, hit.visits)}` : `${t('{n} b.', { n: hit.points })} · ${hit.stamps}/${hit.rules?.stampTarget || '–'} ${t('razítek')} · ${navstev(t, hit.visits)}`)
+              : t('Ještě není členem. Prvním razítkem se stane.')}</p>
           </div>
-          {hit.member && (hit.discount > 0 || hit.credit > 0 || hit.levelLabel !== 'Člen') && (
+          {hit.member && (hit.discount > 0 || hit.credit > 0 || hit.levelLabel !== 'Člen' /* i18n-ok: levelLabel ze serveru */) && (
             <div className="flex flex-wrap items-center gap-1.5">
-              {hit.levelLabel && hit.levelLabel !== 'Člen' && <Chip tone={hit.tier === 'silver' ? 'muted' : 'ink'} size="sm">{hit.levelLabel}</Chip>}
-              {hit.discount > 0 && <Chip tone="ok" size="sm">Sleva {hit.discount} %{hit.discountSource === 'skupina' && hit.discountName ? ` (${hit.discountName})` : ''}</Chip>}
-              {hit.credit > 0 && <Chip tone="ok" size="sm" icon="card">Kredit {money(hit.credit)}</Chip>}
-              {hit.nextTierAt && <span className="t-meta">do „{hit.nextTierLabel}" ještě {hit.nextTierUnit === 'spend' ? money(Math.max(0, hit.nextTierAt - (hit.spend ?? 0))) : czCount(Math.max(0, hit.nextTierAt - hit.visits), NAVSTEVA)}</span>}
+              {hit.levelLabel && hit.levelLabel !== 'Člen' /* i18n-ok */ && <Chip tone={hit.tier === 'silver' ? 'muted' : 'ink'} size="sm">{hit.levelLabel}</Chip>}
+              {hit.discount > 0 && <Chip tone="ok" size="sm">{t('Sleva {n} %', { n: hit.discount })}{hit.discountSource === 'skupina' && hit.discountName ? ` (${hit.discountName})` : ''}</Chip>}
+              {hit.credit > 0 && <Chip tone="ok" size="sm" icon="card">{t('Kredit {n}', { n: money(hit.credit) })}</Chip>}
+              {hit.nextTierAt && <span className="t-meta">{t('do „{uroven}" ještě {kolik}', { uroven: hit.nextTierLabel, kolik: hit.nextTierUnit === 'spend' ? money(Math.max(0, hit.nextTierAt - (hit.spend ?? 0))) : navstev(t, Math.max(0, hit.nextTierAt - hit.visits)) })}</span>}
             </div>
           )}
           {hit.parovani && <ParovaniHosta parovani={hit.parovani} onZmena={() => setObnovaParovani(n => n + 1)} />}
@@ -219,49 +220,49 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
             <Button variant="primary" icon="check" loading={busy === 'stamp'}
               disabled={hit.stampedToday || (!hit.rules?.stampTarget && !hit.campaigns?.some((cp: any) => cp.ruleType === 'visit')) || (hit.campaigns?.some((cp: any) => cp.ruleType === 'visit') && !hit.campaigns.some((cp: any) => cp.ruleType === 'visit' && cp.platiTed !== false))}
               onClick={() => act('stamp')}>
-              {hit.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
+              {hit.stampedToday ? t('Dnes razítko už má') : t('Razítko za návštěvu')}
             </Button>
             <form onSubmit={e => { e.preventDefault(); act('points'); }} className="rada rada-pruzna rada-m">
-              <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Útrata ${symbol}`} className="text-center min-w-0" />
-              <Button type="submit" variant="secondary" loading={busy === 'points'} disabled={!(hit.rules?.pointsPer100 || hit.campaigns?.some((cp: any) => cp.ruleType === 'min_value')) || !amount}>Body</Button>
+              <Input aria-label={t('Útrata v {mena}', { mena: symbol })} type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder={t('Útrata {mena}', { mena: symbol })} className="text-center min-w-0" />
+              <Button type="submit" variant="secondary" loading={busy === 'points'} disabled={!(hit.rules?.pointsPer100 || hit.campaigns?.some((cp: any) => cp.ruleType === 'min_value')) || !amount}>{t('Body')}</Button>
             </form>
           </div>
           {hit.rules?.pointsPer100 > 0 && (
             <details className="group/dopl">
               <summary className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
-                <Icon name="chevron" size={15} className="transition-transform group-open/dopl:rotate-180" />K účtu: kredit nebo poukaz, číslo účtenky
+                <Icon name="chevron" size={15} className="transition-transform group-open/dopl:rotate-180" />{t('K účtu: kredit nebo poukaz, číslo účtenky')}
               </summary>
               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="sc-pred" className="field-label">Z toho zaplaceno kreditem nebo poukazem ({symbol})</label>
                   <Input id="sc-pred" type="number" inputMode="numeric" min={0} step={1} value={predplaceno} onChange={e => setPredplaceno(e.target.value)} placeholder="0" />
-                  <p className="t-meta mt-1">{hit.rules?.bodyPravidla?.excludePrepaid === false ? 'Podnik počítá body z celého účtu, i z části zaplacené poukazem.' : 'Z téhle části se body a cashback nepočítají.'}</p>
+                  <p className="t-meta mt-1">{hit.rules?.bodyPravidla?.excludePrepaid === false ? t('Podnik počítá body z celého účtu, i z části zaplacené poukazem.') : t('Z téhle části se body a cashback nepočítají.')}</p>
                 </div>
                 <div>
-                  <label htmlFor="sc-uct" className="field-label">Číslo účtenky (nepovinné)</label>
-                  <Input id="sc-uct" value={uctenka} maxLength={40} autoComplete="off" onChange={e => setUctenka(e.target.value)} placeholder="Třeba 2026/0412" />
-                  <p className="t-meta mt-1">Bez pokladny: stejné číslo věrnost podruhé nepřipíše.</p>
+                  <label htmlFor="sc-uct" className="field-label">{t('Číslo účtenky (nepovinné)')}</label>
+                  <Input id="sc-uct" value={uctenka} maxLength={40} autoComplete="off" onChange={e => setUctenka(e.target.value)} placeholder={t('Třeba {n}', { n: '2026/0412' })} />
+                  <p className="t-meta mt-1">{t('Bez pokladny: stejné číslo věrnost podruhé nepřipíše.')}</p>
                 </div>
               </div>
             </details>
           )}
           {hit.bills?.length > 0 && (
             <div>
-              <p className="t-label mb-1.5">{hit.parovani ? 'Nebo vyber účet hned' : 'Dnešní účty z pokladny'}</p>
+              <p className="t-label mb-1.5">{hit.parovani ? t('Nebo vyber účet hned') : t('Dnešní účty z pokladny')}</p>
               <div className="flex flex-wrap gap-1.5">
                 {hit.bills.map((bl: any) => (
                   <button key={bl.bill_id} type="button" aria-pressed={bill === bl.bill_id} disabled={bl.awarded}
-                    title={bl.awarded ? 'Z téhle účtenky už věrnost připsala.' : undefined}
+                    title={bl.awarded ? t('Z téhle účtenky už věrnost připsala.') : undefined}
                     onClick={() => { const on = bill === bl.bill_id; setBill(on ? null : bl.bill_id); setAmount(on ? '' : String(Math.round(Number(bl.final_price)))); }}
                     className={`filter-pill tap-target-sm tabular-nums ${bill === bl.bill_id ? 'seg-on' : 'seg-off glass'} ${bl.awarded ? 'opacity-50 line-through' : ''}`}>
-                    {money(Math.round(Number(bl.final_price)))}{bl.awarded ? ' · připsáno' : ''}
+                    {money(Math.round(Number(bl.final_price)))}{bl.awarded ? ` · ${t('připsáno')}` : ''}
                   </button>
                 ))}
               </div>
               {bill && (
                 <div className="mt-2 sloupec sloupec-2">
-                  <Button size="sm" variant="primary" icon="check" className="w-full" loading={busy === 'bill'} onClick={() => act('bill')}>Připsat z účtenky</Button>
-                  <p className="t-meta">Razítka podle položek účtu + body a kredit z částky. Jde to jen jednou na účtenku.</p>
+                  <Button size="sm" variant="primary" icon="check" className="w-full" loading={busy === 'bill'} onClick={() => act('bill')}>{t('Připsat z účtenky')}</Button>
+                  <p className="t-meta">{t('Razítka podle položek účtu + body a kredit z částky. Jde to jen jednou na účtenku.')}</p>
                 </div>
               )}
             </div>
@@ -275,23 +276,23 @@ export default function CardScan({ onToast, onChange, seznamParovani = true, onP
             </form>
           )}
           {(hit.affordable?.length ?? 0) > 0 && (
-            <p className="t-meta">Za body teď dosáhne na: {hit.affordable.map((a: any) => `${a.title} (${a.cost_points} b.)`).join(', ')}. Kupon si vezme sám na své stránce.</p>
+            <p className="t-meta">{t('Za body teď dosáhne na: {co}. Kupon si vezme sám na své stránce.', { co: hit.affordable.map((a: any) => `${a.title} (${t('{n} b.', { n: a.cost_points })})`).join(', ') })}</p>
           )}
-          {hit.rules?.pointsPer100 > 0 && <p className="t-meta">{hit.rules.pointsPer100} b. za každých 100 {symbol}{hit.rules.cashbackPct > 0 ? ` a ${hit.rules.cashbackPct} % zpět jako kredit` : ''}. Razítko nejvýš jedno denně.</p>}
+          {hit.rules?.pointsPer100 > 0 && <p className="t-meta">{t('{n} b. za každých {castka} útraty', { n: hit.rules.pointsPer100, castka: `100 ${symbol}` })}{hit.rules.cashbackPct > 0 ? ` · ${t('{n} % zpět jako kredit', { n: hit.rules.cashbackPct })}` : ''}. {t('Razítko nejvýš jedno denně.')}</p>}
           {hit.openCoupons?.length > 0 && (
             <div>
-              <p className="t-label mb-1">Kupony k uplatnění</p>
+              <p className="t-label mb-1">{t('Kupony k uplatnění')}</p>
               <ul className="list">
                 {hit.openCoupons.map((c: any) => (
                   <ListRow key={c.code} title={c.title} meta={<span className="font-mono">{c.code}</span>}
-                    actions={<Button size="sm" variant="secondary" onClick={() => redeem(c.code)}>Uplatnit</Button>} />
+                    actions={<Button size="sm" variant="secondary" onClick={() => redeem(c.code)}>{t('Uplatnit')}</Button>} />
                 ))}
               </ul>
             </div>
           )}
         </div>
       )}
-      {cam && !hit && !cp && !nova && rezim === 'karta' && <Camera onCode={c => { setCam(false); void resolve(c); }} onForeign={() => setErr('Tohle není QR z Managera (kartička ani kupon). Zkus jiný.')} onError={m => { setCam(false); setErr(m); }} />}
+      {cam && !hit && !cp && !nova && rezim === 'karta' && <Camera onCode={c => { setCam(false); void resolve(c); }} onForeign={() => setErr(t('Tohle není QR z Managera (kartička ani kupon). Zkus jiný.'))} onError={m => { setCam(false); setErr(m); }} />}
       {err && rezim === 'karta' && <p role="alert" className="note note-danger">{err}</p>}
       {rezim === 'karta' && seznamParovani && <CekaNaZaplaceni obnovit={obnovaParovani} onToast={onToast} />}
       {uplatnuji && (
@@ -356,6 +357,7 @@ const datumPoukazu = (d: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec
  * (`balance >= částka`), tady jen `ref` pro opakování po výpadku sítě: stejná akce se neodečte dvakrát.
  */
 function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: string) => void; onChange?: () => void; nativni: boolean; canScan: boolean }) {
+  const t = useT('sprava');
   const money = useMoney();
   const symbol = useSymbol();
   const [kod, setKod] = useState('');
@@ -377,7 +379,7 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
     try {
       const r = await fetch(`/api/client/admin/vouchers/redeem?code=${encodeURIComponent(k)}`);
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
+      if (!r.ok) throw new Error(x.error || t('Nepovedlo se.'));
       setP(x.poukaz); setKod(formatujPriPsani(k)); setCastka(''); setUcet(''); setMinUtrata(Number(x.limity?.minUtrata) || 0); ref.current = null;
     } catch (e: any) { setErr(e.message); setP(null); }
     setBusy('');
@@ -396,12 +398,12 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
     try {
       const r = await fetch('/api/client/admin/vouchers/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: p.code, amount: hodnota, ref: novyRef(), bill: ucet === '' ? null : Number(ucet) }) });
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) { if (r.status < 500) ref.current = null; if (x.poukaz) setP(x.poukaz); throw new Error(x.error || 'Nepovedlo se.'); }
+      if (!r.ok) { if (r.status < 500) ref.current = null; if (x.poukaz) setP(x.poukaz); throw new Error(x.error || t('Nepovedlo se.')); }
       ref.current = null;
       // Hned říkáme, co s body: z části účtu zaplacené poukazem se body nepočítají (nastavení podniku).
       onToast(x.opakovani ? `Už uplatněno: ${money(x.castka)}.` : `Uplatněno ${money(x.castka)}. Na poukazu zbývá ${money(x.poukaz.balance)}.${x.bezBodu ? ` Při připsání bodů zadej ${money(x.castka)} jako zaplaceno poukazem.` : ''}`);
       setP(x.poukaz); setCastka(''); setUcet(''); onChange?.();
-    } catch (e: any) { setErr(e.message || 'Nepovedlo se.'); }
+    } catch (e: any) { setErr(e.message || t('Nepovedlo se.')); }
     setBusy('');
   };
   const cislo = Number(castka);
@@ -418,7 +420,7 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
             className="font-mono tracking-[0.2em] uppercase min-w-0" />
           <Button type="submit" variant="primary" icon="search" loading={busy === 'najit'}>Najít</Button>
           </div>
-          {canScan && <Button type="button" variant="secondary" icon="camera" className="w-full" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
+          {canScan && <Button type="button" variant="secondary" icon="camera" className="w-full" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? t('Zavřít kameru') : t('Skenovat')}</Button>}
         </form>
       ) : (
         <div className="space-y-3">
@@ -438,16 +440,16 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
                 </div>
               )}
               <div className="rada rada-pruzna rada-m">
-                <Input aria-label={`Částka k uplatnění v ${symbol}`} type="number" inputMode="numeric" min={1} max={p.balance} step={1} value={castka}
+                <Input aria-label={t('Částka k uplatnění v {mena}', { mena: symbol })} type="number" inputMode="numeric" min={1} max={p.balance} step={1} value={castka}
                   onChange={e => { setCastka(e.target.value); ref.current = null; }} placeholder={`Max ${p.balance}`} className="text-center min-w-0" />
-                <Button type="submit" variant="primary" icon="check" loading={busy === 'uplatnit'} disabled={!castkaOk}>Uplatnit</Button>
+                <Button type="submit" variant="primary" icon="check" loading={busy === 'uplatnit'} disabled={!castkaOk}>{t('Uplatnit')}</Button>
               </div>
-              <Button type="button" variant="secondary" className="w-full" disabled={busy === 'uplatnit' || !ucetOk} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatni(p.balance); }}>Celý zůstatek</Button>
+              <Button type="button" variant="secondary" className="w-full" disabled={busy === 'uplatnit' || !ucetOk} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatni(p.balance); }}>{t('Celý zůstatek')}</Button>
             </form>
           ) : (
-            <p className="t-meta">{p.stav === 'expired' ? 'Platnost poukazu skončila, uplatnit ho nejde. Prodloužit ho může správce.' : p.stav === 'used' ? 'Poukaz je vyčerpaný.' : 'Poukaz je zrušený.'}</p>
+            <p className="t-meta">{p.stav === 'expired' ? t('Platnost poukazu skončila, uplatnit ho nejde. Prodloužit ho může správce.') : p.stav === 'used' ? t('Poukaz je vyčerpaný.') : t('Poukaz je zrušený.')}</p>
           )}
-          <Button variant="ghost" size="sm" className="w-full" onClick={() => { setP(null); setKod(''); setCastka(''); setUcet(''); setMinUtrata(0); setErr(''); ref.current = null; }}>Jiný poukaz</Button>
+          <Button variant="ghost" size="sm" className="w-full" onClick={() => { setP(null); setKod(''); setCastka(''); setUcet(''); setMinUtrata(0); setErr(''); ref.current = null; }}>{t('Jiný poukaz')}</Button>
         </div>
       )}
       {cam && !p && <Camera prijmi={prijmiPoukaz} onCode={c => { setCam(false); void najdi(c); }} onError={m => { setCam(false); setErr(m); }} />}
