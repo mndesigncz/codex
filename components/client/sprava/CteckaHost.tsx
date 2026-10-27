@@ -2,7 +2,7 @@
 
 // Čtečka u kasy → host po načtení karty (kolo 92, koncept B „B", reference Loopy 11b/2–4).
 // Jedna obrazovka, dvě akce: kdo to je (jméno, úroveň, kolikátá návštěva, kdy byl naposledy),
-// stav karty v barvě podniku, co si host sám vybral k uplatnění (záměr z aplikace hosta, kontrakt
+// stav karty (karta hosta jako v jeho aplikaci, barva podniku jen na dlaždici loga), co si host sám vybral k uplatnění (záměr z aplikace hosta, kontrakt
 // HOST ↔ SPRÁVA §2a), kolik razítek za tuhle návštěvu (−/+, výchozí 1 podle pravidla) a jedna
 // kombinovaná akce „Uplatnit … a přidat razítko". Druhá akce je jen razítko.
 //

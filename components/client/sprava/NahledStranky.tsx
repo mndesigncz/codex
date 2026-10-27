@@ -2,7 +2,8 @@
 
 // Podnik → Stránka podniku: živý náhled stránky pro hosty (kolo 92, koncept B „H", audit C §7).
 // Mění se při každé úpravě vlevo (logo, fotka, barva, motto, adresa) ještě před uložením.
-// Barva podniku jen v hlavičce a na kartě hosta (rozhodnutí koordinátora); hlavní akce hosta
+// Paleta Managera (korekce 2026-10-27): hlavička bez fotky je inkoustová jako na stránce hosta,
+// karta hosta bílá s linkou; barva značky podniku je jen na dlaždici loga. Hlavní akce hosta
 // zůstává limetková. Otevírací doba je z Rozvrhu (jen ke čtení). Kontrast barvy se měří
 // (staciKontrast), ne odhaduje.
 
@@ -10,7 +11,7 @@ import { Icon } from '../../Icons';
 import { staciKontrast } from '@/lib/floorplan';
 import { hoursLabel, vOteviraciDobe, type OpeningHours } from '@/lib/clientSlots';
 import { pragueHM, pragueToday } from '@/lib/pragueTime';
-import { KartaPodniku, LogoPodniku, RamTelefonu, barvyKarty } from './NahledKarty';
+import { KartaPodniku, LogoPodniku, RamTelefonu } from './NahledKarty';
 
 export default function NahledStranky({ p }: { p: any }) {
   const nazev = String(p.team_name || 'Tvůj podnik');
@@ -19,13 +20,12 @@ export default function NahledStranky({ p }: { p: any }) {
   const oteviracka = hoursLabel(hodiny, dnes);
   const otevreno = vOteviraciDobe(hodiny, dnes, pragueHM());
   const zavira = oteviracka.includes('–') ? oteviracka.split('–')[1] : null;
-  const { bg } = barvyKarty(p.accent || null);
   const cil = Number(p.stamp_target) || 0;
   return (
     <div className="space-y-3">
       <RamTelefonu popisek="Náhled stránky podniku v telefonu hosta">
         <div>
-          <div className="relative h-36" style={p.cover_url ? undefined : { background: bg }}>
+          <div className={`relative h-36 ${p.cover_url ? '' : 'h-moje !rounded-none'}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {p.cover_url && <img src={p.cover_url} alt="" className="h-full w-full object-cover" />}
             <div className="absolute left-4 -bottom-6"><LogoPodniku nazev={nazev} logoUrl={p.logo_url || null} velikost={56} barva={p.accent || null} /></div>
@@ -57,8 +57,8 @@ export default function NahledStranky({ p }: { p: any }) {
         <p className={`text-[13px] flex items-start gap-1.5 ${staciKontrast(p.accent) ? 'text-black/60' : 'text-wait-ink'}`}>
           <Icon name={staciKontrast(p.accent) ? 'check' : 'warning'} size={14} className="mt-0.5 shrink-0" />
           {staciKontrast(p.accent)
-            ? 'Kontrast: text na této barvě je čitelný.'
-            : 'Na této barvě se text špatně čte. Zkus ji o kus ztmavit nebo zesvětlit.'}
+            ? 'Kontrast: písmeno na dlaždici loga je na této barvě čitelné.'
+            : 'Na této barvě se písmeno na dlaždici loga špatně čte. Zkus ji o kus ztmavit nebo zesvětlit.'}
         </p>
       )}
     </div>
