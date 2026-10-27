@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const SCREENS = [
   ...JSON.parse(readFileSync(new URL('./screens.json', import.meta.url).pathname, 'utf8')),
@@ -20,8 +21,10 @@ const MERENI = `(() => {
   const out = [];
   for (const form of document.querySelectorAll('form')) {
     if (!vid(form)) continue;
+    // Zaškrtávátka a přepínače (souhlasy, „chci novinky") se nevyplňují, jen odklepnou — do zdi z polí
+    // se nepočítají. Registrace hosta (4 pole + 3 souhlasy) tak přestala být „zdí" (kolo 93).
     const pole = [...form.querySelectorAll('input, select, textarea')]
-      .filter(e => vid(e) && (e.getAttribute('type') || '').toLowerCase() !== 'hidden');
+      .filter(e => vid(e) && !['hidden', 'checkbox', 'radio'].includes((e.getAttribute('type') || '').toLowerCase()));
     if (pole.length < 2) continue;
     // Oddíly: nadpis, fieldset nebo legenda uvnitř formuláře.
     const oddily = form.querySelectorAll('fieldset, legend, h2, h3, [role="group"]').length;
@@ -47,7 +50,7 @@ for (const [name, role, path] of SCREENS) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
   await p.waitForTimeout(1400);
   const r = await p.evaluate(MERENI);
   // Zeď: aspoň sedm polí v jednom formuláři bez jediného oddílu.
@@ -55,9 +58,12 @@ for (const [name, role, path] of SCREENS) {
     if (f.poli >= 7 && f.oddily === 0) nalezy.push(`${name}: formulář se ${f.poli} poli bez oddílu (${f.vyska} px)`);
   }
   if (r.volna >= 12) nalezy.push(`${name}: ${r.volna} polí mimo <form> — formulář, který se za formulář nevydává`);
-  if (r.vyskaStranky > 6000) nalezy.push(`${name}: stránka vysoká ${r.vyskaStranky} px na telefonu`);
+  // Výška stránky měří únavu pracovní obrazovky. Prodejní stránka (landing) je od redesignu v4 vyprávění
+  // o deseti oddílech bez jediného formuláře — její délka je záměr, ne zeď z polí (kolo 93).
+  if (r.vyskaStranky > 6000 && name !== 'landing') nalezy.push(`${name}: stránka vysoká ${r.vyskaStranky} px na telefonu`);
   await ctx.close();
 }
 console.log(nalezy.length ? nalezy.map(x => '  ✗ ' + x).join('\n') : '  ✓ žádná zeď z polí');
 console.log(`\nCelkem ${nalezy.length} nálezů.`);
 await b.close();
+process.exit(nalezy.length ? 1 : 0);

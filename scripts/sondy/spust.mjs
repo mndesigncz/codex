@@ -1,7 +1,7 @@
 // Sondy v prohlížeči — spouštěč.
 //
-// Každá sonda (*.mjs v téhle složce) otevře aplikaci na localhost:3000
-// v Chromiu, API podvrhne fixturami z ./fixtury a tvrdí, co má být na
+// Každá sonda (*.mjs v téhle složce) otevře aplikaci na SONDY_ZAKLAD
+// (výchozí http://localhost:3000) v Chromiu, API podvrhne fixturami z ./fixtury a tvrdí, co má být na
 // obrazovce vidět. Dřív žily jen v pracovní složce jedné session a při
 // její ztrátě se musely skládat z historie; tady jsou v repu a v CI.
 //
@@ -10,8 +10,12 @@
 //   node scripts/sondy/spust.mjs k64 k60    # jen vybrané
 //   node scripts/sondy/spust.mjs --vse      # všechny (i rozpracované)
 //
-// Předpoklad: běží `next start -p 3000` se stejným NEXTAUTH_SECRET, jaký
-// má tenhle proces (sondy si podle něj razí session cookie).
+// Předpoklad: běží `next start -p 3000` (nebo jiný port a SONDY_ZAKLAD=http://localhost:<port>)
+// se stejným NEXTAUTH_SECRET, jaký má tenhle proces (sondy si podle něj razí session cookie).
+//
+// Sonda spadla, když skončí nenulovým kódem, NEBO když její výpis má řádek
+// začínající „✗" (i odsazený). Pojistka pro sondy, které nález jen vypíšou
+// a skončí 0: dřív je spouštěč i CI měly za zelené (kolo 93).
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
@@ -229,7 +233,9 @@ function spust(jmeno) {
     const casovac = setTimeout(() => { out += `\n(čas vypršel po ${limit / 1000} s)`; p.kill('SIGKILL'); }, limit);
     p.on('close', code => {
       clearTimeout(casovac);
-      resolve({ jmeno, ok: code === 0, sekund: Math.round((Date.now() - start) / 1000), out });
+      const krizek = /^\s*✗/m.test(out);
+      if (code === 0 && krizek) out += '\n(sonda skončila 0, ale vypsala ✗: bere se jako spadlá)';
+      resolve({ jmeno, ok: code === 0 && !krizek, sekund: Math.round((Date.now() - start) / 1000), out });
     });
   });
 }
@@ -250,9 +256,9 @@ for (const r of spadle) {
   // Neprošlé tvrzení napřed: dlouhý výpis (tabulka měření) by ho jinak
   // vytlačil z posledních řádků a v logu CI by chyběla příčina.
   const radky = r.out.split('\n');
-  const spadla = radky.filter(l => l.startsWith('✗'));
+  const spadla = radky.filter(l => /^\s*✗/.test(l));
   if (spadla.length) console.log(spadla.join('\n') + '\n…');
-  console.log(radky.filter(l => !l.startsWith('✓') && !l.startsWith('  ✓') && !l.startsWith('✗')).slice(-25).join('\n'));
+  console.log(radky.filter(l => !/^\s*[✓✗]/.test(l)).slice(-25).join('\n'));
 }
 // V GitHub Actions i jako anotace: ty jdou číst přes API (check-runs/…/annotations),
 // log jobu leží na externím úložišti a ne každý ho otevře.
@@ -263,7 +269,7 @@ if (process.env.GITHUB_ACTIONS === 'true') {
     // ✗ řádek i odsazené řádky pod ním (nálezy přetečení, viníci) — bez nich anotace neřekne kde.
     const pricina = [];
     radky.forEach((l, i) => {
-      if (!l.startsWith('✗') || pricina.length >= 30) return;
+      if (!/^\s*✗/.test(l) || pricina.length >= 30) return;
       pricina.push(l);
       for (let j = i + 1; j < radky.length && /^\s+\S/.test(radky[j]) && pricina.length < 30; j++) pricina.push(radky[j]);
     });

@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -15,13 +16,23 @@ async function open(url) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, locale: 'cs-CZ' });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tok('employer'), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
   const sent = [];
+  // Úkoly jako server: PATCH s checklistem se propíše do dalšího GET. Seznam po zápisu znovu načte data
+  // (TaskManager → data.reload), takže statická fixtura vrátila nezaškrtnutý seznam a tlačítko skočilo
+  // zpátky na „Odškrtnout vše" — nález sondy, ne chyba aplikace (kolo 93).
+  let ukoly = JSON.parse(readFileSync(DIR + 'tasks.json', 'utf8'));
   await ctx.route('**/api/**', async route => {
     const u = route.request().url();
     if (u.includes('/api/auth/')) return route.continue();
+    if (new URL(u).pathname === '/api/tasks') {
+      if (route.request().method() === 'PATCH') {
+        const telo = JSON.parse(route.request().postData() || '{}');
+        if (Array.isArray(telo.checklist)) ukoly = ukoly.map(x => (x.id === telo.id ? { ...x, checklist: telo.checklist } : x));
+      } else if (route.request().method() === 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ukoly) });
+    }
     // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení z fixtury balíku (jako att.mjs).
     if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
     if (route.request().method() !== 'GET') {
-      sent.push({ m: route.request().method(), u: u.replace('http://localhost:3000',''), body: route.request().postData() });
+      sent.push({ m: route.request().method(), u: u.replace(BASE,''), body: route.request().postData() });
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"token":"t1","emailSent":true}' });
     }
     const k = keyFor(u);
@@ -30,7 +41,7 @@ async function open(url) {
   });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(String(e).slice(0, 120)));
-  await p.goto('http://localhost:3000' + url, { waitUntil: 'networkidle', timeout: 30000 });
+  await p.goto(BASE + url, { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(1700);
   return { ctx, p, errs, sent };
 }
@@ -80,3 +91,4 @@ console.log('Tým — pozvat víc lidí naráz:');
 }
 console.log(problems.length ? `\nPROBLÉMŮ: ${problems.length}` : '\nVšechno prošlo.');
 await b.close();
+process.exit(problems.length ? 1 : 0);

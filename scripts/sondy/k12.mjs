@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const OUT = new URL('./shots/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -11,6 +12,13 @@ const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\
 const tok = (r) => execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} ${r}`, { encoding: 'utf8' }).trim();
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 const problems = []; const ok = m => console.log('  ✓', m); const bad = m => { console.log('  ✗', m); problems.push(m); };
+function posunDny(text) {
+  const dny = [...text.matchAll(/"(\d{4}-\d{2}-\d{2})/g)].map(m => m[1]).sort();
+  const posledni = dny[dny.length - 1];
+  const dnes = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
+  const o = Math.round((Date.parse(dnes + 'T12:00:00Z') - Date.parse(posledni + 'T12:00:00Z')) / 86400000);
+  return text.replace(/"(\d{4}-\d{2}-\d{2})/g, (_, d) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + o); return '"' + x.toISOString().slice(0, 10); });
+}
 async function open(url, role = 'employer') {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, locale: 'cs-CZ' });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tok(role), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
@@ -22,13 +30,17 @@ async function open(url, role = 'employer') {
     if (new URL(u).pathname === '/api/teams/mine') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8')), opravneni: JSON.parse(readFileSync(DIR + 'roles.json', 'utf8')).ja.opravneni, role: { klic: 'vedeni', roleId: null, nazev: 'Vlastník', typ: 'vedeni', jeVlastnik: true } }) });
     if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
     if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    // Fixtura docházky má pevná data ze září 2026; souhrn hodin ukazuje výchozí „tento měsíc", takže po
+    // přelomu měsíce byl prázdný (0 řádků → bez přepínače řazení) a sonda to jen vypsala. Data se posunou
+    // tak, aby poslední příchod byl dnes (kolo 93).
+    if (new URL(u).pathname === '/api/attendance') return route.fulfill({ status: 200, contentType: 'application/json', body: posunDny(readFileSync(DIR + 'attendance.json', 'utf8')) });
     const k = keyFor(u);
     if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(String(e).slice(0, 120)));
-  await p.goto('http://localhost:3000' + url, { waitUntil: 'networkidle', timeout: 30000 });
+  await p.goto(BASE + url, { waitUntil: 'networkidle', timeout: 30000 });
   await p.waitForTimeout(1600);
   return { ctx, p, errs };
 }
@@ -66,3 +78,4 @@ console.log('Nástěnka — archiv odepnutých:');
 }
 console.log(problems.length ? `\nPROBLÉMŮ: ${problems.length}` : '\nVšechno prošlo.');
 await b.close();
+process.exit(problems.length ? 1 : 0);
