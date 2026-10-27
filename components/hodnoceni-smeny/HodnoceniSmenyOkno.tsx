@@ -102,6 +102,8 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
   const [foto, setFoto] = useState<string | null>(null);
   const [osadka, setOsadka] = useState<number[]>([]);
   const [body, setBody] = useState<Record<number, number>>({});
+  // Poznámka konkrétnímu člověku (Martin): vidí ji jen on a vedení, dostane ji v oznámení.
+  const [poznamky, setPoznamky] = useState<Record<number, string>>({});
   const [vsem, setVsem] = useState(0);
   const [rozpis, setRozpis] = useState(false);
   const [pripominat, setPripominat] = useState(false);
@@ -144,6 +146,7 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
     setFoto(h?.foto ?? null);
     setOsadka(h ? h.osadka : (sk?.lide ?? []).map(l => l.id));
     setBody(Object.fromEntries((h?.body ?? []).map(b => [b.id, b.body])));
+    setPoznamky(Object.fromEntries((h?.body ?? []).filter(b => b.poznamka).map(b => [b.id, b.poznamka as string])));
     setRozpis(!!h?.body.length);
     setVsem(0);
     setNahled(false); setChyba(null); setHotovo(null); setMazu('ne');
@@ -153,7 +156,8 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
     ?? skupina?.lide.find(l => l.id === id)?.jmeno ?? `#${id}`, [data, skupina]);
   const avatar = (id: number) => data?.clenove.find(c => c.id === id)?.avatar ?? null;
 
-  const noveBody = useMemo(() => osadka.map(id => ({ id, body: rozpis ? body[id] ?? 0 : 0 })).filter(x => x.body !== 0), [osadka, body, rozpis]);
+  const noveBody = useMemo(() => osadka.map(id => ({ id, body: rozpis ? body[id] ?? 0 : 0, poznamka: rozpis ? (poznamky[id] ?? '').trim() || null : null }))
+    .filter(x => x.body !== 0 || !!x.poznamka), [osadka, body, poznamky, rozpis]);
   const zmeny = useMemo(() => (ulozene ? zmenyBodu(ulozene.body, noveBody) : []), [ulozene, noveBody]);
   const coUlozit = hvezdy > 0 || !!dobre.trim() || !!kritika.trim() || Object.keys(stitky).length > 0 || kNaprave || !!foto || noveBody.length > 0;
 
@@ -161,7 +165,11 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
   const nazevSkupiny = (s: SkupinaSmeny) => (s.klic === KLIC_DEN ? t('Celý den') : popisSmeny(s) ?? t('Směna'));
 
   const pridatClovek = (id: number) => { if (id && !osadka.includes(id)) setOsadka(o => [...o, id]); };
-  const odebratClovek = (id: number) => { setOsadka(o => o.filter(x => x !== id)); setBody(b => { const n = { ...b }; delete n[id]; return n; }); };
+  const odebratClovek = (id: number) => {
+    setOsadka(o => o.filter(x => x !== id));
+    setBody(b => { const n = { ...b }; delete n[id]; return n; });
+    setPoznamky(b => { const n = { ...b }; delete n[id]; return n; });
+  };
 
   const nahrajFoto = async (f: File) => {
     setNahravam(true); setChyba(null);
@@ -199,7 +207,7 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           den, klic: skupina.klic, nazev: skupina.nazev, hvezdy, dobre, kritika, stitky, kNaprave, foto, osadka,
-          body: noveBody.map(b => ({ id: b.id, body: b.body })),
+          body: noveBody.map(b => ({ id: b.id, body: b.body, poznamka: b.poznamka })),
         }),
       }).then(okJson);
       setHotovo(t('Hodnocení směny je uložené. Celá směna ho uvidí ve Zpětné vazbě.'));
@@ -326,9 +334,9 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
               }} />
             </div>
 
-            <section className="space-y-3" aria-label={t('Body pro lidi')} data-rozpis-bodu="">
-              <SwitchRow as="div" title={t('Body pro lidi')} checked={rozpis} onChange={setRozpis} disabled={!smi}
-                hint={t('Volitelné. Každému ze směny zvlášť, i záporné. Body nejsou peníze — hodnocení směny nekrátí mzdu.')} />
+            <section className="space-y-3" aria-label={t('Body a poznámky pro lidi')} data-rozpis-bodu="">
+              <SwitchRow as="div" title={t('Body a poznámky pro lidi')} checked={rozpis} onChange={setRozpis} disabled={!smi}
+                hint={t('Volitelné. Každému ze směny zvlášť body (i záporné) a poznámka, kterou uvidí jen on. Body nejsou peníze — hodnocení směny nekrátí mzdu.')} />
               {rozpis && (
                 <div className="well space-y-3 p-3.5">
                   {lidi > 1 && smi && (
@@ -355,6 +363,10 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
                               onChange={n => setBody(x => ({ ...x, [id]: n }))} popis={t('Body pro {jmeno}', { jmeno: jmeno(id) })} />
                             {smi && <IconButton icon="close" size="sm" aria-label={t('Odebrat {jmeno} ze směny', { jmeno: jmeno(id) })} onClick={() => odebratClovek(id)} />}
                           </span>
+                          <Input value={poznamky[id] ?? ''} maxLength={500} disabled={!smi} data-poznamka-clovek={id}
+                            aria-label={t('Osobní poznámka — {jmeno}', { jmeno: jmeno(id) })}
+                            placeholder={t('Osobní poznámka, uvidí ji jen {jmeno}…', { jmeno: jmeno(id).split(' ')[0] })}
+                            onChange={e => setPoznamky(x => ({ ...x, [id]: e.target.value }))} className="basis-full" />
                         </li>
                       );
                     })}

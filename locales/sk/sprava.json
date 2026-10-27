@@ -1883,7 +1883,6 @@
   "+ Přidat člověka (zaskočil)": "+ Pridať človeka (zaskočil)",
   "Bez fotky.": "Bez fotky.",
   "Bez lidí v rozvrhu": "Bez ľudí v rozvrhu",
-  "Body pro lidi": "Body pre ľudí",
   "Body pro {jmeno}": "Body pre {jmeno}",
   "Body všem": "Body všetkým",
   "Celá směna uvidí kritiku nahoře ve Zpětné vazbě a potvrdí, že ji četla.": "Celá zmena uvidí kritiku hore v Spätnej väzbe a potvrdí, že ju čítala.",
@@ -1930,11 +1929,14 @@
   "Týmová práce": "Tímová práca",
   "Uložit se změnou bodů": "Uložiť so zmenou bodov",
   "Uzávěrka a kasa": "Uzávierka a kasa",
-  "Volitelné. Každému ze směny zvlášť, i záporné. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Voliteľné. Každému zo zmeny zvlášť, aj záporné. Body nie sú peniaze — hodnotenie zmeny nekráti mzdu.",
   "Změní se body: celkem {c} b": "Zmenia sa body: spolu {c} b",
   "potvrdilo {n} z {z}": "potvrdilo {n} z {z}",
   "{n} z 5": "{n} z 5",
   "{stitek}: dobře": "{stitek}: dobre",
   "{stitek}: k nápravě": "{stitek}: na nápravu",
-  "Čistota": "Čistota"
+  "Čistota": "Čistota",
+  "Body a poznámky pro lidi": "Body a poznámky pre ľudí",
+  "Volitelné. Každému ze směny zvlášť body (i záporné) a poznámka, kterou uvidí jen on. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Voliteľné. Každému zo zmeny zvlášť body (aj záporné) a poznámka, ktorú uvidí len on. Body nie sú peniaze — hodnotenie zmeny nekráti mzdu.",
+  "Osobní poznámka — {jmeno}": "Osobná poznámka — {jmeno}",
+  "Osobní poznámka, uvidí ji jen {jmeno}…": "Osobná poznámka, uvidí ju len {jmeno}…"
 }

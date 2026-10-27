@@ -26,7 +26,7 @@ export function hodnoceniUkazky(s: DemoStav): HodnoceniSmenyDemo[] {
       id: 1, den: vcera, klic: prvni?.klic ?? 'den', nazev: prvni?.nazev ?? null, od: prvni?.od ?? null, do: prvni?.do ?? null, hvezdy: 4,
       dobre: 'Ranní nával jste zvládli bez front, hosté chválili kávu.', kritika: 'Na konci směny zůstal neumytý mlýnek a prázdné mléko v lednici.',
       stitky: { rychlost: 'plus', hoste: 'plus', cistota: 'minus' }, kNaprave: false, foto: null,
-      osadka, videli: [], body: osadka.map((id, i) => ({ id, body: i === 0 ? 5 : 3, poznamka: null })),
+      osadka, videli: [], body: osadka.map((id, i) => ({ id, body: i === 0 ? 5 : 3, poznamka: id === KDO_JSEM.zamestnanec ? 'Díky, že jsi zaskočila u pokladny.' : null })),
       kdo: clen(KDO_JSEM.vedeni).name, upraveno: `${vcera}T20:30:00Z`,
     }];
   }
@@ -35,7 +35,8 @@ export function hodnoceniUkazky(s: DemoStav): HodnoceniSmenyDemo[] {
 
 /** Pohled člena pro /api/rewards (z bodů jen jeho). */
 export function smenyClena(s: DemoStav, kdo: number): (HodnoceniProClena & { den: string })[] {
-  return hodnoceniUkazky(s).map(h => proClena(h, kdo)).filter((x): x is HodnoceniProClena => !!x)
+  const jmena = new Map(LIDE.map(l => [l.id, l.name] as [number, string]));
+  return hodnoceniUkazky(s).map(h => proClena(h, kdo, jmena)).filter((x): x is HodnoceniProClena => !!x)
     .sort((a, b) => b.den.localeCompare(a.den));
 }
 

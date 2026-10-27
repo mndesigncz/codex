@@ -54,7 +54,16 @@ export function SmenaProClena({ s, kompaktni = false }: { s: SmenaVeDni; kompakt
           ))}
         </div>
       )}
-      {s.mojePoznamka && <p className="text-[13px] text-black/60 text-pretty"><Icon name="user" size={13} className="inline -mt-0.5 mr-1" />{s.mojePoznamka}</p>}
+      {/* Osobní poznámka od vedení — vidí ji jen tenhle člověk (kolegové ne). */}
+      {s.mojePoznamka && (
+        <p className="text-sm text-black/75 text-pretty whitespace-pre-line" data-moje-poznamka="">
+          <Icon name="user" size={13} className="inline -mt-0.5 mr-1" /><span className="font-semibold text-[#16181A]">{t('Pro tebe:')}</span> {s.mojePoznamka}
+        </p>
+      )}
+      {/* Kolegové ze směny jménem (bez jejich bodů a poznámek). */}
+      {s.kolegove.length > 0 && (
+        <p className="t-meta text-pretty" data-kolegove-smeny="">{t('Na směně s tebou: {jmena}', { jmena: s.kolegove.join(', ') })}</p>
+      )}
       {s.foto && !kompaktni && (
         <a href={s.foto} target="_blank" rel="noopener noreferrer" className="inline-block rounded-[var(--r-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
