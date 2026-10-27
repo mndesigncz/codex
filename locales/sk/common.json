@@ -193,5 +193,21 @@
   "Výchozí plocha, zámky a navigace": "Predvolená plocha, zámky a navigácia",
   "Dobré ráno": "Dobré ráno",
   "Dobrý večer": "Dobrý večer",
-  "Dobrý den": "Dobrý deň"
+  "Dobrý den": "Dobrý deň",
+  "Stříbrný host": "Strieborný hosť",
+  "Zlatý host": "Zlatý hosť",
+  "Platinový host": "Platinový hosť",
+  "Člen": "Člen",
+  "Sleva {n} %": "Zľava {n} %",
+  "od {castka} útraty": "od {castka} útraty",
+  "a {n} další": "a {n} ďalšie",
+  "Sleva {n} % na {polozka}": "Zľava {n} % na {polozka}",
+  "Sleva {castka} na {polozka}": "Zľava {castka} na {polozka}",
+  "Sleva {castka}": "Zľava {castka}",
+  "Zdarma: {polozka}": "Zadarmo: {polozka}",
+  "Položka zdarma": "Položka zadarmo",
+  "{x}+{y} zdarma: {polozka}": "{x}+{y} zadarmo: {polozka}",
+  "{x}+{y} zdarma": "{x}+{y} zadarmo",
+  "jen {urovne}": "len {urovne}",
+  "mimo: {co}": "okrem: {co}"
 }

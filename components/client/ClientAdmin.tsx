@@ -680,7 +680,7 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
                         {/* Půl hodiny po čase rezervace: „Nedorazil" vedle „Usadit" — jedno klepnutí u dveří. */}
                         {nedorazil === 'tlacitko' && (
                           <Button size="sm" variant="secondary" icon="close" loading={pracuji === r.id} onClick={() => { void zmenit(r, { status: 'no_show' }); }}
-                            aria-label={t('{krok}: {host}, {cas}', { krok: t('Nedorazil'), host: r.host, cas: r.cas })}>{t('Nedorazil')}</Button>
+                            aria-label={t('{krok}: {host}, {cas}', { krok: t('Nedorazil'), host: r.host, cas: r.cas })}>{t('Nedorazil', undefined, 'tlacitko')}</Button>
                         )}
                         {dalsi.length > 0 && <Menu size="sm" label={t('Další akce s rezervací {host}', { host: r.host })} items={dalsi} />}
                       </span>

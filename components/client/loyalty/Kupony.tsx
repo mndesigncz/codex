@@ -10,6 +10,15 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import { STAV_POPISKY, type StavKuponu } from '@/lib/kuponyPravidla';
+import { benefitLabel, conditionBadges } from '@/lib/kuponyPopisky';
+import { useMoney } from '../../CurrencyProvider';
+
+/** Řádek katalogu (camelCase z API) → tvar, ze kterého lib/kuponyPopisky skládá popisky; v jazyce uživatele. */
+const radekPopisku = (c: any) => ({
+  benefit_kind: c.benefitKind, percent_off: c.percentOff, amount_off: c.amountOff, xy_buy: c.xyBuy, xy_free: c.xyFree,
+  menu_item_name: c.menuItemName, min_order_value: c.minOrderValue, target_tiers: c.targetTiers, days_of_week: c.daysOfWeek,
+  hour_from: c.hourFrom, hour_till: c.hourTill, adult_only: c.adultOnly, excluded_items: c.excludedItems, excluded_sections: c.excludedSections,
+});
 import { apiMessage, duplikujKupon, j, kuponNaForm, prazdnyKupon, stahni, type FormKupon } from './kuponyForm';
 import KuponyEditor from './KuponyEditor';
 import KuponyNahled from './KuponyNahled';
@@ -30,7 +39,11 @@ export default function Kupony({ toast }: { toast: (m: string) => void }) {
   const uplatni = useOpravneni().ma('kupony.uplatnit');
   const t = useT('sprava');
   const { jazyk } = useJazyk();
+  const money = useMoney();
   const den = (d: string) => fmtDatum(d, { jazyk, styl: 'denKratce' });
+  // Server skládá benefit a štítky česky; když řádek nese surová pole, popisky se složí znovu v jazyce uživatele.
+  const vyhoda = (c: any) => (c.benefitKind ? benefitLabel(radekPopisku(c), money, t) || c.benefit : c.benefit);
+  const stitky = (c: any): string[] => (c.benefitKind ? conditionBadges(radekPopisku(c), money, t) : c.badges ?? []);
   const [list, setList] = useState<any[] | null>(null);
   const [groups, setGroups] = useState<any[]>([]);
   const [chyba, setChyba] = useState<string | null>(null);
@@ -172,9 +185,9 @@ export default function Kupony({ toast }: { toast: (m: string) => void }) {
                     <ListRow key={c.id} className={c.active && !c.archived ? '' : 'opacity-70'}
                       lead={vybiram ? <input type="checkbox" className="h-5 w-5 accent-[#16181A]" aria-label={t('Vybrat kupon {nazev}', { nazev: c.title })} checked={vybrane.includes(c.id)}
                         onChange={() => setVybrane(v => (v.includes(c.id) ? v.filter(x => x !== c.id) : [...v, c.id]))} /> : undefined}
-                      title={<span className="flex items-center gap-1.5 min-w-0"><span className="truncate">{c.title}</span>{c.benefit && <Chip tone="muted" size="sm">{c.benefit}</Chip>}</span>}
+                      title={<span className="flex items-center gap-1.5 min-w-0"><span className="truncate">{c.title}</span>{vyhoda(c) && <Chip tone="muted" size="sm">{vyhoda(c)}</Chip>}</span>}
                       meta={[
-                        c.costPoints > 0 ? t('{n} b.', { n: c.costPoints }) : t('zdarma'), ...(c.badges ?? []),
+                        c.costPoints > 0 ? t('{n} b.', { n: c.costPoints }) : t('zdarma'), ...stitky(c),
                         c.validSince && stav === 'naplanovano' ? t('od {den}', { den: den(c.validSince) }) : null,
                         c.validUntil ? t('do {den}', { den: den(c.validUntil) }) : null,
                         c.maxTotal ? t('zbývá {n, plural, one {# kus} few {# kusy} other {# kusů}} z {max}', { n: Number(c.remaining ?? 0), max: c.maxTotal }) : null,

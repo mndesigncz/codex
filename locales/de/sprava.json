@@ -2885,5 +2885,6 @@
   "0 = Platina vypnutá.": "0 = Platin aus.",
   "0 návštěv = Platina vypnutá.": "0 Besuche = Platin aus.",
   "Kredit v {mena}": "Guthaben in {mena}",
-  "Čtečka u kasy|dok": "Scanner"
+  "Čtečka u kasy|dok": "Scanner",
+  "Nedorazil|tlacitko": "No-Show"
 }
