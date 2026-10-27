@@ -202,7 +202,9 @@ export async function hodnoceniClena(teamId: number, clen: number, limit = 20): 
   } catch { mojeBody = []; }
   const body = new Map<number, { id: number; body: number; poznamka: string | null }[]>();
   for (const b of mojeBody) body.set(Number(b.ref_id), [{ id: clen, body: Number(b.points) || 0, poznamka: b.note ?? null }]);
-  return rows.map(r => proClena(zRadku(r, body), clen)).filter((x): x is HodnoceniProClena => !!x);
+  // Jména kolegů z osádky (jen členové podniku); jejich body ani poznámky se nečtou vůbec.
+  const jmena = new Map((await clenovePodniku(teamId)).map(m => [m.id, m.name] as [number, string]));
+  return rows.map(r => proClena(zRadku(r, body), clen, jmena)).filter((x): x is HodnoceniProClena => !!x);
 }
 
 /** Člen potvrdil („Beru na vědomí") všechna hodnocení svých směn. */

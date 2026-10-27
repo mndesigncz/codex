@@ -207,6 +207,8 @@ export interface SmenaVeDni {
   mojePoznamka: string | null;
   videno: boolean;
   lidi: number;
+  /** Jména kolegů ze směny (bez jejich bodů). */
+  kolegove: string[];
 }
 
 /** Hodnocení celých směn člena (/api/rewards → smeny), nejnovější první; s dnem. */
@@ -225,6 +227,7 @@ function smenaZ(r: any): SmenaVeDni {
     hvezdy: Math.max(0, Math.min(5, cele(r?.hvezdy))), dobre: text(r?.dobre), kritika: text(r?.kritika), stitky,
     kNaprave: r?.kNaprave === true, foto: text(r?.foto), mojeBody: cele(r?.mojeBody), mojePoznamka: text(r?.mojePoznamka),
     videno: r?.videno !== false, lidi: cele(r?.lidi),
+    kolegove: seznam(r?.kolegove).filter((x: unknown): x is string => typeof x === 'string' && !!x.trim()).map((x: string) => x.trim()),
   };
 }
 

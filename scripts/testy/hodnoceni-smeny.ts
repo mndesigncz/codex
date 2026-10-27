@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   KLIC_DEN, dalsiStavStitku, jeCoUlozit, jeKlic, klicSmeny, normalizujVstup, odkazHodnoceni, popisSmeny, proClena,
-  skupinySmen, soucetZmen, stejneVsem, tonHodnoceni, vychoziSkupina, zmenyBodu,
+  skupinySmen, soucetZmen, stejneVsem, textPoznamkyProClena, tonHodnoceni, vychoziSkupina, zmenyBodu,
 } from '../../lib/hodnoceniSmeny.ts';
 import { bodyDne, dnyHodnoceni, vyberSmenyClena } from '../../lib/odmenyPrehled.ts';
 import { ZACHAZENI_TABULEK, TYMOVE_TABULKY } from '../../lib/smazaniUctu.ts';
@@ -80,6 +80,16 @@ export default function ({ eq, ok }: Testy) {
   eq('člen: vidí kritiku a JEN svoje body a poznámku (body kolegů ne)', anna && [anna.kritika, anna.mojeBody, anna.mojePoznamka, anna.videno, anna.lidi, 'body' in anna], ['Bar', -5, 'Pozdě', false, 2, false]);
   eq('člen: kdo na směně nebyl, hodnocení nedostane', proClena(radek, 3), null);
   eq('člen: štítky jen známé', anna?.stitky, { cistota: 'minus' });
+  // Martin: zaměstnanec vidí jména kolegů ze směny (ne jejich body) a poznámku jen pro sebe.
+  const jmena = new Map([[1, 'Anna Nová'], [2, 'Jakub Horák']]);
+  const jakub = proClena(radek, 2, jmena);
+  const annaSJmeny = proClena(radek, 1, jmena);
+  eq('člen: vidí jména kolegů ze směny (bez sebe)', [annaSJmeny?.kolegove, jakub?.kolegove], [['Jakub Horák'], ['Anna Nová']]);
+  eq('člen: osobní poznámka jen svému adresátovi (Anna „Pozdě", Jakub nic) a body kolegů nikde', [annaSJmeny?.mojePoznamka, jakub?.mojePoznamka, jakub?.mojeBody, JSON.stringify(jakub).includes('Pozdě'), JSON.stringify(annaSJmeny).includes('"body"')], ['Pozdě', null, 3, false, false]);
+  eq('člen: bez mapy jmen žádní kolegové (nic se nevymýšlí)', proClena(radek, 1)?.kolegove, []);
+  eq('oznámení: osobní poznámka jen do oznámení adresáta, zkrácená', [textPoznamkyProClena(' Pozdě  na směnu '), textPoznamkyProClena(null), textPoznamkyProClena('x'.repeat(200)).length], [' · Pro tebe: „Pozdě na směnu“', '', ' · Pro tebe: „'.length + 120 + 1]);
+  const vstupPoznamka = normalizujVstup({ den: '2026-10-20', klic: 'den', kritika: 'k', osadka: [1, 2], body: [{ id: 2, body: 0, poznamka: ' Utři bar ' }] });
+  eq('vstup: poznámka člověku i bez bodů se uloží', vstupPoznamka.ok && vstupPoznamka.v.body, [{ id: 2, body: 0, poznamka: 'Utři bar' }]);
 
   // ---- Zpětná vazba a Hodnocení mých směn (lib/odmenyPrehled) ----
   const raw = {
@@ -91,6 +101,7 @@ export default function ({ eq, ok }: Testy) {
   eq('dny: hodnocení celé směny je u svého dne; kritika k nápravě = výtka, nepotvrzené = nové', [dny[0].den, dny[0].smeny?.length, dny[0].vytka, dny[0].videno, dny[0].hvezdy], ['2026-10-20', 1, true, false, 2]);
   eq('dny: body ze směny se počítají jednou (položka smena), ne znovu z hodnocení', bodyDne(dny[0]), -5);
   eq('dny: den bez hodnocení celé směny pole smeny nemá (tvar dřívějších dnů beze změny)', 'smeny' in dny[1], false);
+  eq('člen: parser nese jména kolegů', vyberSmenyClena({ smeny: [{ ...anna, den: '2026-10-20', kolegove: ['Jakub Horák', '', 5] }] })[0].kolegove, ['Jakub Horák']);
   eq('člen: parser /api/rewards → smeny, nejnovější první', vyberSmenyClena({ smeny: [{ ...anna, den: '2026-10-18', id: 1 }, { ...anna, den: '2026-10-20', id: 2 }, { den: null }] }).map(s => s.id), [2, 1]);
 
   // ---- odkaz z oznámení ----
@@ -101,6 +112,7 @@ export default function ({ eq, ok }: Testy) {
   const api = zdroj('app/api/hodnoceni-smeny/route.ts');
   ok('API: čtení s hodnoceni.zobrazit, zápis a mazání s hodnoceni.hodnotit, tablet nikdy',
     api.includes("pozaduj('hodnoceni.zobrazit')") && (api.match(/pozaduj\('hodnoceni\.hodnotit'\)/g) ?? []).length === 3 && (api.match(/typ === 'kiosk'/g) ?? []).length >= 5);
+  ok('API: osobní poznámka jde jen v oznámení adresáta (notifyUser s textPoznamkyProClena), ostatním společné', api.includes('notifyUsers(komu.filter(id => !poznamka(id))') && api.includes('textPoznamkyProClena(poznamka(id))'));
   ok('API: osádka jen z členů podniku (jeClenem) a audit uložení i smazání', api.includes('jeClenem(id, c.teamId)') && api.includes("'smena.hodnoceni'") && api.includes("'smena.hodnoceni_smazat'"));
   ok('audit: popisky akcí hodnocení směny', !!AUDIT_POPISKY['smena.hodnoceni'] && !!AUDIT_POPISKY['smena.hodnoceni_smazat'] && !!AUDIT_POPISKY['smena.hodnoceni_pravidlo']);
   const db = zdroj('lib/hodnoceniSmenyDb.ts');

@@ -1883,7 +1883,6 @@
   "+ Přidat člověka (zaskočil)": "+ Dodaj osobę (zastępstwo)",
   "Bez fotky.": "Bez zdjęcia.",
   "Bez lidí v rozvrhu": "Nikt w grafiku",
-  "Body pro lidi": "Punkty dla osób",
   "Body pro {jmeno}": "Punkty dla {jmeno}",
   "Body všem": "Punkty dla wszystkich",
   "Celá směna uvidí kritiku nahoře ve Zpětné vazbě a potvrdí, že ji četla.": "Cała zmiana zobaczy krytykę na górze w Opinii i potwierdzi, że ją przeczytała.",
@@ -1930,7 +1929,6 @@
   "Týmová práce": "Praca zespołowa",
   "Uložit se změnou bodů": "Zapisz ze zmianą punktów",
   "Uzávěrka a kasa": "Zamknięcie i kasa",
-  "Volitelné. Každému ze směny zvlášť, i záporné. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Opcjonalne. Każdemu ze zmiany osobno, także ujemne. Punkty to nie pieniądze — ocena zmiany nie obniża wynagrodzenia.",
   "Změní se body: celkem {c} b": "Zmienią się punkty: razem {c} pkt",
   "potvrdilo {n} z {z}": "potwierdziło {n} z {z}",
   "{n} z 5": "{n} z 5",
@@ -2941,5 +2939,9 @@
   "0 návštěv = Platina vypnutá.": "0 wizyt = Platyna wyłączona.",
   "Kredit v {mena}": "Kredyt w {mena}",
   "Čtečka u kasy|dok": "Czytnik",
-  "Nedorazil|tlacitko": "Nie przyszedł"
+  "Nedorazil|tlacitko": "Nie przyszedł",
+  "Body a poznámky pro lidi": "Punkty i notatki dla osób",
+  "Volitelné. Každému ze směny zvlášť body (i záporné) a poznámka, kterou uvidí jen on. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Opcjonalne. Każdemu ze zmiany osobno punkty (także ujemne) i notatka, którą zobaczy tylko on. Punkty to nie pieniądze — ocena zmiany nie obniża wynagrodzenia.",
+  "Osobní poznámka — {jmeno}": "Osobista notatka — {jmeno}",
+  "Osobní poznámka, uvidí ji jen {jmeno}…": "Osobista notatka, zobaczy ją tylko {jmeno}…"
 }

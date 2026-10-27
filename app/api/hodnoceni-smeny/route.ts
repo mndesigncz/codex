@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
-import { notifyUsers } from '@/lib/push';
+import { notifyUser, notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { jeClenem, clenovePodniku } from '@/lib/tenant';
-import { jeDen, normalizujVstup, popisSmeny, tonHodnoceni, zmenyBodu } from '@/lib/hodnoceniSmeny';
+import { jeDen, normalizujVstup, popisSmeny, textPoznamkyProClena, tonHodnoceni, zmenyBodu } from '@/lib/hodnoceniSmeny';
 import {
   denKHodnoceni, hodnoceniClena, hodnoceniDnu, nastavPripominat, oznacVideno, pripominat, smazHodnoceni, ulozHodnoceni,
 } from '@/lib/hodnoceniSmenyDb';
@@ -97,19 +97,26 @@ export async function POST(req: NextRequest) {
     + `${hodnoceni.osadka.length} lidí${zmeny.length ? `, body ${zmeny.map(z => `#${z.id} ${z.pred}→${z.po}`).join(', ')}` : ''}`);
 
   // Oznámení osádce: nové hodnocení vždy, úprava jen když se změnil obsah (ne jen překlep v rozpisu bez dopadu).
+  // Osobní poznámka (Martin: „poznámka konkrétnímu člověku") jde jen tomu člověku — v jeho oznámení,
+  // ostatní ji nedostanou; změna jen jeho poznámky upozorní jen jeho.
   const zmenenObsah = !predtim || predtim.hvezdy !== hodnoceni.hvezdy || predtim.dobre !== hodnoceni.dobre
     || predtim.kritika !== hodnoceni.kritika || predtim.kNaprave !== hodnoceni.kNaprave
     || JSON.stringify(predtim.stitky) !== JSON.stringify(hodnoceni.stitky) || zmeny.length > 0;
-  if (zmenenObsah && hodnoceni.osadka.length) {
+  const poznamka = (id: number) => hodnoceni.body.find(b => b.id === id)?.poznamka ?? null;
+  const poznamkaPred = (id: number) => predtim?.body.find(b => b.id === id)?.poznamka ?? null;
+  const komu = hodnoceni.osadka.filter(id => id !== c.meId && (zmenenObsah || poznamka(id) !== poznamkaPred(id)));
+  if (komu.length) {
     try {
       const ton = tonHodnoceni(hodnoceni);
       const dLabel = `${Number(hodnoceni.den.slice(8, 10))}. ${Number(hodnoceni.den.slice(5, 7))}.`;
-      await notifyUsers(hodnoceni.osadka.filter(id => id !== c.meId), {
+      const spolecne = {
         title: hodnoceni.kNaprave ? 'Hodnocení směny — něco k nápravě' : nove ? 'Vedení ohodnotilo vaši směnu' : 'Hodnocení směny se změnilo',
         body: `${dLabel}, ${popis}${hodnoceni.hvezdy ? ` — ${hodnoceni.hvezdy}★` : ''}${ton === 'kritika' ? ' · co příště jinak' : ton === 'smisene' ? ' · pochvala i kritika' : ''}`,
         type: hodnoceni.kNaprave ? 'warning' : 'info',
         link: '/employee/shifts?view=rewards',
-      });
+      };
+      await notifyUsers(komu.filter(id => !poznamka(id)), spolecne);
+      await Promise.allSettled(komu.filter(id => !!poznamka(id)).map(id => notifyUser(id, { ...spolecne, body: spolecne.body + textPoznamkyProClena(poznamka(id)) })));
     } catch { /* best-effort */ }
   }
   return NextResponse.json({ ok: true, nove, hodnoceni, zmeny });

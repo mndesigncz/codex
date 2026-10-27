@@ -208,6 +208,13 @@ export function jeCoUlozit(v: Pick<VstupHodnoceni, 'hvezdy' | 'dobre' | 'kritika
   return v.hvezdy > 0 || !!v.dobre || !!v.kritika || Object.keys(v.stitky).length > 0 || v.kNaprave || !!v.foto || v.body.some(x => x.body !== 0);
 }
 
+/** Osobní poznámka v oznámení: „ · Pro tebe: …" (zkrácená, ať se vejde do push). */
+export function textPoznamkyProClena(poznamka: string | null | undefined, max = 120): string {
+  const p = (poznamka ?? '').trim().replace(/\s+/g, ' ');
+  if (!p) return '';
+  return ` · Pro tebe: „${p.length > max ? `${p.slice(0, max - 1)}…` : p}“`;
+}
+
 /** Tón hodnocení pro oznámení a štítek: pochvala, kritika, nebo obojí. */
 export function tonHodnoceni(v: Pick<VstupHodnoceni, 'hvezdy' | 'dobre' | 'kritika' | 'stitky' | 'kNaprave'>): 'pochvala' | 'kritika' | 'smisene' {
   const minus = v.kNaprave || !!v.kritika || Object.values(v.stitky).includes('minus') || (v.hvezdy > 0 && v.hvezdy <= 2);
@@ -271,8 +278,10 @@ export interface HodnoceniProClena {
   mojeBody: number;
   mojePoznamka: string | null;
   videno: boolean;
-  /** Kolik lidí bylo na směně (jména kolegů ne — ta zná z rozvrhu). */
+  /** Kolik lidí bylo na směně. */
   lidi: number;
+  /** Jména kolegů z osádky (Martin: zaměstnanec vidí, s kým na směně byl) — bez jejich bodů a poznámek. */
+  kolegove: string[];
 }
 
 /** Pohled člena: z rozpisu bodů jen jeho řádek. Člen mimo osádku hodnocení nedostane (null). */
@@ -280,7 +289,7 @@ export function proClena(radek: {
   id: number; den: string; klic: string; nazev: string | null; od: string | null; do: string | null; hvezdy: number;
   dobre: string | null; kritika: string | null; stitky: unknown; kNaprave: boolean; foto: string | null;
   osadka: number[]; videli: number[]; body: { id: number; body: number; poznamka: string | null }[];
-}, clen: number): HodnoceniProClena | null {
+}, clen: number, jmena: ReadonlyMap<number, string> = new Map()): HodnoceniProClena | null {
   if (!radek.osadka.includes(clen)) return null;
   const moje = radek.body.find(x => x.id === clen);
   return {
@@ -289,6 +298,8 @@ export function proClena(radek: {
     kNaprave: radek.kNaprave, foto: radek.foto,
     mojeBody: moje?.body ?? 0, mojePoznamka: moje?.poznamka ?? null,
     videno: radek.videli.includes(clen), lidi: radek.osadka.length,
+    // Z ostatních jen jméno (body a osobní poznámky kolegů zůstávají jim a vedení).
+    kolegove: radek.osadka.filter(id => id !== clen).map(id => jmena.get(id)).filter((j): j is string => !!j),
   };
 }
 

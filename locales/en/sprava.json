@@ -1883,7 +1883,6 @@
   "+ Přidat člověka (zaskočil)": "+ Add a person (filled in)",
   "Bez fotky.": "No photo.",
   "Bez lidí v rozvrhu": "No one scheduled",
-  "Body pro lidi": "Points for people",
   "Body pro {jmeno}": "Points for {jmeno}",
   "Body všem": "Points for everyone",
   "Celá směna uvidí kritiku nahoře ve Zpětné vazbě a potvrdí, že ji četla.": "The whole shift sees the critique at the top of Feedback and confirms they read it.",
@@ -1930,7 +1929,6 @@
   "Týmová práce": "Teamwork",
   "Uložit se změnou bodů": "Save with point changes",
   "Uzávěrka a kasa": "Closing and till",
-  "Volitelné. Každému ze směny zvlášť, i záporné. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Optional. Separately for each person on the shift, negative too. Points aren't money — a shift rating never cuts pay.",
   "Změní se body: celkem {c} b": "Points will change: {c} pts in total",
   "potvrdilo {n} z {z}": "{n} of {z} confirmed",
   "{n} z 5": "{n} of 5",
@@ -2941,5 +2939,9 @@
   "0 návštěv = Platina vypnutá.": "0 visits = Platinum off.",
   "Kredit v {mena}": "Credit in {mena}",
   "Čtečka u kasy|dok": "Scanner",
-  "Nedorazil|tlacitko": "No-show"
+  "Nedorazil|tlacitko": "No-show",
+  "Body a poznámky pro lidi": "Points and notes for people",
+  "Volitelné. Každému ze směny zvlášť body (i záporné) a poznámka, kterou uvidí jen on. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Optional. Points (negative too) for each person on the shift, and a note only they will see. Points aren't money — a shift rating never cuts pay.",
+  "Osobní poznámka — {jmeno}": "Personal note — {jmeno}",
+  "Osobní poznámka, uvidí ji jen {jmeno}…": "Personal note, only {jmeno} will see it…"
 }
