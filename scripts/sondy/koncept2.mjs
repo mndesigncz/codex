@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -29,7 +30,7 @@ const kontext = async (role) => {
 {
   const ctx = await kontext('employer');
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=chat', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/employer/overview?view=chat', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1600);
   // Na počítači chat neotevře konverzaci sám („Vyber konverzaci").
   await p.getByText('Týmový chat').first().click().catch(() => {}); await p.waitForTimeout(800);
@@ -38,9 +39,9 @@ const kontext = async (role) => {
     await okno.click();
     await p.keyboard.type('rozepsana zprava sondy', { delay: 10 });
     await p.waitForTimeout(400);
-    await p.goto('http://localhost:3000/employer/overview?view=tasks', { waitUntil: 'networkidle' });
+    await p.goto(BASE + '/employer/overview?view=tasks', { waitUntil: 'networkidle' });
     await p.waitForTimeout(700);
-    await p.goto('http://localhost:3000/employer/overview?view=chat', { waitUntil: 'networkidle' });
+    await p.goto(BASE + '/employer/overview?view=chat', { waitUntil: 'networkidle' });
     await p.waitForTimeout(800); await p.getByText('Týmový chat').first().click().catch(() => {});
     await p.waitForTimeout(1800);
     const v = await p.locator('textarea:visible').first().inputValue().catch(() => '');
@@ -59,7 +60,7 @@ const kontext = async (role) => {
   const ctx = await kontext('employer');
   const p = await ctx.newPage();
   const otevriPruvodce = async () => {
-    await p.goto('http://localhost:3000/employer/overview?mode=client&tab=campaigns', { waitUntil: 'networkidle' });
+    await p.goto(BASE + '/employer/overview?mode=client&tab=campaigns', { waitUntil: 'networkidle' });
     await p.waitForTimeout(1200);
     await p.getByRole('button', { name: 'Nová kampaň' }).first().click().catch(() => {});
     const okno = p.getByRole('dialog');
@@ -75,7 +76,7 @@ const kontext = async (role) => {
     await pole.click();
     await p.keyboard.type('rozepsane rozeslani sondy', { delay: 10 });
     await p.waitForTimeout(400);
-    await p.goto('http://localhost:3000/employer/overview?mode=client&tab=events', { waitUntil: 'networkidle' });
+    await p.goto(BASE + '/employer/overview?mode=client&tab=events', { waitUntil: 'networkidle' });
     await p.waitForTimeout(700);
     const znovu = await otevriPruvodce();
     const v = await znovu.locator('#kp-body').inputValue().catch(() => '');

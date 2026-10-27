@@ -18,7 +18,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { buildBoard, publicShape } from '../../lib/menu.ts';
 import { kontext, tvrdi, konec, fixtura, OUT } from './k68-spolecne.mjs';
 
-const BASE = process.env.SONDY_BASE ?? 'http://localhost:3000';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const TEL = { width: 390, height: 844 };
 const JAZYKY = [['cs', 'Čeština'], ['en', 'English'], ['de', 'Deutsch'], ['sk', 'Slovenčina'], ['pl', 'Polski']];
 

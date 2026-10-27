@@ -3,6 +3,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -24,7 +25,7 @@ async function kontext(viewport) {
     const u = route.request().url();
     if (u.includes('/api/auth/')) return route.continue();
     if (route.request().method() !== 'GET') {
-      posty.push({ url: u.replace('http://localhost:3000', ''), body: route.request().postData() });
+      posty.push({ url: u.replace(BASE, ''), body: route.request().postData() });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, organization: JSON.parse(readFileSync(DIR + 'organization.json', 'utf8')).organization, kopie: [] }) });
     }
     // Kolo 69 (B5b): Všechny podniky jsou plocha — rozložení se seznamem podniků (nástroj) z fixtury balíku.
@@ -46,12 +47,12 @@ async function kontext(viewport) {
 // 1) „Přidat podnik" jen když to server dovolí
 {
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
+  await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
   await p.locator('aside button[title^="Podnik:"]').first().click(); await p.waitForTimeout(300);
   let menu = norm(await p.locator('aside [role="menu"]').innerText());
   tvrdi('přepínač: bez vlastnictví se „Přidat podnik" nenabízí', menu.includes('kavárna karlín') && !menu.includes('přidat podnik'), menu.slice(0, 160));
   stav.muzuZalozit = true;
-  await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
+  await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
   await p.locator('aside button[title^="Podnik:"]').first().click(); await p.waitForTimeout(300);
   menu = norm(await p.locator('aside [role="menu"]').innerText());
   tvrdi('přepínač: vlastník „Přidat podnik" vidí', menu.includes('přidat podnik'), menu.slice(0, 160));
@@ -61,14 +62,14 @@ async function kontext(viewport) {
 // 2) Telefon: přepínač v hlavičce — v režimu TO GO i v plné správě
 {
   const ctx = await kontext({ width: 390, height: 844 }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
+  await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
   tvrdi('telefon (TO GO): přepínač podniků je v plovoucí hlavičce', await p.locator('button[title^="Podnik:"]').first().isVisible(), 'chybí');
   await p.locator('button[title^="Podnik:"]').first().click(); await p.waitForTimeout(300);
   const menuTogo = norm(await p.locator('[role="menu"]').first().innerText());
   tvrdi('telefon (TO GO): menu nabízí druhý podnik', menuTogo.includes('kavárna karlín'), menuTogo.slice(0, 120));
   await p.keyboard.press('Escape');
   await ctx.addInitScript(() => { try { localStorage.setItem('managero-app-mode', 'full'); } catch {} });
-  await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
+  await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
   const btn = p.locator('header button[title^="Podnik:"]').first();
   tvrdi('telefon (správa): přepínač podniků je v hlavičce', await btn.isVisible(), 'chybí');
   await btn.click(); await p.waitForTimeout(300);
@@ -83,7 +84,7 @@ async function kontext(viewport) {
 {
   stav.navodyBezZdroje = true;
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
+  await p.goto(BASE + '/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   // Kolo 7 (R7-7): organizace je vlastní sekce Nastavení (?tab=organizace), ne karta v Tým › Podnik.
   await p.waitForTimeout(600);
   const okno = p.getByRole('dialog', { name: 'Změnit sdílení?' });
@@ -109,7 +110,7 @@ async function kontext(viewport) {
 {
   stav.jenCiziKategorie = true;
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=inventory', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
+  await p.goto(BASE + '/employer/overview?view=inventory', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   await p.locator('[data-plocha] button[aria-label="Další akce"]:visible').first().click(); // kolo 69: „···" hlavičky plochy await p.waitForTimeout(300);
   await p.getByRole('menuitem', { name: /Kategorie a balení/ }).or(p.getByText('Kategorie a balení')).first().click(); await p.waitForTimeout(700);
   const m = norm(await p.locator('body').innerText());
@@ -121,7 +122,7 @@ async function kontext(viewport) {
 // 5) Ceník: fajfka a tečka mají roli, kterou odečítač přečte
 {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 950 }, locale: 'cs-CZ' }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/', { waitUntil: 'networkidle' }); await p.waitForTimeout(500);
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' }); await p.waitForTimeout(500);
   const ano = await p.locator('span[role="img"][aria-label="ano"]').count(), ne = await p.locator('span[role="img"][aria-label="ne"]').count();
   tvrdi('ceník: „ano"/„ne" mají role="img"', ano > 0 && ne > 0, `ano ${ano}, ne ${ne}`);
   await ctx.close();
@@ -130,7 +131,7 @@ async function kontext(viewport) {
 // 6) /pozastaveno nabízí přepínač (člověk s víc podniky se dostane do zdravého)
 {
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/pozastaveno', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
+  await p.goto(BASE + '/pozastaveno', { waitUntil: 'networkidle' }); await p.waitForTimeout(800);
   const m = norm(await p.locator('main').innerText());
   tvrdi('pozastaveno: stránka se ukáže a má přepínač podniků', m.includes('pozastaven') && (await p.locator('main button[title^="Podnik:"]').count()) === 1, m.slice(0, 120));
   await ctx.close();
@@ -140,7 +141,7 @@ async function kontext(viewport) {
 {
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
   await ctx.route('**/api/teams/switch', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'V tomhle podniku nejsi členem.' }) }));
-  await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
+  await p.goto(BASE + '/employer/overview?view=org', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   const pred = norm(await p.locator('main').innerText());
   await p.getByRole('button', { name: 'Otevřít', exact: true }).first().click(); await p.waitForTimeout(600);
   const po = norm(await p.locator('main').innerText());

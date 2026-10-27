@@ -1,6 +1,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -21,6 +22,6 @@ await ctx.route('**/api/**', async route => {
 const p = await ctx.newPage();
 p.on('pageerror', e => console.log('PAGEERROR:', e.message));
 p.on('console', m => { if (m.type() === 'error') console.log('CONSOLE:', m.text().slice(0, 300)); });
-await p.goto('http://localhost:3000/employer/overview?mode=client&tab=tables', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview?mode=client&tab=tables', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1500);
 await b.close();

@@ -2,6 +2,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -15,7 +16,7 @@ const posty = [];
 await ctx.route('**/api/**', async route => {
   const u = route.request().url();
   if (u.includes('/api/auth/')) return route.continue();
-  if (route.request().method() !== 'GET') { posty.push({ url: u.replace('http://localhost:3000', ''), body: route.request().postData() }); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, organization: { id: 9, name: 'Moje kavárny', settings: JSON.parse(readFileSync(DIR + 'organization.json', 'utf8')).organization.settings }, kopie: [] }) }); }
+  if (route.request().method() !== 'GET') { posty.push({ url: u.replace(BASE, ''), body: route.request().postData() }); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, organization: { id: 9, name: 'Moje kavárny', settings: JSON.parse(readFileSync(DIR + 'organization.json', 'utf8')).organization.settings }, kopie: [] }) }); }
   // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
   if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
   // Kolo 69 (B1): Rozvrh je plocha s widgety — rozložení z fixtury balíku (widgety rozvrhu a plánovač jako nástroj).
@@ -46,7 +47,7 @@ const RADEK = '(contains(@class,"well") or contains(@class,"glass-card") or self
 const radky = (text, scope = p) => scope.locator(`xpath=//*[${RADEK} and .//text()[contains(., "${text}")] and not(.//*[${RADEK} and .//text()[contains(., "${text}")]])]`);
 
 // 1) Nastavení organizace
-await p.goto('http://localhost:3000/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+await p.goto(BASE + '/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
 // Kolo 7 (R7-7): organizace je vlastní sekce Nastavení (?tab=organizace), ne karta v Tým › Podnik.
 await p.waitForTimeout(600);
 let m = norm(await p.locator('main').innerText());
@@ -69,7 +70,7 @@ tvrdi('nastavení: potvrzení rozlišuje kopie a „přestanou být vidět"', /k
 tvrdi('nastavení: zrušené potvrzení nic neuloží', posty.filter(x => x.url === '/api/organization').length === predTim, 'PATCH odešel');
 
 // 2) Sklad → Kategorie a balení
-await p.goto('http://localhost:3000/employer/overview?view=inventory', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+await p.goto(BASE + '/employer/overview?view=inventory', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
 await p.locator('[data-plocha] button[aria-label="Další akce"]:visible').first().click(); // kolo 69: „···" hlavičky plochy await p.waitForTimeout(400);
 await p.getByRole('menu').getByText('Kategorie a balení', { exact: false }).first().click(); await p.waitForTimeout(700);
 m = norm(await p.locator('body').innerText());
@@ -89,7 +90,7 @@ tvrdi('typy směn: cizí typ bez Upravit/Smazat', await p.getByRole('button', { 
 tvrdi('typy směn: vlastní typ má Upravit', await p.getByRole('button', { name: 'Upravit typ Ranní' }).count() >= 1, 'vlastní typ bez Upravit');
 
 // 4) Návody → Spravovat kategorie
-await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+await p.goto(BASE + '/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
 // Kolo 69 (B6b): správa kategorií je v „···" hlavičky plochy (Další akce → Spravovat kategorie).
 await p.locator('[data-plocha] header, [data-plocha]').first().getByRole('button', { name: 'Další akce', exact: true }).first().click(); await p.waitForTimeout(300);
 await p.getByRole('menuitem', { name: 'Spravovat kategorie' }).click(); await p.waitForTimeout(700);
@@ -98,7 +99,7 @@ tvrdi('návody: cizí kategorie s chipem', m.includes('bezpečnost z organizace'
 await p.keyboard.press('Escape'); await p.waitForTimeout(300);
 
 // 5) Odměny
-await p.goto('http://localhost:3000/employer/overview?view=rewards', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+await p.goto(BASE + '/employer/overview?view=rewards', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
 // Kolo 69 (B7): Odměny jsou plocha s widgety; katalog se spravuje v části Nastavení
 // a mazání má popisek „Smazat odměnu <název>".
 await p.locator('[data-plocha]').getByRole('tab', { name: 'Nastavení' }).click(); await p.waitForTimeout(800);

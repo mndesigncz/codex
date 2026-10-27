@@ -7,6 +7,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
@@ -53,7 +54,7 @@ const tvrdi = (popis, cond, co = '') => { console.log(`${cond ? '✓' : '✗'} $
 
 // ---- 1 + 2: uzávěrka zaměstnance ------------------------------------------
 const p = await mk(b, 'employee');
-await p.goto('http://localhost:3000/employee/shifts?view=closing', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employee/shifts?view=closing', { waitUntil: 'networkidle' });
 await p.waitForTimeout(2500);
 const t = (await p.locator('main').innerText()).replace(/[\u00a0\u202f]/g, ' ').toLowerCase();
 tvrdi('uzávěrka je vidět', t.includes('kontrola kasy'), t.slice(0, 160));
@@ -76,7 +77,7 @@ tvrdi('karta ukazuje body za dnešek s rozpisem',
 
 // ---- 3: odškrtnutí úkolu → body hned ----------------------------------------
 const p2 = await mk(b, 'employee');
-await p2.goto('http://localhost:3000/employee/shifts?view=tasks', { waitUntil: 'networkidle' });
+await p2.goto(BASE + '/employee/shifts?view=tasks', { waitUntil: 'networkidle' });
 await p2.waitForTimeout(1200);
 // Kolo 69 (B6a): zaškrtávátko úkolu je role="checkbox" pojmenované názvem úkolu
 // a „Tohle není dnešní úkol" je okno místo confirm().

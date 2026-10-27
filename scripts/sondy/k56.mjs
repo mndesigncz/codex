@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -20,7 +21,7 @@ await ctx.route('**/api/**', async route => {
   const u = route.request().url();
   if (u.includes('/api/auth/')) return route.continue();
   if (route.request().method() !== 'GET') {
-    posty.push({ url: u.replace('http://localhost:3000', ''), body: route.request().postData() });
+    posty.push({ url: u.replace(BASE, ''), body: route.request().postData() });
     if (u.includes('/api/teams/switch')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, teamId: 2, role: 'employer', teamName: 'Kavárna Karlín' }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   }
@@ -42,7 +43,7 @@ const tvrdi = (popis, cond, co = '') => { console.log(`${cond ? '✓' : '✗'} $
 // innerText vrací text po text-transform; číslice a NBSP normalizujeme.
 const norm = s => s.replace(/ /g, ' ').toLowerCase();
 
-await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/employer/overview', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const prepinac = p.locator('button[title="Podnik: Kavárna Vinohrady"]').first();
 tvrdi('přepínač podniku je v hlavičce', await prepinac.count() > 0, 'chybí');
@@ -78,7 +79,7 @@ if (await prepinac.count() > 0) {
 }
 
 // networkidle v CI občas nedoběhne do 30 s (pomalý runner) — stačí načtená stránka a pak čekat na obsah.
-await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.goto(BASE + '/employer/overview?view=org', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await p.locator('main').getByText(/moje kavárny/i).first().waitFor({ timeout: 30000 }).catch(() => {});
 await p.waitForTimeout(1500);
 const m3 = norm(await p.locator('main').innerText());
@@ -87,7 +88,7 @@ tvrdi('hluboký odkaz ?view=org otevře přehled', m3.includes('tržby celkem') 
 // Vypnuto v nastavení → přehled to přizná, nevymýšlí čísla
 await ctx.route('**/api/organization/overview**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ available: false, reason: 'vypnuto', message: 'Přehled za všechny podniky je v nastavení organizace vypnutý.' }) }));
 // networkidle v CI občas nedoběhne do 30 s (pomalý runner) — stačí načtená stránka a pak čekat na obsah.
-await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await p.goto(BASE + '/employer/overview?view=org', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await p.locator('main').getByText(/moje kavárny/i).first().waitFor({ timeout: 30000 }).catch(() => {});
 await p.waitForTimeout(1500);
 const m4 = norm(await p.locator('main').innerText());

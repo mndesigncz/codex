@@ -1,6 +1,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -30,7 +31,7 @@ for (const [name, width, url, role, type] of [
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(String(e).slice(0, 120)));
-  await p.goto('http://localhost:3000' + url, { waitUntil: 'networkidle' });
+  await p.goto(BASE + url, { waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
   const input = p.locator('input[placeholder*="Hledat"]').first();
   await input.click();

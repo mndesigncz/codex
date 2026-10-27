@@ -2,10 +2,11 @@
 // se ví, že přetéká, a prvek, o kterém se ví, že končí v půlce. Když je
 // sonda nenajde, nula z předchozího běhu nic neznamená.
 import { chromium } from 'playwright-core';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 const ctx = await b.newContext({ viewport: { width: 390, height: 900 } });
 const p = await ctx.newPage();
-await p.goto('http://localhost:3000/', { waitUntil: 'networkidle' });
+await p.goto(BASE + '/', { waitUntil: 'networkidle' });
 const r = await p.evaluate(() => {
   const s = document.querySelector('section');
   const zly = document.createElement('div');

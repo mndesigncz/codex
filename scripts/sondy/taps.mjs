@@ -1,6 +1,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const DIR = new URL('./fixtury/', import.meta.url).pathname;
 const have = new Set(readdirSync(DIR).map(f => f.replace(/\.json$/, '')));
 const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\/api\//, '');
@@ -23,7 +24,7 @@ for (const [name, role, path] of SCREENS) {
   });
   const p = await ctx.newPage();
   try {
-    await p.goto('http://localhost:3000' + path, { waitUntil: 'networkidle', timeout: 25000 });
+    await p.goto(BASE + path, { waitUntil: 'networkidle', timeout: 25000 });
     await p.waitForTimeout(900);
     const small = await p.evaluate(() => {
       const out = [];

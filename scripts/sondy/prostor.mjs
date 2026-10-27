@@ -4,7 +4,8 @@
 //  B) OSIŘELÁ BUŇKA — mřížka, kde počet dětí není násobkem počtu sloupců,
 //     takže poslední řádek zeje.
 import { chromium } from 'playwright-core';
-const URL = process.env.URL || 'http://localhost:3000/';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
+const URL = process.env.URL || BASE + '/';
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 for (const w of [390, 768, 1024, 1280, 1440]) {
   const ctx = await b.newContext({ viewport: { width: w, height: 900 } });

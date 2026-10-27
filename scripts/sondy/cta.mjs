@@ -3,6 +3,7 @@
 // sfotíte úplně jiné místo) a hledá se NEJSVĚTLEJŠÍ pixel podkladu.
 import { chromium } from 'playwright-core';
 import { PNG } from 'pngjs';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 const lum = (r, g, b2) => {
   const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
@@ -13,7 +14,7 @@ const kontrast = (L) => +(1.05 / (L + 0.05)).toFixed(2);
 for (const w of [390, 1280]) {
   const ctx = await b.newContext({ viewport: { width: w, height: 900 } });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/', { waitUntil: 'networkidle' });
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' });
   await p.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 700) { scrollTo(0, y); await new Promise(r => setTimeout(r, 90)); } });
   await p.waitForTimeout(500);
   const el = await p.evaluateHandle(() => {

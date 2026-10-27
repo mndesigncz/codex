@@ -4,9 +4,10 @@
 //     jeho pravá hrana leží mezi 55 % a 92 % obsahové šířky
 //  C) překrytý text — absolutně posazený prvek leží přes text pod sebou
 import { chromium } from 'playwright-core';
+const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
 const SIRKY = [360, 390, 414, 768, 834, 1024, 1280, 1440];
-const URL = process.env.URL || 'http://localhost:3000/';
+const URL = process.env.URL || BASE + '/';
 
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 let celkem = { A: 0, B: 0, C: 0 };
