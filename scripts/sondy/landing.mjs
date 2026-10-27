@@ -13,7 +13,7 @@ const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || 
 let celkem = { A: 0, B: 0, C: 0 };
 
 for (const w of SIRKY) {
-  const ctx = await b.newContext({ viewport: { width: w, height: 900 }, deviceScaleFactor: 1 });
+  const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: w, height: 900 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   await p.goto(URL, { waitUntil: 'networkidle' });
   // scroll celou stránkou, ať se spustí Reveal a lazy věci

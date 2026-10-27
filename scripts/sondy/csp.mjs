@@ -15,7 +15,7 @@ const r = await fetch(BASE + '/login'); const csp = r.headers.get('content-secur
 tvrdi('CSP v produkci bez unsafe-eval', !csp.includes('unsafe-eval'), csp.slice(0,120));
 // 2) stránky se vykreslí bez porušení CSP
 for (const [role, path, co] of [[null,'/','landing'],[null,'/login','přihlášení'],['employer','/employer/overview','přehled vedení'],['employer','/employer/overview?view=org','všechny podniky'],['employee','/employee/shifts','směny zaměstnance']]) {
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: 1280, height: 900 } });
   if (role) {
     const tok = execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} ${role}`, { encoding: 'utf8' }).trim();
     await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);

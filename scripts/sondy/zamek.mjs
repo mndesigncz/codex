@@ -20,7 +20,7 @@ const stavy = [
 ];
 
 for (const [jm, patch, cekano] of stavy) {
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: 1280, height: 900 } });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
   await ctx.route('**/api/**', async route => {
     const u = route.request().url();

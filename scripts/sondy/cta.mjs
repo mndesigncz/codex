@@ -12,7 +12,7 @@ const lum = (r, g, b2) => {
 const kontrast = (L) => +(1.05 / (L + 0.05)).toFixed(2);
 
 for (const w of [390, 1280]) {
-  const ctx = await b.newContext({ viewport: { width: w, height: 900 } });
+  const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: w, height: 900 } });
   const p = await ctx.newPage();
   await p.goto(BASE + '/', { waitUntil: 'networkidle' });
   await p.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 700) { scrollTo(0, y); await new Promise(r => setTimeout(r, 90)); } });

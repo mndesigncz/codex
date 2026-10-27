@@ -4,7 +4,7 @@ import { chromium } from 'playwright-core';
 const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 for (const [jm, w, h] of [['iPad na výšku', 810, 1080], ['iPad na šířku', 1080, 810]]) {
-  const p = await b.newPage({ viewport: { width: w, height: h }, hasTouch: true });
+  const p = await b.newPage({ locale: 'cs-CZ', viewport: { width: w, height: h }, hasTouch: true });
   const chyby = []; p.on('pageerror', e => chyby.push(String(e).slice(0, 120)));
   await p.goto(BASE + '/menu-akce.html', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1500);

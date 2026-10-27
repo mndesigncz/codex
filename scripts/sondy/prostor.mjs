@@ -8,7 +8,7 @@ const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://local
 const URL = process.env.URL || BASE + '/';
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 for (const w of [390, 768, 1024, 1280, 1440]) {
-  const ctx = await b.newContext({ viewport: { width: w, height: 900 } });
+  const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: w, height: 900 } });
   const p = await ctx.newPage();
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 700) { scrollTo(0, y); await new Promise(r => setTimeout(r, 80)); } });

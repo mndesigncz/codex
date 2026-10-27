@@ -4,7 +4,7 @@
 import { chromium } from 'playwright-core';
 const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
-const ctx = await b.newContext({ viewport: { width: 390, height: 900 } });
+const ctx = await b.newContext({ locale: 'cs-CZ', viewport: { width: 390, height: 900 } });
 const p = await ctx.newPage();
 await p.goto(BASE + '/', { waitUntil: 'networkidle' });
 const r = await p.evaluate(() => {
