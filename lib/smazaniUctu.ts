@@ -72,6 +72,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   shift_review_items: 'ponechat',
   // přepočty bodů zpětně (kolo 91): kdo přepočítal je anonymní autor, staré hodnoty řádků patří podniku (vrácení přepočtu)
   body_prepocty: 'ponechat',
+  // hodnocení směny jako celku: provozní záznam podniku (body z něj jsou v shift_review_items); kdo hodnotil, zůstane anonymní
+  smeny_hodnoceni: 'ponechat',
   reward_redemptions: 'ponechat', inventory_log: 'ponechat', inventory_reports: 'ponechat',
   inventory_items: 'ponechat', chat_messages: 'ponechat', messages: 'ponechat', procedure_runs: 'ponechat',
   // poznámky k úkolům, návodům, postupům, recepturám a skladu: provozní znalost podniku, autor zůstane anonymní
@@ -152,6 +154,8 @@ export const TYMOVE_TABULKY = [
   'reward_challenges',
   // kolo 91 (body-R): přepočty bodů zpětně
   'body_prepocty',
+  // hodnocení směny jako celku
+  'smeny_hodnoceni',
   'extra_work', 'extra_offers',
   // kolo 10: tresty
   'penalties', 'penalty_types', 'penalty_dismissed',

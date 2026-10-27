@@ -110,6 +110,9 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'navic.nabidka.smazat': 'Smazána položka nabídky navíc',
   'navic.ukol.vzit': 'Vzat volitelný úkol za body',
   'navic.ukol.vratit': 'Vrácen volitelný úkol za body',
+  'smena.hodnoceni': 'Ohodnocena směna (celá směna)',
+  'smena.hodnoceni_smazat': 'Smazáno hodnocení směny',
+  'smena.hodnoceni_pravidlo': 'Změna pravidla připomínat ohodnocení směny',
   'tresty.udelit': 'Udělen trest',
   'tresty.upravit': 'Upraven trest',
   'tresty.zrusit': 'Zrušen trest',
@@ -320,6 +323,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   tresty: 'odmeny', penalty: 'odmeny', penalty_type: 'odmeny',
   // týmové výzvy (kolo 8)
   vyzva: 'odmeny',
+  // hodnocení směny jako celku
+  smena: 'odmeny',
   // hosté (Managero client)
   client: 'klient', klient: 'klient', rezervace: 'klient', recenze: 'klient',
   // nastavení podniku, organizace, předplatné

@@ -13,6 +13,8 @@ import { clenovePodniku, idClenu } from '@/lib/tenant';
 import { urciKontextUzaverky, chybejiciPredUzaverkou, smiObejitPovinne } from '@/lib/povinnePredUzaverkouDb';
 import { jeZamceno, zpravaZamceno, pocty } from '@/lib/povinnePredUzaverkou';
 import { bodyZaUzaverku } from '@/lib/bodyZapisDb';
+import { pripominat as pripominatHodnoceni } from '@/lib/hodnoceniSmenyDb';
+import { odkazHodnoceni } from '@/lib/hodnoceniSmeny';
 
 export const dynamic = 'force-dynamic';
 
@@ -636,6 +638,21 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error('notify employers failed', e);
   }
+
+  // Pravidlo podniku (vypnuté výchozí): po uzávěrce připomenout ohodnocení celé směny těm, kdo smí hodnotit.
+  // Odkaz otevře okno „Ohodnotit směnu" na dni uzávěrky (lib/hodnoceniSmeny, HodnoceniSmenyHost).
+  try {
+    if (approved && await pripominatHodnoceni(c.teamId)) {
+      const hodnotitele = (await clenoveSOpravnenim(c.teamId, 'hodnoceni.hodnotit')).filter(id => id !== actorId);
+      await Promise.allSettled(hodnotitele.map(id => notifyUser(id, {
+        title: 'Směna skončila — ohodnoť ji',
+        body: `${row.shift_label ? `${row.shift_label}, ` : ''}${shiftDate}: pochval nebo zkritizuj celou směnu.`,
+        type: 'info',
+        category: 'closing',
+        link: odkazHodnoceni(shiftDate),
+      })));
+    }
+  } catch { /* best-effort — uzávěrka je uložená */ }
 
   // Co-workers: one closing can cover everyone who worked. A colleague who has
   // no planned shift can still be added manually — we then create an auto shift
