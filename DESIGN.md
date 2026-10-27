@@ -69,6 +69,7 @@ mezi sekcemi ≥ 20 px, nic nepřetéká, cíle ≥ 44 px, tmavý režim stejně
 | `.note` + `note-danger/wait/info/ok` | inline hláška (chyba, čeká, info); nikdy ručně `bg-red-500/10` |
 | `.glass` | tónovaná plocha ovládacích prvků (5 % inkoustu, v3 bez viditelného rámečku); `.glass-strong` blur jen pro plovoucí chrome |
 | `.list` + `.list-row` (+ `.list-row-tap`) | seznam v jedné kartě, řádek 56 px, linky mezi řádky kreslí `.list` |
+| `.h-plocha` (+ `.h-sklo`, `.h-dok`, `.h-list-sklo`) | **jen host** (`/client…`) a rám náhledu hosta ve správě: skvrny limetky a krému za obsahem, `.card`/`.h-karta` uvnitř jako sklo — viz „Host: sklo, rozostření a pozadí“ |
 
 Karty v kartách jsou zakázané — uvnitř karty je jamka nebo seznam.
 **Dekorativní přechody v kartách jsou zakázané** (limetkový „dotek“ v rohu
@@ -2204,22 +2205,22 @@ třídy `.h-*` v `app/globals.css` (každá s tmavou variantou).
 
 - **Motiv:** host jede podle telefonu (`window.__motivVychozi` ze skriptu v `app/layout.tsx`, volba
   Systém / Světlý / Tmavý v Moje → Jazyk a vzhled, jen na zařízení). Pole QR (`.h-qr-pole`) je bílé vždy.
-- **Karta podniku** (`KartaPodniku`, sdílená se správou jako živý náhled): bílá karta s linkou
-  (`.h-karta` = `--surface`, `--surface-line`, `--shadow-card`; v tmavém `--surface`), dlaždice loga,
+- **Karta podniku** (`KartaPodniku`, sdílená se správou jako živý náhled): pod `.h-plocha` bílé sklo
+  (mimo ni, např. ve čtečce u kasy, `.h-karta` = `--surface`, `--surface-line`, `--shadow-card`), dlaždice loga,
   **jedno číslo** 34/600 tabular (razítka X / N, nebo body), jedna věta, stav „Připraveno“
   (`.h-pripraveno`, limetka) vpravo u čísla. Lišta bodů: dráha v jamce, pokrok limetkou, rysky prahů inkoustem.
 - **Razítka s datem** (`RazitkaMrizka`): kolečka 5 v řadě, plné = inkoust s datem návštěvy („2.9.“;
   v tmavém světlé), prázdné čárkované, poslední = odměna v limetkové jamce (plná = limetka); právě
   připsané je limetkové s prstencem a docvakne (`.h-pop`, 220 ms).
-- **Dok hosta:** `Karta · Podniky · [U kasy] · Odměny · Aktivita`; U kasy je inkoustový kruh 56 s limetkovou
+- **Dok hosta:** `Karta · Podniky · [U kasy] · Odměny · Aktivita`, plovoucí sklo `.h-dok`; U kasy je inkoustový kruh 56 s limetkovou
   ikonou QR (tmavě limetkový kruh), vystupuje nad dok. Aktivní položka = limetková pilulka pod ikonou.
   Profil („Moje“) je za avatarem (limetkový kruh s iniciálami) v hlavičce Karty a v liště od md.
 - **Telefon bez horní lišty** pro přihlášeného: obrazovka začíná svým nadpisem (t-page 28–32). Od md lišta
   se čtyřmi položkami, „Ukázat kartu“ (inkoust) a avatarem.
 - **U kasy / Razítko připsáno / Rezervace / Živý poukaz** jsou `<Modal>` (na telefonu zdola, U kasy na
   celou výšku). Odezva: `.h-plus` (limetkový kruh 72 s „+1“), karta razítek, dvě akce ½ + ½ × 52.
-- **Stránka podniku:** inkoustová hlavička (`.h-moje`, sklo `.h-kruh-sklo` pro Zpět a Sdílet, dlaždice loga 64)
-  přes šířku telefonu, pod ní karta s řadou akcí (`.h-akce`, 4 rovné díly, ikona v jamce 40 + popisek 13);
+- **Stránka podniku:** hlavička ze skla nad skvrnami (`.h-sklo`, kruhy `.h-kruh-svetle` pro Zpět
+  a Sdílet, dlaždice loga 64, inkoustový text) přes šířku telefonu, pod ní karta s řadou akcí (`.h-akce`, 4 rovné díly, ikona v jamce 40 + popisek 13);
   od md dva sloupce (karta a odměny vlevo, menu a info vpravo). „Stát se členem“ je limetka (`btn-accent`),
   tlačítko banneru inkoust (`btn-primary`, na fotce bílé `.h-cta-foto`), banner bez fotky je `.card`.
 - **Čipy dne a času** (`.h-cip`, výška 36, v rezervaci 44 `.h-cas`): vybraný inkoust, obsazený přeškrtnutý.
@@ -2231,13 +2232,14 @@ Koncept B vyplnil barvou značky podniku karty na domově (tmavě zelená, hněd
 i kartu razítek. Martin: „vypadalo to dost dobře, jen ses nedržel našich barev.“ Host je Managero, ne
 mozaika barev podniků — a s pěti podniky na domově se z barev stane pestrý seznam, ve kterém nic nevede.
 
-- **Barva značky podniku je jen na dlaždici loga** (`LogoPodniku`: logo na bílé s linkou; bez loga první
-  písmeno na barvě podniku, písmo podle `onAccent`; bez barvy grafit `#2B2F33`). Nikde jinde v aplikaci
-  hosta — ne karta, hlavička, razítka, tlačítko, banner ani tečky karuselu. `stylKarty`, `--k-bg` a `--k-ink`
+- **Barva značky podniku se u hosta nepoužívá** (`LogoPodniku`: logo na bílé s linkou; bez loga první
+  písmeno v inkoustu `.h-logo-pismeno`). Nikde v aplikaci hosta — ne dlaždice, karta, hlavička, razítka,
+  tlačítko, banner ani tečky karuselu. `stylKarty`, `--k-bg` a `--k-ink`
   jsou pryč; `barvyKarty` zůstává jen pro dlaždici.
 - **Jedna inkoustová plocha na obrazovku.** Domov: Moje karta s QR (`.h-moje`) — proto jsou karty podniků
   pod ní bílé s linkou, ne inkoustové: QR zůstane nejvýraznější a karty se čtou jako seznam, jako karty
-  ve Správě. Stránka podniku: hlavička. U kasy a odezva: nic (bílý list, limetkové +1).
+  ve Správě. Stránka podniku: nic (hlavička je od korekce skla sklo). U kasy a odezva: nic (skleněný
+  list, limetkové +1).
 - **Karta razítek** je bílá s inkoustovými razítky všude (domov, stránka podniku, odezva u kasy, náhledy
   ve správě, čtečka) — stejná komponenta, stejné barvy.
 - **Limetka** zůstává tam, kde dřív: hlavní akce, „Připraveno“, pokrok, právě připsané razítko, odměna, +1.
@@ -2246,3 +2248,37 @@ mozaika barev podniků — a s pěti podniky na domově se z barev stane pestrý
   `lib/menuTheme.ts`), e-maily a tisk barvu podniku nečtou. Vysvětluje to Stránka podniku → Barva značky.
 - Ukázka `/client/demo` má v datech barvy podniků dál (dlaždice loga je ukazuje); do ploch se nepropisují.
 
+### Host: sklo, rozostření a pozadí (korekce 2026-10-27)
+
+Martin k návrhu v paletě: „Používej naše barvy a glass + blur efekty a pozadí.“ Host přebírá povrch, na
+kterém stála skleněná prodejní stránka (třídy zůstaly v `app/globals.css`: `.lgx`, `.lgx-strong`, `.lg-blob-*`,
+`.lg-bar`), a nepřináší žádnou novou barvu: inkoust, bílá a krém, limetka.
+
+- **Pozadí:** kořen hosta `.h-plocha` (ClientShell) má pod obsahem `PozadiHosta` (`components/client/host/PozadiHosta.tsx`):
+  limetka vpravo nahoře, krém vlevo, slabší limetka dole pod dokem, `.lg-blob` rozmazané 70 px, **statické**
+  a fixní k oknu, `z-index: -1` v izolovaném kontextu — nikdy přes text. Totéž v rámu náhledu ve správě (`ram`).
+- **Karty a panely = sklo** (`.lgx`): uvnitř `.h-plocha` dostane každá `.card` / `.h-karta` průsvitný bílý přechod
+  (78 → 48 %, jako `.lgx`), `blur(18px) saturate(170%)`, bílou hranu, odlesk na horní hraně a vlasový inkoustový prstenec
+  (na světlém plátně by bílá hrana zmizela). Odměny, Aktivita, Moje, karty podniků, Podniky, stránka podniku,
+  přihlášení od md (`.karta-od-md`). Přechod je tu materiál skla, ne dekorace — zákaz přechodů v kartách
+  platí pro aplikaci, host je výjimka jako landing.
+- **Hlavička stránky podniku** je `.h-sklo` přes šířku telefonu (limetka za ní prosvítá), stejně tak hlavička
+  v náhledu stránky ve správě.
+- **Silné sklo** (`.lgx-strong`): list U kasy a živý poukaz
+  `.h-list-sklo` (pole QR v něm zůstává pevně bílé kvůli čtečce), dok `.h-dok` (krytí 88 → 72 %, pod
+  popisky projíždí text). Lišta od md a lišta nepřihlášeného jsou `.lg-bar`: nahoře bez pozadí, sklo až
+  po posunu (hlídka + IntersectionObserver, žádný posluchač scrollu).
+- **Moje karta s QR** zůstává jediná inkoustová plocha domova; dostala jen odlesk skla (bílý přechod 9 %
+  v horním rohu, světlá horní hrana).
+- **Tmavý režim** (landing ho nemá): sklo = bílá 10 → 5,5 % s blurem a hranou 9 %, dok a lišta inkoust
+  72–74 % s blurem, skvrny limetka 12 % a 7 % a o pětinu menší (víc se na inkoustu slije do olivové plochy —
+  tmavě zelenou nepoužíváme), krém 3,5 % (na inkoustu by šedl). Text `#EDF2E4` a tlumený
+  66 % drží nad sklem ≥ 4,5 : 1 (sondy dark, tokeny, barva).
+- **Výkon:** blur nese kontejner (karta, seznam v kartě, dok, list), řádky uvnitř ho nemají. Opakované karty
+  dlouhého seznamu (oddíly menu podniku) mají `.h-sklo-tichy` — totéž sklo bez `backdrop-filter`; pod nimi je
+  jen statické rozmazané pozadí, takže vypadají stejně a telefon nepočítá blur za každou.
+- **Přístupnost:** `prefers-reduced-transparency` → plné plochy z tokenů (`--surface`) bez blur, skvrny pryč
+  (`.lg-blob`); `prefers-contrast: more` a `data-contrast="high"` → zřetelný okraj jako `.card`; skvrny se nehýbou
+  vůbec, takže `prefers-reduced-motion` nemá co tlumit.
+- **Správa** zůstává ve stylu aplikace; skleněný povrch má jen rám náhledu hosta (`RamTelefonu`: Věrnost,
+  Stránka podniku), ať náhled odpovídá tomu, co host uvidí.
