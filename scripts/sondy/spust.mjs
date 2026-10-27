@@ -13,6 +13,10 @@
 // Předpoklad: běží `next start -p 3000` (nebo jiný port a SONDY_ZAKLAD=http://localhost:<port>)
 // se stejným NEXTAUTH_SECRET, jaký má tenhle proces (sondy si podle něj razí session cookie).
 //
+// Jazyk: od kola 93 rozhoduje (bez cookie managero-lang) jazyk prohlížeče. Kontext Playwrightu bez
+// `locale` posílá Accept-Language en-US, takže aplikace odpoví anglicky — sonda, která tvrdí české
+// texty, si proto nastaví `locale: 'cs-CZ'` (nebo cookie managero-lang).
+//
 // Sonda spadla, když skončí nenulovým kódem, NEBO když její výpis má řádek
 // začínající „✗" (i odsazený). Pojistka pro sondy, které nález jen vypíšou
 // a skončí 0: dřív je spouštěč i CI měly za zelené (kolo 93).
@@ -195,6 +199,8 @@ export const ZELENE = [
   'skladba',
   // ověření kola 92: čtečka u kasy ↔ host (přibalená odměna, jedna akce, živá odezva +2 a uplatnění)
   'k92-ctecka-host',
+  // kolo 93: v angličtině a němčině žádná čeština mimo data ukázky (/demo všechny role a záložky Managero client, /client/demo)
+  'k93-jazyk-ui',
 ];
 
 const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy', 'preteceni-jadro']);
@@ -220,7 +226,7 @@ mkdirSync(DIR + 'shots', { recursive: true });
 const SOUBEZNE = Number(env.SONDY_SOUBEZNE ?? 3);
 const LIMIT_MS = Number(env.SONDY_LIMIT_MS ?? 240_000);
 // Sondy, které měří desítky obrazovek ve čtyřech bězích (motiv × šířka), potřebují víc času.
-const LIMITY = { skladba: 900_000 };
+const LIMITY = { skladba: 900_000, 'k93-jazyk-ui': 900_000 };
 
 function spust(jmeno) {
   return new Promise(resolve => {

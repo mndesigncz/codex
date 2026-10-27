@@ -25,6 +25,8 @@ import { czCount, type CzNoun } from '@/lib/czech';
 import type { DenPokladny, OsobaPokladny, PolozkaPokladny, TonRady } from '@/lib/financeWidgety';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { aktualniJazyk } from '@/lib/i18n/stav';
+import { zkratkyDnuOdNedele } from '@/lib/weekJazyk';
 
 // Výběr dat z /api/pos/daily a období jsou čistá logika v lib/financeWidgety (testuje se v Node);
 // odsud se jen znovu vyvážejí, ať widgety tržeb berou všechno z jednoho místa.
@@ -37,7 +39,11 @@ export const KUS: CzNoun = { one: 'kus', few: 'kusy', many: 'kusů' }; // i18n-o
 
 const PISMENA_DNU = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So']; // i18n-ok
 /** „Po" z „2026-09-21" — poledne UTC, ať se den nepřehoupne podle pásma zařízení. */
-export const pismenoDne = (d: string) => PISMENA_DNU[new Date(`${d}T12:00:00Z`).getUTCDay()] ?? '';
+export const pismenoDne = (d: string) => {
+  const jazyk = aktualniJazyk();
+  const dny = jazyk === 'cs' ? PISMENA_DNU : zkratkyDnuOdNedele(jazyk);
+  return dny[new Date(`${d}T12:00:00Z`).getUTCDay()] ?? '';
+};
 /** „21. 9." */
 export const kratkeDatum = (d: string) => {
   const [, m, dd] = d.split('-').map(Number);

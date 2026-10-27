@@ -50,7 +50,8 @@ import {
   vyberCleny, vyberHodnoceni, vyberRezervace, vyberVernost, varovaniHosta, type RazeniClenu, type Rezervace, type StavRezervace, type KrokPropojeni,
 } from '@/lib/klientPrehled';
 import { krokyPruvodce, procento } from '@/lib/klientSprava/zdravi';
-import { RES_STATUS, czDay } from '@/lib/clientSlots';
+import { RES_STATUS } from '@/lib/clientSlots';
+import { fmtDatum } from '@/lib/i18n/format';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { Icon } from '../../Icons';
 import CardScan from '../../client/CardScan';
@@ -774,7 +775,7 @@ function ClenoveKlubu({ velikost, nastaveni }: WidgetProps<{ razeni?: unknown }>
             <ul className="list">
               {top.map(c => (
                 <ListRow key={c.id} title={c.jmeno}
-                  meta={razeni === 'nejnovejsi' && c.clenOd ? t('člen od {datum}', { datum: czDay(c.clenOd) }) : t('{n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { n: c.navstev })}
+                  meta={razeni === 'nejnovejsi' && c.clenOd ? t('člen od {datum}', { datum: fmtDatum(c.clenOd, { jazyk: t.jazyk, styl: 'denKratce' }) }) : t('{n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { n: c.navstev })}
                   value={<>{cislo(c.body)} <span className="text-xs font-medium text-black/50">{t('b.')}</span></>} />
               ))}
             </ul>
@@ -1031,7 +1032,7 @@ function Razitka14({ velikost }: WidgetProps) {
           <Stat label={t('Rozdané body')} value={cislo(bodu)} unit={t('b.')} />
         </StatRow>
         <BarSpark height={velikost === 'L' ? 120 : 96} label={t('Razítka po dnech za posledních 14 dní')} highlight={dny.length - 1}
-          data={dny.map(d => ({ value: d.razitek, tip: `${czDay(d.den)}: ${cislo(d.razitek)}` }))} />
+          data={dny.map(d => ({ value: d.razitek, tip: `${fmtDatum(d.den, { jazyk: t.jazyk, styl: 'denKratce' })}: ${cislo(d.razitek)}` }))} />
       </div>
     </Widget>
   );

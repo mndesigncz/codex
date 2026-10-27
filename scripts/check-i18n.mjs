@@ -37,9 +37,16 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 133; // −1: /api/teams bez cs-CZ (výkon, balík S); −1: čas v Centru oznámení přes relativniCas + fmtDatum (kolo 6, B3); −1: okno úpravy člena ve Věrnosti přes cisloCs (W2); předtím −2: ceník na prodejní stránce formátuje ceny podle jazyka (kolo 79)
+const BASELINE_CS_CZ = 126; // −7: hlavička Přehledu, denVetou, data v Odměnách, Akcích a Client přes jazyk uživatele (kolo 93); −1: /api/teams bez cs-CZ (výkon, balík S); −1: čas v Centru oznámení přes relativniCas + fmtDatum (kolo 6, B3); −1: okno úpravy člena ve Věrnosti přes cisloCs (W2); předtím −2: ceník na prodejní stránce formátuje ceny podle jazyka (kolo 79)
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
-const BASELINE_NATVRDO = {};
+// Kolo 93: správa Managero client přeložená z větší části; zbývá hlubší editory (body a úrovně, razítka,
+// plánek, vzhled QR, poukaz u kasy). Čísla smí jen klesat.
+const BASELINE_NATVRDO = {
+  'components/client/CardScan.tsx': 9,
+  'components/client/FloorPlanEditor.tsx': 17,
+  'components/client/LoyaltyTabs.tsx': 63,
+  'components/client/QrDesigner.tsx': 14,
+};
 
 const args = process.argv.slice(2);
 
@@ -172,6 +179,19 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
   }
   for (const x of plan.MAX_EXTRAS) { pridej('spolecne', x, PL); pridej('predplatne', x, PL); }
   for (const d of moder.DUVODY) pridej('spolecne', d.nazev, 'lib/moderace.ts (DUVODY)');
+  // Správa Managero client (kolo 93): publika kampaní, kanály zpráv a segmenty hostů se překládají podle textu (`t(s.label)`).
+  const seg = await import('../lib/segmenty.ts');
+  for (const s of seg.SEGMENTY) { pridej('sprava', s.label, 'lib/segmenty.ts (SEGMENTY)'); pridej('sprava', s.popis, 'lib/segmenty.ts (SEGMENTY)'); }
+  const kan = await import('../lib/zpravyKanaly.ts');
+  for (const k of kan.KANALY_ZPRAVY) { pridej('sprava', k.label, 'lib/zpravyKanaly.ts (KANALY_ZPRAVY)'); pridej('sprava', k.popis, 'lib/zpravyKanaly.ts (KANALY_ZPRAVY)'); }
+  const sh = await import('../lib/klientSprava/segmentyHostu.ts');
+  for (const s of sh.SEGMENTY_HOSTU) { pridej('sprava', s.label, 'lib/klientSprava/segmentyHostu.ts (SEGMENTY_HOSTU)'); pridej('sprava', s.popis, 'lib/klientSprava/segmentyHostu.ts (SEGMENTY_HOSTU)'); }
+  const cf = await import('../lib/clenoveFiltr.ts');
+  for (const r of cf.RAZENI) pridej('sprava', r.label, 'lib/clenoveFiltr.ts (RAZENI)');
+  const kp = await import('../lib/kuponyPravidla.ts');
+  for (const v of Object.values(kp.STAV_POPISKY)) pridej('sprava', v, 'lib/kuponyPravidla.ts (STAV_POPISKY)');
+  const pk = await import('../lib/promoKody.ts');
+  for (const v of Object.values(pk.STAV_PROMO_POPISKY)) pridej('sprava', v, 'lib/promoKody.ts (STAV_PROMO_POPISKY)');
 }
 
 // Prodejní stránka: texty z components/landing/obsah.ts a ze scén živé ukázky se kreslí přes

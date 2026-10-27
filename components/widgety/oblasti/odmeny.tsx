@@ -67,6 +67,7 @@ import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typ
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { dbTimeDayHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import {
@@ -221,8 +222,10 @@ function denVetou(datum: string): string {
   // Poledne: datum bez času se nepřehoupne do vedlejšího dne v žádné zóně.
   const d = new Date(`${datum}T12:00:00`);
   if (Number.isNaN(d.getTime())) return datum;
-  const s = d.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
-  return s.charAt(0).toLocaleUpperCase('cs-CZ') + s.slice(1);
+  // V jazyce zvoleném v prohlížeči (kolo 93: dřív vždy česky i v angličtině).
+  const loc = LOCALE_PRO_JAZYK[aktualniJazyk()];
+  const s = d.toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' });
+  return s.charAt(0).toLocaleUpperCase(loc) + s.slice(1);
 }
 
 // ---------------------------------------------------------------------------

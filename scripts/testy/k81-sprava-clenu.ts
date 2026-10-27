@@ -89,7 +89,7 @@ export default function ({ eq, ok }: Testy) {
   ok('rozhraní: blokace a odebrání člena se potvrzují', ui.includes('<Potvrdit') && ui.includes('Odebrat z klubu') && ui.includes('Zablokovat'));
   const detail = precti('components/client/loyalty/ClenoveDetail.tsx');
   ok('rozhraní: správa a celá historie jsou v detailu člena, správa jen s oprávněním', detail.includes("smi('zakaznici.sprava_clenu') && <SpravaClena") && detail.includes('<HistorieClena'));
-  ok('rozhraní: duplicity otevírá seznam členů jen správci', precti('components/client/loyalty/ClenoveSprava.tsx').includes("smiSpravu && <Button size=\"sm\" variant=\"secondary\" icon=\"users\" onClick={() => setDuplicity(true)}>Duplicity"));
+  ok('rozhraní: duplicity otevírá seznam členů jen správci', precti('components/client/loyalty/ClenoveSprava.tsx').includes("smiSpravu && <Button size=\"sm\" variant=\"secondary\" icon=\"users\" onClick={() => setDuplicity(true)}>{t('Duplicity')}"));
   const kat = precti('lib/opravneniKatalog.ts');
   ok('oprávnění: správa členů je v katalogu a ve vedení', kat.includes('"id": "zakaznici.sprava_clenu"') && kat.includes('"zakaznici.sprava_clenu",\n   "zakaznici.zobrazit"'));
   const role = precti('scripts/sondy/fixtury/roles.json');

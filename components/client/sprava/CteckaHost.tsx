@@ -14,12 +14,20 @@
 
 import { Avatar, Button, Chip } from '../../ui';
 import { Icon } from '../../Icons';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { poslediNavsteva } from '@/lib/ctecka';
 import { KartaPodniku, RazitkaMrizka } from './NahledKarty';
 
-const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
-const RAZITKO: CzNoun = { one: 'razítko', few: 'razítka', many: 'razítek' };
+/** poslediNavsteva (lib/ctecka) v jazyce uživatele: „dnes", „včera", „před 3 dny". */
+function posledniNavstevaT(iso: string, t: PrekladFn): string {
+  const s = poslediNavsteva(iso);
+  if (s === 'dnes') return t('dnes');
+  if (s === 'včera') return t('včera'); // i18n-ok: porovnání s výstupem poslediNavsteva
+  const n = Number(/\d+/.exec(s)?.[0]);
+  if (Number.isFinite(n) && n > 0) return t('{n, plural, one {před # dnem} few {před # dny} other {před # dny}}', { n });
+  return t('poprvé u nás');
+}
+const razitek = (t: PrekladFn, n: number) => t('{n, plural, one {# razítko} few {# razítka} other {# razítek}}', { n });
 
 export interface ZamerCtecky { claimId: number; code: string; title: string; benefit: string | null; fromStamps: boolean }
 
@@ -44,15 +52,16 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
   onKombinace: (zamer: ZamerCtecky) => void;
   onJiny: () => void;
 }) {
+  const t = useT('sprava');
   const kampan = hlavniKampan(h);
   const zamer: ZamerCtecky | null = h.zamer && typeof h.zamer === 'object' ? h.zamer : null;
   const cil = Number(kampan?.required) || Number(h.rules?.stampTarget) || 0;
-  const razitek = kampan ? Number(kampan.stamps) || 0 : Number(h.stamps) || 0;
+  const maRazitek = kampan ? Number(kampan.stamps) || 0 : Number(h.stamps) || 0;
   const meta = h.member
-    ? [h.levelLabel && h.tier !== 'bronze' ? h.levelLabel : null, `${h.points ?? 0} b.`, h.visits ? `${h.visits + 1}. ${NAVSTEVA.one}` : 'první návštěva', h.lastVisit ? `naposledy ${poslediNavsteva(h.lastVisit)}` : null].filter(Boolean).join(' · ')
-    : 'Ještě není členem tohoto podniku.';
+    ? [h.levelLabel && h.tier !== 'bronze' ? h.levelLabel : null, t('{n} b.', { n: h.points ?? 0 }), h.visits ? t('{n}. návštěva', { n: h.visits + 1 }) : t('první návštěva'), h.lastVisit ? t('naposledy {kdy}', { kdy: posledniNavstevaT(h.lastVisit, t) }) : null].filter(Boolean).join(' · ')
+    : t('Ještě není členem tohoto podniku.');
   const lzeRazitko = smiRazitko && !h.stampedToday && (!!kampan || Number(h.rules?.stampTarget) > 0) && kampan?.platiTed !== false;
-  const kRazitku = h.stampedToday ? 'Dnes razítko už má' : pocet > 1 ? `Přidat ${czCount(pocet, RAZITKO)}` : 'Jen přidat razítko';
+  const kRazitku = h.stampedToday ? t('Dnes razítko už má') : pocet > 1 ? t('Přidat {razitek}', { razitek: razitek(t, pocet) }) : t('Jen přidat razítko');
   const pripraveno = (h.openCoupons ?? []).find((c: any) => c.fromStamps)?.title ?? null;
   return (
     <div className="sloupec sloupec-4 min-w-0">
@@ -62,22 +71,22 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
           <p className="text-xl font-bold leading-tight break-words text-[#16181A]">{h.customer?.name}</p>
           <p className="t-meta tabular-nums mt-0.5">{meta}</p>
         </div>
-        <Button size="sm" variant="secondary" onClick={onJiny}>Jiný host</Button>
+        <Button size="sm" variant="secondary" onClick={onJiny}>{t('Jiný host')}</Button>
       </div>
       {h.member && (h.discount > 0 || h.credit > 0 || h.birthdayToday) && (
         <div className="flex flex-wrap items-center gap-1.5">
-          {h.discount > 0 && <Chip tone="ok" size="sm">Sleva {h.discount} %{h.discountSource === 'skupina' && h.discountName ? ` (${h.discountName})` : h.discountSource === 'uroven' ? ' (úroveň)' : ''}</Chip>}
-          {h.credit > 0 && <Chip tone="ok" size="sm" icon="card">Kredit {h.credit}</Chip>}
-          {h.birthdayToday && <Chip tone="info" size="sm" icon="gift">Má dnes narozeniny</Chip>}
+          {h.discount > 0 && <Chip tone="ok" size="sm">{t('Sleva {n} %', { n: h.discount })}{h.discountSource === 'skupina' && h.discountName ? ` (${h.discountName})` : h.discountSource === 'uroven' ? ` (${t('úroveň')})` : ''}</Chip>}
+          {h.credit > 0 && <Chip tone="ok" size="sm" icon="card">{t('Kredit {n}', { n: h.credit })}</Chip>}
+          {h.birthdayToday && <Chip tone="info" size="sm" icon="gift">{t('Má dnes narozeniny')}</Chip>}
         </div>
       )}
 
       {h.member && kampan && cil > 0 && (
         <KartaPodniku nazev={nazevPodniku} barva={h.accent ?? kampan.color ?? null} podtitul={kampan.name}
-          cislo={`${razitek} / ${cil}`} jednotka="razítek" pripraveno={pripraveno ? 'Připraveno' : null}
-          veta={razitek >= cil ? 'Karta je plná, odměna je připravená.' : `Ještě ${czCount(cil - razitek, RAZITKO)} do odměny „${kampan.reward ?? 'odměna'}".`}
-          ariaLabel={`${kampan.name}: ${razitek} z ${cil} razítek`}>
-          <div className="mt-4"><RazitkaMrizka pocet={razitek} cil={cil} popis={`${razitek} z ${cil} razítek`} /></div>
+          cislo={`${maRazitek} / ${cil}`} jednotka={t('razítek')} pripraveno={pripraveno ? t('Připraveno') : null}
+          veta={maRazitek >= cil ? t('Karta je plná, odměna je připravená.') : t('Ještě {razitek} do odměny „{odmena}".', { razitek: razitek(t, cil - maRazitek), odmena: kampan.reward ?? t('odměna') })}
+          ariaLabel={t('{karta}: {n} z {cil} razítek', { karta: kampan.name, n: maRazitek, cil })}>
+          <div className="mt-4"><RazitkaMrizka pocet={maRazitek} cil={cil} popis={t('{n} z {cil} razítek', { n: maRazitek, cil })} /></div>
         </KartaPodniku>
       )}
 
@@ -85,8 +94,8 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
         <div className="rounded-[var(--r-md)] border-2 border-[#C8F542] bg-[#C8F542]/10 px-4 py-3 flex items-start gap-3" data-testid="ctecka-zamer">
           <span className="mt-0.5 h-5 w-5 rounded-full bg-[#C8F542] grid place-items-center shrink-0"><Icon name="check" size={12} /></span>
           <div className="min-w-0">
-            <p className="text-[15px] font-semibold leading-snug">Host chce uplatnit: {zamer.title}</p>
-            <p className="t-meta">{[zamer.benefit, zamer.fromStamps ? 'odměna za plnou kartu' : null, 'vybral v aplikaci před chvílí'].filter(Boolean).join(' · ')}</p>
+            <p className="text-[15px] font-semibold leading-snug">{t('Host chce uplatnit: {co}', { co: zamer.title })}</p>
+            <p className="t-meta">{[zamer.benefit, zamer.fromStamps ? t('odměna za plnou kartu') : null, t('vybral v aplikaci před chvílí')].filter(Boolean).join(' · ')}</p>
           </div>
         </div>
       )}
@@ -94,13 +103,13 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
       {lzeRazitko && smiNavic && (
         <div className="flex items-center gap-3 min-w-0">
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-medium">Razítek za tuto návštěvu</p>
-            <p className="t-meta">Pravidlo: 1 razítko za návštěvu{pocet > 1 ? ', navíc se zapíše s důvodem' : ''}</p>
+            <p className="text-[15px] font-medium">{t('Razítek za tuto návštěvu')}</p>
+            <p className="t-meta">{t('Pravidlo: 1 razítko za návštěvu')}{pocet > 1 ? `, ${t('navíc se zapíše s důvodem')}` : ''}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button size="lg" variant="secondary" iconOnly icon="minus" aria-label="O razítko méně" disabled={pocet <= 1} onClick={() => setPocet(pocet - 1)} />
+            <Button size="lg" variant="secondary" iconOnly icon="minus" aria-label={t('O razítko méně')} disabled={pocet <= 1} onClick={() => setPocet(pocet - 1)} />
             <span className="w-6 text-center text-lg font-bold tabular-nums" aria-live="polite">{pocet}</span>
-            <Button size="lg" variant="secondary" iconOnly icon="plus" aria-label="O razítko víc" disabled={pocet >= 3} onClick={() => setPocet(pocet + 1)} />
+            <Button size="lg" variant="secondary" iconOnly icon="plus" aria-label={t('O razítko víc')} disabled={pocet >= 3} onClick={() => setPocet(pocet + 1)} />
           </div>
         </div>
       )}
@@ -110,14 +119,14 @@ export default function CteckaHost({ h, nazevPodniku, busy, pocet, setPocet, smi
         {zamer && smiKupon && (
           <Button size="lg" variant="accent" icon="check" className="w-full" loading={busy === 'kombinace'}
             onClick={() => onKombinace(zamer)} data-testid="ctecka-kombinace">
-            {lzeRazitko ? `Uplatnit ${zamer.title.toLowerCase()} a přidat ${pocet > 1 ? czCount(pocet, RAZITKO) : 'razítko'}` : `Uplatnit ${zamer.title.toLowerCase()}`}
+            {lzeRazitko ? t('Uplatnit {co} a přidat {razitek}', { co: zamer.title.toLowerCase(), razitek: pocet > 1 ? razitek(t, pocet) : t('razítko') }) : t('Uplatnit {co}', { co: zamer.title.toLowerCase() })}
           </Button>
         )}
         {/* Razítko bez platné karty (mimo okno, dnes už má) zůstává vidět zakázané — důvod říká karta níž. */}
         {h.member && smiRazitko && (!!kampan || Number(h.rules?.stampTarget) > 0 || (h.campaigns ?? []).length > 0) && (
           <Button size="lg" variant={zamer ? 'secondary' : 'primary'} icon="check" className="w-full" loading={busy === 'stamp'}
             disabled={!lzeRazitko} onClick={onRazitko}>
-            {zamer || h.stampedToday ? kRazitku : pocet > 1 ? `Přidat ${czCount(pocet, RAZITKO)}` : 'Razítko za návštěvu'}
+            {zamer || h.stampedToday ? kRazitku : pocet > 1 ? t('Přidat {razitek}', { razitek: razitek(t, pocet) }) : t('Razítko za návštěvu')}
           </Button>
         )}
       </div>
