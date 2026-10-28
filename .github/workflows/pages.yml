@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Deploy to Vercel (via Git integration)
-        run: echo "Vercel auto-deploys on push to main via Git integration at https://pangea-eosin.vercel.app"
+        run: echo "Vercel auto-deploys on push to main via Git integration at https://www.managero.app"
 
   guard:
     name: Kontroly (čas, typy)

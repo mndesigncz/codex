@@ -23,6 +23,8 @@ export default async function ({ eq, ok }: Testy) {
   eq('zdraví: e-mail zapnutý', plne.funkce.email, true);
   eq('zdraví: platby vypnuté', plne.funkce.platby, false);
   ok('zdraví: výstup neobsahuje hodnoty', !JSON.stringify(plne).includes('tajne-heslo-123'));
+  eq('zdraví: náhled nepotřebuje NEXTAUTH_URL', stavNastaveni({ VERCEL_ENV: 'preview' }).povinneChybi.includes('NEXTAUTH_URL'), false);
+  eq('zdraví: produkce NEXTAUTH_URL potřebuje', stavNastaveni({ VERCEL_ENV: 'production' }).povinneChybi.includes('NEXTAUTH_URL'), true);
   eq('zdraví: mezery = nevyplněno', stavNastaveni({ DATABASE_URL: '  ' }).povinneChybi.includes('DATABASE_URL'), true);
 
   eq('tajemství: z prostředí', podpisoveTajemstvi({ NEXTAUTH_SECRET: 'abc' }), 'abc');
