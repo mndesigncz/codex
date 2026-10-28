@@ -1604,7 +1604,7 @@ function otevriKalendar(nav: Navigace, den: string): void {
   nav.onNavigate('rewards');
 }
 
-const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' });
+const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(LOCALE_PRO_JAZYK[aktualniJazyk()], { day: 'numeric', month: 'long' });
 
 function NehodnoceneSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento' | 'minuly' }>) {
   const t = useT('widgety');

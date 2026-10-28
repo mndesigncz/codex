@@ -44,7 +44,8 @@ import { apiMessage, okJson } from '@/lib/api';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../../PredUzaverkou';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
-import { fmtHM } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM } from '@/lib/i18n/format';
+import { aktualniJazyk } from '@/lib/i18n/stav';
 import {
   vyberUkoly, vRozsahu, poTerminu, podleLidi, splnenoDnes, jeCiziUkol, povinnePrvni, podleCasuTerminu, chceFotku, type Ukol, type RozsahUkolu,
 } from '@/lib/ukolyPrehled';
@@ -98,7 +99,7 @@ function useBrana(id: string): { ok: boolean; ceka: boolean } {
   return { ok, ceka: false };
 }
 
-const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
+const denKratce = (d: string) => fmtDatum(d, { jazyk: aktualniJazyk(), styl: 'denKratce' });
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 /** Otevře Úkoly vyfiltrované na člověka (null = pro kohokoli). */
