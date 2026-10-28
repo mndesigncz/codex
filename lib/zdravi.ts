@@ -28,8 +28,13 @@ export const FUNKCE: Record<string, readonly string[]> = {
 
 const ma = (env: Env, k: string) => Boolean(env[k]?.trim());
 
+/** Náhled na Vercelu: NextAuth bez NEXTAUTH_URL vezme adresu nasazení z x-forwarded-host
+ *  (next-auth/utils/detect-origin, větev VERCEL). Produkční adresa tam naopak nepatří. */
+const NEPOVINNE_V_NAHLEDU: readonly string[] = ['NEXTAUTH_URL'];
+
 export function stavNastaveni(env: Env): { povinneChybi: string[]; funkce: Record<string, boolean> } {
-  const povinneChybi = POVINNE.filter(k => !ma(env, k));
+  const nahled = env.VERCEL_ENV === 'preview';
+  const povinneChybi = POVINNE.filter(k => !ma(env, k) && !(nahled && NEPOVINNE_V_NAHLEDU.includes(k)));
   const funkce = Object.fromEntries(Object.entries(FUNKCE).map(([f, klice]) => [f, klice.every(k => ma(env, k))]));
   // Právní údaje: vyplněné, když lib/firma.ts (výchozí hodnoty + FIRMA_*) nemá žádný chybějící povinný údaj.
   funkce.pravniUdaje = chybejiciUdaje(firma(env)).length === 0;
