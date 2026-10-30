@@ -64,6 +64,10 @@ import { useUlozeno } from '@/lib/useUlozeno';
 import { dayPlus } from '@/lib/pragueTime';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { TlacitkoHodnotitSmenu } from '../hodnoceni-smeny/TlacitkoHodnotitSmenu';
+import { useNavrhyTrestu } from '../tresty-vedeni/data';
+import { DatTrest } from '../tresty-vedeni/DatTrest';
+import type { PredvolbyTrestu } from '../tresty-vedeni/logika';
+import { DNI_NAVRHU, DNI_ZPETNE, posunDni, textNavrhu } from '@/lib/tresty';
 import { useLocale } from './jazyk';
 
 type Zaznam = ZaznamSeStavem & { id: number | string; employeeId: number | string };
@@ -171,6 +175,12 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const smiUpravit = smi('dochazka.upravit');
   const smiMazat = smi('dochazka.mazat');
   const smiExport = smi('dochazka.exportovat');
+  // Trest za pozdní příchod přímo u záznamu (dřív jen ze Souhrnu hodin ve widgetu). Klíč návrhu `pozde:<id záznamu>`
+  // jako ve widgetu, takže návrh v Trestech v týmu po udělení zmizí; nabízí se jen do DNI_ZPETNE a u čerstvých
+  // příchodů (do DNI_NAVRHU) jen dokud návrh ještě čeká — vyřízený nebo zahozený se znovu nenabídne.
+  const smiTrest = smi('tresty.udelit');
+  const navrhyTrestu = useNavrhyTrestu(smiTrest);
+  const [trest, setTrest] = useState<PredvolbyTrestu | null>(null);
   const vidiMzdy = smi('finance.mzdy');
   // Profil člena jen s tym.profil (přísně, jako widgety a Tým) — jinak by
   // okno profilu skončilo 403.
@@ -577,17 +587,29 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                   </span>
                 ) : null;
                 const jmeno = e.employeeName ?? '';
+                const denSmeny = (() => { const od = parseDbTime(x.clockIn); return e.planDate && /^\d{4}-\d{2}-\d{2}$/.test(e.planDate) ? e.planDate : od ? pragueDayOf(od) : ''; })();
+                const klicPozde = `pozde:${e.id}`;
+                const zaPozde: PredvolbyTrestu | null = smiTrest && pr.pozdeMin != null && e.id != null && e.employeeId != null && denSmeny
+                  && denSmeny >= posunDni(dnesDen, -DNI_ZPETNE) && denSmeny <= dnesDen
+                  && (denSmeny < posunDni(dnesDen, -DNI_NAVRHU) || !!navrhyTrestu.data?.some(n => n.klic === klicPozde))
+                  ? { userId: Number(e.employeeId), jmeno, day: denSmeny, sourceKey: klicPozde, druhNavrhu: 'pozde',
+                      text: textNavrhu({ druh: 'pozde', minuty: pr.pozdeMin, castka: null, poznamka: null }, String, t) }
+                  : null;
+                const polozkaTrestu = zaPozde ? { label: t('Dát trest za pozdní příchod'), icon: 'warning', hint: zaPozde.text, onClick: () => setTrest(zaPozde) } : null;
                 // Tužka a koš mají na telefonu 44 px (palec), na počítači zůstávají drobné v hustém seznamu.
                 // V uzavřeném období místo nich zámek s hláškou, kam jít (server by úpravu stejně odmítl).
                 const akce = d.zamek ? (
                   <Button variant="ghost" size="sm" iconOnly icon="lock" className="max-sm:!h-11 max-sm:!w-11" onClick={() => oznam(hlaskaZamku(d.zamek!), 'bad')}
                     aria-label={t('Období je uzavřené: {jmeno}', { jmeno })} title={t('Období je uzavřené')} data-zamek />
-                ) : smiUpravit && smiMazat && !zapomenuty ? (
+                ) : (smiUpravit && smiMazat && !zapomenuty) || (polozkaTrestu && !smiUpravit && !smiMazat) ? (
                   // v4 (V4): úprava a smazání jsou jedno „···" 36 na R — dřív tužka a koš jako dvě holé ikony
                   // na vlastním druhém řádku (prázdný řádek jen kvůli dvěma ikonám u pravé hrany).
                   <Menu size="sm" label={t('Upravit nebo smazat záznam: {jmeno}', { jmeno })} items={[
-                    { label: t('Upravit čas…'), icon: 'pencil', onClick: () => otevriUpravu(x) },
-                    { label: t('Smazat záznam…'), icon: 'trash', danger: true, onClick: () => { setChybaSmazani(null); setSmazat(x); } },
+                    ...(smiUpravit && smiMazat && !zapomenuty ? [
+                      { label: t('Upravit čas…'), icon: 'pencil', onClick: () => otevriUpravu(x) },
+                      { label: t('Smazat záznam…'), icon: 'trash', danger: true, onClick: () => { setChybaSmazani(null); setSmazat(x); } },
+                    ] : []),
+                    ...(polozkaTrestu ? [polozkaTrestu] : []),
                   ]} />
                 ) : (
                   <>
@@ -596,6 +618,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                       : <Button variant="ghost" size="sm" iconOnly icon="pencil" className="max-sm:!h-11 max-sm:!w-11" onClick={() => otevriUpravu(x)} aria-label={t('Upravit čas: {jmeno}', { jmeno })} />)}
                     {smiMazat && (
                       <Button variant="ghost" size="sm" iconOnly icon="trash" className="max-sm:!h-11 max-sm:!w-11" onClick={() => { setChybaSmazani(null); setSmazat(x); }} aria-label={t('Smazat záznam: {jmeno}', { jmeno })} />
+                    )}
+                    {polozkaTrestu && (
+                      <Button variant="ghost" size="sm" iconOnly icon="warning" className="max-sm:!h-11 max-sm:!w-11" onClick={polozkaTrestu.onClick} aria-label={t('Dát trest za pozdní příchod: {jmeno}', { jmeno })} title={zaPozde?.text} />
                     )}
                   </>
                 );
@@ -620,7 +645,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                     // dostane každý řádek (na lg+ prázdný), jinak by mezera navíc posunula čísla o 12 px.
                     aside={chipy ?? ''}
                     right={chipy ? <span className="lg:hidden">{chipy}</span> : undefined}
-                    actions={smiUpravit || smiMazat ? akce : undefined}
+                    actions={smiUpravit || smiMazat || polozkaTrestu ? akce : undefined}
                   />
                 );
               })}
@@ -659,6 +684,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         nastroj={nastroj}
       />
 
+      {smiTrest && <DatTrest open={!!trest} predvolby={trest} onClose={() => setTrest(null)} />}
       <Toast message={hlaska?.text ?? null} tone={hlaska?.tone} id={hlaska?.id} ms={hlaska?.tone === 'bad' ? 6000 : undefined} onClose={() => setHlaska(null)} />
 
       {pridat && (

@@ -2943,5 +2943,7 @@
   "Body a poznámky pro lidi": "Punkte und Notizen für Personen",
   "Volitelné. Každému ze směny zvlášť body (i záporné) a poznámka, kterou uvidí jen on. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Optional. Für jede Person der Schicht Punkte (auch negativ) und eine Notiz, die nur sie sieht. Punkte sind kein Geld — eine Schichtbewertung kürzt nie den Lohn.",
   "Osobní poznámka — {jmeno}": "Persönliche Notiz — {jmeno}",
-  "Osobní poznámka, uvidí ji jen {jmeno}…": "Persönliche Notiz, nur {jmeno} sieht sie…"
+  "Osobní poznámka, uvidí ji jen {jmeno}…": "Persönliche Notiz, nur {jmeno} sieht sie…",
+  "Dát trest za pozdní příchod": "Strafe für Verspätung",
+  "Dát trest za pozdní příchod: {jmeno}": "Strafe für Verspätung: {jmeno}"
 }
