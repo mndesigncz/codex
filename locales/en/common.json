@@ -209,5 +209,9 @@
   "{x}+{y} zdarma: {polozka}": "{x}+{y} free: {polozka}",
   "{x}+{y} zdarma": "{x}+{y} free",
   "jen {urovne}": "{urovne} only",
-  "mimo: {co}": "except: {co}"
+  "mimo: {co}": "except: {co}",
+  "Pozdní příchod o {minuty} min.": "Late arrival by {minuty} min.",
+  "Manko v uzávěrce {castka}.": "Cash shortage in closing: {castka}.",
+  "Výtka z hodnocení směny: {poznamka}": "Reprimand from shift review: {poznamka}",
+  "Výtka z hodnocení směny.": "Reprimand from shift review."
 }

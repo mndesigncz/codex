@@ -258,7 +258,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               const poznamka = mark?.note ?? legacyNote ?? null;
               return {
                 userId: employee.id, jmeno: employee.name, day: date, druhNavrhu: 'vytka',
-                text: textNavrhu({ druh: 'vytka', minuty: null, castka: null, poznamka }, money),
+                text: textNavrhu({ druh: 'vytka', minuty: null, castka: null, poznamka }, money, t),
                 sourceKey: mark?.id ? `vytka:${mark.id}` : klicVytky(navrhyTrestu.data ?? [], { userId: employee.id, day: date, poznamka }),
               };
             }} />

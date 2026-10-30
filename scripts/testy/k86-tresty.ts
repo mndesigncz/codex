@@ -74,6 +74,10 @@ export default function ({ eq, ok }: Testy) {
   eq('trest text', [trestText({ points: 10, bonusCut: 0 }, kc), trestText({ points: 10, bonusCut: 300 }, kc), trestText({ points: 0, bonusCut: 0 }, kc)], ['−10 b', '−10 b · krácení 300 Kč', 'Napomenutí']);
   eq('text návrhu', [textNavrhu({ druh: 'pozde', minuty: 18, castka: null, poznamka: null }, kc), textNavrhu({ druh: 'manko', minuty: null, castka: 340, poznamka: null }, kc)],
     ['Pozdní příchod o 18 min.', 'Manko v uzávěrce 340 Kč.']);
+  const en: Record<string, string> = { 'Pozdní příchod o {minuty} min.': 'Late arrival by {minuty} min.', 'Výtka z hodnocení směny.': 'Reprimand from shift review.' };
+  const tEn = (k: string, h?: Record<string, string | number>) => (en[k] ?? k).replace(/\{(\w+)\}/g, (_, x: string) => String(h?.[x] ?? ''));
+  eq('text návrhu v jazyce vedení (t)', [textNavrhu({ druh: 'pozde', minuty: 18, castka: null, poznamka: null }, kc, tEn), textNavrhu({ druh: 'vytka', minuty: null, castka: null, poznamka: null }, kc, tEn)],
+    ['Late arrival by 18 min.', 'Reprimand from shift review.']);
   const druhy = [{ id: 1, title: 'Pozdní příchod', description: null, points: 10, bonusCut: null, active: true, createdAt: '' }, { id: 2, title: 'Manko v kase', description: null, points: 20, bonusCut: 200, active: true, createdAt: '' }];
   eq('položka sazebníku k návrhu', [druhProNavrh(druhy, 'pozde')?.id, druhProNavrh(druhy, 'manko')?.id, druhProNavrh(druhy, 'vytka')], [1, 2, null]);
   eq('oznámení trestu a napomenutí', [oznameniTrest({ points: 10, bonusCut: 0, text: 'Pozdě' }, kc).title, oznameniTrest({ points: 0, bonusCut: 0, text: 'Pozdě' }, kc).title], ['Trest: −10 b', 'Napomenutí']);

@@ -1090,7 +1090,7 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
     const k = pozdniKTrestu(pozdniPrichody, r.id, dnes, navrhyKlice);
     return k ? {
       userId: Number(r.id), jmeno: r.jmeno, day: k.den, sourceKey: `pozde:${k.id}`, druhNavrhu: 'pozde',
-      text: textNavrhu({ druh: 'pozde', minuty: k.minuty, castka: null, poznamka: null }, money),
+      text: textNavrhu({ druh: 'pozde', minuty: k.minuty, castka: null, poznamka: null }, money, t),
     } : null;
   };
 
