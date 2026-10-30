@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 124; // −2: termín úkolu a „nejstarší“ v Odměnách podle jazyka (k93 sonda, PR 372); −7: hlavička Přehledu, denVetou, data v Odměnách, Akcích a Client přes jazyk uživatele (kolo 93); −1: /api/teams bez cs-CZ (výkon, balík S); −1: čas v Centru oznámení přes relativniCas + fmtDatum (kolo 6, B3); −1: okno úpravy člena ve Věrnosti přes cisloCs (W2); předtím −2: ceník na prodejní stránce formátuje ceny podle jazyka (kolo 79)
+const BASELINE_CS_CZ = 122; // −2: měsíc ve Financích a data ve Skladu podle jazyka; −2: termín úkolu a „nejstarší“ v Odměnách podle jazyka (k93 sonda, PR 372); −7: hlavička Přehledu, denVetou, data v Odměnách, Akcích a Client přes jazyk uživatele (kolo 93); −1: /api/teams bez cs-CZ (výkon, balík S); −1: čas v Centru oznámení přes relativniCas + fmtDatum (kolo 6, B3); −1: okno úpravy člena ve Věrnosti přes cisloCs (W2); předtím −2: ceník na prodejní stránce formátuje ceny podle jazyka (kolo 79)
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 // Kolo 93: správa Managero client přeložená z větší části; zbývá hlubší editory (body a úrovně, razítka,
 // plánek, vzhled QR, poukaz u kasy). Čísla smí jen klesat.
