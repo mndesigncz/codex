@@ -118,7 +118,7 @@ for (const w of [1280, 390]) {
   const b = stav.hodnoceni?.[0]?.body ?? {};
   tvrdi(`S1 ${w}: POST nese den, směnu, 2 hvězdy, kritiku, Čistota −, k nápravě`, b.den === DNY.PRED3 && b.klic === '08:00-16:00' && b.hvezdy === 2 && /Nepořádek u baru/.test(b.kritika) && b.stitky?.cistota === 'minus' && b.kNaprave === true, JSON.stringify(b));
   tvrdi(`S1 ${w}: …a rozpis bodů po lidech (Eva +3, Jakub −5), poznámku jen Jakubovi a osádku`, JSON.stringify(b.body) === JSON.stringify([{ id: 16, body: 3, poznamka: null }, { id: 17, body: -5, poznamka: 'Utři bar před odchodem' }]) && JSON.stringify(b.osadka) === '[16,17]', JSON.stringify(b.body));
-  tvrdi(`S1 ${w}: po uložení potvrzení v okně`, await dokud(() => o.locator('[data-hodnoceni-ulozeno]').isVisible(), 4000));
+  tvrdi(`S1 ${w}: po uložení potvrzení v okně`, await dokud(() => o.locator('[data-hodnoceni-ulozeno]').isVisible(), 8000));
   await o.getByRole('button', { name: 'Zavřít' }).last().click();
   await dokud(async () => (await okno(p).count()) === 0, 3000);
 

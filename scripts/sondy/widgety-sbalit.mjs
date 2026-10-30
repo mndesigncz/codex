@@ -98,7 +98,7 @@ for (const w of [1280, 390]) {
 }
 // 4) Telefon 390: šipka malé karty pod názvem, minimalizovaná malá karta přes celý řádek.
 {
-  const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
+  const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
   const uzaverky = (vseSchvaleno) => (req, json) => {
     const u = new URL(req.url());
     if (req.method() !== 'GET' || u.pathname !== '/api/closings') return dalsi(req, json);

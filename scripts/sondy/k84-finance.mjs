@@ -26,7 +26,7 @@ const POSUN = (() => {
   return (13 * 60 - min) * 60000;
 })();
 const ted = () => Date.now() + POSUN;
-const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(ted() + o * 86400000));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(ted()))}T12:00:00Z`));
 const hmPraha = (min) => new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ted() + min * 60000));
 const DNES = praha(0);
 const MESIC = DNES.slice(0, 7);

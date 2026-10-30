@@ -229,7 +229,7 @@ for (const o of [OBRAZOVKY[0], OBRAZOVKY[3], OBRAZOVKY[6]]) {
 
 // ============================================================ kolo 6 (B5): zaměstnanec na telefonu
 {
-  const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
+  const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
   const DNY = { DNES: praha(0), VCERA: praha(-1), PREDEVCIREM: praha(-2), PREDVCEREM: praha(-2), PRED3: praha(-3), PRED4: praha(-4), PRED5: praha(-5), PRED6: praha(-6),
     ZITRA: praha(1), POZDEJI: praha(20), CAS_DNES: new Date(Date.now() - 60000).toISOString(), CAS_PREDVCEREM: new Date(Date.now() - 2 * 86400000).toISOString() };
   const sDaty = (jmeno) => {

@@ -132,7 +132,7 @@ for (const [w, h, mobil] of ROZMERY) {
   const FIX = nacti('k69-b9-rozlozeni-smena');
   // Kdo má směnu (L, týden) přidaný vedením do rozložení tabletu — doporučený widget, ne výchozí.
   const fix = { ...FIX, polozky: [...FIX.polozky, { id: 'tym-nahled', widget: 'rozvrh.tym_nahled', velikost: 'L', nastaveni: { rozsah: 'tyden' } }] };
-  const den = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + n * 86400000));
+  const den = (n) => ((d) => { d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
   const isoPred = (min) => new Date(Date.now() - min * 60000).toISOString();
   // Jen Jakub (bez PINu) na směně 7 h 32 min → tablet ví, kdo u něj stojí, a odchod jde bez číselníku.
   const roster = () => ({
