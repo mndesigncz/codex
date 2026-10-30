@@ -15,6 +15,7 @@ import { neon } from '@neondatabase/serverless';
 import { rozhodni, ZPRAVA_423, VYJIMKY } from '@/lib/blokace';
 import { ciziPuvod } from '@/lib/puvod';
 import { obalZUserAgent, rozhodniObal } from '@/lib/obal';
+import { adresaVedeniZeZamestnance } from '@/lib/odkazVedeni';
 
 // Matcher je široký kvůli bráně nativního obalu (lib/obal.ts): ta musí vidět i
 // úvodní stránku, přihlášení a registraci, jinak by aplikace hostů otevřela
@@ -101,6 +102,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
   const cesta = req.nextUrl.pathname;
+  // Odkaz z oznámení pro zaměstnance otevřený účtem vedení: stejné zobrazení ve vedení (lib/odkazVedeni).
+  if (req.method === 'GET' && (token as { role?: unknown }).role === 'employer') {
+    const cil = adresaVedeniZeZamestnance(cesta, req.nextUrl.searchParams);
+    if (cil) return NextResponse.redirect(new URL(cil, req.url));
+  }
   if (VYJIMKY.some(v => cesta === v || cesta.startsWith(v + '/') || cesta.startsWith(v))) {
     // Přepnutí podniku: zapamatovaný aktivní tým je od téhle chvíle starý.
     // Zahodit ho TADY, a tým se pro tenhle požadavek už nečíst — jinak by se

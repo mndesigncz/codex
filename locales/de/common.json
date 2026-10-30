@@ -209,5 +209,9 @@
   "{x}+{y} zdarma: {polozka}": "{x}+{y} gratis: {polozka}",
   "{x}+{y} zdarma": "{x}+{y} gratis",
   "jen {urovne}": "nur {urovne}",
-  "mimo: {co}": "außer: {co}"
+  "mimo: {co}": "außer: {co}",
+  "Pozdní příchod o {minuty} min.": "Verspätung um {minuty} Min.",
+  "Manko v uzávěrce {castka}.": "Kassenfehlbetrag im Abschluss: {castka}.",
+  "Výtka z hodnocení směny: {poznamka}": "Rüge aus der Schichtbewertung: {poznamka}",
+  "Výtka z hodnocení směny.": "Rüge aus der Schichtbewertung."
 }

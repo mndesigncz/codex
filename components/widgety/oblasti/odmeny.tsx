@@ -1802,7 +1802,7 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
   const druhy = mesicni.data?.druhy ?? [];
   const vsechnyNavrhy = navrhy.data ?? [];
   const navrhyVidet = L ? vsechnyNavrhy : vsechnyNavrhy.slice(0, NAVRHU_M);
-  const zNavrhu = (n: NavrhTrestu) => setDavam(predvolbyZNavrhu(n, druhy, money));
+  const zNavrhu = (n: NavrhTrestu) => setDavam(predvolbyZNavrhu(n, druhy, money, t));
 
   const souhrnText = [
     nastaveni.obdobi === 'minuly' ? t('Minulý měsíc') : t('Tento měsíc'),

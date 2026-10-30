@@ -382,7 +382,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                           vyrizeno={{ day: String(c.shift_date ?? c.date).slice(0, 10), sourceKey: `manko:${id}` }}
                           predvolby={{
                             userId: Number(c.created_by), jmeno: c.author_name ?? undefined, day: String(c.shift_date ?? c.date).slice(0, 10), closingId: id,
-                            text: textNavrhu({ druh: 'manko', castka: -diff, minuty: null, poznamka: null }, money), sourceKey: `manko:${id}`, druhNavrhu: 'manko',
+                            text: textNavrhu({ druh: 'manko', castka: -diff, minuty: null, poznamka: null }, money, t), sourceKey: `manko:${id}`, druhNavrhu: 'manko',
                           }} />
                       </div>
                     ) : null}

@@ -2943,5 +2943,7 @@
   "Body a poznámky pro lidi": "Body a poznámky pre ľudí",
   "Volitelné. Každému ze směny zvlášť body (i záporné) a poznámka, kterou uvidí jen on. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Voliteľné. Každému zo zmeny zvlášť body (aj záporné) a poznámka, ktorú uvidí len on. Body nie sú peniaze — hodnotenie zmeny nekráti mzdu.",
   "Osobní poznámka — {jmeno}": "Osobná poznámka — {jmeno}",
-  "Osobní poznámka, uvidí ji jen {jmeno}…": "Osobná poznámka, uvidí ju len {jmeno}…"
+  "Osobní poznámka, uvidí ji jen {jmeno}…": "Osobná poznámka, uvidí ju len {jmeno}…",
+  "Dát trest za pozdní příchod": "Dať trest za neskorý príchod",
+  "Dát trest za pozdní příchod: {jmeno}": "Dať trest za neskorý príchod: {jmeno}"
 }

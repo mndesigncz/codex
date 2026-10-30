@@ -209,5 +209,9 @@
   "{x}+{y} zdarma: {polozka}": "{x}+{y} zadarmo: {polozka}",
   "{x}+{y} zdarma": "{x}+{y} zadarmo",
   "jen {urovne}": "len {urovne}",
-  "mimo: {co}": "okrem: {co}"
+  "mimo: {co}": "okrem: {co}",
+  "Pozdní příchod o {minuty} min.": "Neskorý príchod o {minuty} min.",
+  "Manko v uzávěrce {castka}.": "Manko v uzávierke {castka}.",
+  "Výtka z hodnocení směny: {poznamka}": "Výčitka z hodnotenia zmeny: {poznamka}",
+  "Výtka z hodnocení směny.": "Výčitka z hodnotenia zmeny."
 }

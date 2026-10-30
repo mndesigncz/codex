@@ -16,7 +16,7 @@ const NAVRHOVATEL = (() => { const r = sysRole('barista'); return mine([...r.opr
 const SNIMKY = process.env.K84_SNIMKY ? process.env.K84_SNIMKY.replace(/\/?$/, '/') : OUT;
 mkdirSync(SNIMKY, { recursive: true });
 
-const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDEVCIREM: praha(-2), PRED3: praha(-3), PRED4: praha(-4), PRED5: praha(-5), PRED6: praha(-6) };
 const MESIC = DNY.DNES.slice(0, 7);
 // Pražský čas se správným posunem podle data (letní +02:00, zimní +01:00) — pevné +02:00

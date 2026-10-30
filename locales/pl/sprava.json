@@ -2943,5 +2943,7 @@
   "Body a poznámky pro lidi": "Punkty i notatki dla osób",
   "Volitelné. Každému ze směny zvlášť body (i záporné) a poznámka, kterou uvidí jen on. Body nejsou peníze — hodnocení směny nekrátí mzdu.": "Opcjonalne. Każdemu ze zmiany osobno punkty (także ujemne) i notatka, którą zobaczy tylko on. Punkty to nie pieniądze — ocena zmiany nie obniża wynagrodzenia.",
   "Osobní poznámka — {jmeno}": "Osobista notatka — {jmeno}",
-  "Osobní poznámka, uvidí ji jen {jmeno}…": "Osobista notatka, zobaczy ją tylko {jmeno}…"
+  "Osobní poznámka, uvidí ji jen {jmeno}…": "Osobista notatka, zobaczy ją tylko {jmeno}…",
+  "Dát trest za pozdní příchod": "Ukarz za spóźnienie",
+  "Dát trest za pozdní příchod: {jmeno}": "Ukarz za spóźnienie: {jmeno}"
 }

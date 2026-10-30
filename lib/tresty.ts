@@ -467,10 +467,15 @@ export function trestText(t: Pick<Trest, 'points' | 'bonusCut'>, kc: (n: number)
 }
 
 /** Výchozí text trestu z návrhu (vedení ho může přepsat). */
-export function textNavrhu(n: Pick<NavrhTrestu, 'druh' | 'minuty' | 'castka' | 'poznamka'>, kc: (n: number) => string): string {
-  if (n.druh === 'pozde') return `Pozdní příchod o ${n.minuty ?? 0} min.`;
-  if (n.druh === 'manko') return `Manko v uzávěrce ${kc(n.castka ?? 0)}.`;
-  return n.poznamka ? `Výtka z hodnocení směny: ${n.poznamka}` : 'Výtka z hodnocení směny.';
+type PrelozText = (klic: string, hodnoty?: Record<string, string | number>) => string;
+/** Bez `t` (testy, server) česky: jen dosadí {parametry}. */
+const cesky: PrelozText = (klic, hodnoty) => klic.replace(/\{(\w+)\}/g, (_, k: string) => String(hodnoty?.[k] ?? ''));
+
+/** Předvyplněný text trestu z návrhu. V okně vždy s `t`: text se uloží a člověk ho čte v jazyce, ve kterém ho vedení zadalo. */
+export function textNavrhu(n: Pick<NavrhTrestu, 'druh' | 'minuty' | 'castka' | 'poznamka'>, kc: (n: number) => string, t: PrelozText = cesky): string {
+  if (n.druh === 'pozde') return t('Pozdní příchod o {minuty} min.', { minuty: n.minuty ?? 0 });
+  if (n.druh === 'manko') return t('Manko v uzávěrce {castka}.', { castka: kc(n.castka ?? 0) });
+  return n.poznamka ? t('Výtka z hodnocení směny: {poznamka}', { poznamka: n.poznamka }) : t('Výtka z hodnocení směny.');
 }
 
 /** Položka sazebníku, která návrhu nejspíš odpovídá (podle názvu); jinak null. */

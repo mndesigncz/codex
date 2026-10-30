@@ -89,7 +89,7 @@ function pred(iso: string | null | undefined, t: PrekladFn): string {
   return t('před {n, plural, one {# dnem} few {# dny} other {# dny}}', { n: dny });
 }
 
-const datumKratce = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' }) : '');
+const datumKratce = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(LOCALE_PRO_JAZYK[aktualniJazyk()], { day: 'numeric', month: 'numeric', year: 'numeric' }) : '');
 
 /**
  * Brána widgetu (spec §1.5): přísně `nacteno && všechny z vse && aspoň jedno

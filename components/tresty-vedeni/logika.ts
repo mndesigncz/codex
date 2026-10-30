@@ -109,11 +109,11 @@ export interface PredvolbyTrestu {
 }
 
 /** Předvolby z návrhu: text z dat, položka sazebníku podle druhu (body a krácení z ní), klíč návrhu. */
-export function predvolbyZNavrhu(n: NavrhTrestu, druhy: readonly DruhTrestu[], kc: (x: number) => string): PredvolbyTrestu {
+export function predvolbyZNavrhu(n: NavrhTrestu, druhy: readonly DruhTrestu[], kc: (x: number) => string, t?: Parameters<typeof textNavrhu>[2]): PredvolbyTrestu {
   const druh = druhProNavrh(druhy, n.druh);
   return {
     userId: n.userId, jmeno: n.userName, day: n.day, shiftId: n.shiftId, closingId: n.closingId,
-    text: textNavrhu(n, kc), typeId: druh?.id ?? null, sourceKey: n.klic,
+    text: textNavrhu(n, kc, t), typeId: druh?.id ?? null, sourceKey: n.klic,
     points: druh?.points ?? 0, bonusCut: druh?.bonusCut ?? 0,
   };
 }

@@ -122,11 +122,11 @@ export function useSiroka(): boolean {
   );
 }
 
-/** „září 2026" pro meta řádek (velké písmeno dodá cz-sentence). */
+/** „září 2026" / „September 2026" pro meta řádek v jazyce aplikace (velké písmeno dodá cz-sentence). */
 function nazevMesice(m: string): string {
   const [y, mm] = m.split('-').map(Number);
   if (!y || !mm) return m;
-  return new Date(Date.UTC(y, mm - 1, 15)).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return new Date(Date.UTC(y, mm - 1, 15)).toLocaleDateString(LOCALE_PRO_JAZYK[aktualniJazyk()], { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 const sZnamenkem = (p: number) => `${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p)} %`;

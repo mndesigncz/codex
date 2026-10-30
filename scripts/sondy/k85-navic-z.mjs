@@ -31,7 +31,7 @@ const sRole = (klic, navic) => { const r = sysRole(klic); return mine([...r.opra
 const BARISTA = sRole('barista', ['navic.zapsat']);
 const KIOSK = sRole('kiosk', ['navic.zapsat']);
 
-const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED2: praha(-2), PREDEVCIREM: praha(-2), PRED3: praha(-3), PRED5: praha(-5), PRED6: praha(-6), ZITRA: praha(1), POZITRI: praha(2), ZA3: praha(3), ZA5: praha(5), ZA7: praha(7), ZA10: praha(10), ZA12: praha(12), ZA20: praha(20) };
 const MESIC = DNY.DNES.slice(0, 7);
 const nacti = (jmeno) => {

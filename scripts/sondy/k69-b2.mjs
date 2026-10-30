@@ -31,7 +31,7 @@ const ted = () => Date.now() + POSUN;
 // S posunutými hodinami vykreslí server časy bez posunu a React při hydrataci
 // ohlásí nesoulad textu (#418). Je to artefakt sondy, ne chyba aplikace.
 const skutecneChyby = (chyby) => POSUN ? chyby.filter(c => !/Minified React error #418/.test(c)) : chyby;
-const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(ted() + o * 86400000));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(ted()))}T12:00:00Z`));
 const hmPraha = (min) => new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ted() + min * 60000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDEVCIREM: praha(-2), PRED5: praha(-5) };
 /** Pražský čas „HH:MM" dne `den` jako ISO (kolo 7: záznamy s pevným časem proti plánu 08:00–16:00). */
