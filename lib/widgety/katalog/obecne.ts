@@ -122,7 +122,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
-    stranky: ['vedeni.prehled'],
+    stranky: ['vedeni.prehled', 'vedeni.togo'],
     opravneni: {
       vse: [],
       nektere: ['tym.zobrazit', 'rozvrh.zobrazit', 'sklad.zobrazit', 'uzaverky.zobrazit_vse'],

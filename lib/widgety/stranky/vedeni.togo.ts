@@ -17,6 +17,10 @@
 // Audit 2026-10 (V42, V09): pod čísla dne přibylo Čeká na tebe — „co hoří" na telefonu, odkud
 // se tlačítkem Vyřídit na jednom místě schvaluje volno, výměny, uzávěrky, navíc i tresty bez
 // přepínání do plné správy. Když nic nečeká, karta se nekreslí.
+// Spuštění (průchod nového zákazníka 2026-10): pod Čeká na tebe stojí První kroky. Vlastník na
+// telefonu po průvodci přistál v TO GO bez jediného vodítka (První kroky byly jen na Přehledu
+// plné správy), přitom finále průvodce slibuje „Co dál". Widget se sám skryje, jakmile jsou
+// všechny kroky hotové nebo je člověk zavřel, takže zaběhnutému podniku nepřekáží.
 // Nástroj stránka nemá.
 import type { DefiniceStranky } from '../typy.ts';
 
@@ -30,6 +34,7 @@ export const STRANKA: DefiniceStranky = {
   inkoust: true,
   doporucene: [
     'prehled.ceka_na_tebe',
+    'prehled.prvni_kroky',
     'pokladna.dnes',
     'finance.mzdy_dnes',
     'trzby.otevrene',
@@ -50,6 +55,7 @@ export const STRANKA: DefiniceStranky = {
       { w: 'finance.mzdy_dnes', s: 'S' },
       { w: 'trzby.otevrene', s: 'S' },
       { w: 'prehled.ceka_na_tebe', s: 'M' },
+      { w: 'prehled.prvni_kroky', s: 'M' },
       { w: 'trzby.po_dnech', s: 'M' },
       { w: 'dochazka.dnes_v_podniku', s: 'M' },
       { w: 'vyroba.k_vyrobe', s: 'M' },
