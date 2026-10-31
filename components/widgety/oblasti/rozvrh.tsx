@@ -721,7 +721,11 @@ function Diry({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: string }>) 
       // Červeně jen, když někde nikdo neotevře; chybějící druhý člověk je mírnější.
       doplnek={!S && dny.length > 0 ? <Chip tone={dny.some(d => d.povinna) ? 'bad' : 'wait'} size="sm">{cislo(dny.length)}</Chip> : undefined}
       otevrit={S && smiDoplnit && dny[0] ? () => otevriDen(dny[0].den) : undefined}
-      prazdno={dny.length === 0 ? <p className="t-meta text-pretty">{t('Na {mesic} je obsazeno — bez děr.', { mesic: naMesic })}</p> : undefined}
+      // Díry se počítají jen pro dny, na které je něco naplánované (/api/schedule). Prázdný měsíc
+      // proto díry nemá, ale „obsazeno — bez děr" by novému podniku bez jediné směny lhalo.
+      prazdno={dny.length === 0 ? <p className="t-meta text-pretty">{(data.data?.smeny.length ?? 0) === 0
+        ? t('Na {mesic} zatím nikdo nemá směnu.', { mesic: naMesic })
+        : t('Na {mesic} je obsazeno — bez děr.', { mesic: naMesic })}</p> : undefined}
     >
       {S ? (
         <Stat label={naMesic} value={cislo(dny.length)} note={t('{n, plural, one {den} few {dny} other {dní}} s dírou · první {kdy}', { n: dny.length, kdy: denKratce(dny[0]?.den ?? dnes, dnes, t).toLowerCase() })} />
