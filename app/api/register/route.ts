@@ -57,11 +57,13 @@ export async function POST(request: Request) {
     // Create the employer account. Dvě souběžné registrace téhož e-mailu
     // projdou kontrolou výš obě; unikát v databázi rozhodne a druhá dostane
     // srozumitelné 409 místo pětistovky.
+    // Avatar je výchozí „👤" jako u zaměstnanců (components/ui/Avatar ho nekreslí a ukáže iniciály).
+    // Dřív tu bylo „👔": nový vlastník měl v liště, rozvrhu i docházce emoji, které si nevybral.
     let user: any;
     try {
       [user] = await sql`
         INSERT INTO users (name, email, password_hash, role, avatar, job_title)
-        VALUES (${name}, ${email}, ${passwordHash}, 'employer', '👔', 'Provozovatel')
+        VALUES (${name}, ${email}, ${passwordHash}, 'employer', '👤', 'Provozovatel')
         RETURNING id, name, email, role`;
     } catch (e: any) {
       if (e?.code === '23505') return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
