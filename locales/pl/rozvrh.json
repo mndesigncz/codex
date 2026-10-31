@@ -514,5 +514,6 @@
   "Ukázat měsíc jako mřížku": "Pokaż miesiąc jako siatkę",
   "Ukázat dny jako seznam": "Pokaż dni jako listę",
   "Potvrdit a uložit rozvrh jen uloží — tým ho uvidí, až ho publikuješ. „Uložit a publikovat“ nahoře udělá obojí najednou.": "Potwierdź i zapisz tylko zapisuje grafik — zespół zobaczy go po opublikowaniu. „Zapisz i opublikuj” u góry zrobi obie rzeczy naraz.",
-  "Jak směna dopadla? Pochval nebo zkritizuj celou směnu.": "Jak poszła zmiana? Pochwal albo skrytykuj całą zmianę."
+  "Jak směna dopadla? Pochval nebo zkritizuj celou směnu.": "Jak poszła zmiana? Pochwal albo skrytykuj całą zmianę.",
+  "{n, plural, one {# člověk bez dostupnosti} few {# lidé bez dostupnosti} other {# lidí bez dostupnosti}}": "{n, plural, one {# osoba bez dostępności} few {# osoby bez dostępności} many {# osób bez dostępności} other {# osoby bez dostępności}}"
 }
