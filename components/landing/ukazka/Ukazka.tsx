@@ -15,7 +15,7 @@ import {
 // jsou izolované. Co stránka dělá navíc:
 //  - plakát (skutečný snímek) je v HTML hned: LCP i bez skriptu. Samotná ukázka
 //    se načte až když je rám vidět a prohlížeč je v klidu, nebo hned při prvním
-//    dotyku. Při vypnutém pohybu a na úsporném přenosu se nenačítá sama,
+//    dotyku (na telefonu jen po dotyku, viz mount). Při vypnutém pohybu a na úsporném přenosu se nenačítá sama,
 //    čeká na tlačítko „Spustit živou ukázku".
 //  - scény, role a zařízení se přepínají zprávami (`demo-scena`), ne načítáním
 //    stránky; „Začít znovu" posílá `demo-reset`.
@@ -99,11 +99,18 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
     mq.addEventListener('change', nastav);
     const u = uspornyRezim();
     setRucni(u);
+    // Telefon: ukázka se v klidu sama nenačítá, až po prvním dotyku do ní
+    // (onPointerDownCapture níž) nebo po volbě scény. Je to celá aplikace
+    // (~450 kB přenosu, na běžném telefonu ~2 s práce hlavního vlákna), která
+    // by se jinak stahovala a spouštěla právě ve chvíli, kdy člověk začne
+    // rolovat, a prodejní stránka by mu pod prstem zasekávala. Plakát je
+    // skutečný snímek téže scény, takže do dotyku vypadá stránka stejně.
+    const telefon = mq.matches;
     const el = korenRef.current;
     let zrusit = false;
     let viditelny = false;
     let idle = false;
-    const zkus = () => { if (!zrusit && viditelny && idle && !u) aktivuj(); };
+    const zkus = () => { if (!zrusit && viditelny && idle && !u && !telefon) aktivuj(); };
     const io = el && 'IntersectionObserver' in window
       ? new IntersectionObserver(([z]) => { viditelny = z.isIntersecting; zkus(); }, { rootMargin: '200px 0px' })
       : null;
@@ -298,7 +305,9 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
           <div ref={obrazovka} className="ld-obrazovka">
             {/* Plakát: skutečný snímek první scény, v HTML hned (LCP). Pod iframem zůstává. */}
             <picture>
-              <source media="(max-width: 767px)" srcSet="/brand/landing/rec/hero-prehled-telefon.webp" />
+              {/* Rám telefonu má obrazovku 18 rem (~286 px): 520 px stačí do hustoty ~1,8×, 780 px pro 3× displeje. */}
+              <source media="(max-width: 767px)" sizes="18rem" width={780} height={1560}
+                srcSet="/brand/landing/rec/hero-prehled-telefon-520.webp 520w, /brand/landing/rec/hero-prehled-telefon.webp 780w" />
               <img src="/brand/landing/rec/hero-prehled-pocitac.webp" alt="" width={2420} height={1518}
                 fetchPriority="high" decoding="async" draggable={false} />
             </picture>
