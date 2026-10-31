@@ -113,12 +113,16 @@ for (const w of [1280, 390]) {
   } else {
     await o.screenshot({ path: SNIMKY + 'hodnoceni-smeny-kritika-1280.png' });
   }
+  const getuPred = (stav.dny ?? []).length;
   await o.getByRole('button', { name: 'Uložit pro 2 lidi' }).click();
   await dokud(() => (stav.hodnoceni ?? []).length > 0, 4000);
+  // Po uložení se den načte znovu; potvrzení musí přežít i nově načtená data (dřív ho efekt plnění formuláře smazal).
+  await dokud(() => (stav.dny ?? []).length > getuPred, 4000);
+  await p.waitForTimeout(400);
   const b = stav.hodnoceni?.[0]?.body ?? {};
   tvrdi(`S1 ${w}: POST nese den, směnu, 2 hvězdy, kritiku, Čistota −, k nápravě`, b.den === DNY.PRED3 && b.klic === '08:00-16:00' && b.hvezdy === 2 && /Nepořádek u baru/.test(b.kritika) && b.stitky?.cistota === 'minus' && b.kNaprave === true, JSON.stringify(b));
   tvrdi(`S1 ${w}: …a rozpis bodů po lidech (Eva +3, Jakub −5), poznámku jen Jakubovi a osádku`, JSON.stringify(b.body) === JSON.stringify([{ id: 16, body: 3, poznamka: null }, { id: 17, body: -5, poznamka: 'Utři bar před odchodem' }]) && JSON.stringify(b.osadka) === '[16,17]', JSON.stringify(b.body));
-  tvrdi(`S1 ${w}: po uložení potvrzení v okně`, await dokud(() => o.locator('[data-hodnoceni-ulozeno]').isVisible(), 8000));
+  tvrdi(`S1 ${w}: po uložení potvrzení v okně (i po novém načtení dne)`, (stav.dny ?? []).length > getuPred && await dokud(() => o.locator('[data-hodnoceni-ulozeno]').isVisible(), 2000));
   await o.getByRole('button', { name: 'Zavřít' }).last().click();
   await dokud(async () => (await okno(p).count()) === 0, 3000);
 

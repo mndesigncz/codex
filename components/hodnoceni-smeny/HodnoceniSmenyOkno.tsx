@@ -149,8 +149,11 @@ export default function HodnoceniSmenyOkno({ den: den0, klic: klic0, clovek, onC
     setPoznamky(Object.fromEntries((h?.body ?? []).filter(b => b.poznamka).map(b => [b.id, b.poznamka as string])));
     setRozpis(!!h?.body.length);
     setVsem(0);
-    setNahled(false); setChyba(null); setHotovo(null); setMazu('ne');
+    setNahled(false); setChyba(null); setMazu('ne');
   }, [data, klic]);
+  // Potvrzení „uloženo" maže jen jiná směna nebo den. Po uložení se data načtou znovu
+  // (nacti) a efekt výš proběhne — kdyby mazal i tohle, potvrzení by jen problikla.
+  useEffect(() => { setHotovo(null); }, [den, klic]);
 
   const jmeno = useCallback((id: number) => data?.clenove.find(c => c.id === id)?.jmeno
     ?? skupina?.lide.find(l => l.id === id)?.jmeno ?? `#${id}`, [data, skupina]);
