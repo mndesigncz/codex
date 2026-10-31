@@ -17,8 +17,10 @@
 //   SONDY_ZAKLAD=http://localhost:3441 node scripts/sondy/k85-navic-z.mjs
 import { readFileSync, mkdirSync } from 'node:fs';
 import bcrypt from 'bcryptjs';
-import { kontext, konec, tvrdi, otevri, dokud, jdi, roleMine, mine, sysRole, DIR, OUT, BASE } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, jdi, roleMine, mine, sysRole, DIR, OUT, BASE, ukotviDen } from './k68-spolecne.mjs';
 import { nastavJazyk } from './preteceni-jadro.mjs';
+// Fixtury počítají dny zpět ve stejném měsíci: prvních 9 dní v měsíci se hodiny posunou (k68-spolecne ukotviDen).
+const POSUN = ukotviDen();
 
 const TEL = { width: 390, height: 844 };
 const PC = { width: 1280, height: 900 };
@@ -31,7 +33,7 @@ const sRole = (klic, navic) => { const r = sysRole(klic); return mine([...r.opra
 const BARISTA = sRole('barista', ['navic.zapsat']);
 const KIOSK = sRole('kiosk', ['navic.zapsat']);
 
-const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + POSUN))}T12:00:00Z`));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED2: praha(-2), PREDEVCIREM: praha(-2), PRED3: praha(-3), PRED5: praha(-5), PRED6: praha(-6), ZITRA: praha(1), POZITRI: praha(2), ZA3: praha(3), ZA5: praha(5), ZA7: praha(7), ZA10: praha(10), ZA12: praha(12), ZA20: praha(20) };
 const MESIC = DNY.DNES.slice(0, 7);
 const nacti = (jmeno) => {
@@ -377,7 +379,7 @@ for (const [nazev, volby] of [['390', { viewport: TEL, mobil: true }], ['1280', 
 // Z5 — Tablet 1024×1366: souhrn po odchodu s blokem navíc (POST s actingAs), „Napsat…"
 // ---------------------------------------------------------------------------
 {
-  const TED = Date.now();
+  const TED = Date.now() + POSUN;
   const prahaHMS = (posunMin) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(TED + posunMin * 60000));
   const isoPred = (min) => new Date(TED - min * 60000).toISOString();
   const OTISK = bcrypt.hashSync('1234', 4);

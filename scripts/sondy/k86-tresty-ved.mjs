@@ -19,12 +19,14 @@
 //  L — Polsky na 320 px: widget a okno Dát trest bez přetečení.
 //   SONDY_ZAKLAD=http://localhost:3444 node scripts/sondy/k86-tresty-ved.mjs
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, roleMine, VLASTNIK, DIR, OUT, BASE } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, roleMine, VLASTNIK, DIR, OUT, BASE, ukotviDen } from './k68-spolecne.mjs';
+// Fixtury počítají dny zpět ve stejném měsíci: prvních 9 dní v měsíci se hodiny posunou (k68-spolecne ukotviDen).
+const POSUN = ukotviDen();
 
 const PC = { width: 1280, height: 900 };
 const TEL = { width: 390, height: 844 };
 const SNIMKY = process.env.SONDY_SNIMKY ? process.env.SONDY_SNIMKY.replace(/\/?$/, '/') : OUT;
-const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + POSUN))}T12:00:00Z`));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED3: praha(-3), PRED4: praha(-4), PRED5: praha(-5), PRED6: praha(-6), STARY: praha(-40) };
 const MESIC = DNY.DNES.slice(0, 7);
 // Pražský čas se správným posunem podle data (letní +02:00, zimní +01:00) — pevné +02:00
@@ -87,8 +89,8 @@ const podvrh = ({ att = null } = {}) => {
       if (mm && m === 'PATCH') {
         const x = data.items.find(i => i.id === Number(mm[1]));
         if (!x) return json({ error: 'Trest nenalezen.' }, 404);
-        if (telo?.status === 'zruseno') Object.assign(x, { status: 'zruseno', cancelNote: telo.note ?? null, cancelledBy: 15, cancelledByName: 'Martin Nemeškal', cancelledAt: new Date().toISOString(), disputeHandledAt: x.disputed ? new Date().toISOString() : x.disputeHandledAt });
-        else if (telo?.disputeHandled) x.disputeHandledAt = new Date().toISOString();
+        if (telo?.status === 'zruseno') Object.assign(x, { status: 'zruseno', cancelNote: telo.note ?? null, cancelledBy: 15, cancelledByName: 'Martin Nemeškal', cancelledAt: new Date(Date.now() + POSUN).toISOString(), disputeHandledAt: x.disputed ? new Date(Date.now() + POSUN).toISOString() : x.disputeHandledAt });
+        else if (telo?.disputeHandled) x.disputeHandledAt = new Date(Date.now() + POSUN).toISOString();
         else { Object.assign(x, telo); if ('points' in telo || 'bonusCut' in telo) x.seenAt = null; }
         return json({ ok: true, item: x });
       }
@@ -101,7 +103,7 @@ const podvrh = ({ att = null } = {}) => {
           givenBy: 15, givenByName: 'Martin Nemeškal', day: telo.day ?? DNY.DNES, shiftId: telo.shiftId ?? null, closingId: telo.closingId ?? null, taskId: null,
           typeId: telo.typeId ?? null, typeTitle: d?.title ?? null, text: telo.text, photoUrl: telo.photoUrl ?? null, points: Number(telo.points) || 0, bonusCut: Number(telo.bonusCut) || 0,
           status: 'plati', source: telo.sourceKey ? telo.sourceKey.split(':')[0] : 'rucne', sourceKey: telo.sourceKey ?? null, seenAt: null, response: null, responseAt: null,
-          disputed: false, disputeHandledAt: null, cancelledBy: null, cancelledByName: null, cancelledAt: null, cancelNote: null, createdAt: new Date().toISOString(),
+          disputed: false, disputeHandledAt: null, cancelledBy: null, cancelledByName: null, cancelledAt: null, cancelNote: null, createdAt: new Date(Date.now() + POSUN).toISOString(),
         };
         data.items.unshift(x);
         return json({ ok: true, item: x }, 201);

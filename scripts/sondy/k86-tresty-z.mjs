@@ -15,8 +15,10 @@
 // Z4 Polština a němčina 320: Domů, detail a Odměny bez přetečení.
 //   SONDY_ZAKLAD=http://localhost:3443 node scripts/sondy/k86-tresty-z.mjs
 import { readFileSync, mkdirSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dokud, jdi, mine, sysRole, DIR, OUT, BASE } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, jdi, mine, sysRole, DIR, OUT, BASE, ukotviDen } from './k68-spolecne.mjs';
 import { nastavJazyk } from './preteceni-jadro.mjs';
+// Fixtury počítají dny zpět ve stejném měsíci: prvních 9 dní v měsíci se hodiny posunou (k68-spolecne ukotviDen).
+const POSUN = ukotviDen();
 
 const TEL = { width: 390, height: 844 };
 const PC = { width: 1280, height: 900 };
@@ -26,7 +28,7 @@ mkdirSync(SNIMKY, { recursive: true });
 const r = sysRole('barista');
 const BARISTA = mine(r.opravneni, { klic: 'barista', roleId: null, nazev: r.nazev, typ: r.typ, jeVlastnik: false });
 
-const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + POSUN))}T12:00:00Z`));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED3: praha(-3), PRED5: praha(-5), PRED6: praha(-6) };
 const MESIC = DNY.DNES.slice(0, 7);
 const nacti = (jmeno) => {
@@ -60,8 +62,8 @@ const podvrh = (req, json, stav) => {
     (stav.zapisy ??= []).push({ m, path, telo: t });
     const id = Number(path.split('/').pop());
     const puvodni = data.items.find(x => x.id === id) ?? data.items[0];
-    if (t?.seen) return json({ ok: true, item: { ...puvodni, seenAt: new Date().toISOString() } });
-    if (t?.response !== undefined) return json({ ok: true, item: { ...puvodni, response: t.response, responseAt: new Date().toISOString(), disputed: t.disagree === true, seenAt: puvodni.seenAt ?? new Date().toISOString() } });
+    if (t?.seen) return json({ ok: true, item: { ...puvodni, seenAt: new Date(Date.now() + POSUN).toISOString() } });
+    if (t?.response !== undefined) return json({ ok: true, item: { ...puvodni, response: t.response, responseAt: new Date(Date.now() + POSUN).toISOString(), disputed: t.disagree === true, seenAt: puvodni.seenAt ?? new Date(Date.now() + POSUN).toISOString() } });
     return json({ ok: true, item: puvodni });
   }
   if (path === '/api/rewards' && m === 'GET') return json(nacti('k86-tresty-z-rewards'));
