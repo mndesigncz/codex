@@ -109,7 +109,7 @@ html:has(.cs-root) { background: var(--bg); }
 .cs-tarif .cs-volba-veta { display: block; margin-top: 0.3rem; }
 .cs-tarif-cena { flex-shrink: 0; text-align: right; font-weight: 700; font-size: 1.125rem; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .cs-tarif-cena > span { display: block; font-size: 0.8125rem; font-weight: 500; color: rgba(22, 24, 26, 0.55); }
-.cs-doporuceno { border-radius: 9999px; padding: 1px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: var(--ink); color: #fff; }
+.cs-doporuceno { border-radius: 9999px; padding: 1px 8px; font-size: 11px; font-weight: 700; background: var(--ink); color: #fff; } /* štítek větou (DESIGN v3), ne verzálky */
 .cs-zdarma { border-radius: 9999px; padding: 1px 8px; font-size: 11px; font-weight: 650; background: color-mix(in srgb, var(--lime) 45%, transparent); color: #3E5406; }
 .cs-shrnuti-platby { padding: 1rem 1.1rem; border-radius: var(--r-md, 14px); background: rgba(22, 24, 26, 0.035); font-size: 0.9375rem; line-height: 1.5; color: rgba(22, 24, 26, 0.75); text-wrap: pretty; }
 .cs-shrnuti-platby strong { color: var(--ink); }
