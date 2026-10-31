@@ -6,6 +6,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { cestaOdkazuZalohy, podepisOdkazZalohy, PLATNOST_ODKAZU_DNI } from '@/lib/pravni/zalohaOdkaz';
 import { poDavkach } from '@/lib/cronDavky';
+import { zapisBehCronu } from '@/lib/cronSouhrn';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -72,6 +73,7 @@ export async function GET(request: Request) {
 
     const ok = failed === 0 && (sent > 0 || teamsNotified === 0);
     if (!ok) console.error('backup: part failed', { sent, failed, problems });
+    else zapisBehCronu('backup', { ok, teams: teamsNotified, emailedTo: sent, failed });
     return NextResponse.json({ ok, teams: teamsNotified, emailedTo: sent, failed, problems }, { status: ok ? 200 : 500 });
   } catch (error) {
     console.error('backup failed', error);

@@ -16,6 +16,7 @@ import { tymyCiselnikuHromadne } from '@/lib/tenant';
 import { clenoveSOpravnenim, maOpravneni } from '@/lib/opravneniDb';
 import { chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
 import { poDavkach, type VysledekDavek } from '@/lib/cronDavky';
+import { zapisBehCronu } from '@/lib/cronSouhrn';
 
 export const dynamic = 'force-dynamic';
 // Digest iteruje přes všechny týmy a u každého sahá na pokladnu — default 10 s
@@ -314,9 +315,12 @@ export async function GET(request: Request) {
       }
     };
     davky = await poDavkach(teams as any[], zpracujPodnik, { soubezne: 4, rozpocetMs: 50_000 });
-    if (davky.nestihnuto || davky.chyby) console.error('digest: nedokončeno', davky);
   } catch (err) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
+    // Dřív bez záznamu v logu (selhaný souhrn nebyl vidět nikde) a s hláškou
+    // Postgresu v odpovědi. Podrobnost patří do logu, ven jen fakt.
+    console.error('digest failed', err);
+    return NextResponse.json({ ok: false, error: 'Souhrn dne se nepodařilo rozeslat.' }, { status: 500 });
   }
+  zapisBehCronu('digest', { ok: true, sent, ...(davky ? { podniku: davky.hotovo, chyby: davky.chyby, nestihnuto: davky.nestihnuto } : {}) });
   return NextResponse.json({ ok: true, sent, date: today, ...(davky ? { podniku: davky.hotovo, chyby: davky.chyby, nestihnuto: davky.nestihnuto } : {}) });
 }

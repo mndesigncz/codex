@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { checkCron } from '@/lib/cronAuth';
 import { reconcile } from '@/lib/billing';
+import { zapisBehCronu } from '@/lib/cronSouhrn';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -9,5 +10,7 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   const gate = checkCron(request);
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
-  return NextResponse.json(await reconcile());
+  const vysledek = await reconcile();
+  zapisBehCronu('billing/cron', vysledek);
+  return NextResponse.json(vysledek);
 }
