@@ -213,5 +213,14 @@
   "Pozdní příchod o {minuty} min.": "Neskorý príchod o {minuty} min.",
   "Manko v uzávěrce {castka}.": "Manko v uzávierke {castka}.",
   "Výtka z hodnocení směny: {poznamka}": "Výčitka z hodnotenia zmeny: {poznamka}",
-  "Výtka z hodnocení směny.": "Výčitka z hodnotenia zmeny."
+  "Výtka z hodnocení směny.": "Výčitka z hodnotenia zmeny.",
+  "Stránka nenalezena": "Stránka sa nenašla",
+  "Tahle stránka tu není": "Táto stránka tu nie je",
+  "Adresa možná přestala platit — sdílené odkazy na nabídku se dají kdykoli vypnout nebo vystavit znovu. Zkus to místo, odkud jsi přišel, nebo se zeptej v podniku na aktuální odkaz.": "Adresa možno prestala platiť — zdieľané odkazy na ponuku sa dajú kedykoľvek vypnúť alebo vystaviť znova. Skús sa vrátiť tam, odkiaľ si prišiel, alebo sa v podniku opýtaj na aktuálny odkaz.",
+  "Tady se něco pokazilo": "Tu sa niečo pokazilo",
+  "Data jsou v pořádku — spadlo vykreslení téhle stránky. Zkus to znovu; když to bude opakovat, dej vědět a pošli s tím kód níž.": "Údaje sú v poriadku — spadlo len zobrazenie tejto stránky. Skús to znova; ak sa to bude opakovať, daj vedieť a pošli s tým kód nižšie.",
+  "Zkusit znovu": "Skúsiť znova",
+  "Na úvod": "Na úvod",
+  "Technický detail": "Technický detail",
+  "Najít podnik": "Nájsť podnik"
 }

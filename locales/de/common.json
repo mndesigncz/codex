@@ -213,5 +213,14 @@
   "Pozdní příchod o {minuty} min.": "Verspätung um {minuty} Min.",
   "Manko v uzávěrce {castka}.": "Kassenfehlbetrag im Abschluss: {castka}.",
   "Výtka z hodnocení směny: {poznamka}": "Rüge aus der Schichtbewertung: {poznamka}",
-  "Výtka z hodnocení směny.": "Rüge aus der Schichtbewertung."
+  "Výtka z hodnocení směny.": "Rüge aus der Schichtbewertung.",
+  "Stránka nenalezena": "Seite nicht gefunden",
+  "Tahle stránka tu není": "Diese Seite gibt es hier nicht",
+  "Adresa možná přestala platit — sdílené odkazy na nabídku se dají kdykoli vypnout nebo vystavit znovu. Zkus to místo, odkud jsi přišel, nebo se zeptej v podniku na aktuální odkaz.": "Die Adresse ist vielleicht nicht mehr gültig — geteilte Links zur Speisekarte können jederzeit deaktiviert oder neu erstellt werden. Geh zurück, woher du gekommen bist, oder frag im Betrieb nach dem aktuellen Link.",
+  "Tady se něco pokazilo": "Hier ist etwas schiefgelaufen",
+  "Data jsou v pořádku — spadlo vykreslení téhle stránky. Zkus to znovu; když to bude opakovat, dej vědět a pošli s tím kód níž.": "Deine Daten sind in Ordnung — nur die Anzeige dieser Seite ist abgestürzt. Versuch es erneut; wenn es sich wiederholt, gib uns Bescheid und schick den Code unten mit.",
+  "Zkusit znovu": "Erneut versuchen",
+  "Na úvod": "Zur Startseite",
+  "Technický detail": "Technische Details",
+  "Najít podnik": "Betrieb finden"
 }
