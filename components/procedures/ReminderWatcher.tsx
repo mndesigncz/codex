@@ -56,7 +56,8 @@ function markFired(key: string) {
 export default function ReminderWatcher() {
   const t = useT('postupy');
   const { active, startRun, starting } = useProcedures();
-  const { status: stavRelace } = useSession();
+  const { status: stavRelace, data: relace } = useSession();
+  const jeHost = (relace?.user as { role?: string } | undefined)?.role === 'customer';
   const proceduresRef = useRef<ProcedureLite[]>([]);
   const hasShiftTodayRef = useRef(false);
   const openingRef = useRef<{ open: string; close: string; closed: boolean }>({ open: '08:00', close: '20:00', closed: false });
@@ -128,8 +129,9 @@ export default function ReminderWatcher() {
   }, [fireRemind]);
 
   useEffect(() => {
-    // Bez přihlášení není co hlídat (a /api/procedures by vrátilo 401).
-    if (stavRelace !== 'authenticated') return;
+    // Bez přihlášení není co hlídat (a /api/procedures by vrátilo 401); host Managero client
+    // (role customer) postupy nemá a dostal by 403.
+    if (stavRelace !== 'authenticated' || jeHost) return;
     let cancelled = false;
     (async () => {
       await loadProcedures();
@@ -143,7 +145,7 @@ export default function ReminderWatcher() {
       clearInterval(tick);
       clearInterval(refresh);
     };
-  }, [loadProcedures, check, stavRelace]);
+  }, [loadProcedures, check, stavRelace, jeHost]);
 
   // If a run starts (this or another procedure), drop the prompt.
   useEffect(() => {
