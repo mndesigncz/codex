@@ -3227,7 +3227,9 @@ function DayModal({
     if (!employeeId || !start || !end || kolidujeRucne) return;
     setSaving(true);
     try {
-      const ok = await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type: typeName || 'Vlastní', ...(navrh ? {} : { note: poznamka.trim() || null }) });
+      // Název typu se uloží v jazyce vedení (jako předvyplněné texty trestů): dřív natvrdo „Vlastní",
+      // takže anglický tým četl u směny s vlastním časem česky „Vlastní · Saturday 31 October".
+      const ok = await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type: typeName || t('Vlastní'), ...(navrh ? {} : { note: poznamka.trim() || null }) });
       // Výběr se smaže jen po uložení — neúspěch nesmí vypadat jako úspěch.
       if (ok) { setEmployeeId(''); setPoznamka(''); }
     } finally {
