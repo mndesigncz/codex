@@ -384,7 +384,9 @@ for (const tmavy of [false, true]) {
   const oknoP = p.getByRole('dialog', { name: 'Dát trest' });
   const otevreno = await oknoP.waitFor({ timeout: 4000 }).then(() => true, () => false);
   if (otevreno) await doberAnimace(oknoP);
-  tvrdi(`T3 (390${sfx}): Dát trest z profilu — okno nad profilem, Eva předvyplněná (bez výběru člověka)`, otevreno && await naKlepnuti(oknoP.locator('#trest-text'))
+  // Okno vyjíždí zdola; getAnimations() hned po objevení může být ještě prázdné (animace začne až příští snímek),
+  // proto se „klepnutelnost“ tvrdí až po dosednutí — do 2 s, ne v jediném okamžiku uprostřed vyjíždění.
+  tvrdi(`T3 (390${sfx}): Dát trest z profilu — okno nad profilem, Eva předvyplněná (bez výběru člověka)`, otevreno && await dokud(() => naKlepnuti(oknoP.locator('#trest-text')), 2000)
     && (await oknoP.locator('#trest-kdo').count()) === 0 && /Eva Testová/.test(await text(oknoP)));
   await oknoP.getByRole('button', { name: 'Zrušit', exact: true }).click();
   tvrdi(`T (390${sfx}): bez chyb v konzoli`, skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));

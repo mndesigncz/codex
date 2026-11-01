@@ -81,6 +81,15 @@ export function ukotviDen() {
   return posunVychozi;
 }
 
+/** Pevný „dnešek" (RRRR-MM-DD, 12:00 v Praze) pro sondy, jejichž fixtury a tvrzení počítají s konkrétním
+ *  kalendářem (Rozvrh: příští měsíc začíná nedělí, „neděle 6. prosince"…). Vrací posun hodin (ms) a nastaví
+ *  ho jako výchozí posunCasu pro kontext(). */
+export function ukotviNaDatum(den) {
+  const tz = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Prague', timeZoneName: 'longOffset' }).formatToParts(new Date(`${den}T12:00:00Z`)).find(x => x.type === 'timeZoneName')?.value ?? 'GMT+01:00';
+  posunVychozi = Date.parse(`${den}T12:00:00${tz.replace('GMT', '') || '+00:00'}`) - Date.now();
+  return posunVychozi;
+}
+
 export async function kontext({ viewport = { width: 1280, height: 950 }, role = 'employer', mineData = VLASTNIK, mineZpozdeni = 0,
   fix = FIX_VEDENI, mobil = false, reduced = false, tmavy = false, dalsi = null, posunCasu = posunVychozi } = {}) {
   const b = await browser();

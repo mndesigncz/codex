@@ -95,8 +95,11 @@ async function otevriRozvrh(p) {
     const ted = new Date(); const prvni = new Date(Date.UTC(ted.getUTCFullYear(), ted.getUTCMonth() + 1, 15));
     const cil = new Intl.DateTimeFormat('cs-CZ', { month: 'long', year: 'numeric', timeZone: 'Europe/Prague' }).format(prvni).toLowerCase();
     const nadpis = p.locator('#planovac-nadpis');
-    if ((await nadpis.innerText()).trim().toLowerCase() !== cil) await p.getByRole('button', { name: 'Další měsíc' }).first().click();
-    await dokud(async () => (await nadpis.innerText()).trim().toLowerCase() === cil, 3000);
+    // Klik před hydratací přijde vniveč (v celé sadě pod zátěží) — opakovat, dokud nadpis neukáže cílový měsíc.
+    for (let pokus = 0; pokus < 4 && (await nadpis.innerText()).trim().toLowerCase() !== cil; pokus++) {
+      await p.getByRole('button', { name: 'Další měsíc' }).first().click();
+      await dokud(async () => (await nadpis.innerText()).trim().toLowerCase() === cil, 3000);
+    }
     return;
   }
   if ((await pristi.getAttribute('aria-pressed')) !== 'true') await pristi.click();
