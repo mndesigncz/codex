@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
+import { alternatesDokumentu } from '@/lib/pravni/odkazy';
 import PravniStranka from '@/components/pravni/PravniStranka';
 
 // Veřejná stránka bez přihlášení (App Store a Google Play ji vyžadují). Text v lib/pravni/dokumenty (viz docs/PRAVNI.md).
-export const metadata: Metadata = { title: 'Support · Managero', alternates: { canonical: '/en/podpora' } };
+export const metadata: Metadata = { title: 'Support · Managero', alternates: alternatesDokumentu('podpora', 'en') };
 
 export default function Stranka() {
   return <PravniStranka klic="podpora" jazyk="en" />;

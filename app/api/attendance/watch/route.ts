@@ -11,6 +11,7 @@ import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { autoCloseEntry, plannedEndFor, isForgottenClockOut } from '@/lib/staleShifts';
+import { zapisBehCronu } from '@/lib/cronSouhrn';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,9 @@ export async function GET(request: Request) {
         AND te.clock_in < NOW() - INTERVAL '15 minutes'`;
   } catch (e) {
     console.error('attendance watch query failed', e);
-    return NextResponse.json({ ok: false });
+    // 500, ne 200: Vercel → Cron Jobs ukazuje běh podle stavu odpovědi a
+    // s 200 vypadal nefunkční hlídač docházky jako úspěšný.
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 
   const now = Date.now();
@@ -72,5 +75,6 @@ export async function GET(request: Request) {
     } catch { /* best-effort */ }
   }
 
+  zapisBehCronu('attendance/watch', { ok: true, watched: open.length, nudged, closed });
   return NextResponse.json({ ok: true, watched: open.length, nudged, closed });
 }

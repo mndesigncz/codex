@@ -213,5 +213,14 @@
   "Pozdní příchod o {minuty} min.": "Late arrival by {minuty} min.",
   "Manko v uzávěrce {castka}.": "Cash shortage in closing: {castka}.",
   "Výtka z hodnocení směny: {poznamka}": "Reprimand from shift review: {poznamka}",
-  "Výtka z hodnocení směny.": "Reprimand from shift review."
+  "Výtka z hodnocení směny.": "Reprimand from shift review.",
+  "Stránka nenalezena": "Page not found",
+  "Tahle stránka tu není": "This page isn’t here",
+  "Adresa možná přestala platit — sdílené odkazy na nabídku se dají kdykoli vypnout nebo vystavit znovu. Zkus to místo, odkud jsi přišel, nebo se zeptej v podniku na aktuální odkaz.": "The link may have stopped working — shared menu links can be switched off or reissued at any time. Go back to where you came from, or ask the venue for the current link.",
+  "Tady se něco pokazilo": "Something went wrong here",
+  "Data jsou v pořádku — spadlo vykreslení téhle stránky. Zkus to znovu; když to bude opakovat, dej vědět a pošli s tím kód níž.": "Your data is fine — only this page failed to display. Try again; if it keeps happening, let us know and send the code below.",
+  "Zkusit znovu": "Try again",
+  "Na úvod": "To the start page",
+  "Technický detail": "Technical details",
+  "Najít podnik": "Find a place"
 }

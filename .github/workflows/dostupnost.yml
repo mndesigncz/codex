@@ -1,0 +1,68 @@
+name: Dostupnost produkce
+
+# Hlídání dostupnosti bez dalšího účtu (UptimeRobot, Better Stack…): každých
+# 10 minut se zeptá produkce, jestli běží. Když ne, job spadne a GitHub pošle
+# vlastníkovi repa e-mail o neúspěšném běhu (Settings → Notifications →
+# Actions → „Send notifications for failed workflows only").
+#
+# Žádné tajné klíče: /api/health je veřejný a vrací jen ano/ne (200 + "ok":true
+# = aplikace běží a databáze odpovídá, 503 = databáze nedostupná nebo chybí
+# povinné nastavení).
+#
+# Pozor: GitHub plánované běhy občas o pár minut zdrží a v repu bez aktivity
+# je po 60 dnech sám vypne — pak stačí v záložce Actions znovu povolit.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Zdržený běh nemá čekat ve frontě za dalším; stačí ten nejnovější.
+concurrency:
+  group: dostupnost
+  cancel-in-progress: true
+
+jobs:
+  kontrola:
+    name: Health a úvodní stránka
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ZAKLAD: https://www.managero.app
+    steps:
+      # Tři pokusy s pauzou: jeden studený start funkce nebo zaváhání sítě
+      # nemá budit majitele e-mailem.
+      - name: /api/health (200 a "ok":true)
+        run: |
+          for pokus in 1 2 3; do
+            kod=$(curl -sS -o odpoved.json -w '%{http_code}' --max-time 20 \
+              -H 'Cache-Control: no-cache' "$ZAKLAD/api/health") || kod=000
+            if [ "$kod" = "200" ] && grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' odpoved.json; then
+              echo "OK (pokus $pokus): HTTP $kod"
+              exit 0
+            fi
+            echo "::warning::Pokus $pokus: /api/health vrátil HTTP $kod"
+            [ "$pokus" -lt 3 ] && sleep 20
+          done
+          echo "::error::Produkce neodpovídá zdravě: $ZAKLAD/api/health (HTTP $kod)"
+          # Odpověď je jen ano/ne a názvy chybějících nastavení — žádné hodnoty.
+          # Vypíše se jen JSON z /api/health, ne HTML chybové stránky.
+          if grep -q '^{' odpoved.json 2>/dev/null; then head -c 500 odpoved.json; echo; fi
+          exit 1
+
+      - name: Úvodní stránka (200)
+        run: |
+          for pokus in 1 2 3; do
+            kod=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -L "$ZAKLAD/") || kod=000
+            if [ "$kod" = "200" ]; then
+              echo "OK (pokus $pokus): HTTP $kod"
+              exit 0
+            fi
+            echo "::warning::Pokus $pokus: úvodní stránka vrátila HTTP $kod"
+            [ "$pokus" -lt 3 ] && sleep 20
+          done
+          echo "::error::Úvodní stránka $ZAKLAD/ neodpovídá (HTTP $kod)"
+          exit 1

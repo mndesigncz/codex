@@ -309,7 +309,7 @@ async function nahraj(browser, s, tmp) {
 async function plakatyHero(browser) {
   const tvary = [
     { id: 'hero-prehled-pocitac', okno: { width: 1100, height: 690 }, dsf: 2.2, sirka: 2420 },
-    { id: 'hero-prehled-telefon', okno: { width: 390, height: 780 }, dsf: 2, sirka: 780 },
+    { id: 'hero-prehled-telefon', okno: { width: 390, height: 780 }, dsf: 2, sirka: 780, mensi: [520] },
   ];
   for (const t of tvary) {
     const ctx = await browser.newContext({ viewport: t.okno, deviceScaleFactor: t.dsf, locale: 'cs-CZ' });
@@ -322,6 +322,11 @@ async function plakatyHero(browser) {
     const cil = VYSTUP + t.id + '.webp';
     const info = await sharp(png).resize({ width: t.sirka }).webp({ quality: 80, effort: 5 }).toFile(cil);
     console.log(`✓ plakát ${t.id}: ${info.width}x${info.height}, ${(info.size / 1024).toFixed(0)} kB`);
+    // Menší varianta pro srcset (telefony s hustotou do 2×): plakát je LCP prvek na telefonu.
+    for (const w of t.mensi ?? []) {
+      const i2 = await sharp(png).resize({ width: w }).webp({ quality: 82, effort: 6 }).toFile(VYSTUP + `${t.id}-${w}.webp`);
+      console.log(`✓ plakát ${t.id}-${w}: ${i2.width}x${i2.height}, ${(i2.size / 1024).toFixed(0)} kB`);
+    }
   }
 }
 

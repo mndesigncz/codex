@@ -78,11 +78,14 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
   // Postupy jsou jen pro přihlášené. Provider je v kořeni celé aplikace,
   // takže bez téhle kontroly střílel i anonymní návštěvník prodejní stránky
   // na /api/procedures/runs a dostával 401 (dvě chyby v konzoli na každé načtení).
-  const { status: stavRelace } = useSession();
+  // Host Managero client (role customer) postupy nemá vůbec — dřív mu /client/* na každém
+  // načtení vracelo 403 dvakrát do konzole (průchod nového zákazníka na náhledu).
+  const { status: stavRelace, data: relace } = useSession();
+  const jeHost = (relace?.user as { role?: string } | undefined)?.role === 'customer';
 
   // Hydrate on mount: trust the server's running run; localStorage only gates the fetch.
   useEffect(() => {
-    if (stavRelace !== 'authenticated') return;
+    if (stavRelace !== 'authenticated' || jeHost) return;
     let cancelled = false;
     (async () => {
       try {
@@ -95,7 +98,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [stavRelace]);
+  }, [stavRelace, jeHost]);
 
   // Mirror the active run id into localStorage so a refresh knows to restore.
   useEffect(() => {

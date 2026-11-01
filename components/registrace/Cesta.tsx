@@ -184,7 +184,8 @@ export default function Cesta() {
           <div className="cs-postup" role="progressbar" aria-label={t('Postup registrace')} aria-valuemin={0} aria-valuemax={krokyCesty.length} aria-valuenow={poradi + 1}>
             <span style={{ transform: `scaleX(${postup})` }} />
           </div>
-          <Link href="/login" className="cs-prihlasit">{t('Přihlásit')}</Link>
+          {/* Na volbě tarifu je člověk už přihlášený (podnik je založený) — „Přihlásit" by mátlo. */}
+          {krok !== 'tarif' && <Link href="/login" className="cs-prihlasit">{t('Přihlásit')}</Link>}
         </div>
       </header>
 

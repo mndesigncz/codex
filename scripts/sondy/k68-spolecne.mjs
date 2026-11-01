@@ -65,8 +65,24 @@ export async function konec() {
  * - `dalsi(req, json, stav)`: vlastní obsluha; vrátí-li něco jiného než undefined, požadavek je vyřízený
  * - `mobil`, `reduced`, `tmavy`: telefon s dotykem, omezený pohyb, tmavý režim
  */
+// Ukotvený „dnešek" pro sondy, jejichž fixtury počítají dny zpět ve stejném měsíci (včera, před 6 dny…).
+// Prvních 9 dní v měsíci by „včera" padlo do minulého měsíce a filtry „Tento měsíc", kalendáře a souhrny
+// by je neukázaly. ukotviDen() vrátí posun hodin (ms): od 10. dne v měsíci 0, jinak 20. den minulého
+// měsíce 12:00 v Praze (vždy v minulosti, ať ho server nepovažuje za budoucnost). kontext() ho pak
+// použije jako výchozí posunCasu.
+let posunVychozi = 0;
+export function ukotviDen() {
+  const dnes = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
+  if (Number(dnes.slice(8)) >= 10) { posunVychozi = 0; return 0; }
+  const d = new Date(`${dnes.slice(0, 7)}-01T12:00:00Z`); d.setUTCDate(0);
+  const den = `${d.toISOString().slice(0, 7)}-20`;
+  const tz = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Prague', timeZoneName: 'longOffset' }).formatToParts(new Date(`${den}T12:00:00Z`)).find(x => x.type === 'timeZoneName')?.value ?? 'GMT+01:00';
+  posunVychozi = Date.parse(`${den}T12:00:00${tz.replace('GMT', '') || '+00:00'}`) - Date.now();
+  return posunVychozi;
+}
+
 export async function kontext({ viewport = { width: 1280, height: 950 }, role = 'employer', mineData = VLASTNIK, mineZpozdeni = 0,
-  fix = FIX_VEDENI, mobil = false, reduced = false, tmavy = false, dalsi = null, posunCasu = 0 } = {}) {
+  fix = FIX_VEDENI, mobil = false, reduced = false, tmavy = false, dalsi = null, posunCasu = posunVychozi } = {}) {
   const b = await browser();
   const ctx = await b.newContext({ viewport, locale: 'cs-CZ', isMobile: mobil, hasTouch: mobil, reducedMotion: reduced ? 'reduce' : 'no-preference' });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tokenPro(role), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);

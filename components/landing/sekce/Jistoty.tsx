@@ -42,7 +42,7 @@ function Role() {
         <div key={x.kdo} className="ld-role" style={{ ['--i' as string]: i }}>
           <span className="font-semibold">{t(x.kdo)}</span>
           {[x.mzdy, x.finance].map((v, j) => (
-            <span key={j} className={v ? 'ld-role-ano' : 'ld-role-ne'} aria-label={t(v ? M.vidi : M.nevidi)}>
+            <span key={j} role="img" className={v ? 'ld-role-ano' : 'ld-role-ne'} aria-label={t(v ? M.vidi : M.nevidi)}>
               <Icon name={v ? 'check' : 'lock'} size={11} aria-hidden />
             </span>
           ))}

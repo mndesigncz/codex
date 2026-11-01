@@ -25,8 +25,10 @@ const DESK = { width: 1280, height: 900 };
 const dnes = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
 const posun = (d, o) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + o); return x.toISOString().slice(0, 10); };
 const zitra = posun(dnes, 1), vcera = posun(dnes, -1), predevcirem = posun(dnes, -2);
+// Den s tečkou v kalendáři musí být v aktuálním měsíci: poslední den v měsíci je zítřek už v dalším (31. 10. → 1. 11.).
+const denKal = zitra.slice(0, 7) === dnes.slice(0, 7) ? zitra : vcera;
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8')
-  .replaceAll('"PREDEVCIREM', `"${predevcirem}`).replaceAll('"VCERA', `"${vcera}`).replaceAll('"ZITRA', `"${zitra}`).replaceAll('"DNES', `"${dnes}`).replaceAll('"MESIC"', `"${dnes.slice(0, 7)}"`));
+  .replaceAll('"PREDEVCIREM', `"${predevcirem}`).replaceAll('"VCERA', `"${vcera}`).replaceAll('"DENKAL', `"${denKal}`).replaceAll('"ZITRA', `"${zitra}`).replaceAll('"DNES', `"${dnes}`).replaceAll('"MESIC"', `"${dnes.slice(0, 7)}"`));
 
 /** Posun hodin tak, aby v Praze bylo právě `hh:mm`. */
 function posunNa(hh, mm = 0) {
@@ -110,7 +112,7 @@ for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
   const kal = p.getByRole('dialog', { name: 'Skok na den' });
   tvrdi(`R ${jmeno}: „Den" otevře kalendář a načte tečky (GET ?month=${dnes.slice(0, 7)})`, await dokud(() => kal.isVisible(), 3000) && await dokud(() => dotazy(stav, `month=${dnes.slice(0, 7)}`).length > 0, 3000));
   const bunkaZitra = kal.getByRole('button', { name: new RegExp(`^.*: 1 rezervace$`) }).first();
-  tvrdi(`R ${jmeno}: zítřek má tečku „1 rezervace", dnešek „4 rezervace"`, await dokud(() => bunkaZitra.isVisible(), 3000) && await kal.getByRole('button', { name: /: 4 rezervace$/ }).isVisible());
+  tvrdi(`R ${jmeno}: jiný den měsíce (zítřek, poslední den v měsíci včerejšek) má tečku „1 rezervace", dnešek „4 rezervace"`, await dokud(() => bunkaZitra.isVisible(), 3000) && await kal.getByRole('button', { name: /: 4 rezervace$/ }).isVisible());
   if (mobil) {
     // Okno zdola dojíždí ~400 ms — měřit až po dojezdu.
     await p.waitForTimeout(600);
@@ -121,7 +123,7 @@ for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
     await p.screenshot({ path: OUT + `k84-klient-rezervace-kalendar-${jmeno}.png` });
   }
   await bunkaZitra.click();
-  tvrdi(`R ${jmeno}: den pošle GET ?date=${zitra} a kalendář se zavře`, await dokud(() => dotazy(stav, `date=${zitra}`).length > 0, 3000) && await dokud(async () => !(await kal.isVisible()), 2000));
+  tvrdi(`R ${jmeno}: den pošle GET ?date=${denKal} a kalendář se zavře`, await dokud(() => dotazy(stav, `date=${denKal}`).length > 0, 3000) && await dokud(async () => !(await kal.isVisible()), 2000));
   tvrdi(`R ${jmeno}: tlačítko dne nese vybraný den a jde zrušit`, await p.locator('[data-plocha]').getByRole('button', { name: /Vybraný den/ }).isVisible() && await p.locator('[data-plocha]').getByRole('button', { name: 'Zrušit výběr dne' }).isVisible());
   await p.locator('[data-plocha]').getByRole('button', { name: 'Zrušit výběr dne' }).click();
   // Minulé: pilulky, oříznutí, Načíst další.

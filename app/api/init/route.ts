@@ -11,6 +11,7 @@ import { spustAutomatizaceCron } from '@/lib/automatizaceDb';
 import { pripomenPoukazy } from '@/lib/poukazyPrehledDb';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
+import { zapisBehCronu } from '@/lib/cronSouhrn';
 import { zDashboardConfig } from '@/lib/widgety/migrace';
 import bcryptPin from 'bcryptjs';
 
@@ -3215,6 +3216,8 @@ export async function GET(request: Request) {
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
     if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);
+    // Úspěšná noční migrace dřív nezapsala nic — z logu nešlo poznat, jestli vůbec běžela.
+    else if (zCronu) zapisBehCronu('init', { ok: true, migFails: 0 });
 
     // Which build actually ran the migrations. `ok: true` alone is ambiguous —
     // an older deployment still answering during a rollout returns it too, and

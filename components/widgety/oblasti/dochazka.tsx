@@ -280,7 +280,9 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
     if (nahled || ja.id == null || pise) return;
     setPise(true); setChyba(null); setPripomenUzaverku(false); setPtamSe(false);
     try {
-      const d = await fetch('/api/attendance/pauza', { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ action, minuty: PAUZA_MIN }) }).then(okJson);
+      // keepalive: odchod z odpočtu se zapisuje i při zavření aplikace (pagehide) a bez něj by ho
+      // prohlížeč s odcházející stránkou zrušil — člověk by si myslel, že je odpíchnutý.
+      const d = await fetch('/api/attendance/pauza', { method: 'POST', headers: JSON_HLAVICKA, keepalive: action === 'odchod', body: JSON.stringify({ action, minuty: PAUZA_MIN }) }).then(okJson);
       if (action === 'odchod' || action === 'doplnit' || action === 'bez_pauzy') poOdchodu(d);
       if (action === 'start') { const zaklad = data.data; if (zaklad) data.set({ ...zaklad, roster: zaklad.roster.map(r => (Number(r.id) === ja.id ? { ...r, openSince: null, breakSince: d?.pauzaOd ?? new Date().toISOString() } : r)) }); }
       data.reload(); obnovDochazku();
@@ -311,8 +313,9 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
         poloha = await zjistiPolohu(typeof navigator !== 'undefined' ? navigator.geolocation : null);
         setZjistujiPolohu(false);
       }
+      // keepalive u odchodu: viz pauzuj — zápis při pagehide nesmí zaniknout se stránkou.
       const d = await fetch('/api/attendance', {
-        method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ employeeId: ja.id, action: akce, ...(poloha ? { poloha } : {}) }),
+        method: 'POST', headers: JSON_HLAVICKA, keepalive: akce === 'out', body: JSON.stringify({ employeeId: ja.id, action: akce, ...(poloha ? { poloha } : {}) }),
       }).then(okJson);
       // Stav hned podle odpovědi, ať tlačítko neukazuje půl vteřiny starý stav;
       // obnova pak srovná i „Právě na směně", které čte stejnou adresu.

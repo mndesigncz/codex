@@ -7,11 +7,13 @@
 //  - kolo 81 (B2), telefon: výsledek po pevných nákladech, export v „···", okno Pravidelné náklady zdola,
 //    pás kategorií v knize výdajů, detail objednávky, kategorie a datum nákupu v nové účtence.
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, fixtura, roleMine, DIR, OUT } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, fixtura, roleMine, DIR, OUT, ukotviDen } from './k68-spolecne.mjs';
 import { dayPlus, pragueToday } from '../../lib/pragueTime.ts';
+// Fixtury počítají dny zpět ve stejném měsíci: prvních 9 dní v měsíci se hodiny posunou (k68-spolecne ukotviDen).
+const POSUN = ukotviDen();
 const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 
-const dnes = pragueToday();
+const dnes = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + POSUN));
 const vcera = dayPlus(dnes, -1);
 const mesic = dnes.slice(0, 7);
 const base = () => JSON.parse(readFileSync(DIR + 'k69-b5b-pos-daily.json', 'utf8').replaceAll('DNES', dnes));

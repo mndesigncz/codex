@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
 import { Avatar, Button, Chip, EmptyState, ErrorState, Field, ListRow, Skeleton } from './ui';
 import { useOpravneni } from './role/useOpravneni';
+import { OdemknoutButton, usePlan } from './Pro';
 import { ApiError, apiMessage, okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 
@@ -28,6 +29,8 @@ export default function KioskSettings() {
   // se otevře oběma, ale server druhou polovinu jinak odmítne (403). Kdo má jen PINy,
   // formulář přihlášení tabletu nedostane, kdo jen účet, PINy ne.
   const { ma } = useOpravneni();
+  // Účet tabletu je funkce Pro (server na Zdarma vrací 402). Dokud tarif není načtený, usePlan říká „Pro".
+  const { pro } = usePlan();
   const smiUcet = ma('kiosk.spravovat');
   const smiPiny = ma('dochazka.piny');
   // Načtení se nesmí tvářit jako „nic tu není": dřív `.catch(() => ({}))` udělal
@@ -121,6 +124,13 @@ export default function KioskSettings() {
             <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
           ) : chybaUctu ? (
             <ErrorState compact title={t('Tabletový účet se nenačetl')} hint={t('Formulář neukážu, ať omylem nezaložíš druhý účet.')} detail={chybaUctu} onRetry={load} />
+          ) : !kiosk && !pro ? (
+            // Spuštění (průchod nového zákazníka): na tarifu Zdarma člověk vyplnil e-mail i heslo
+            // a teprve po odeslání dostal 402 „funkce je v tarifu Pro". Teď to ví předem.
+            <div className="space-y-3" data-tablet-tarif>
+              <p className="note note-info text-sm">{t('Tablet u baru patří do tarifu Pro. Tabletový účet založíš, až ho podnik bude mít.')}</p>
+              <OdemknoutButton plan="pro" />
+            </div>
           ) : (
           <form onSubmit={saveAccount} className="space-y-3">
             <p className="t-label">{t('Přihlášení tabletu')}</p>

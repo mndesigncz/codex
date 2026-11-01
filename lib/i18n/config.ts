@@ -131,11 +131,34 @@ export function jazykZeZeme(zeme: string | null | undefined): Jazyk | undefined 
  * zůstává pojistkou pro prohlížeče, které neposílají nic, čemu rozumíme
  * (fr, ja, nebo hlavička chybí). Přihlášenému pak NastaveniSync dosadí
  * jazyk z účtu (users.lang), pokud si na zařízení nezvolil jiný.
+ *
+ * Výjimka: vyhledávač nebo náhled odkazu (jeRobot) dostane vždy výchozí
+ * češtinu. Googlebot chodí z IP v USA bez Accept-Language, takže podle
+ * země by indexoval anglickou prodejní stránku — pod jedinou adresou,
+ * s canonical, og:locale cs_CZ a JSON-LD `inLanguage: cs`. Vícejazyčné adresy
+ * (/en/…) má zatím jen právní část; dokud je prodejní stránka jedna adresa,
+ * do vyhledávačů a náhledů na sítích jde její česká podoba.
  */
 export function jazykNavstevnika(o: {
   cookie?: string | null;
   acceptLanguage?: string | null;
   zeme?: string | null;
+  userAgent?: string | null;
 }): Jazyk {
-  return cistyJazyk(o.cookie) ?? jazykZAccept(o.acceptLanguage) ?? jazykZeZeme(o.zeme) ?? VYCHOZI;
+  const zCookie = cistyJazyk(o.cookie);
+  if (zCookie) return zCookie;
+  if (jeRobot(o.userAgent)) return VYCHOZI;
+  return jazykZAccept(o.acceptLanguage) ?? jazykZeZeme(o.zeme) ?? VYCHOZI;
+}
+
+/**
+ * Vyhledávače a náhledy odkazů (sítě, chaty). Záměrně široké: „bot", „crawler",
+ * „spider" a známá jména bez nich (Google-InspectionTool, facebookexternalhit,
+ * WhatsApp…). Omyl ve prospěch robota znamená jen to, že člověk s takovým
+ * prohlížečem uvidí češtinu a jazyk si přepne v patičce.
+ */
+export const ROBOT_UA = /bot\b|bot\/|crawler|spider|slurp|seznam|[\w-]+-Google|Google-[\w-]+|Chrome-Lighthouse|facebookexternalhit|facebookcatalog|WhatsApp|SkypeUriPreview|vkShare|quora link preview|bitlybot|tumblr|ia_archiver|Yeti|BingPreview|embedly/i;
+
+export function jeRobot(userAgent: string | null | undefined): boolean {
+  return !!userAgent && ROBOT_UA.test(userAgent);
 }

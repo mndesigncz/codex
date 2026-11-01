@@ -12,8 +12,10 @@
 //     uvnitř widgetu (nepřetéká ani s dlouhým německým chipem).
 // Snímky do scripts/sondy/shots/k83-sklad-*.png (necommitují se).
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dokud, DIR, OUT, BASE } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, DIR, OUT, BASE, ukotviDen } from './k68-spolecne.mjs';
 import { nastavJazyk } from './preteceni-jadro.mjs';
+// Fixtury počítají dny zpět ve stejném měsíci: prvních 9 dní v měsíci se hodiny posunou (k68-spolecne ukotviDen).
+const POSUN = ukotviDen();
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
 const slovnik = {};
@@ -28,7 +30,7 @@ const tr = (jazyk, sekce, klic, hodnoty = {}) => {
 };
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + POSUN))}T12:00:00Z`));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDEVCIREM: praha(-2), PRED3: praha(-3), PRED4: praha(-4), PRED5: praha(-5), PRED6: praha(-6) };
 const MESIC = DNY.DNES.slice(0, 7);
 const sDaty = (jmeno) => {

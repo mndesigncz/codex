@@ -3227,7 +3227,9 @@ function DayModal({
     if (!employeeId || !start || !end || kolidujeRucne) return;
     setSaving(true);
     try {
-      const ok = await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type: typeName || 'Vlastní', ...(navrh ? {} : { note: poznamka.trim() || null }) });
+      // Název typu se uloží v jazyce vedení (jako předvyplněné texty trestů): dřív natvrdo „Vlastní",
+      // takže anglický tým četl u směny s vlastním časem česky „Vlastní · Saturday 31 October".
+      const ok = await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type: typeName || t('Vlastní'), ...(navrh ? {} : { note: poznamka.trim() || null }) });
       // Výběr se smaže jen po uložení — neúspěch nesmí vypadat jako úspěch.
       if (ok) { setEmployeeId(''); setPoznamka(''); }
     } finally {
@@ -3638,12 +3640,16 @@ function TymNaDen({
   };
 
   const pocetMuze = radky.filter((r) => (r.stav === 'muze' || r.stav === 'omezeni') && !r.maSmenu).length;
+  // Nový tým dostupnost ještě nezadal: „další nikdo nemůže" by tvrdilo, že nikdo nemůže, přitom to jen nevíme.
+  const pocetBezDostupnosti = radky.filter((r) => r.stav === 'nevyplneno' && !r.maSmenu).length;
 
   return (
     <section ref={sekceRef} aria-labelledby={`tym-den-${date}`}>
       <div className="flex items-baseline justify-between gap-3 mb-1">
         <p id={`tym-den-${date}`} className="t-label">{t('Tým na tento den')}</p>
-        <p className="t-meta tabular-nums">{pocetMuze > 0 ? t('{n, plural, one {# člověk může} few {# lidé můžou} other {# lidí může}}', { n: pocetMuze }) : t('další nikdo nemůže')}</p>
+        <p className="t-meta tabular-nums">{pocetMuze > 0 ? t('{n, plural, one {# člověk může} few {# lidé můžou} other {# lidí může}}', { n: pocetMuze })
+          : pocetBezDostupnosti > 0 ? t('{n, plural, one {# člověk bez dostupnosti} few {# lidé bez dostupnosti} other {# lidí bez dostupnosti}}', { n: pocetBezDostupnosti })
+          : t('další nikdo nemůže')}</p>
       </div>
       <p ref={hlaskaRef} tabIndex={-1} role="status" className={`t-meta flex items-center gap-1.5 outline-none ${hlaska ? 'mb-1' : 'sr-only'}`} data-hlaska-tym>
         {hlaska && <><Icon name="check" size={14} className="shrink-0 text-ok-ink" />{hlaska}</>}

@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { windowOf } from '@/lib/shiftWindow';
 import { clenoveSOpravnenim, maOpravneni } from '@/lib/opravneniDb';
+import { zapisBehCronu } from '@/lib/cronSouhrn';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,5 +101,6 @@ export async function GET(request: Request) {
     }
   } catch { /* approved column may not exist yet */ }
 
+  zapisBehCronu('closings/remind', { ok: true, reminded, nudgedEmployers });
   return NextResponse.json({ ok: true, reminded, nudgedEmployers });
 }

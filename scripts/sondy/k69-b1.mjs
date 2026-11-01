@@ -14,11 +14,15 @@
 // „@" = požadovaný měsíc) se doplní při podvrhu podle pražského dne, ať sonda nezestárne.
 import { readFileSync } from 'node:fs';
 import {
-  kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, DIR, OUT, VLASTNIK,
+  kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, DIR, OUT, VLASTNIK, ukotviDen,
 } from './k68-spolecne.mjs';
 import { STRANKA as STRANKA_ROZVRH } from '../../lib/widgety/stranky/vedeni.rozvrh.ts';
+// Fixtury počítají dny v aktuálním měsíci: prvních 9 dní v měsíci se hodiny posunou (k68-spolecne ukotviDen).
+// Server pak vykreslí jiný den než prohlížeč, takže chyba hydratace (#418) se v kontrole konzole nepočítá (jako k84-dochazka).
+const POSUN = ukotviDen();
+const skutecne = (chyby) => chyby.filter(c => !/Minified React error #418|Hydration|hydrat/i.test(c));
 
-const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + POSUN))}T12:00:00Z`));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED3: praha(-3), ZITRA: praha(1), POZITRI: praha(2), ZA3: praha(3), ZA5: praha(5), ZA7: praha(7), ZA10: praha(10) };
 const MESIC = DNY.DNES.slice(0, 7);
 const pristi = (() => { const [y, m] = MESIC.split('-').map(Number); const d = new Date(Date.UTC(y, m, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; })();
@@ -42,7 +46,7 @@ const podvrh = ({ mineId = 15 } = {}) => (req, json, stav) => {
       // Kolo 7 (R7-1): připomenutí dostupnosti, poznámka ke směně a stav publikování.
       if (path === '/api/availability/remind') return json({ notified: 3, ztlumeno: 0 });
       if (path === '/api/shifts' && req.method() === 'PATCH') { const b = JSON.parse(req.postData() || '{}'); return json({ ok: true, shift: { id: b.id, note: b.note ?? null } }); }
-      if (path === '/api/schedule/publish') return json({ ok: true, notified: 3, publishedAt: new Date().toISOString() });
+      if (path === '/api/schedule/publish') return json({ ok: true, notified: 3, publishedAt: new Date(Date.now() + POSUN).toISOString() });
       // Schválení Terezina volna (71): ve dnech volna má dvě směny — server je vrátí v `conflicts` (kolo 6 UX).
       if (path === '/api/timeoff' && req.method() === 'PATCH') {
         const b = JSON.parse(req.postData() || '{}');
@@ -189,7 +193,7 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   await hotovo(p).click().catch(() => {});
   await dokud(async () => !(await vUpravach(p)), 1500);
   tvrdi('R7: návrh rozvrhu po úpravách pořád na místě', await nastroj.getByText('Navržený rozvrh').isVisible());
-  tvrdi('R: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('R: bez chyb v konzoli', skutecne(chyby).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
@@ -271,7 +275,7 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   await okno.getByRole('button', { name: 'Zamítnout' }).click();
   tvrdi('R7-6: …PATCH /api/timeoff rejected s note', await dokud(() => (stav.zapisy ?? []).some(z => z.path === '/api/timeoff' && z.m === 'PATCH' && z.body.includes('rejected') && z.body.includes('Ten týden už má volno Petr')), 2000));
   tvrdi('R7-6: Zamítnout v řádku zůstává jedním klikem (bez okna)', await volno.getByRole('button', { name: 'Zamítnout', exact: true }).count() >= 1);
-  tvrdi('R7: bez chyb v konzoli', chyby.filter(c => !/hydrat|same key/i.test(c)).length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('R7: bez chyb v konzoli', skutecne(chyby).filter(c => !/same key/i.test(c)).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await p.screenshot({ path: OUT + 'k83-rozvrh-desk.png', fullPage: true });
   await ctx.close();
 }
@@ -403,7 +407,7 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   const tecky = await p.locator(kde.flatMap(m => [`${m} [class*="cat-dot-"]`, `${m} .bg-black\\/15`]).join(', ')).count();
   tvrdi('T11: tečky typů v legendě a pásu typů jsou třídy kategorií, ne inline hex', tecky > 0 && await p.locator(kde.map(m => `${m} [style*="background"]`).join(', ')).count() === 0, `${tecky}`);
   await p.screenshot({ path: OUT + 'k69-b1-rozvrh-tmavy.png', fullPage: true });
-  tvrdi('T11: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('T11: bez chyb v konzoli', skutecne(chyby).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
@@ -484,7 +488,7 @@ const vycuhuje = (p, sel) => p.locator(sel).first().evaluate(koren => [...koren.
   tvrdi('K1: v „···" je Publikovat s počtem směn měsíce', await dokud(() => p.getByRole('menuitem', { name: /Publikovat rozvrh \(4\)/ }).isVisible(), 1500));
   await p.keyboard.press('Escape');
   await p.screenshot({ path: OUT + 'k69-b1-k6-tel.png' });
-  tvrdi('K1: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('K1: bez chyb v konzoli', skutecne(chyby).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
@@ -520,7 +524,7 @@ for (const [nazev, viewport] of [['1280', { width: 1280, height: 950 }], ['768',
     await p.keyboard.press('Escape');
   }
   await p.screenshot({ path: OUT + `k69-b1-k6-tyden-${nazev}.png`, fullPage: true });
-  tvrdi(`K3 ${nazev}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi(`K3 ${nazev}: bez chyb v konzoli`, skutecne(chyby).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
@@ -588,7 +592,7 @@ const FIX_MOJE_V = nacti('k69-b1-rozlozeni-moje-vedeni');
   const g = await doporucene(p);
   tvrdi('MV3: galerie nabízí „Minulé směny" a „Kdo má směnu" v Doporučených', g.text.includes('Minulé směny') && g.text.includes('Kdo má směnu'), g.text.slice(0, 300));
   await hotovo(p).click().catch(() => {});
-  tvrdi('MV: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('MV: bez chyb v konzoli', skutecne(chyby).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
@@ -644,7 +648,7 @@ const BARISTA = roleMine('barista');
   const g = await doporucene(p);
   tvrdi('MZ3: galerie baristy nabízí Moje směny v číslech/Minulé směny, ne Žádosti o volno týmu', g.vse.includes('Minulé směny') && !g.vse.includes('Žádosti o volno') && !g.vse.includes('Naplánované hodiny'));
   await hotovo(p).click().catch(() => {});
-  tvrdi('MZ: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('MZ: bez chyb v konzoli', skutecne(chyby).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
@@ -679,7 +683,7 @@ const FIX_DOST = nacti('k69-b1-rozlozeni-dostupnost');
   await hotovo(p).click().catch(() => {});
   await dokud(async () => !(await vUpravach(p)), 1500);
   tvrdi('D7: rozepsaná poznámka přežila úpravy', await nastroj.getByLabel('Poznámka pro vedení').inputValue() === 'Ve středu škola');
-  tvrdi('D: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('D: bez chyb v konzoli', skutecne(chyby).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
@@ -709,7 +713,7 @@ const FIX_DOST = nacti('k69-b1-rozlozeni-dostupnost');
   const dnes = await kontrastCar(p, '[data-plocha] li[data-widget="nastroj"] [class*="ring-black/30"]', 'boxShadow');
   tvrdi('T11: …a prstenec dneška (pokud je v měsíci) taky', dnes.pocet === 0 || dnes.nejhorsi >= 2, JSON.stringify(dnes));
   await p.screenshot({ path: OUT + 'k69-b1-dostupnost-tmavy.png', fullPage: true });
-  tvrdi('T11: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('T11: bez chyb v konzoli', skutecne(chyby).length === 0, skutecne(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 

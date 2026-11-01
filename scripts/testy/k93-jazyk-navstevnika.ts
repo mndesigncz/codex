@@ -27,4 +27,15 @@ export default function ({ eq }: Testy) {
   eq('bez všeho (lokálně, build) → čeština', jazykNavstevnika({}), 'cs');
   eq('nepodporovaný prohlížeč bez země → čeština', jazykNavstevnika({ acceptLanguage: 'fr', zeme: null }), 'cs');
   eq('neznámá země (XX) → čeština', jazykNavstevnika({ acceptLanguage: '', zeme: 'XX' }), 'cs');
+
+  // 5) vyhledávače a náhledy odkazů: česká podoba jediné adresy, ne jazyk podle IP robota
+  const GOOGLEBOT = 'Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
+  eq('Googlebot z USA bez Accept-Language → čeština', jazykNavstevnika({ zeme: 'US', userAgent: GOOGLEBOT }), 'cs');
+  eq('Googlebot s anglickým Accept-Language → čeština', jazykNavstevnika({ acceptLanguage: 'en-US', zeme: 'US', userAgent: GOOGLEBOT }), 'cs');
+  eq('SeznamBot → čeština', jazykNavstevnika({ zeme: 'CZ', userAgent: 'Mozilla/5.0 (compatible; SeznamBot/4.0; +https://o-seznam.cz/napoveda/vyhledavani/en/seznambot-crawler/)' }), 'cs');
+  eq('náhled na Facebooku z Irska → čeština', jazykNavstevnika({ zeme: 'IE', userAgent: 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)' }), 'cs');
+  eq('Bingbot z USA → čeština', jazykNavstevnika({ acceptLanguage: 'en-US', zeme: 'US', userAgent: 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)' }), 'cs');
+  eq('cookie vyhrává i u robota', jazykNavstevnika({ cookie: 'de', zeme: 'US', userAgent: GOOGLEBOT }), 'de');
+  eq('obyčejný Chrome z USA → angličtina (robot jen podle UA)', jazykNavstevnika({ zeme: 'US', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36' }), 'en');
+  eq('Safari na iPhonu v Německu → němčina', jazykNavstevnika({ acceptLanguage: 'de-DE', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }), 'de');
 }

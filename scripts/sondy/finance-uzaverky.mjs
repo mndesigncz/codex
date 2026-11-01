@@ -6,10 +6,12 @@
 //  C) Uzávěrky: období jedním prvkem v hlavičce nástroje (Vše | Měsíc + MonthNav, kolo 7) — šipky mění měsíc
 //     i jméno exportu, export bere to, co je vidět (i po filtru), meta „· 84 hostů"; 320/390 bez přetečení.
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, fixtura, DIR, OUT, BASE } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, fixtura, DIR, OUT, BASE, ukotviDen } from './k68-spolecne.mjs';
 import { dayPlus, pragueToday } from '../../lib/pragueTime.ts';
+// Fixtury počítají dny zpět ve stejném měsíci: prvních 9 dní v měsíci se hodiny posunou (k68-spolecne ukotviDen).
+const POSUN = ukotviDen();
 
-const dnes = pragueToday();
+const dnes = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + POSUN));
 const mesic = dnes.slice(0, 7);
 const minuly = (() => { const [y, m] = mesic.split('-').map(Number); const d = new Date(Date.UTC(y, m - 2, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; })();
 const text = async (p, w) => (await p.locator(`[data-plocha] li[data-widget="${w}"]`).innerText().catch(() => '')).replace(/ /g, ' ');

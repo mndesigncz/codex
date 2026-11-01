@@ -9,12 +9,20 @@
 // Co tu tedy musí být: česky, řekne co se stalo, nabídne kam jít a nesvaluje
 // to na člověka. „Neplatný odkaz" zní jako jeho chyba; odkaz přestal platit.
 
+// Jazyk podle požadavku (cookie, prohlížeč, země) jako zbytek webu; bez toho
+// dostal anglický návštěvník `<html lang="en">` s českou větou.
+
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { getT } from '@/lib/i18n/server';
 
-export const metadata: Metadata = { title: 'Stránka nenalezena' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: `${t('Stránka nenalezena')} · Managero` };
+}
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getT();
   return (
     <main className="min-h-[100dvh] flex items-center justify-center p-6">
       <div className="card max-w-md w-full p-8 text-center">
@@ -24,15 +32,13 @@ export default function NotFound() {
             <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
           </svg>
         </div>
-        <h1 className="t-page mt-5">Tahle stránka tu není</h1>
+        <h1 className="t-page mt-5">{t('Tahle stránka tu není')}</h1>
         <p className="t-meta mt-2.5 text-pretty">
-          Adresa možná přestala platit — sdílené odkazy na nabídku se dají kdykoli
-          vypnout nebo vystavit znovu. Zkus to místo, odkud jsi přišel, nebo se
-          zeptej v podniku na aktuální odkaz.
+          {t('Adresa možná přestala platit — sdílené odkazy na nabídku se dají kdykoli vypnout nebo vystavit znovu. Zkus to místo, odkud jsi přišel, nebo se zeptej v podniku na aktuální odkaz.')}
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5">
-          <Link href="/" className="btn btn-accent">Na úvod</Link>
-          <Link href="/client" className="btn btn-secondary">Najít podnik</Link>
+          <Link href="/" className="btn btn-accent">{t('Na úvod')}</Link>
+          <Link href="/client" className="btn btn-secondary">{t('Najít podnik')}</Link>
         </div>
       </div>
     </main>

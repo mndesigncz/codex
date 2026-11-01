@@ -330,7 +330,11 @@ async function mesicSipkami(p, posun) {
   const tyden = p.locator('[data-tydenni-pohled]');
   await dokud(() => tyden.isVisible(), 2000);
   const radky = () => tyden.locator('[data-radek-tydne]').evaluateAll(els => els.map(e => e.getAttribute('data-radek-tydne')));
-  tvrdi('Y1: týden měsíce začínajícího nedělí = první týden se čtyřmi dny měsíce (2.–8.)', (await tyden.locator('thead').innerText()).includes('2') && (await tyden.locator('p[aria-live]').innerText()).startsWith('2.'), await tyden.locator('p[aria-live]').innerText());
+  // První týden měsíce = týden (po–ne) s aspoň čtyřmi dny měsíce: začíná v pondělí před 1. dnem (může být v minulém
+  // měsíci), když 1. den padne na po–čt, jinak v pondělí po něm. Počítá se z kalendáře příštího měsíce, ne natvrdo
+  // (listopad 2026 začíná nedělí → 2.–8., prosinec úterým → 30. 11.–6. 12.).
+  const prvniPondeli = (() => { const d = new Date(`${PRISTI}-01T12:00:00Z`); const dt = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() + (dt <= 4 ? 1 - dt : 8 - dt)); return d.getUTCDate(); })();
+  tvrdi(`Y1: první týden měsíce = týden se čtyřmi dny měsíce (od ${prvniPondeli}.)`, (await tyden.locator('thead').innerText()).includes(String(prvniPondeli)) && (await tyden.locator('p[aria-live]').innerText()).startsWith(`${prvniPondeli}.`), await tyden.locator('p[aria-live]').innerText());
   tvrdi('Y1: filtr na Evu — v tabulce jen její řádek', JSON.stringify(await radky()) === '["16"]', JSON.stringify(await radky()));
   const eva = tyden.locator('[data-radek-tydne="16"]');
   tvrdi('Y1: …se třemi směnami v týdnu a 18 h za týden', await eva.locator('span[title]').count() === 3 && (await eva.locator('td').last().innerText()).trim() === '18', await eva.innerText());

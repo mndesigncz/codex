@@ -7,6 +7,7 @@ import { checkCron } from '@/lib/cronAuth';
 import { runFullSync, syncMenu } from '@/lib/posMirror';
 import { getConnection } from '@/lib/storyous';
 import { poDavkach } from '@/lib/cronDavky';
+import { zapisBehCronu } from '@/lib/cronSouhrn';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -18,7 +19,11 @@ export async function GET(request: Request) {
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   let teams: any[] = [];
-  try { teams = await sql`SELECT team_id FROM pos_connections`; } catch { return NextResponse.json({ ok: true, teams: 0 }); }
+  try { teams = await sql`SELECT team_id FROM pos_connections`; } catch (e) {
+    // Bez tabulky (nemigrovaná databáze) není co synchronizovat — ale ať je to v logu.
+    console.error('pos/cron: seznam připojení se nenačetl', (e as { code?: string })?.code ?? e);
+    return NextResponse.json({ ok: true, teams: 0 });
+  }
   const out: any[] = [];
   // Po dávkách (lib/cronDavky): tři podniky souběžně (Storyous nechceme
   // zahltit), s hlídáním času. Co se nestihne, dotáhne první otevření
@@ -34,6 +39,8 @@ export async function GET(request: Request) {
       out.push({ teamId, ok: false, error: String((e as any)?.message ?? e).slice(0, 120) });
     }
   }, { soubezne: 3, rozpocetMs: 50_000 });
-  if (davky.nestihnuto) console.error('pos/cron: nestihnuto', davky.nestihnuto);
+  // Selhání podniku dřív skončilo jen v odpovědi (results[].error), kterou
+  // nikdo nečte — v logu nebylo nic. Souhrn ho ukáže jako chybu.
+  zapisBehCronu('pos/cron', { ok: true, teams: teams.length, selhalo: out.filter(r => r.ok === false).length, nestihnuto: davky.nestihnuto });
   return NextResponse.json({ ok: true, teams: teams.length, nestihnuto: davky.nestihnuto, results: out });
 }

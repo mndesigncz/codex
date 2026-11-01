@@ -580,7 +580,9 @@ export default function EmployerLayout({ user }: Props) {
         ) : plan && plan.effective === 'free' && !plan.hadSubscription ? (
           <button type="button" onClick={() => navigate('settings', 'billing')}
             className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
-            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />{`Vyzkoušejte Pro ${TRIAL_DAYS} dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.` /* i18n-ok (platební a cenové věty jsou právně citlivé, překlad až po lidské revizi) */}
+            {/* Spuštění: lišta visí nad každou obrazovkou nového podniku, v en/de/sk/pl byla česky.
+                Česká věta zůstává beze změny; překlad drží smysl vět o kartě z registrace (auth). */}
+            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />{t('Vyzkoušejte Pro {n} dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.', { n: TRIAL_DAYS })}
           </button>
         ) : null}
         {/* Ověření e-mailu vedení (spuštění, balík S): jen prosba, nic neblokuje. */}

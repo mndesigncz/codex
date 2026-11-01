@@ -11,7 +11,7 @@
 //     („Uzávěrka se odemkla") se řekne větou ve `role=status`.
 //  L4 Izolace: žádný požadavek na cizí původ a žádné `/api` z ukázky (mock v prohlížeči);
 //     hlavní stránka nevolá nic na cizí server. Bez chyb v konzoli.
-//  L5 Telefon 390: žádné vodorovné přetečení, rám telefonu, ukázka funguje.
+//  L5 Telefon 390: žádné vodorovné přetečení, rám telefonu, ukázka se sama nestahuje a po dotyku funguje.
 //  L6 Nahrávky jsou líné: před příchodem k sekci „Jeden den" se nestáhne žádná,
 //     potom jen ta aktivní; s vypnutým pohybem se nestáhne žádná sama.
 //  L7 Vypnutý pohyb: ukázka se sama nenačte, čeká na tlačítko, a po něm funguje.
@@ -211,7 +211,11 @@ const cekejNaBublinu = (p, re, timeout = 12000) => p.waitForFunction(
 {
   const { ctx, p, pozadavky, chyby } = await novy({ viewport: { width: 390, height: 844 }, mobil: true });
   await p.goto(BASE + '/', { waitUntil: 'networkidle' });
-  await pripraveno(p).then(() => tvrdi('L5 na telefonu se ukázka načte', true)).catch(() => tvrdi('L5 na telefonu se ukázka načte', false, 'nenačetla se'));
+  // Telefon: celá aplikace ukázky se nestahuje sama v klidu (data, hlavní vlákno), až po dotyku.
+  await p.waitForTimeout(3500);
+  tvrdi('L5 na telefonu se ukázka sama nenačte (jen plakát, žádný /demo)', await p.locator(ZIVA).count() === 0 && !pozadavky.some(r => /\/demo\?/.test(r.url)));
+  await p.locator('.ld-obrazovka').first().tap();
+  await pripraveno(p).then(() => tvrdi('L5 na telefonu se ukázka po dotyku načte', true)).catch(() => tvrdi('L5 na telefonu se ukázka po dotyku načte', false, 'nenačetla se'));
   const w = async () => p.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth }));
   let m = await w();
   tvrdi('L5 telefon 390: stránka nepřetéká vodorovně', m.sw <= m.iw + 1, JSON.stringify(m));

@@ -2,7 +2,8 @@
 //
 // Jazyk požadavku = cookie `managero-lang` (nastavuje přepínač), jinak jazyk
 // prohlížeče (`Accept-Language`), jinak země návštěvníka z hlavičky Vercelu
-// (`x-vercel-ip-country`), jinak čeština. Pořadí a důvody: jazykNavstevnika v config.ts.
+// (`x-vercel-ip-country`), jinak čeština; vyhledávač a náhled odkazu bez cookie vždy česky.
+// Pořadí a důvody: jazykNavstevnika v config.ts.
 // Jazyk podniku = `teams.default_lang`; před migrací sloupce a při chybě čeština.
 import { cookies, headers } from 'next/headers';
 import { neon } from '@neondatabase/serverless';
@@ -16,6 +17,7 @@ export async function jazykPozadavku(): Promise<Jazyk> {
       cookie: c.get(COOKIE_JAZYKA)?.value,
       acceptLanguage: h.get('accept-language'),
       zeme: h.get('x-vercel-ip-country'),
+      userAgent: h.get('user-agent'),
     });
   } catch {
     return VYCHOZI; // mimo požadavek (build) cookie není

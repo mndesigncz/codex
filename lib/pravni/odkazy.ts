@@ -33,6 +33,17 @@ export const ODKAZY_PRAVNI: PravniOdkaz[] = [
 /** Základní odkazy (bez smluvních dokumentů pro podniky) — výchozí výběr PravniOdkazy. */
 export const ODKAZY_ZAKLAD: KlicOdkazu[] = ['soukromi', 'podminky', 'podpora', 'smazat-ucet'];
 
+/**
+ * `alternates` pro metadata dokumentu: canonical na sebe a hreflang na obě jazykové
+ * verze (x-default = čeština). Vyhledávač pak ukáže Čechovi /podminky a cizinci
+ * /en/podminky a nebere je jako duplicitu. Sitemap (app/sitemap.ts) nese totéž.
+ */
+export function alternatesDokumentu(klic: KlicDokumentu, jazyk: 'cs' | 'en') {
+  const cs = cestaDokumentu(klic, 'cs');
+  const en = cestaDokumentu(klic, 'en');
+  return { canonical: jazyk === 'en' ? en : cs, languages: { cs, en, 'x-default': cs } };
+}
+
 /** Cesta k právní stránce v daném jazyce; stránky bez anglické verze vedou na českou. */
 export function cestaDokumentu(klic: KlicOdkazu | string, jazyk: 'cs' | 'en' = 'cs'): string {
   const maEn = (KLICE_DOKUMENTU as string[]).includes(klic);

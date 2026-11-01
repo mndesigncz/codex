@@ -15,12 +15,14 @@
 //  L — Polsky na 320 px: widget i okno Uznat bez přetečení.
 //   SONDY_ZAKLAD=http://localhost:3442 node scripts/sondy/k85-navic-ved.mjs
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, roleMine, VLASTNIK, DIR, OUT, BASE } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, roleMine, VLASTNIK, DIR, OUT, BASE, ukotviDen } from './k68-spolecne.mjs';
+// Fixtury počítají dny zpět ve stejném měsíci: prvních 9 dní v měsíci se hodiny posunou (k68-spolecne ukotviDen).
+const POSUN = ukotviDen();
 
 const PC = { width: 1280, height: 900 };
 const TEL = { width: 390, height: 844 };
 const SNIMKY = process.env.SONDY_SNIMKY ? process.env.SONDY_SNIMKY.replace(/\/?$/, '/') : OUT;
-const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now()))}T12:00:00Z`));
+const praha = (o = 0) => ((d) => { d.setUTCDate(d.getUTCDate() + o); return d.toISOString().slice(0, 10); })(new Date(`${new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + POSUN))}T12:00:00Z`));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED3: praha(-3), PRED4: praha(-4), PRED5: praha(-5), PRED6: praha(-6) };
 const MESIC = DNY.DNES.slice(0, 7);
 // Pražský čas se správným posunem podle data (letní +02:00, zimní +01:00) — pevné +02:00
@@ -66,7 +68,7 @@ const podvrh = () => {
       const telo = (() => { try { return req.postData() ? JSON.parse(req.postData()) : null; } catch { return null; } })();
       (stav.zapisy ??= []).push({ m, path, telo, q: url.search });
       if (path === '/api/navic/offers') {
-        if (m === 'POST') { const o = { id: ++dalsiId, bonusCzk: null, description: null, validFrom: null, validTo: null, maxPerDay: null, ...telo, createdAt: new Date().toISOString() }; nabidka.offers.push(o); return json({ ok: true, offer: o }, 201); }
+        if (m === 'POST') { const o = { id: ++dalsiId, bonusCzk: null, description: null, validFrom: null, validTo: null, maxPerDay: null, ...telo, createdAt: new Date(Date.now() + POSUN).toISOString() }; nabidka.offers.push(o); return json({ ok: true, offer: o }, 201); }
         if (m === 'PATCH') { const o = nabidka.offers.find(x => x.id === Number(telo?.id)); if (o) Object.assign(o, telo); return json({ ok: true, offer: o }); }
         if (m === 'DELETE') { const i = nabidka.offers.findIndex(x => x.id === Number(q.get('id'))); if (i >= 0) nabidka.offers.splice(i, 1); return json({ ok: true }); }
       }
@@ -76,7 +78,7 @@ const podvrh = () => {
         if (!z) return json({ error: 'Zápis nenalezen.' }, 404);
         if (telo?.status === 'uznano') { z.status = 'uznano'; z.points = Number(telo.points) || 0; z.bonusCzk = telo.bonusCzk ?? null; }
         else { z.status = 'odmitnuto'; z.points = null; z.bonusCzk = null; }
-        z.decidedBy = 15; z.decidedByName = 'Martin Nemeškal'; z.decidedAt = new Date().toISOString(); z.decisionNote = telo?.note ?? null;
+        z.decidedBy = 15; z.decidedByName = 'Martin Nemeškal'; z.decidedAt = new Date(Date.now() + POSUN).toISOString(); z.decisionNote = telo?.note ?? null;
         return json({ ok: true, item: z });
       }
       if (path === '/api/navic' && m === 'POST') {
@@ -87,8 +89,8 @@ const podvrh = () => {
           reportedBy: 15, reportedByName: 'Martin Nemeškal', day: telo?.day ?? DNY.DNES, shiftId: null, closingId: null, taskId: null,
           offerId: n?.id ?? null, offerTitle: n?.title ?? null, text: telo?.text ?? '', photoUrl: null, pointsProposed: n?.points ?? null,
           status: telo?.uznat ? 'uznano' : 'ceka', points: telo?.uznat ? Number(telo.uznat.points) || 0 : null, bonusCzk: telo?.uznat?.bonusCzk ?? null,
-          decidedBy: telo?.uznat ? 15 : null, decidedByName: telo?.uznat ? 'Martin Nemeškal' : null, decidedAt: telo?.uznat ? new Date().toISOString() : null,
-          decisionNote: telo?.uznat?.note ?? null, createdAt: new Date().toISOString(),
+          decidedBy: telo?.uznat ? 15 : null, decidedByName: telo?.uznat ? 'Martin Nemeškal' : null, decidedAt: telo?.uznat ? new Date(Date.now() + POSUN).toISOString() : null,
+          decisionNote: telo?.uznat?.note ?? null, createdAt: new Date(Date.now() + POSUN).toISOString(),
         };
         data.items.unshift(z);
         return json({ ok: true, item: z }, 201);

@@ -12,8 +12,10 @@
 // patří pod rozklikávátko, ne do první věty.
 
 import { useEffect } from 'react';
+import { useT } from '@/lib/i18n/client';
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const t = useT();
   useEffect(() => {
     // Do konzole patří celá chyba; na obrazovku jen to, co člověku pomůže.
     console.error('[chyba stránky]', error);
@@ -29,19 +31,18 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
             <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
           </svg>
         </div>
-        <h1 className="t-page mt-5">Tady se něco pokazilo</h1>
+        <h1 className="t-page mt-5">{t('Tady se něco pokazilo')}</h1>
         <p className="t-meta mt-2.5 text-pretty">
-          Data jsou v pořádku — spadlo vykreslení téhle stránky. Zkus to znovu;
-          když to bude opakovat, dej vědět a pošli s tím kód níž.
+          {t('Data jsou v pořádku — spadlo vykreslení téhle stránky. Zkus to znovu; když to bude opakovat, dej vědět a pošli s tím kód níž.')}
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5">
-          <button type="button" onClick={reset} className="btn btn-accent">Zkusit znovu</button>
-          <a href="/" className="btn btn-secondary">Na úvod</a>
+          <button type="button" onClick={reset} className="btn btn-accent">{t('Zkusit znovu')}</button>
+          <a href="/" className="btn btn-secondary">{t('Na úvod')}</a>
         </div>
         {error.digest && (
           <details className="mt-6 text-left">
             <summary className="text-[11px] uppercase tracking-wider text-black/35 cursor-pointer select-none">
-              Technický detail
+              {t('Technický detail')}
             </summary>
             <p className="mt-2 text-[11px] text-black/45 font-mono break-all">{error.digest}</p>
           </details>

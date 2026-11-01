@@ -80,6 +80,13 @@ function bezpecnostniHlavicky({ ramovatSam }) {
 }
 
 const nextConfig = {
+  // Roboti, kterým Next pošle <title>, popis a Open Graph v <head> (blokující
+  // vykreslení metadat). Ostatním je od Next 15.2 streamuje až do <body>, a to
+  // robot, který čte jen <head> a nespouští skripty, nevidí. Výchozí seznam Next
+  // (html-bots.js) nezná SeznamBot — přitom Seznam je u nás druhý vyhledávač —
+  // ani obecné „bot/crawler/spider". Výchozí vzor je tu opsaný, ať se seznam
+  // jen rozšiřuje, nikdy nezúží.
+  htmlLimitedBots: /[\w-]+-Google|Google-[\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight|Seznam|bot\b|bot\/|crawler|spider|embedly|Pinterest|TelegramBot|Viber/i,
   async headers() {
     return [
       {
