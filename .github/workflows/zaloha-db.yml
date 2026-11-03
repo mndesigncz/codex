@@ -1,0 +1,86 @@
+name: Záloha databáze
+
+# Denní záloha produkční databáze bez placeného tarifu Neonu. Bezplatný Neon drží
+# historii pro obnovu do bodu v čase (PITR) jen 6 hodin a dovolí jediný snapshot,
+# takže chyba objevená druhý den by se bez téhle zálohy obnovit nedala.
+#
+# Co dělá: pg_dump (verze 18 jako server) → zašifrovat heslem (gpg AES256) →
+# artefakt běhu, uchovaný 14 dní. Repo je soukromé, artefakt stáhne jen člověk
+# s přístupem k repu, a i tak je bez hesla nečitelný (osobní údaje hostů a týmu).
+#
+# Nastavení (jednou, Settings → Secrets and variables → Actions → New repository secret):
+#   ZALOHA_DATABASE_URL  připojovací řetězec k produkční větvi Neonu (stačí role jen pro čtení)
+#   ZALOHA_HESLO         dlouhé heslo k šifrování záloh — uložit i mimo GitHub, bez něj záloha nejde otevřít
+# Bez nich se job jen ohlásí a skončí úspěšně (nic nepadá).
+#
+# Obnova: stáhnout artefakt, `gpg -d managero-*.dump.gpg > zaloha.dump`,
+# pak `pg_restore --no-owner --clean -d "<url cílové větve>" zaloha.dump` — nejdřív
+# do nové větve Neonu, ne rovnou do produkce. Postup je v docs/SPUSTENI.md.
+
+on:
+  schedule:
+    # 02:40 UTC = 03:40 / 04:40 v Praze, mimo provoz kaváren i mimo noční crony aplikace.
+    - cron: '40 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zaloha-db
+  cancel-in-progress: false
+
+jobs:
+  zaloha:
+    name: pg_dump → šifrovaný artefakt
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DB: ${{ secrets.ZALOHA_DATABASE_URL }}
+      HESLO: ${{ secrets.ZALOHA_HESLO }}
+    steps:
+      - name: Kontrola nastavení
+        id: nastaveni
+        run: |
+          if [ -z "$DB" ] || [ -z "$HESLO" ]; then
+            echo "::notice::Záloha není nastavená: chybí tajemství ZALOHA_DATABASE_URL nebo ZALOHA_HESLO (viz hlavička workflow)."
+            echo "pripraveno=ne" >> "$GITHUB_OUTPUT"
+          else
+            echo "pripraveno=ano" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Klient PostgreSQL 18
+        if: steps.nastaveni.outputs.pripraveno == 'ano'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18 > /dev/null
+          /usr/lib/postgresql/18/bin/pg_dump --version
+
+      - name: pg_dump a šifrování
+        if: steps.nastaveni.outputs.pripraveno == 'ano'
+        run: |
+          set -euo pipefail
+          SOUBOR="managero-$(date -u +%Y-%m-%dT%H%MZ).dump"
+          # Vlastní formát (-Fc): komprimovaný, obnova po tabulkách přes pg_restore.
+          /usr/lib/postgresql/18/bin/pg_dump --format=custom --no-owner --no-privileges --dbname="$DB" --file="$SOUBOR"
+          VELIKOST=$(stat -c %s "$SOUBOR")
+          if [ "$VELIKOST" -lt 10000 ]; then
+            echo "::error::Záloha je podezřele malá ($VELIKOST B) — databáze prázdná, nebo špatné připojení."
+            exit 1
+          fi
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$HESLO" --symmetric --cipher-algo AES256 --output "$SOUBOR.gpg" "$SOUBOR"
+          shred -u "$SOUBOR"
+          echo "SOUBOR=$SOUBOR.gpg" >> "$GITHUB_ENV"
+          echo "Záloha: $SOUBOR.gpg ($(stat -c %s "$SOUBOR.gpg") B zašifrováno, $VELIKOST B dump)"
+
+      - name: Uložit artefakt (14 dní)
+        if: steps.nastaveni.outputs.pripraveno == 'ano'
+        uses: actions/upload-artifact@v4
+        with:
+          name: zaloha-db-${{ github.run_number }}
+          path: ${{ env.SOUBOR }}
+          retention-days: 14
+          if-no-files-found: error
