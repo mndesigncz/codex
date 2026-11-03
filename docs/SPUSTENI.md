@@ -92,10 +92,19 @@ Viz `docs/OBCHODY.md` a `apps/README.md` (účty Apple a Google, klíče pro pus
 
 ### Zálohy a obnova
 
-- **Hlavní záloha = Neon Point-in-time restore** (produkční větev projektu v Neonu). Obnova:
+- **Neon Point-in-time restore** (produkční větev projektu v Neonu). Obnova:
   Neon Console → projekt → Backup & Restore (Restore) → produkční větev → čas před chybou. Neon před
-  obnovou sám uloží dosavadní stav do záložní větve, takže krok jde vrátit. Délka historie závisí na
-  tarifu (Free jen hodiny) — ověř v nastavení projektu, že je aspoň 7 dní.
+  obnovou sám uloží dosavadní stav do záložní větve, takže krok jde vrátit. **Stav 3. 11. 2026: tarif
+  Free, historie jen 6 h** (`history_retention_seconds` 21600 je strop Free) a plánované snapshoty
+  tarif neumí. Placený tarif (Launch) dá 7 dní historie a denní snapshoty.
+- **Snapshot před spuštěním:** `pred-spustenim-2026-11-03` (Free dovolí jediný snapshot). Obnova:
+  Neon Console → Backup & Restore → Snapshots → Restore (do nové větve).
+- **Denní šifrovaná záloha mimo Neon:** workflow `.github/workflows/zaloha-db.yml` (02:40 UTC) udělá
+  `pg_dump`, zašifruje ho heslem a uloží jako artefakt běhu na 14 dní. Potřebuje tajemství
+  `ZALOHA_DATABASE_URL` a `ZALOHA_HESLO` (Settings → Secrets → Actions); bez nich jen ohlásí, že není
+  nastavená. Obnova: Actions → běh → Artifacts → stáhnout → `gpg -d soubor.dump.gpg > zaloha.dump` →
+  `pg_restore --no-owner --clean -d "<url nové větve>" zaloha.dump` — nejdřív do nové větve Neonu,
+  ověřit, teprve pak přepnout nebo data přenést.
 - Než obnovíš celou produkci, zkus **větev z minulosti** (Branches → Create branch → From a point in
   time) a data z ní dotáhni ručně — obnova celé větve vrátí i všechno, co se mezitím zapsalo správně.
 - **`/api/backup`** (cron denně) není úložiště: každému s oprávněním `data.zaloha` pošle e-mail s
@@ -121,6 +130,15 @@ Viz `docs/OBCHODY.md` a `apps/README.md` (účty Apple a Google, klíče pro pus
 Všechny chtějí `Authorization: Bearer $CRON_SECRET` (Vercel ho posílá sám). Ruční spuštění: přihlášené
 vedení otevře aplikaci (migrace se spustí sama po nasazení), nebo z Vercelu → Cron Jobs → *Run*.
 
+### Vyhledávače
+
+- `robots.txt` má řádek `Sitemap: https://www.managero.app/sitemap.xml` — Google i Seznam si podle
+  něj sitemapu najdou samy, bez registrace.
+- **IndexNow** (Bing, Seznam, Yandex): po nasazení se změnami veřejných stránek spustit
+  `node scripts/indexnow.mjs`. Klíč je veřejný soubor `public/<klíč>.txt` (podmínka protokolu).
+- Google Search Console / Seznam Webmaster jsou volitelné (statistiky, chyby indexace) — vyžadují
+  ověření domény účtem majitele (TXT záznam v Cloudflare DNS).
+
 ### Kontakty
 
 - Podpora pro zákazníky: **podpora@managero.app** (musí přijímat poštu, viz §2).
@@ -138,6 +156,7 @@ vedení otevře aplikaci (migrace se spustí sama po nasazení), nebo z Vercelu 
   cookies nechat zkontrolovat advokátem (`docs/PRAVNI.md`).
 - [ ] **Retence:** po schválení lhůt (24 měsíců hosté, 90 dní zrušené podniky) zkontrolovat náhled ve
   Správě platformy a zapnout `RETENCE_ZAPNUTA=1` (Production) + redeploy (§3a).
-- [ ] **Neon:** ověřit tarif a délku historie pro Point-in-time restore (aspoň 7 dní) a oddělenou
-  větev pro náhledy (§1).
+- [ ] **Záloha databáze:** vložit tajemství `ZALOHA_DATABASE_URL` (Neon → produkční větev → Connect)
+  a `ZALOHA_HESLO` (dlouhé heslo, uložit i do správce hesel) a spustit workflow „Záloha databáze“
+  ručně (Actions → Run workflow) — od té doby denně (§6 Zálohy). Volitelně Neon Launch pro 7 dní PITR.
 - [ ] **GitHub:** mít zapnuté e-maily o neúspěšných workflow (Settings → Notifications → Actions).
