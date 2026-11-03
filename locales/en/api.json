@@ -199,5 +199,11 @@
   "Zadej současné i nové heslo.": "Enter both your current and your new password.",
   "Účet se nepodařilo smazat. Zkus to znovu, nebo napiš podpoře.": "We couldn't delete the account. Try again or contact support.",
   "Sledování balení se ještě připravuje. Zkus to za chvíli znovu.": "Pack tracking is still being set up. Try again in a moment.",
-  "Označení „nevedeme\" se ještě připravuje. Zkus to za chvíli znovu.": "The “not stocked” label is still being set up. Try again in a moment."
+  "Označení „nevedeme\" se ještě připravuje. Zkus to za chvíli znovu.": "The “not stocked” label is still being set up. Try again in a moment.",
+  "Tenhle e-mail už v Managero má účet. Použijte k němu stejné heslo, ať je účet jeden, nebo se přihlaste.": "This email already has a Managero account. Use the same password so it stays one account, or sign in.",
+  "Tenhle e-mail už v Managero má účet. Použij k němu stejné heslo, ať je účet jeden, nebo se přihlas.": "This email already has a Managero account. Use the same password so it stays one account, or sign in.",
+  "Neznámá strana": "Unknown side",
+  "Moc pokusů, zkuste to za chvíli.": "Too many attempts, try again in a moment.",
+  "Druhou stranu tenhle účet nemá.": "This account has no other side.",
+  "Do správy podniku se přihlas heslem.": "Sign in to business management with your password."
 }

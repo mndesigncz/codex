@@ -13,6 +13,7 @@ import { HLASKA_ROLE_V_CLIENTU } from '@/lib/obal';
 import PravniOdkazy from '../pravni/PravniOdkazy';
 import SouhlasPodminek from '../pravni/SouhlasPodminek';
 import { useT, useJazyk } from '@/lib/i18n/client';
+import { kamPoPrihlaseni } from '@/lib/dveStranyKlient';
 
 const input = 'field text-sm';
 const label = 'field-label';
@@ -53,7 +54,7 @@ export function RegisterForm() {
     const r = await fetch('/api/client/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pw, ref: ref.trim() || undefined, novinky, terms: souhlas, vek15: vek }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setErr(d.error ? t(d.error) : t('Registrace se nepovedla.')); setBusy(false); return; }
-    const s = await signIn('credentials', { email, password: pw, redirect: false });
+    const s = await signIn('credentials', { email, password: pw, strana: 'host', redirect: false });
     if (s?.error) { setErr(t('Účet vznikl, ale přihlášení selhalo. Zkus se přihlásit.')); setBusy(false); return; }
     router.push(next); router.refresh();
   };
@@ -108,11 +109,13 @@ export function LoginForm() {
       if (jeObal) { await signOut({ redirect: false }); setErr(HLASKA_ROLE_V_CLIENTU); setBusy(false); return; }
       router.push('/'); router.refresh(); return;
     }
-    router.push(next); router.refresh();
+    // Majitel podniku bývá i hostem: s oběma stranami se poprvé zeptáme „Kam teď?“.
+    const kam = await kamPoPrihlaseni(next, params.get('next') != null);
+    router.push(kam); router.refresh();
   };
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setBusy(true);
-    const s = await signIn('credentials', { email, password: pw, redirect: false });
+    const s = await signIn('credentials', { email, password: pw, strana: 'host', redirect: false });
     await poPrihlaseni(s?.error, t('E-mail nebo heslo nesedí.'));
   };
   const poslatKod = async (e?: React.FormEvent) => {
@@ -179,6 +182,12 @@ export function LoginForm() {
           <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
           <p className="text-sm text-black/55 text-center">{t('Ještě účet nemáš?')} <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Založ si ho')}</Link></p>
         </form>
+      )}
+      {/* Kdo hledá správu podniku, je tu omylem: jeden odkaz ho pošle na správný vchod. */}
+      {!jeObal && (
+        <p className="mt-6 pt-5 border-t border-black/[0.07] text-sm text-black/55 text-center">
+          {t('Máš podnik?')} <Link href="/login" className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Přihlásit se do správy podniku')}</Link>
+        </p>
       )}
     </AuthCard>
   );

@@ -24,6 +24,7 @@ import { fmtDatum } from '@/lib/i18n/format';
 import { RES_STATUS } from '@/lib/clientSlots';
 import { formatMoney } from '@/lib/money';
 import { odhlasit } from '@/lib/odhlaseni';
+import { useDruhaStrana } from '@/lib/dveStranyKlient';
 
 export default function Profil() {
   const t = useT('klient-host');
@@ -93,12 +94,33 @@ export default function Profil() {
 
         <UcetHosta novinky={d.me?.novinky === true} novinkyEmail={d.me?.novinkyEmail !== false} onFlash={setFlash} />
 
+        {!demo && <PrepnoutNaPodnik onFlash={setFlash} />}
+
         {!demo && (
           <button type="button" onClick={() => odhlasit({ callbackUrl: '/client' })} className="btn btn-secondary w-full !h-[52px]"><Icon name="logout" size={17} />{t('Odhlásit se')}</button>
         )}
         {demo && <Link href={cesta('/client/me')} className="btn btn-secondary w-full !h-[52px]">{t('Zpět na kartu')}</Link>}
       </div>
     </div>
+  );
+}
+
+/** Kdo má k téže adrese i účet v provozu, přejde odsud do správy podniku (bez nového hesla). */
+function PrepnoutNaPodnik({ onFlash }: { onFlash: (m: string) => void }) {
+  const t = useT('klient-host');
+  const { druha, prepnout, busy, chyba, zrusChybu } = useDruhaStrana();
+  useEffect(() => { if (chyba) { onFlash(t(chyba)); zrusChybu(); } }, [chyba, onFlash, t, zrusChybu]);
+  if (druha !== 'podnik') return null;
+  return (
+    <button type="button" onClick={() => void prepnout()} disabled={busy} aria-busy={busy}
+      className="card w-full flex items-center gap-3 p-4 sm:p-5 text-left transition hover:bg-black/[0.02] disabled:opacity-60">
+      <span className="grid place-items-center size-10 rounded-full bg-[#16181A] text-white shrink-0" aria-hidden><Icon name="overview" size={18} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold">{busy ? t('Načítání…') : t('Správa podniku')}</span>
+        <span className="block t-meta mt-0.5 text-pretty">{t('Směny, kasa, sklad, rezervace a tým.')}</span>
+      </span>
+      <Icon name="chevronRight" size={18} className="text-black/40 shrink-0" />
+    </button>
   );
 }
 

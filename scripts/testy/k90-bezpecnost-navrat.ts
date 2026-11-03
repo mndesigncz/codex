@@ -26,7 +26,10 @@ export default function ({ eq, ok }: Testy) {
   eq('odkaz: cizí cíl dá holé přihlášení', prihlaseniSNavratem('https://zly.cz'), '/login');
 
   const form = cti('components/LoginForm.tsx');
-  ok('LoginForm: čte callbackUrl i next přes navratPoPrihlaseni', /navratPoPrihlaseni\(searchParams\.get\('callbackUrl'\) \?\? searchParams\.get\('next'\), window\.location\.origin\)/.test(form));
+  // Odkud se vzal cíl, potřebuje i volba strany (lib/dveStranyKlient), proto se čte zvlášť.
+  ok('LoginForm: čte callbackUrl i next přes navratPoPrihlaseni',
+    /const odkud = searchParams\.get\('callbackUrl'\) \?\? searchParams\.get\('next'\);/.test(form)
+    && /navratPoPrihlaseni\(odkud, window\.location\.origin\)/.test(form));
   ok('LoginForm: už ne natvrdo router.push(\'/\')', !/router\.push\('\/'\)/.test(form));
   const mw = cti('middleware.ts');
   ok('middleware: stránka bez přihlášení → /login s callbackUrl', /searchParams\.set\('callbackUrl'/.test(mw));

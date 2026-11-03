@@ -42,7 +42,7 @@ export function ZapomenuteHesloForm({ klient }: { klient: boolean }) {
     e.preventDefault();
     setChyba(''); setBusy(true);
     try {
-      const r = await fetch('/api/account/heslo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const r = await fetch('/api/account/heslo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, strana: klient ? 'host' : 'podnik' }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) setChyba(d.error ? tg(d.error) : t('Žádost se nepodařilo odeslat.'));
       else setHotovo(t('Pokud je e-mail v aplikaci, poslali jsme na něj odkaz pro nové heslo.'));

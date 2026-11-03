@@ -18,7 +18,8 @@ export const teams = pgTable('teams', {
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
-  email: text('email').notNull().unique(),
+  // Unikát po stranách (provoz / host) drží index users_email_strana v app/api/init.
+  email: text('email').notNull(),
   passwordHash: text('password_hash').notNull(),
   role: roleEnum('role').notNull().default('employee'),
   avatar: text('avatar').default('👤'),

@@ -126,10 +126,12 @@ export async function POST(request: Request) {
   const typPrijeti = typUctu(slibena ?? vychozi);
   // Existující účet jde pozvat do DALŠÍHO podniku (přijetí mu přidá členství).
   // Nejde pozvat tablet ani hosta, a nejde pozvat někoho, kdo už tu je.
-  const [existingUser] = await sql`SELECT id, role, team_id FROM users WHERE lower(email) = ${email} ORDER BY id LIMIT 1`;
+  // Hostovský účet téhož e-mailu pozvání nebrání: přijetím vznikne druhá
+  // strana účtu se stejným heslem (lib/dveStrany).
+  const [existingUser] = await sql`SELECT id, role, team_id FROM users WHERE lower(email) = ${email} AND role <> 'customer' ORDER BY id LIMIT 1`;
   if (existingUser) {
-    if (existingUser.role === 'kiosk' || existingUser.role === 'customer') {
-      return NextResponse.json({ error: 'Tenhle e-mail patří tabletu nebo hostovi — do týmu ho pozvat nejde.' }, { status: 409 });
+    if (existingUser.role === 'kiosk') {
+      return NextResponse.json({ error: 'Tenhle e-mail patří tabletu — do týmu ho pozvat nejde.' }, { status: 409 });
     }
     let uzClen = Number(existingUser.team_id) === Number(team.id);
     try {

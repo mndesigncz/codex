@@ -93,7 +93,7 @@ export async function GET(request: Request) {
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE,
+        email TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'employee',
         avatar TEXT DEFAULT '👤',
@@ -117,10 +117,34 @@ export async function GET(request: Request) {
         AND NOT EXISTS (
           SELECT 1 FROM users o WHERE o.id <> u.id AND lower(btrim(o.email)) = lower(btrim(u.email))
         )`);
-    // Unikát bez ohledu na velikost písmen. Padne, dokud existují dvojníci —
-    // to je záměr (fail-open: aplikace běží dál, jen bez pojistky v databázi);
-    // duplicity se hlásí v migFailDetail a řeší je člověk.
-    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower ON users (lower(email))`);
+    // Jeden e-mail, dvě strany (lib/dveStrany.ts): tatáž adresa smí mít jeden
+    // účet v provozu (podnik, zaměstnanec, kiosk) a jeden hostovský. Unikát
+    // proto platí bez ohledu na velikost písmen, ale zvlášť pro každou stranu.
+    // Původní celotabulkové pojistky (sloupcový UNIQUE pod jménem z CREATE TABLE
+    // i z drizzle-kit, a users_email_lower) se ruší, jinak by druhý řádek nešel
+    // založit. Nový index vzniká první; padne jen při dvojnících na téže straně
+    // (fail-open jako dřív, hlásí migFailDetail) a pak starý index zůstane stát.
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_email_strana ON users (lower(email), (role = 'customer'))`);
+    await ddl(sql`
+      DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'users_email_strana') THEN
+          ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;
+          ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_unique;
+          DROP INDEX IF EXISTS users_email_lower;
+        END IF;
+      END $$`);
+    // Heslo, které zaměstnanci zadal vedoucí (/api/users), zná i on: takový účet
+    // se s hostovskou stranou nepáruje, dokud si heslo neobnoví přes e-mail
+    // (lib/dveStrany, lzeParovat). Stávající zaměstnanci i vedení (role
+    // employer) se označí všichni kromě majitelů podniků — u nich už nejde
+    // poznat, kdo heslo zadal.
+    await ddl(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'heslo_od_spravce') THEN
+          ALTER TABLE users ADD COLUMN heslo_od_spravce BOOLEAN NOT NULL DEFAULT false;
+          UPDATE users SET heslo_od_spravce = true WHERE role NOT IN ('customer', 'kiosk') AND NOT EXISTS (SELECT 1 FROM teams t WHERE t.owner_id = users.id);
+        END IF;
+      END $$`);
 
     // ---- Invitations ----
     await ddl(sql`

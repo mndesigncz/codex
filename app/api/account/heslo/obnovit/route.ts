@@ -9,6 +9,7 @@ import { klientIp } from '@/lib/klientIp';
 import { hashTokenu, jePlatny, vypadaJakoToken, hesloStaci } from '@/lib/jednorazovyToken';
 import { klicPoctadla } from '@/lib/ucetEmail';
 import { zvysVerziRelace } from '@/lib/authRelace';
+import { protejsek, nastavHeslo } from '@/lib/dveStrany';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,11 +43,22 @@ export async function POST(request: Request) {
   const [u] = await sql`SELECT email, role FROM users WHERE id = ${userId}`;
   if (!u) return NextResponse.json({ error: NEPLATNY }, { status: 400 });
 
-  await sql`UPDATE users SET password_hash = ${await bcrypt.hash(heslo, 12)} WHERE id = ${userId}`;
-  // Obnovené heslo odhlásí všechna zařízení — kdo heslo znal, už se nedostane dál.
-  await zvysVerziRelace(userId);
-  // Ostatní nevyužité odkazy téhož účtu přestanou platit a zamčené přihlášení se uvolní.
-  try { await sql`UPDATE password_resets SET used_at = NOW() WHERE user_id = ${userId} AND used_at IS NULL`; } catch { /* nevadí */ }
+  // Odkaz z e-mailu dokládá adresu, takže nové heslo dostane i druhá strana
+  // téže adresy (kromě kiosku) a obě se tím spárují (lib/dveStrany). Jedním
+  // příkazem, ať nezůstane jedna strana se starým heslem.
+  const druhy = await protejsek(userId);
+  const ucty = druhy ? [userId, druhy.id] : [userId];
+  const otisk = await bcrypt.hash(heslo, 12);
+  await nastavHeslo(ucty, otisk, true);
+  // Obnovené heslo odhlásí všechna zařízení obou stran — kdo heslo znal, už se nedostane dál.
+  for (const id of ucty) await zvysVerziRelace(id);
+  // Ostatní nevyužité odkazy obou stran přestanou platit (starý by heslo přepsal
+  // znovu) a zamčené přihlášení se uvolní.
+  try {
+    await sql`UPDATE password_resets SET used_at = NOW() WHERE user_id = ANY(${ucty}) AND used_at IS NULL`;
+  } catch (e) {
+    console.error('[heslo/obnovit] zbylé odkazy nezneplatněny', e);
+  }
   await clear(`login:${String(u.email).toLowerCase()}`);
   await clear(klicPoctadla('reset', String(u.email).toLowerCase()));
   return NextResponse.json({ ok: true, role: String(u.role) });

@@ -31,6 +31,8 @@ import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
 import { zalozkaNastaveni } from '@/lib/nastaveniZalozky';
 import { useUkolyZaBody } from '../navic/data';
 import { pocetKVzeti, urlUkolyZaBody } from '../navic/logika';
+import { useDruhaStrana } from '@/lib/dveStranyKlient';
+import Toast from '../ui/Toast';
 
 // Pohledy se stahují až při otevření — viz EmployerLayout. Zaměstnanec
 // otevře za směnu obvykle dvě obrazovky; stahovat kvůli tomu uzávěrku,
@@ -83,6 +85,9 @@ export default function EmployeeLayout({ user }: Props) {
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
   const t = useT();
   const { jazyk } = useJazyk();
+  // Zaměstnanec je jinde i hostem: jeden účet, přepínač na jeho karty a rezervace.
+  const druhaStrana = useDruhaStrana();
+  const popisekHosta = druhaStrana.busy ? t('Načítání…') : t('Moje karty a rezervace');
   // Navigace podle oprávnění (první) a nastavení podniku (skrýt, přejmenovat, pořadí).
   const nav = useNavigaceAplikace('zamestnanec', smiPohled, [opravneni, nacteno]);
   const [jazykOpen, setJazykOpen] = useState(false);
@@ -259,6 +264,7 @@ export default function EmployeeLayout({ user }: Props) {
               className="absolute left-3 right-3 bottom-full mb-2 origin-bottom-left">
               <MenuItemButton label={t('Nastavení')} icon="settings" onClick={openSettings} />
               <MenuItemButton label={`${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`} icon="globe" onClick={() => { setAccountOpen(false); setJazykOpen(true); }} />
+              {druhaStrana.druha === 'host' && <MenuItemButton label={popisekHosta} icon="card" onClick={() => { void druhaStrana.prepnout(); }} />}
               <div role="separator" className="h-px bg-black/[0.06] my-1" />
               <MenuItemButton label={t('Odhlásit se')} icon="logout" danger onClick={() => odhlasit({ callbackUrl: '/login' })} />
             </MenuPanel>
@@ -350,9 +356,11 @@ export default function EmployeeLayout({ user }: Props) {
           { label: t('Hledat'), icon: 'search', onClick: () => { setMoreOpen(false); setHledani(true); } },
           { label: t('Nastavení'), icon: 'settings', onClick: openSettings },
           { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setMoreOpen(false); setJazykOpen(true); } },
+          ...(druhaStrana.druha === 'host' ? [{ label: popisekHosta, icon: 'card', onClick: () => { void druhaStrana.prepnout(); } }] : []),
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
+      <Toast message={druhaStrana.chyba ? t(druhaStrana.chyba) : null} tone="bad" onClose={druhaStrana.zrusChybu} />
       <GlobalniHledani open={hledaniOtevreno} onClose={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('zamestnanec', smiPohled)} onStranka={navigate}
         hledatUkoly={smiPohled('tasks')} hledatSklad={smiPohled('inventory')} hledatNavody={smiPohled('guides')} hledatPostupy={smiPohled('procedures')}
         hledatReceptury={smiPohled('recipes')} />

@@ -3,6 +3,7 @@
 
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { hesloProDruhouStranu, HLASKA_JINE_HESLO_TY } from '@/lib/dveStrany';
 import { sql, customerByCard } from '@/lib/client';
 import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
@@ -32,9 +33,13 @@ export async function POST(request: Request) {
   const gate = await hit(`client-register:${email}`, 5, 15 * 60);
   if (!gate.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkus to za čtvrt hodiny.' }, { status: 429 });
 
-  const [existing] = await sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`;
+  // Jeden e-mail, dvě strany (lib/dveStrany): hostovský účet smí vzniknout
+  // vedle účtu podniku, ale jen se stejným heslem — převezme jeho otisk.
+  const [existing] = await sql`SELECT id FROM users WHERE lower(email) = ${email} AND role = 'customer' LIMIT 1`;
   if (existing) return NextResponse.json({ error: 'Tenhle e-mail už je zaregistrovaný. Přihlas se.' }, { status: 409 });
-  const hash = await bcrypt.hash(password, 12);
+  const otiskDruhe = await hesloProDruhouStranu(email, 'host', password);
+  if (otiskDruhe === false) return NextResponse.json({ error: HLASKA_JINE_HESLO_TY }, { status: 409 });
+  const hash = otiskDruhe ?? await bcrypt.hash(password, 12);
   // Kód od kamaráda (kód jeho kartičky). Špatný kód registraci neshodí —
   // jen se nezapíše; odměna padá až při prvním členství ve společném podniku.
   let referredBy: number | null = null;
@@ -49,7 +54,9 @@ export async function POST(request: Request) {
       INSERT INTO users (name, email, password_hash, role, avatar, job_title, referred_by, notif_prefs, terms_accepted_at)
       VALUES (${name}, ${email}, ${hash}, 'customer', '👤', 'Host', ${referredBy}, ${prefs}::jsonb, NOW())
       RETURNING id, name, email`;
-  } catch {
+  } catch (e: any) {
+    // Souběžná registrace téže adresy narazí na unikát (users_email_strana).
+    if (e?.code === '23505') return NextResponse.json({ error: 'Tenhle e-mail už je zaregistrovaný. Přihlas se.' }, { status: 409 });
     // Před migrací (sloupce notif_prefs a terms_accepted_at ještě nejsou): registrace nesmí spadnout.
     [u] = await sql`
       INSERT INTO users (name, email, password_hash, role, avatar, job_title, referred_by)

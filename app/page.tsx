@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import Landing from '@/components/Landing';
@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { OG_ZAKLAD } from '@/lib/web';
 import { obalZHlavicek, HLASKA_ROLE_V_PROVOZU } from '@/lib/obal';
 import SpatnaRole from '@/components/auth/SpatnaRole';
+import { COOKIE_STRANA, druhaStranaRelace } from '@/lib/dveStrany';
 import { getJazyk } from '@/lib/i18n/server';
 import { ZapisSlovniky } from '@/lib/i18n/client';
 import { nactiSekce } from '@/lib/i18n/slovniky';
@@ -33,6 +34,10 @@ export default async function Home() {
   const role = (session.user as any)?.role;
   // Host v aplikaci pro podniky: přesměrování na /client by brána vrátila zpět (smyčka).
   if (obal === 'managero' && role === 'customer') return <SpatnaRole zprava={HLASKA_ROLE_V_PROVOZU} />;
+  // Účet s oběma stranami, který si ještě nevybral (lib/dveStrany): nejdřív „Kam jdeš“.
+  if (!obal && !(await cookies()).get(COOKIE_STRANA) && (await druhaStranaRelace(parseInt((session.user as any).id), (session.user as any).metoda).catch(() => null))) {
+    redirect('/kam');
+  }
   if (role === 'employer') {
     redirect('/employer/overview');
   }

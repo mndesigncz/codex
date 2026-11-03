@@ -39,6 +39,7 @@ export default function Paticka({ provozovatel }: {
                 <li key={o.id}><a href={`#${o.id}`} className="tap-target-sm inline-flex items-center text-[color:var(--ld-text-2)] hover:text-[color:var(--ld-papir)] transition-colors">{t(o.dlouze ?? o.label)}</a></li>
               ))}
               <li><Link href="/login" className="tap-target-sm inline-flex items-center text-[color:var(--ld-text-2)] hover:text-[color:var(--ld-papir)] transition-colors">{t('Přihlášení')}</Link></li>
+              <li><Link href="/client/login" className="tap-target-sm inline-flex items-center text-[color:var(--ld-text-2)] hover:text-[color:var(--ld-papir)] transition-colors">{t('Moje karty a rezervace')}</Link></li>
             </ul>
           </nav>
         </div>

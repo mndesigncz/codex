@@ -103,7 +103,7 @@ const jeHost = (r: any) => String(r?.role) === 'customer';
 export async function nahledDavky(teamId: number, radky: RadekImportu[]): Promise<NahledDavky> {
   const emaily = radky.map(r => r.email);
   const lide = emaily.length
-    ? (await sql`SELECT id, lower(email) AS email, role FROM users WHERE lower(email) = ANY(${emaily})`) as any[]
+    ? (await sql`SELECT id, lower(email) AS email, role FROM users WHERE lower(email) = ANY(${emaily}) AND role = 'customer'`) as any[]
     : [];
   const hoste = lide.filter(jeHost);
   const ids = hoste.map(u => Number(u.id));
@@ -167,7 +167,9 @@ export async function importujDavku(
 
   // --- Účty ---
   const emaily = radky.map(r => r.email);
-  const znamy = (await sql`SELECT id, lower(email) AS email, role FROM users WHERE lower(email) = ANY(${emaily})`) as any[];
+  // Jen hostovské účty: kdo má adresu v provozu, dostane vedle něj hostovský (lib/dveStrany)
+  // s vlastním náhodným heslem — heslo provozu se z importu nikdy nepřebírá.
+  const znamy = (await sql`SELECT id, lower(email) AS email, role FROM users WHERE lower(email) = ANY(${emaily}) AND role = 'customer'`) as any[];
   const poEmailu = new Map<string, any>(znamy.map(u => [String(u.email), u]));
   const chybi = radky.filter(r => !poEmailu.has(r.email));
   const novyUcet = new Set<number>();
@@ -195,7 +197,7 @@ export async function importujDavku(
     // Souběh s registrací: e-mail mezitím vznikl jinde — dotáhne se, ať řádek nepropadne.
     const stale = chybi.filter(r => !poEmailu.has(r.email)).map(r => r.email);
     if (stale.length) {
-      const dohledane = (await sql`SELECT id, lower(email) AS email, role FROM users WHERE lower(email) = ANY(${stale})`) as any[];
+      const dohledane = (await sql`SELECT id, lower(email) AS email, role FROM users WHERE lower(email) = ANY(${stale}) AND role = 'customer'`) as any[];
       for (const u of dohledane) poEmailu.set(String(u.email), u);
     }
   }

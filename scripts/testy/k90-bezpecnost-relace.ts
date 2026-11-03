@@ -25,7 +25,8 @@ export default function ({ eq, ok }: Testy) {
 
   const zmena = cti('app/api/account/route.ts');
   ok('změna hesla: zvýší verzi a současné zařízení ponechá', /zvysVerziRelace\(id\)/.test(zmena) && /ponechSoucasneZarizeni\(verze\)/.test(zmena));
-  ok('obnovení hesla: zvýší verzi', /zvysVerziRelace\(userId\)/.test(cti('app/api/account/heslo/obnovit/route.ts')));
+  const obnova = cti('app/api/account/heslo/obnovit/route.ts');
+  ok('obnovení hesla: zvýší verzi (účtu i druhé straně)', /const ucty = druhy \? \[userId, druhy\.id\] : \[userId\]/.test(obnova) && /for \(const id of ucty\) await zvysVerziRelace\(id\)/.test(obnova));
   const init = cti('app/api/init/route.ts');
   ok('init: session_version s výchozí 0 pro všechny', /ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0/.test(init));
   const rel = cti('lib/authRelace.ts');

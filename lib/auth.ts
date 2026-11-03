@@ -1,5 +1,6 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import { getToken } from 'next-auth/jwt';
 import bcrypt from 'bcryptjs';
 import { klientIp } from './klientIp';
 import { neon } from '@neondatabase/serverless';
@@ -16,6 +17,7 @@ import { cistyJazyk } from './i18n/config';
 import { verzeRelace, relaceOdvolana, RELACE_ODVOLANA } from './authVerze';
 import { zaznamenejNavstevu } from './naposledy';
 import { overKodPrihlaseni } from './klient/prihlaseniKodem';
+import { seradPodleStrany, overListek, stranaRole, metodaRelace, smiNaStranu, dvojnik, chybiSloupec, type Metoda } from './dveStrany';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -101,6 +103,92 @@ async function stavUzivatele(id: number, cerstve: boolean): Promise<StavUzivatel
   }
 }
 
+/** Vstupní značka nativního obalu z hlaviček požadavku NextAuth (bez ní web). */
+function obalZPozadavku(req: any) {
+  const hlavicky = (req?.headers ?? {}) as Record<string, string | string[] | undefined>;
+  const ua = hlavicky['user-agent'];
+  return obalZUserAgent(Array.isArray(ua) ? ua[0] : ua).obal;
+}
+
+type RadekUzivatele = typeof users.$inferSelect;
+
+/**
+ * Token relace, se kterou přišel požadavek na přihlášení (NextAuth do authorize
+ * posílá jen hlavičky, ne rozparsované cookies). Null = nepřihlášený.
+ */
+async function relaceZPozadavku(req: any) {
+  const hlavicky = (req?.headers ?? {}) as Record<string, string | string[] | undefined>;
+  const surove = Array.isArray(hlavicky.cookie) ? hlavicky.cookie.join('; ') : String(hlavicky.cookie ?? '');
+  const cookies: Record<string, string> = {};
+  for (const kus of surove.split(';')) {
+    const i = kus.indexOf('=');
+    if (i <= 0) continue;
+    const hodnota = kus.slice(i + 1).trim();
+    try { cookies[kus.slice(0, i).trim()] = decodeURIComponent(hodnota); } catch { cookies[kus.slice(0, i).trim()] = hodnota; }
+  }
+  try {
+    return await getToken({ req: { cookies, headers: hlavicky } as any, secret: process.env.NEXTAUTH_SECRET });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Společný konec přihlášení heslem i přepnutím strany: tým, členství,
+ * správce, jazyk a verze relace do tokenu. Volá se až s ověřeným účtem.
+ */
+async function dokonciPrihlaseni(user: RadekUzivatele, metoda: Metoda = 'heslo') {
+  let teamId: number | null = user.teamId ?? null;
+  if (user.role === 'employer') {
+    teamId = await ensureEmployerTeam(user.id, user.name, teamId);
+  }
+  // Členství v podniku (kolo 55): kdo má tým z doby před migrací, dostane
+  // řádek v team_members — přepínač podniků ho jinak nevidí.
+  await zajistiClenstvi(user.id, teamId, user.role);
+  // Zaměstnanec bez aktivního podniku, ale s členstvím (odebraný z jednoho
+  // podniku, pozvaný do druhého): přepne se do prvního, kde členem je.
+  // Jinak by se přihlásil do prázdna a přepínač se mu s jedním členstvím
+  // ani neukáže.
+  if (!teamId && user.role === 'employee') {
+    try {
+      const cl = await clenstviUzivatele(user.id);
+      if (cl.length) { const c = await prepniTym(user.id, cl[0].teamId); if (c) teamId = c.teamId; }
+    } catch { /* před migrací zůstane bez podniku */ }
+  }
+  // Správce platformy se rozhodne tady, podle databáze, a jede v tokenu.
+  // Klient si token nepřepíše; obnovuje se jen z databáze (níž).
+  const superadmin = await jeSpravcePodleDb(user.id);
+  // Jazyk aplikace (kolo 76): zvlášť a defenzivně, sloupec `users.lang`
+  // před migrací není a přihlášení kvůli němu selhat nesmí.
+  let lang: string | undefined;
+  try {
+    const sqlJ = neon(process.env.DATABASE_URL!);
+    const [l] = await sqlJ`SELECT lang FROM users WHERE id = ${user.id}`;
+    lang = cistyJazyk(l?.lang);
+  } catch { /* sloupec ještě není */ }
+  // Verze relace do tokenu (lib/authVerze): po změně hesla jinde je
+  // tenhle token starý a callback jwt ho odhlásí. Bez sloupce 0.
+  let sv = 0;
+  try {
+    const sqlV = neon(process.env.DATABASE_URL!);
+    const [r] = await sqlV`SELECT session_version FROM users WHERE id = ${user.id}`;
+    sv = verzeRelace(r?.session_version);
+  } catch { /* sloupec ještě není */ }
+  return {
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar: user.avatar ?? '👤',
+    jobTitle: user.jobTitle ?? 'Barista',
+    teamId,
+    superadmin,
+    lang,
+    sv,
+    metoda,
+  } as any;
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -108,6 +196,9 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Heslo', type: 'password' },
+        // Kam se člověk hlásí (lib/dveStrany): s jedním e-mailem na obou stranách
+        // rozhodne, který účet se zkusí první. Nepovinné; nic neodemyká.
+        strana: { label: 'Strana', type: 'text' },
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -133,13 +224,25 @@ export const authOptions: NextAuthOptions = {
         // a mobilní klávesnice ho dnes pošle malými. Kdyby z dřívějška existovaly
         // dva účty lišící se jen velikostí písmen, zkusí se nejdřív ten, který
         // přesně odpovídá zadání, a pustí se ten, jehož heslo sedí.
-        const nalezeni = await db.query.users.findMany({
+        let nalezeni = await db.query.users.findMany({
           where: sqlD`lower(${users.email}) = ${email}`,
           limit: 5,
         });
         if (nalezeni.length === 0) return null;
+        // Smazaný účet se nepřihlásí. Převzatý host (kartička připojená k jinému
+        // účtu, lib/kartyFyzickeDb) si nechává adresu i heslo, jen dostane deleted_at.
+        try {
+          const ids = nalezeni.map((k) => k.id);
+          const smazani = await neon(process.env.DATABASE_URL!)`SELECT id FROM users WHERE id = ANY(${ids}) AND deleted_at IS NOT NULL` as any[];
+          const pryc = new Set(smazani.map((r) => Number(r.id)));
+          nalezeni = nalezeni.filter((k) => !pryc.has(k.id));
+        } catch (e) {
+          if (!chybiSloupec(e)) throw e; // jen před migrací deleted_at chybí; jinak se nepouští naslepo
+        }
+        if (nalezeni.length === 0) return null;
         let user: (typeof nalezeni)[number] | null = null;
-        for (const kandidat of poradiKandidatu(credentials.email, nalezeni)) {
+        // Obě strany se zkouší (heslo je jedno), ale ta, kam se člověk hlásí, první.
+        for (const kandidat of seradPodleStrany(poradiKandidatu(credentials.email, nalezeni, 5), credentials.strana)) {
           if (await bcrypt.compare(credentials.password, kandidat.passwordHash)) { user = kandidat; break; }
         }
         if (!user) return null;
@@ -147,59 +250,60 @@ export const authOptions: NextAuthOptions = {
         // je AŽ po správném hesle, takže jiný chybový kód než „špatné heslo“ dostane
         // jen ten, kdo účet opravdu vlastní (nejde tak zjistit, které e-maily existují).
         // Značka jen zužuje: bez ní (web) se nic nemění a falešná značka nic neodemkne.
-        const hlavicky = (req?.headers ?? {}) as Record<string, string | string[] | undefined>;
-        const ua = hlavicky['user-agent'];
-        const obal = obalZUserAgent(Array.isArray(ua) ? ua[0] : ua).obal;
-        if (!rolePatriDoObalu(obal, user.role)) throw new Error('OBAL_ROLE');
+        // Spárovaná druhá strana (lib/dveStrany: dvojnik), která do obalu patří,
+        // má přednost před chybou.
+        const obal = obalZPozadavku(req);
+        if (!rolePatriDoObalu(obal, user.role)) {
+          const d = await dvojnik(user.id);
+          const vhodny = d ? nalezeni.find((k) => k.id === d.id && rolePatriDoObalu(obal, k.role)) : undefined;
+          if (!vhodny) throw new Error('OBAL_ROLE');
+          user = vhodny;
+        }
         await clear(`login:${email}`);
-        let teamId: number | null = user.teamId ?? null;
-        if (user.role === 'employer') {
-          teamId = await ensureEmployerTeam(user.id, user.name, teamId);
-        }
-        // Členství v podniku (kolo 55): kdo má tým z doby před migrací, dostane
-        // řádek v team_members — přepínač podniků ho jinak nevidí.
-        await zajistiClenstvi(user.id, teamId, user.role);
-        // Zaměstnanec bez aktivního podniku, ale s členstvím (odebraný z jednoho
-        // podniku, pozvaný do druhého): přepne se do prvního, kde členem je.
-        // Jinak by se přihlásil do prázdna a přepínač se mu s jedním členstvím
-        // ani neukáže.
-        if (!teamId && user.role === 'employee') {
-          try {
-            const cl = await clenstviUzivatele(user.id);
-            if (cl.length) { const c = await prepniTym(user.id, cl[0].teamId); if (c) teamId = c.teamId; }
-          } catch { /* před migrací zůstane bez podniku */ }
-        }
-        // Správce platformy se rozhodne tady, podle databáze, a jede v tokenu.
-        // Klient si token nepřepíše; obnovuje se jen z databáze (níž).
-        const superadmin = await jeSpravcePodleDb(user.id);
-        // Jazyk aplikace (kolo 76): zvlášť a defenzivně, sloupec `users.lang`
-        // před migrací není a přihlášení kvůli němu selhat nesmí.
-        let lang: string | undefined;
+        return dokonciPrihlaseni(user);
+      },
+    }),
+    // Přepnutí strany (Správa podniku ↔ Moje karty a rezervace) bez nového hesla:
+    // lístek vydá /api/strana přihlášenému účtu a platí minutu (lib/dveStrany).
+    // Tady se ověří podpis, že ho uplatňuje relace zdrojového účtu, že jeho
+    // verze relace sedí (po změně hesla nebo odhlášení všude je lístek mrtvý),
+    // že oba účty pořád mají tutéž adresu a cíl žije. Způsob přihlášení se dědí:
+    // relace z kódu z e-mailu se do správy podniku nedostane ani oklikou.
+    CredentialsProvider({
+      id: 'prepnout-stranu',
+      name: 'prepnout-stranu',
+      credentials: { listek: { label: 'Lístek', type: 'text' } },
+      async authorize(credentials, req) {
+        const tajemstvi = process.env.NEXTAUTH_SECRET;
+        if (!tajemstvi) return null;
+        const l = overListek(credentials?.listek, tajemstvi);
+        if (!l) return null;
+        const relace = await relaceZPozadavku(req);
+        if (!relace?.sub || parseInt(String(relace.sub)) !== l.zId) return null;
+        if (verzeRelace(relace.sv) !== l.sv) return null;
+        const sqlP = neon(process.env.DATABASE_URL!);
+        let rows: any[];
         try {
-          const sqlJ = neon(process.env.DATABASE_URL!);
-          const [l] = await sqlJ`SELECT lang FROM users WHERE id = ${user.id}`;
-          lang = cistyJazyk(l?.lang);
-        } catch { /* sloupec ještě není */ }
-        // Verze relace do tokenu (lib/authVerze): po změně hesla jinde je
-        // tenhle token starý a callback jwt ho odhlásí. Bez sloupce 0.
-        let sv = 0;
-        try {
-          const sqlV = neon(process.env.DATABASE_URL!);
-          const [r] = await sqlV`SELECT session_version FROM users WHERE id = ${user.id}`;
-          sv = verzeRelace(r?.session_version);
-        } catch { /* sloupec ještě není */ }
-        return {
-          id: String(user.id),
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          avatar: user.avatar ?? '👤',
-          jobTitle: user.jobTitle ?? 'Barista',
-          teamId,
-          superadmin,
-          lang,
-          sv,
-        } as any;
+          rows = await sqlP`SELECT id, email, role, session_version FROM users WHERE id IN (${l.zId}, ${l.naId}) AND deleted_at IS NULL` as any[];
+        } catch (e) {
+          if (!chybiSloupec(e)) throw e;
+          rows = await sqlP`SELECT id, email, role FROM users WHERE id IN (${l.zId}, ${l.naId})` as any[];
+        }
+        const z = rows.find((r) => Number(r.id) === l.zId);
+        const na = rows.find((r) => Number(r.id) === l.naId);
+        if (!z || !na) return null;
+        if (String(z.email).toLowerCase() !== String(na.email).toLowerCase()) return null;
+        if (verzeRelace(z.session_version) !== l.sv) return null;
+        if (stranaRole(z.role) === stranaRole(na.role)) return null;
+        if (z.role === 'kiosk' || na.role === 'kiosk') return null;
+        if (!smiNaStranu(stranaRole(na.role), l.metoda)) return null;
+        // Párování platí i teď (heslo od vedoucího, smazaný účet…), ne jen při výdeji lístku.
+        const d = await dvojnik(l.zId);
+        if (!d || d.id !== l.naId) return null;
+        if (!rolePatriDoObalu(obalZPozadavku(req), String(na.role))) throw new Error('OBAL_ROLE');
+        const cil = await db.query.users.findFirst({ where: sqlD`${users.id} = ${l.naId}` });
+        if (!cil) return null;
+        return dokonciPrihlaseni(cil, l.metoda);
       },
     }),
     // Host (Managero client): přihlášení kódem z e-mailu bez hesla. Jen účty hostů; kód ověří
@@ -229,6 +333,7 @@ export const authOptions: NextAuthOptions = {
         return {
           id: String(u.id), name: u.name, email: u.email, role: 'customer',
           avatar: u.avatar ?? '👤', jobTitle: u.job_title ?? '', teamId: null, superadmin: false, lang, sv,
+          metoda: 'kod',
         } as any;
       },
     }),
@@ -243,6 +348,7 @@ export const authOptions: NextAuthOptions = {
         token.superadmin = (user as any).superadmin === true;
         token.lang = cistyJazyk((user as any).lang);
         token.sv = verzeRelace((user as any).sv);
+        token.metoda = (user as any).metoda === 'kod' ? 'kod' : 'heslo';
       }
       // session.update() volá PROHLÍŽEČ. Smí proto obnovit jen to, co je
       // kosmetické — jméno a avatar. Příslušnost k týmu odsud přijímat nelze:
@@ -294,6 +400,8 @@ export const authOptions: NextAuthOptions = {
         // (role vedení, e-mail ze seznamu, bez dvojníka). Klient ho nezmění.
         (session.user as any).superadmin = token.superadmin === true;
         (session.user as any).lang = cistyJazyk(token.lang);
+        // Heslem, nebo kódem z e-mailu (lib/dveStrany): rozhoduje, kam smí přepínač.
+        (session.user as any).metoda = metodaRelace(token.metoda, token.role);
       }
       return session;
     },

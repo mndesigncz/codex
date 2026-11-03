@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { pridejClenstvi, pocetClenu } from '@/lib/tenant';
 import bcrypt from 'bcryptjs';
+import { hesloProDruhouStranu, HLASKA_JINE_HESLO_TY } from '@/lib/dveStrany';
 import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { notifyUsers } from '@/lib/push';
@@ -55,17 +56,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
     }
 
-    const existing = await sql`SELECT id FROM users WHERE lower(email) = ${email}`;
+    // Hostovský účet téhož e-mailu nevadí (lib/dveStrany), heslo ale musí sedět.
+    const existing = await sql`SELECT id FROM users WHERE lower(email) = ${email} AND role <> 'customer'`;
     if (existing.length > 0) {
       return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
     }
+    const otiskDruhe = await hesloProDruhouStranu(email, 'podnik', password);
+    if (otiskDruhe === false) return NextResponse.json({ error: HLASKA_JINE_HESLO_TY }, { status: 409 });
 
     // Kolo 67: kdo přijde kódem, dostane výchozí roli podniku (bez
     // nastavení Barista, tedy totéž co dřív „zaměstnanec"). Typ účtu jde
     // s rolí — určuje, které rozhraní se po přihlášení otevře.
     const role = await vychoziRolePodniku(Number(team.id));
     const ucet = typUctu(role);
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = otiskDruhe ?? await bcrypt.hash(password, 12);
     const [user] = await sql`
       INSERT INTO users (name, email, password_hash, role, avatar, team_id, employer_id)
       VALUES (${name}, ${email}, ${passwordHash}, ${ucet}, '👤', ${team.id}, ${team.owner_id})
@@ -91,6 +95,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, user });
   } catch (error) {
+    // Souběžná registrace téže adresy narazí na unikát (users_email_strana).
+    if ((error as any)?.code === '23505') return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
     console.error('Join error:', error);
     return NextResponse.json({ error: 'Chyba serveru' }, { status: 500 });
   }

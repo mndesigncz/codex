@@ -199,5 +199,11 @@
   "Zadej současné i nové heslo.": "Gib dein aktuelles und dein neues Passwort ein.",
   "Účet se nepodařilo smazat. Zkus to znovu, nebo napiš podpoře.": "Das Konto konnte nicht gelöscht werden. Versuch es erneut oder schreib dem Support.",
   "Sledování balení se ještě připravuje. Zkus to za chvíli znovu.": "Die Gebindeverfolgung wird noch vorbereitet. Versuch es gleich noch einmal.",
-  "Označení „nevedeme\" se ještě připravuje. Zkus to za chvíli znovu.": "Die Markierung „führen wir nicht“ wird noch vorbereitet. Versuch es gleich noch einmal."
+  "Označení „nevedeme\" se ještě připravuje. Zkus to za chvíli znovu.": "Die Markierung „führen wir nicht“ wird noch vorbereitet. Versuch es gleich noch einmal.",
+  "Tenhle e-mail už v Managero má účet. Použijte k němu stejné heslo, ať je účet jeden, nebo se přihlaste.": "Diese E-Mail hat bereits ein Konto bei Managero. Verwenden Sie dasselbe Passwort, damit es ein Konto bleibt, oder melden Sie sich an.",
+  "Tenhle e-mail už v Managero má účet. Použij k němu stejné heslo, ať je účet jeden, nebo se přihlas.": "Diese E-Mail hat schon ein Konto bei Managero. Nimm dasselbe Passwort, damit es ein Konto bleibt, oder melde dich an.",
+  "Neznámá strana": "Unbekannte Seite",
+  "Moc pokusů, zkuste to za chvíli.": "Zu viele Versuche, bitte gleich noch einmal.",
+  "Druhou stranu tenhle účet nemá.": "Dieses Konto hat keine zweite Seite.",
+  "Do správy podniku se přihlas heslem.": "Melde dich mit deinem Passwort bei der Betriebsverwaltung an."
 }
