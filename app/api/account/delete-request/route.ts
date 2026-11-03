@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   after(async () => {
     if (!adr.ok) return;
     try {
-      const ucet = await najdiUcet(email);
+      const ucet = await najdiUcet(email, b?.strana);
       if (!ucet) return;
       const { token, hash } = novyToken();
       const sql = neon(process.env.DATABASE_URL!);

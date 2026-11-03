@@ -1,22 +1,20 @@
 // Hledání účtu podle e-mailu pro jednorázové odkazy (heslo, smazání z webu).
 // Smazané (anonymizované) účty se nenajdou: nemají e-mail ani heslo, ale pro jistotu.
 
-import { neon } from '@neondatabase/serverless';
+import { seradPodleStrany, uctyEmailu } from './dveStrany';
 import { createHash } from 'node:crypto';
 
 export interface NalezenyUcet { id: number; name: string; email: string; role: string }
 
-export async function najdiUcet(emailMale: string): Promise<NalezenyUcet | null> {
-  const sql = neon(process.env.DATABASE_URL!);
-  let rows: any[];
-  try {
-    rows = await sql`SELECT id, name, email, role FROM users WHERE lower(email) = ${emailMale} AND deleted_at IS NULL ORDER BY id LIMIT 1` as any[];
-  } catch {
-    // Před migrací sloupec `deleted_at` neexistuje.
-    rows = await sql`SELECT id, name, email, role FROM users WHERE lower(email) = ${emailMale} ORDER BY id LIMIT 1` as any[];
-  }
-  const u = rows[0];
-  return u ? { id: Number(u.id), name: String(u.name), email: String(u.email), role: String(u.role) } : null;
+/**
+ * Účet s adresou; má-li ji podnik i host (lib/dveStrany), přednost má strana,
+ * ze které žádost přišla (formulář posílá `strana`), jinak starší účet.
+ */
+export async function najdiUcet(emailMale: string, strana?: unknown): Promise<NalezenyUcet | null> {
+  // Kiosk až nakonec: odkaz na heslo patří člověku, ne tabletu směny.
+  const ucty = seradPodleStrany(await uctyEmailu(emailMale), strana);
+  const u = [...ucty.filter((x) => x.role !== 'kiosk'), ...ucty.filter((x) => x.role === 'kiosk')][0];
+  return u ? { id: u.id, name: u.name, email: u.email, role: u.role } : null;
 }
 
 /**

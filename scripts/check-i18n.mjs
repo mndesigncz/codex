@@ -244,6 +244,8 @@ for (const dir of ['schedule', 'inventory', 'stocktake', 'shift-types', 'fixed-a
   if (existsSync(cesta)) for (const f of walk(cesta)) apiZdroje.push(f);
 }
 apiZdroje.push('lib/api.ts', 'lib/blokace.ts', 'middleware.ts', 'lib/client.ts');
+// Jeden účet, dvě strany: hlášky o druhé straně (registrace) a přepínače stran.
+apiZdroje.push('lib/dveStrany.ts', 'app/api/strana/route.ts');
 // Host (přestavba Managero client): hlášky sdílené logiky rout (promo kód, Mám kód, záměr u kasy, volné časy).
 if (existsSync('lib/klient')) for (const f of walk('lib/klient')) if (!f.includes('/demo/')) apiZdroje.push(f);
 // Hlášky rout, které zobrazují společné komponenty (obnova hesla, smazání účtu, nahlášení, blokace, platby).
@@ -256,7 +258,7 @@ apiZdroje.push(
 );
 for (const f of apiZdroje) {
   if (!existsSync(f)) continue;
-  for (const m of readFileSync(f, 'utf8').matchAll(/(?:error|ZPRAVA_423|NEPLATNY|zprava)(?::|\s*=)\s*'((?:[^'\\]|\\.)*)'/g)) apiKlice.add(m[1].replace(/\\'/g, "'"));
+  for (const m of readFileSync(f, 'utf8').matchAll(/(?:error|ZPRAVA_423|NEPLATNY|zprava|HLASKA_\w+)(?::|\s*=)\s*'((?:[^'\\]|\\.)*)'/g)) apiKlice.add(m[1].replace(/\\'/g, "'"));
   // Věta se šablonou `${…}` se nepřekládá (jméno by se dosadilo do cizího textu); hláška o /api/init je pro správce.
   for (const m of readFileSync(f, 'utf8').matchAll(/error:\s*'((?:[^'\\]|\\.)*)'/g)) if (/\/api\/init/.test(m[1])) apiVynechat.add(m[1].replace(/\\'/g, "'"));
   for (const m of readFileSync(f, 'utf8').matchAll(/return '([^']+)';/g)) if (f === 'lib/api.ts') apiKlice.add(m[1]);

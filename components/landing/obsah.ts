@@ -22,8 +22,35 @@ export const ZKUSIT_ZDARMA = 'Vyzkoušet {n, plural, one {# den} few {# dny} oth
 export const ZDARMA_VETA = 'Registrace bez karty. Tým do {n, plural, one {# člověka} other {# lidí}} může na tarifu Zdarma zůstat napořád.';
 
 export const HERO = {
-  h1: 'Směny, sklad a uzávěrka bez Excelu a bez WhatsAppu.',
-  podtitulek: 'Pod tímhle je skutečná aplikace. Klikej, nic nerozbiješ.',
+  h1: 'Provoz bez Excelu a bez WhatsAppu. A hosté s kartou v telefonu.',
+  podtitulek: 'Směny, sklad a uzávěrky pro tým, věrnostní karty a rezervace pro hosty. Pod tímhle je skutečná aplikace. Klikej, nic nerozbiješ.',
+};
+
+// ——— Volba na začátku: kam patříš ————————————————————————————
+// Dvě dlaždice nad ukázkou. Stejný účet (e-mail a heslo) platí pro správu
+// podniku i pro hostovskou část, ale přihlašují se do dvou různých míst.
+export const VOLBA = {
+  skupina: 'Vyber, kam patříš',
+  podnik: {
+    stitek: 'Mám podnik',
+    text: 'Směny, docházka, sklad a uzávěrky na jednom místě. Správa podniku a týmu.',
+    vedlejsi: 'Přihlásit do správy',
+  },
+  host: {
+    stitek: 'Chodím do podniku',
+    text: 'Věrnostní karty, odměny a rezervace v telefonu. Bez instalace.',
+    hlavni: 'Otevřít moje karty',
+    vedlejsi: 'Vytvořit účet hosta',
+  },
+  jedenUcet: 'Jeden účet: stejný e-mail a heslo platí pro správu podniku i pro karty.',
+};
+
+// ——— Přihlášení v liště ————————————————————————————————————
+export const PRIHLASENI = {
+  tlacitko: 'Přihlásit',
+  skupina: 'Kam se chceš přihlásit',
+  podnik: { nazev: 'Správa podniku', popis: 'Směny, sklad, uzávěrky a tým' },
+  host: { nazev: 'Moje karty a rezervace', popis: 'Věrnostní karty, odměny a stoly' },
 };
 
 // ——— Pro koho ——————————————————————————————————————————————
@@ -53,7 +80,7 @@ export const FUNKCE: Funkce[] = [
   { icon: 'calendar', title: 'Rozvrh a směny', scena: 'rozvrh',
     text: 'Generátor navrhne směny podle dostupnosti lidí. Kolizi uvidíš dřív, než rozvrh zveřejníš.' },
   { icon: 'clock', title: 'Docházka', scena: 'kiosk',
-    text: 'Příchod jedním klepnutím na telefonu nebo tabletu. Hodiny a mzdové náklady se sečtou samy.' },
+    text: 'Příchod jedním klepnutím na telefonu nebo tabletu. Hodiny, mzdové náklady i podklad pro výplaty se sečtou samy.' },
   { icon: 'coins', title: 'Uzávěrky', scena: 'uzaverka',
     text: 'Kasa po bankovkách. Rozdíl se nezamlčí ani nezaokrouhlí a dokud nejsou hotové povinné věci, uzávěrka zůstane zamčená.' },
   { icon: 'box', title: 'Sklad', scena: 'sklad',
@@ -61,16 +88,59 @@ export const FUNKCE: Funkce[] = [
   { icon: 'cup', title: 'Receptury',
     text: 'Cena receptury spočítaná ze surovin na gramy. Marži vidíš na první pohled.' },
   { icon: 'clipboard', title: 'Úkoly a postupy', scena: 'uzaverka',
-    text: 'Otevírání, zavírání a návody pro nováčky. Co je povinné, pohlídá aplikace za tebe.' },
+    text: 'Otevírání, zavírání a návody pro nováčky. Za splněné úkoly jsou body, u postupů se měří, jak dlouho trvají. Co je povinné, pohlídá aplikace za tebe.' },
+  { icon: 'award', title: 'Body, odměny a spropitné',
+    text: 'Tým sbírá body za úkoly a povedenou směnu a mění je za odměny. Bonusy navíc, tresty i spropitné po lidech jsou na jednom místě.' },
   { icon: 'chat', title: 'Týmový chat',
     text: 'Kanály, přímé zprávy a ankety. Důležitá věc nezapadne pod padesát zpráv ve skupině.' },
   { icon: 'play', title: 'Tablet u baru', scena: 'kiosk',
     text: 'Jeden sdílený tablet bez hesel. Klepnutí na jméno a každý zapisuje sám za sebe.' },
 ];
 
-export const FUNKCE_DALSI = 'A k tomu stránka pro hosty (menu přes QR, rezervace, věrnostní kartičky), akce a catering a finance s exportem pro účetní.';
+export const FUNKCE_DALSI = 'A k tomu finance s exportem pro účetní, výroba vlastních produktů (tarif Max), akce a catering, widgety na přehledu a rychlé hledání na Ctrl K. Pro hosty je Managero client, viz níž.';
 export const V_UKAZCE_VPRAVO = 'V ukázce vpravo: {scena}';
 export const UKAZ_V_UKAZCE = 'Ukaž v ukázce';
+
+// ——— Hosté: Managero client ———————————————————————————————————
+// Hostovská část Managera (tarif Max). Neslibuje se tu nic, co aplikace
+// neumí: žádné aplikace v obchodech, host ji otevře v prohlížeči.
+export const HOSTE = {
+  max: 'Tarif Max',
+  nadpis: 'Hosté mají kartu v telefonu. Ty víš, kdo se vrací.',
+  perex: 'Managero client je část pro hosty. Host si u tebe vytvoří věrnostní kartu, rezervuje stůl a objedná od stolu. Ty to spravuješ vedle směn a skladu.',
+  poznamka: 'Hostovská část patří do tarifu Max. Co je v kterém tarifu, najdeš v ceníku.',
+  ukazka: 'Vyzkoušet ukázku pro hosty',
+  cenik: 'Ceník a tarif Max',
+  seznam: 'Co hosté a ty dostanete',
+  karta: {
+    popis: 'Ukázka karty hosta: razítka, úroveň hosta, QR kód a přidání do Wallet',
+    nadpis: 'Věrnostní karta',
+    razitka: 'Razítka {hotovo}/{celkem}',
+    odmena: 'Odměna: káva zdarma',
+    uroven: 'Zlatý host',
+    qr: 'QR kód pro čtečku u kasy',
+    wallet: 'Přidat do Wallet',
+  },
+};
+
+export const HOSTE_FUNKCE: { icon: IconName; title: string; text: string }[] = [
+  { icon: 'card', title: 'Věrnostní karta',
+    text: 'Razítka nebo body, úrovně hostů (stříbrný, zlatý, platinový) a odměny. Karta je v telefonu a jde přidat do Apple nebo Google Wallet.' },
+  { icon: 'qr', title: 'QR kód u kasy',
+    text: 'Host ukáže QR kód, ty ho načteš čtečkou u kasy a razítko nebo body naskočí. Žádné kartičky v peněžence.' },
+  { icon: 'gift', title: 'Kupony a poukazy',
+    text: 'Slevové kupony a dárkové poukazy, které host uvidí v telefonu a uplatní u kasy.' },
+  { icon: 'calendarCheck', title: 'Rezervace a plán stolů',
+    text: 'Host si rezervuje stůl, ty potvrdíš nebo odmítneš. Stoly si rozložíš do plánu sálu.' },
+  { icon: 'cart', title: 'Menu a objednávka od stolu',
+    text: 'Menu přes QR kód a objednávka přímo od stolu. Objednávky ti chodí do přehledu.' },
+  { icon: 'chat', title: 'Zpětná vazba hostů',
+    text: 'Host ti po návštěvě napíše, jak se mu u tebe líbilo. Všechno vidíš na jednom místě.' },
+  { icon: 'bell', title: 'Kampaně a automatiky',
+    text: 'Nabídky a oznámení pro hosty a automatiky, které odměňují stálé hosty samy.' },
+  { icon: 'print', title: 'Karty z papíru i z plastu',
+    text: 'Papírové razítkové kartičky převedeš do aplikace a můžeš vydat i fyzické karty s QR kódem.' },
+];
 
 // ——— Jeden den s podnikem ———————————————————————————————————
 export interface Moment {
@@ -120,7 +190,7 @@ export const MISTO: { tema: string; dnes: string; managero: string }[] = [
 ];
 
 export const MISTO_PATA = {
-  hlavni: 'Nejsme pokladna. Managero řeší všechno kolem ní: lidi, sklad, receptury, uzávěrky a hosty. Tržby z pokladny Storyous se načtou samy (tarif Max).',
+  hlavni: 'Nejsme pokladna. Managero řeší všechno kolem ní: lidi, sklad, receptury, uzávěrky a hosty (Managero client, tarif Max). Tržby z pokladny Storyous se načtou samy (také tarif Max).',
   vedlejsi: 'Na vlastní výpočty je Excel pořád skvělý. Managero je na provoz.',
 };
 
@@ -200,6 +270,8 @@ export const FAQ: { q: string; a: string }[] = [
   { q: 'Je ukázka nahoře skutečná aplikace?', a: 'Ano, je to skutečná aplikace s vymyšlenými daty. Všechno, co v ní uděláš, zůstane jen v tvém prohlížeči a po obnovení stránky zmizí. Nic se neodesílá a nikdo jiný to neuvidí.' },
   { q: 'Potřebuju k vyzkoušení kartu?', a: 'Na tarifu Zdarma nikdy. Pro a Max zkoušíš {n, plural, one {# den} few {# dny} other {# dní}} zdarma: kartu zadáš až na konci registrace a první platba proběhne po zkušební době. Když předplatné do té doby zrušíš, nezaplatíš nic.' },
   { q: 'Jak se připojí zaměstnanci?', a: 'Jedním kódem nebo pozvánkou e-mailem. Připojí se z telefonu a hned vidí svůj rozvrh. Nic se neinstaluje, je to webová aplikace, kterou si jde připnout na plochu.' },
+  { q: 'Co je Managero client?', a: 'Hostovská část Managera: věrnostní karta, kupony, rezervace, menu a objednávka od stolu. Patří do tarifu Max. Host ji otevře v prohlížeči a kartu si může přidat do Apple nebo Google Wallet, nic neinstaluje. Vyzkoušet ji můžeš v ukázce pro hosty.' },
+  { q: 'Je aplikace i v jiných jazycích?', a: 'Ano: česky, anglicky, německy, slovensky a polsky. Stránka i aplikace se nastaví podle jazyka prohlížeče a jazyk jde kdykoli přepnout.' },
   { q: 'Funguje to na telefonu?', a: 'Ano, celá aplikace je stavěná pro telefon, tablet i počítač. Na tablet u baru je zvláštní režim s velkými tlačítky.' },
   { q: 'Máme ceny v eurech.', a: 'Měnu podniku si zvolíš a všechno (menu, uzávěrky, přehledy) počítá v ní. Host vidí ceny v měně podniku.' },
   { q: 'Co se stane po zkušební době?', a: 'Předplatné se samo spustí, nebo ho zrušíš a zůstaneš na tarifu Zdarma s menším týmem. Data zůstávají tvoje.' },
@@ -216,7 +288,7 @@ export const ZAVER = {
 };
 
 export const PATICKA = {
-  popis: 'Provoz podniku na jednom místě: směny, docházka, uzávěrky, sklad, receptury, úkoly, chat a stránka pro hosty.',
+  popis: 'Provoz podniku na jednom místě: směny, docházka, uzávěrky, sklad, receptury, úkoly, chat a věrnostní program pro hosty (Managero client).',
   naStrance: 'Na stránce',
   poctivost: 'Obrazovky, ukázka i nahrávky na této stránce jsou ze skutečné aplikace. Data v nich jsou vymyšlená a nepatří žádnému podniku ani zákazníkovi.',
 };
@@ -224,6 +296,7 @@ export const PATICKA = {
 export const NAVIGACE: { id: string; label: string; dlouze?: string }[] = [
   { id: 'ukazka-okno', label: 'Ukázka' },
   { id: 'funkce', label: 'Co umí' },
+  { id: 'hoste', label: 'Pro hosty' },
   { id: 'den', label: 'Jeden den', dlouze: 'Jeden den s Managerem' },
   { id: 'zacatek', label: 'Jak začít' },
   { id: 'cenik', label: 'Ceník' },
@@ -233,6 +306,8 @@ export const NAVIGACE: { id: string; label: string; dlouze?: string }[] = [
 /** Všechny texty souboru pro kontrolu překladů (scripts/check-i18n.mjs). */
 export function vsechnyTexty(): string[] {
   const out: string[] = [ZKUSIT_ZDARMA, ZDARMA_VETA, FUNKCE_DALSI, V_UKAZCE_VPRAVO, UKAZ_V_UKAZCE, ...TYPY_PODNIKU];
+  const plocha = (v: unknown): string[] => typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(plocha) : v && typeof v === 'object' ? Object.values(v).flatMap(plocha) : [];
+  out.push(...plocha(VOLBA), ...plocha(PRIHLASENI), ...plocha(HOSTE), ...HOSTE_FUNKCE.flatMap(f => [f.title, f.text]));
   const objekty = [HERO, PRO_KOHO, FUNKCE_NADPIS, DEN_NADPIS, MISTO_NADPIS, MISTO_PATA, ZACATEK_NADPIS, MINI, JISTOTY_NADPIS, FAQ_NADPIS, ZAVER, PATICKA];
   for (const o of objekty) out.push(...Object.values(o));
   for (const [k, v] of Object.entries(MINI_JISTOTY)) if (k !== 'soubory') out.push(...(Array.isArray(v) ? v : [v]));

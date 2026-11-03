@@ -8,6 +8,7 @@ import { planInfoOf, canAddMember, MEMBER_LIMIT_MSG } from '@/lib/plan';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { smiPriraditRoli } from '@/lib/opravneni';
 import { audit } from '@/lib/audit';
+import { chybiSloupec } from '@/lib/dveStrany';
 import { vychoziRolePodniku, typUctu, zapisRoliClenstvi } from '../teams/_role';
 
 export const dynamic = 'force-dynamic';
@@ -69,17 +70,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Chybí jméno, e-mail nebo heslo' }, { status: 400 });
   }
 
-  const [existing] = await sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`;
+  const [existing] = await sql`SELECT id, role FROM users WHERE lower(email) = ${email} ORDER BY (role = 'customer') LIMIT 1`;
+  if (existing?.role === 'customer') {
+    // Host v Managero client má vlastní heslo; účet za něj vedení nezaloží
+    // (heslo musí být jedno, lib/dveStrany). Pozvánku přijme svým heslem.
+    return NextResponse.json({ error: 'Tenhle e-mail už používá host v Managero client. Pošlete mu pozvánku do týmu, přijme ji svým heslem.' }, { status: 409 });
+  }
   if (existing) return NextResponse.json({ error: 'Účet s tímto e-mailem už existuje' }, { status: 409 });
 
   const passwordHash = await bcrypt.hash(String(password), 10);
   // Role je vždy výchozí role podniku (bez nastavení Barista) — Vedení tudy
   // vzniknout nemůže, výchozí role nesmí nést nic citlivého (smiBytVychozi).
-  const [newUser] = await sql`
-    INSERT INTO users (name, email, password_hash, role, avatar, phone, job_title, employer_id, team_id)
-    VALUES (${name}, ${email}, ${passwordHash}, ${ucet}, ${avatar ?? '👤'}, ${phone ?? null},
-            ${jobTitle ?? 'Barista'}, ${c.meId}, ${c.teamId})
-    RETURNING id, name, email`;
+  // Heslo zná vedoucí, takže se účet nepáruje s hostovskou stranou (lib/dveStrany).
+  let newUser: any;
+  try {
+    [newUser] = await sql`
+      INSERT INTO users (name, email, password_hash, role, avatar, phone, job_title, employer_id, team_id, heslo_od_spravce)
+      VALUES (${name}, ${email}, ${passwordHash}, ${ucet}, ${avatar ?? '👤'}, ${phone ?? null},
+              ${jobTitle ?? 'Barista'}, ${c.meId}, ${c.teamId}, true)
+      RETURNING id, name, email`;
+  } catch (e) {
+    if (!chybiSloupec(e)) throw e;
+    // Před migrací sloupec chybí; lib/dveStrany pak zaměstnance nepáruje podle role.
+    [newUser] = await sql`
+      INSERT INTO users (name, email, password_hash, role, avatar, phone, job_title, employer_id, team_id)
+      VALUES (${name}, ${email}, ${passwordHash}, ${ucet}, ${avatar ?? '👤'}, ${phone ?? null},
+              ${jobTitle ?? 'Barista'}, ${c.meId}, ${c.teamId})
+      RETURNING id, name, email`;
+  }
   // Členství hned při založení — ne až při prvním přihlášení (kolo 62):
   // sazbu, kterou vedení nastaví ještě před ním, má členství nést.
   try {

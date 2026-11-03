@@ -273,7 +273,7 @@ export async function aktivujKartu(teamId: number, staffId: number, kodRaw: stri
  */
 export async function zalozHostaBezAplikace(teamId: number, staffId: number, h: NovyHost): Promise<Vysledek<{ host: { id: number; name: string } }>> {
   if (h.email) {
-    const [ex] = await sql`SELECT id FROM users WHERE lower(email) = ${h.email}`;
+    const [ex] = await sql`SELECT id FROM users WHERE lower(email) = ${h.email} AND role = 'customer'`;
     if (ex) return { ok: false, status: 409, chyba: 'S tímhle e-mailem už účet je. Vyhledej hosta podle e-mailu.' };
   }
   const hash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10);

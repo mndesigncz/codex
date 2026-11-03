@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { hesloProDruhouStranu } from '@/lib/dveStrany';
 import { neon } from '@neondatabase/serverless';
 import { normalizujEmail } from '@/lib/emailAdresa';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
@@ -72,7 +73,9 @@ export async function POST(request: Request) {
     // znovu (e-mail je unikátní) a nevrací se 409. Přesně tohle je majitel
     // druhé kavárny nebo barista, který jezdí mezi pobočkami. Heslo se
     // ověřuje, aby pozvánka v cizí schránce nešla přijmout za někoho jiného.
-    const [existing] = await sql`SELECT id, name, password_hash FROM users WHERE lower(email) = ${normalizujEmail(inv.email)} ORDER BY id LIMIT 1`;
+    // Jen účty provozu: hostovský účet téže adresy se nepřidává do týmu, vedle
+    // něj vznikne druhá strana se stejným heslem (lib/dveStrany).
+    const [existing] = await sql`SELECT id, name, password_hash FROM users WHERE lower(email) = ${normalizujEmail(inv.email)} AND role <> 'customer' ORDER BY id LIMIT 1`;
     if (existing) {
       const ok = await bcrypt.compare(password, String(existing.password_hash ?? ''));
       if (!ok) return NextResponse.json({ error: 'Účet s tímhle e-mailem už existuje — zadej jeho heslo.' }, { status: 409 });
@@ -107,17 +110,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, user: { id: existing.id, name: existing.name, email: inv.email }, existingAccount: true });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const otiskDruhe = await hesloProDruhouStranu(normalizujEmail(inv.email), 'podnik', password);
+    if (otiskDruhe === false) return NextResponse.json({ error: 'Účet s tímhle e-mailem už existuje — zadej jeho heslo.' }, { status: 409 });
+    const passwordHash = otiskDruhe ?? await bcrypt.hash(password, 12);
     const nova = await roleZPozvanky(inv, Number(team.id));
     const newRole = typUctu(nova);
 
     if (await memberLimitHit(sql, inv.team_id)) {
       return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
     }
-    const [user] = await sql`
-      INSERT INTO users (name, email, password_hash, role, avatar, job_title, team_id, employer_id)
-      VALUES (${name}, ${normalizujEmail(inv.email)}, ${passwordHash}, ${newRole}, '👤', ${inv.job_title || 'Barista'}, ${team.id}, ${team.owner_id})
-      RETURNING id, name, email, role`;
+    let user: any;
+    try {
+      [user] = await sql`
+        INSERT INTO users (name, email, password_hash, role, avatar, job_title, team_id, employer_id)
+        VALUES (${name}, ${normalizujEmail(inv.email)}, ${passwordHash}, ${newRole}, '👤', ${inv.job_title || 'Barista'}, ${team.id}, ${team.owner_id})
+        RETURNING id, name, email, role`;
+    } catch (e: any) {
+      // Souběžné přijetí téže pozvánky narazí na unikát (users_email_strana).
+      if (e?.code === '23505') return NextResponse.json({ error: 'Účet s tímhle e-mailem už existuje — zadej jeho heslo.' }, { status: 409 });
+      throw e;
+    }
 
     await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;
     await zapisSouhlas(Number(user.id));

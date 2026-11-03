@@ -1,5 +1,6 @@
 import { NextResponse, after } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { hesloProDruhouStranu, HLASKA_JINE_HESLO } from '@/lib/dveStrany';
 import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from '@/lib/team';
 import { hit } from '@/lib/rateLimit';
@@ -47,12 +48,16 @@ export async function POST(request: Request) {
 
     // Hledá se bez ohledu na velikost písmen, ať se neobejde ani účet, který
     // vznikl dřív než sjednocení e-mailů.
-    const existing = await sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`;
+    // Hostovský účet (Managero client) registraci nebrání: majitel bývá i hostem
+    // jinde. Nový účet podniku pak převezme jeho heslo (lib/dveStrany).
+    const existing = await sql`SELECT id FROM users WHERE lower(email) = ${email} AND role <> 'customer' LIMIT 1`;
     if (existing.length > 0) {
       return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
     }
+    const otiskDruhe = await hesloProDruhouStranu(email, 'podnik', password);
+    if (otiskDruhe === false) return NextResponse.json({ error: HLASKA_JINE_HESLO }, { status: 409 });
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = otiskDruhe ?? await bcrypt.hash(password, 12);
 
     // Create the employer account. Dvě souběžné registrace téhož e-mailu
     // projdou kontrolou výš obě; unikát v databázi rozhodne a druhá dostane

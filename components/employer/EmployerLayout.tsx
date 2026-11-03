@@ -44,6 +44,8 @@ import { JAZYK_NAZEV } from '@/lib/i18n/config';
 import JazykOkno from '../JazykOkno';
 import { Chip } from '../ui';
 import { PotvrditEmailBanner } from '../auth/OvereniEmailu';
+import { useDruhaStrana } from '@/lib/dveStranyKlient';
+import Toast from '../ui/Toast';
 
 // Pohledy se stahují až při otevření.
 //
@@ -143,6 +145,11 @@ export default function EmployerLayout({ user }: Props) {
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
   const t = useT('sprava');
   const { jazyk } = useJazyk();
+  // Majitel bývá i hostem jiných podniků: jeden účet, přepínač na jeho karty a rezervace.
+  const druhaStrana = useDruhaStrana();
+  const polozkaHosta = druhaStrana.druha === 'host'
+    ? [{ label: druhaStrana.busy ? t('Načítání…') : t('Moje karty a rezervace'), icon: 'card', onClick: () => { void druhaStrana.prepnout(); } }]
+    : [];
   // Navigace podle oprávnění (první) a nastavení podniku (skrýt, přejmenovat, pořadí).
   const nav = useNavigaceAplikace('vedeni', smiPohled, [opravneni, nacteno]);
   const [jazykOpen, setJazykOpen] = useState(false);
@@ -370,6 +377,7 @@ export default function EmployerLayout({ user }: Props) {
     ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => { setAccountOpen(false); switchMode('client'); } }] : []),
     // Endonym v popisku: kdo se ocitne v cizím jazyce, pozná cestu zpět.
     { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setAccountOpen(false); setJazykOpen(true); } },
+    ...polozkaHosta,
   ];
   // Prvek, ne komponenta: `const AccountMenu = () => …` by byl při každém
   // překreslení layoutu (tik chatu každých 8 s) nový typ a React by panel
@@ -421,6 +429,7 @@ export default function EmployerLayout({ user }: Props) {
         { label: t('Nastavení'), icon: 'settings', onClick: () => doAdministrace(openSettings) },
         ...(smiTym ? [{ label: t('Tým'), icon: 'users', onClick: () => doAdministrace(openTeam) }] : []),
         ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => switchMode('client') }] : []),
+        ...polozkaHosta,
         { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
       ],
     };
@@ -653,9 +662,11 @@ export default function EmployerLayout({ user }: Props) {
           // Správce platformy podle prostředí (SUPERADMIN_USER_IDS), ne podle role.
           ...(user.superadmin ? [{ label: t('Správa platformy'), icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),
           ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } }] : []),
+          ...polozkaHosta,
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
+      <Toast message={druhaStrana.chyba ? t(druhaStrana.chyba) : null} tone="bad" onClose={druhaStrana.zrusChybu} />
       {/* Cíl hledání jde stejnou cestou jako proklik z widgetu: záložky Managero client („klient:customers") i pohledy administrace. */}
       <HledaniVedeni otevreno={hledaniOtevreno} zavrit={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('vedeni', smiPohled)} onStranka={navigujZWidgetu}
         ukoly={smiPohled('tasks')} sklad={smiPohled('inventory')} lide={ma('tym.profil')} navody={smiPohled('guides')} postupy={smiPohled('procedures')}

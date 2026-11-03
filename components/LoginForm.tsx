@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { LogoMark } from './Icons';
+import { Icon, LogoMark } from './Icons';
+import { useObal } from './ObalProvider';
 import PravniOdkazy from './pravni/PravniOdkazy';
 import { HLASKA_ROLE_V_PROVOZU } from '@/lib/obal';
 import { navratPoPrihlaseni } from '@/lib/navratPoPrihlaseni';
+import { kamPoPrihlaseni } from '@/lib/dveStranyKlient';
 
 import { Button } from './ui';
 import JazykMenu from './ui/JazykMenu';
@@ -24,6 +26,7 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { jeObal } = useObal();
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get('registered') === '1';
 
@@ -32,13 +35,16 @@ export default function LoginForm() {
     setError('');
     setIsLoading(true);
     try {
-      const result = await signIn('credentials', { email, password, redirect: false });
+      const result = await signIn('credentials', { email, password, strana: 'podnik', redirect: false });
       // OBAL_ROLE vrací server jen po správném hesle: účet hosta v aplikaci pro podniky.
       if (result?.error) setError(result.error === 'OBAL_ROLE' ? HLASKA_ROLE_V_PROVOZU : t('Nesprávný email nebo heslo.'));
       else {
         // Návrat tam, odkud přihlášení přišlo (odkaz na zálohu, pozvánka, e-mail):
         // jen místní cesta, cizí adresa skončí na úvodu (lib/navratPoPrihlaseni).
-        const kam = navratPoPrihlaseni(searchParams.get('callbackUrl') ?? searchParams.get('next'), window.location.origin);
+        const odkud = searchParams.get('callbackUrl') ?? searchParams.get('next');
+        const navrat = navratPoPrihlaseni(odkud, window.location.origin);
+        // Účet s oběma stranami se poprvé zeptá „Kam teď?“ (lib/dveStranyKlient).
+        const kam = await kamPoPrihlaseni(navrat, navrat !== '/');
         // Odkaz na zálohu je stránka z API (HTML ze serveru), ne stránka aplikace: plné načtení.
         if (kam.startsWith('/api/')) window.location.assign(kam);
         else { router.push(kam); router.refresh(); }
@@ -92,6 +98,7 @@ export default function LoginForm() {
           </div>
 
           {/* Audit L04: „Přihlásit se" byl nadpis i tlačítko pod ním; nadpis teď vítá. */}
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45 mb-3">{t('Správa podniku')}</p>
           <h1 className="t-page">{t('Vítej zpátky')}</h1>
           <p className="text-[15px] text-black/60 mt-2 mb-8">{t('Přihlas se e-mailem a heslem.')}</p>
 
@@ -123,6 +130,19 @@ export default function LoginForm() {
               {t('Přihlásit se')}
             </Button>
           </form>
+
+          {/* Hosté mají vlastní vchod (Managero client). Jeden účet může mít obě strany,
+              ale kdo hledá svou kartu, má to vědět hned tady. V obalu pro podniky host nemá co dělat. */}
+          {!jeObal && (
+            <Link href="/client/login" className="mt-6 flex items-center gap-3 rounded-2xl border border-black/[0.08] p-3.5 transition-colors hover:bg-black/[0.03]">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C8F542] text-[#16181A]"><Icon name="card" size={19} /></span>
+              <span className="grid text-sm text-left">
+                <span className="font-semibold text-[#16181A]">{t('Chodíš do podniku jako host?')}</span>
+                <span className="text-black/55 text-pretty">{t('Věrnostní karty a rezervace najdeš v Managero client.')}</span>
+              </span>
+              <Icon name="chevronRight" size={16} className="ml-auto shrink-0 opacity-40" />
+            </Link>
+          )}
 
           <div className="mt-8 pt-6 border-t border-black/[0.07] space-y-2 text-center text-sm">
             <p className="text-black/60">{t('Provozuješ podnik?')} <Link href="/register" className="tap-target-sm inline-flex items-center text-[#16181A] underline-offset-2 hover:underline font-semibold">{t('Vytvořit účet')}</Link></p>

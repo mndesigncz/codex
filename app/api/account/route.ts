@@ -8,6 +8,7 @@ import { smazUcet, hesloSedi } from '@/lib/smazaniUctuDb';
 import { cistyJazyk } from '@/lib/i18n/config';
 import { cistePrefsUctu } from '@/lib/nastaveniUcet';
 import { zvysVerziRelace, ponechSoucasneZarizeni } from '@/lib/authRelace';
+import { dvojnik, nastavHeslo } from '@/lib/dveStrany';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,12 +82,17 @@ export async function PATCH(request: Request) {
     if (!valid) {
       return NextResponse.json({ error: 'Současné heslo není správné.' }, { status: 400 });
     }
+    // Heslo je jedno pro obě strany účtu (lib/dveStrany). Dvojník se hledá před
+    // změnou (pozná se podle stejného hesla) a obě strany se mění jedním příkazem.
+    // Příznak „heslo od vedoucího“ tu nezmizí: změnit heslo mohl i vedoucí, když ho znal.
+    const d = await dvojnik(id);
     const hash = await bcrypt.hash(newPassword, 10);
-    await sql`UPDATE users SET password_hash = ${hash} WHERE id = ${id}`;
+    await nastavHeslo(d ? [id, d.id] : [id], hash, false);
     // Ostatní zařízení se odhlásí (nová verze relace), tohle zůstane přihlášené
     // s přepsanou cookie (lib/authRelace). Bez sloupce se jen změní heslo.
     const verze = await zvysVerziRelace(id);
     const ponechano = verze != null ? await ponechSoucasneZarizeni(verze) : true;
+    if (d) await zvysVerziRelace(d.id);
     return NextResponse.json({ ok: true, message: 'Heslo bylo změněno.', odhlasenoJinde: verze != null, ponechano });
   }
 
