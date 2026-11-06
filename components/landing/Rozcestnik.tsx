@@ -1,46 +1,98 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Icon, LogoMark } from '@/components/Icons';
 import { useT } from '@/lib/i18n/client';
 import { COOKIE_ROZCESTNIK, ROZCESTNIK } from './obsah';
 
-// Rozcestník: první obrazovka prodejní stránky, rozdělená napůl. Vlevo podnik
-// (inkoust, limetka), vpravo zákazník (papír). Zákazník odchází rovnou na své
-// karty; podnik „otevře dveře“: poloviny odjedou do stran a pod nimi je
-// prodejní stránka. Volba podniku platí do zavření prohlížeče (cookie bez
-// max-age), app/page.tsx pak rozcestník nevykreslí.
+// Rozcestník: samostatná první obrazovka přes celé okno, rozdělená napůl. Vlevo
+// podnik (inkoust, limetka), vpravo zákazník (papír), každá polovina s fotkou,
+// která se prolíná do barvy poloviny. Dolů se z něj sjet nedá: stránka pod ním
+// stojí (overflow v landing.css) a je inert, dokud si návštěvník nevybere.
 //
-// V toku stránky, ne překryv: kdo místo volby sroluje dolů, prostě pokračuje
-// na stránku pro podniky. Odkaz s kotvou (#cenik…) ho skryje už před
-// vykreslením (skript v components/Landing.tsx).
+// Volba se chová jako přechod na jinou stránku:
+// - Zákazník: polovina se roztáhne přes celé okno a odejde se na /client/login.
+// - Podnik: poloviny odjedou do stran jako dveře, adresa se změní na /?pro=podnik
+//   (záznam v historii), takže tlačítko Zpět vrátí rozcestník. Volba platí do
+//   zavření prohlížeče (cookie bez max-age), app/page.tsx pak rozcestník nevykreslí.
+// Odkaz s kotvou (#cenik…) rozcestník skryje už před vykreslením (skript
+// v components/Landing.tsx).
+type Odchod = 'podnik' | 'host' | null;
+
 export default function Rozcestnik() {
   const t = useT('landing');
-  const [odchazi, setOdchazi] = useState(false);
+  const router = useRouter();
+  const ref = useRef<HTMLElement>(null);
+  const [odchod, setOdchod] = useState<Odchod>(null);
   const [pryc, setPryc] = useState(false);
 
-  function otevritPodnik() {
-    if (odchazi) return;
+  const klidne = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Podnik: dveře se otevřou a pod nimi už čeká prodejní stránka.
+  function doPodniku(zapsat: boolean) {
     document.cookie = `${COOKIE_ROZCESTNIK}=podnik; path=/; samesite=lax`;
-    const klidne = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    // Rozcestník se z toku vyjme (fixed na místě) a stránka skočí nahoru, takže
-    // pod odjíždějícími polovinami už čeká hero.
+    if (zapsat) window.history.pushState(null, '', '/?pro=podnik');
     window.scrollTo(0, 0);
-    setOdchazi(true);
+    setOdchod('podnik');
     window.setTimeout(() => {
       setPryc(true);
       document.getElementById('nadpis-hero')?.focus({ preventScroll: true });
-    }, klidne ? 160 : 760);
+    }, klidne() ? 160 : 760);
   }
+
+  function zpetNaRozcestnik() {
+    document.cookie = `${COOKIE_ROZCESTNIK}=; path=/; max-age=0; samesite=lax`;
+    window.scrollTo(0, 0);
+    setOdchod(null);
+    setPryc(false);
+  }
+
+  // Zákazník: polovina zabere celé okno, pak se přejde na jeho přihlášení.
+  // Klik s modifikátorem (nová karta) nechá prohlížeči.
+  function doKaret(e: MouseEvent<HTMLAnchorElement>) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    if (odchod) return;
+    setOdchod('host');
+    window.setTimeout(() => router.push('/client/login'), klidne() ? 0 : 560);
+  }
+
+  // Zpět / Vpřed mezi rozcestníkem (/) a stránkou pro podniky (/?pro=podnik).
+  useEffect(() => {
+    const naHistorii = () => {
+      if (new URLSearchParams(window.location.search).has('pro')) doPodniku(false);
+      else zpetNaRozcestnik();
+    };
+    window.addEventListener('popstate', naHistorii);
+    return () => window.removeEventListener('popstate', naHistorii);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Přišel odkazem s kotvou: rozcestník je skrytý, stránka pod ním musí žít.
+  useEffect(() => {
+    if (document.documentElement.dataset.bezRozcestniku !== undefined) setPryc(true);
+  }, []);
+
+  // Dokud rozcestník stojí, stránka pod ním je inert: Tab ani čtečka do ní nespadnou.
+  useEffect(() => {
+    const el = ref.current;
+    if (pryc || !el?.parentElement) return;
+    const sousede = Array.from(el.parentElement.children).filter((s): s is HTMLElement => s !== el && s instanceof HTMLElement && s.tagName !== 'SCRIPT');
+    sousede.forEach((s) => (s.inert = true));
+    return () => sousede.forEach((s) => (s.inert = false));
+  }, [pryc]);
 
   if (pryc) return null;
 
   return (
-    <section className="ld-rozc" data-odchazi={odchazi ? 'true' : undefined} aria-labelledby="rozc-nadpis">
+    <section ref={ref} className="ld-rozc" data-odchazi={odchod ?? undefined} aria-labelledby="rozc-nadpis">
       <h2 id="rozc-nadpis" className="sr-only">{t(ROZCESTNIK.skupina)}</h2>
 
       <div className="ld-rozc-pul ld-rozc-podnik">
+        <Foto src="/brand/landing/v2/majitel.webp" />
         <div className="ld-rozc-hlava">
           <span className="flex items-center gap-2.5">
             <LogoMark size={32} />
@@ -53,7 +105,7 @@ export default function Rozcestnik() {
           <h3 className="ld-rozc-nadpis">{t(ROZCESTNIK.podnik.nadpis)}</h3>
           <p className="ld-rozc-text">{t(ROZCESTNIK.podnik.text)}</p>
           <div className="ld-rozc-akce">
-            <button type="button" onClick={otevritPodnik} className="ld-btn ld-rozc-hlavni ld-rozc-roztazeny">
+            <button type="button" onClick={() => !odchod && doPodniku(true)} className="ld-btn ld-rozc-hlavni ld-rozc-roztazeny">
               {t(ROZCESTNIK.podnik.hlavni)} <Icon name="chevron" size={15} className="ld-sipka -rotate-90" aria-hidden />
             </button>
             <Link href="/login" className="ld-btn ld-btn-obrys ld-rozc-nad">{t(ROZCESTNIK.podnik.vedlejsi)}</Link>
@@ -62,6 +114,7 @@ export default function Rozcestnik() {
       </div>
 
       <div className="ld-rozc-pul ld-rozc-host">
+        <Foto src="/brand/hero-counter.webp" />
         {/* Prázdná hlava, aby obě ilustrace začínaly ve stejné výšce. */}
         <div className="ld-rozc-hlava" aria-hidden />
         <KartaNahled />
@@ -70,7 +123,7 @@ export default function Rozcestnik() {
           <h3 className="ld-rozc-nadpis">{t(ROZCESTNIK.host.nadpis)}</h3>
           <p className="ld-rozc-text">{t(ROZCESTNIK.host.text)}</p>
           <div className="ld-rozc-akce">
-            <Link href="/client/login" className="ld-btn ld-rozc-hlavni ld-rozc-roztazeny">
+            <Link href="/client/login" onClick={doKaret} className="ld-btn ld-rozc-hlavni ld-rozc-roztazeny">
               {t(ROZCESTNIK.host.hlavni)} <Icon name="chevron" size={15} className="ld-sipka -rotate-90" aria-hidden />
             </Link>
             <Link href="/client/register" className="ld-btn ld-btn-obrys ld-rozc-nad">{t(ROZCESTNIK.host.vedlejsi)}</Link>
@@ -80,6 +133,18 @@ export default function Rozcestnik() {
 
       <p className="ld-rozc-pozn">{t(ROZCESTNIK.jedenUcet)}</p>
     </section>
+  );
+}
+
+// Fotka pozadí poloviny a závoj, který ji prolne do barvy poloviny. Obojí leží
+// přímo v .ld-rozc-pul pod obsahem (z-index v landing.css); mezi tlačítkem
+// a polovinou tak nepřibude nic s position, co by sebralo roztažený odkaz.
+function Foto({ src }: { src: string }) {
+  return (
+    <>
+      <Image src={src} alt="" fill priority sizes="(min-width: 768px) 60vw, 100vw" className="ld-rozc-foto" />
+      <span className="ld-rozc-zavoj" aria-hidden />
+    </>
   );
 }
 

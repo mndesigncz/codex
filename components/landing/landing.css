@@ -520,23 +520,29 @@ html:has(.ld-root) body::after { display: none; }
    sebou. Odchod podniku: rozcestník se vyjme z toku (fixed) a poloviny
    odjedou do stran jako dveře. */
 .ld-rozc {
-  position: relative; display: flex; flex-direction: column;
-  min-height: 100svh;
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
+  height: 100vh; height: 100dvh;
+  /* Dolů na stránku se nesjede; vlastní posun jen když se obsah do okna nevejde. */
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  background: #16181A;
 }
-@media (min-width: 768px) { .ld-rozc { flex-direction: row; height: 100svh; min-height: 36rem; } }
+@media (min-width: 768px) { .ld-rozc { flex-direction: row; } }
 :root[data-bez-rozcestniku] .ld-rozc { display: none; }
+/* Stránka pod rozcestníkem stojí, dokud se neotevřou dveře do podniku. */
+:root:not([data-bez-rozcestniku]):has(.ld-rozc:not([data-odchazi="podnik"])),
+:root:not([data-bez-rozcestniku]):has(.ld-rozc:not([data-odchazi="podnik"])) body { overflow: hidden; }
 
 .ld-rozc-pul {
   position: relative; flex: 1 1 0; min-width: 0;
   display: flex; flex-direction: column; justify-content: space-between; gap: 2rem;
-  min-height: 50svh;
+  min-height: min-content;
   padding: clamp(1.25rem, 4vw, 3.5rem) var(--ld-okraj);
   padding-bottom: clamp(2rem, 5vw, 4.5rem);
   background: rgb(var(--ld-bg)); color: rgb(var(--ld-fg));
   overflow: hidden; isolation: isolate;
 }
 @media (min-width: 768px) {
-  .ld-rozc-pul { min-height: 0; padding-bottom: clamp(4rem, 8vh, 6rem); }
+  .ld-rozc-pul { padding-bottom: clamp(4rem, 8vh, 6rem); }
   .ld-rozc-pul { transition: flex-grow 700ms var(--ld-ease); }
   @media (hover: hover) { .ld-rozc-pul:hover { flex-grow: 1.22; } }
 }
@@ -546,6 +552,28 @@ html:has(.ld-root) body::after { display: none; }
   --ld-ink: rgb(var(--ld-bg)); --ld-papir: rgb(var(--ld-fg));
   --ld-text-2: rgb(var(--ld-fg) / 0.66); --ld-text-3: rgb(var(--ld-fg) / 0.5);
   --ld-linka: rgb(var(--ld-fg) / 0.1); --ld-linka-2: rgb(var(--ld-fg) / 0.18);
+}
+
+/* Fotka pozadí a závoj, který ji prolne do barvy poloviny: nahoře je fotka
+   vidět, k textu dole houstne do plné barvy. Oboje pod obsahem (záporný
+   z-index uvnitř isolation: isolate poloviny). */
+.ld-rozc-pul > .ld-rozc-foto { z-index: -2; object-fit: cover; object-position: center 35%; }
+.ld-rozc-podnik > .ld-rozc-foto { filter: saturate(0.85); }
+.ld-rozc-zavoj { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.ld-rozc-podnik .ld-rozc-zavoj {
+  background:
+    linear-gradient(to top, rgb(var(--ld-bg)) 0%, rgb(var(--ld-bg)) 26%, rgb(var(--ld-bg) / 0.78) 52%, rgb(var(--ld-bg) / 0.4) 78%, rgb(var(--ld-bg) / 0.55) 100%),
+    linear-gradient(to left, rgb(var(--ld-bg) / 0.35), transparent 40%);
+}
+.ld-rozc-host .ld-rozc-zavoj {
+  background:
+    linear-gradient(to top, rgb(var(--ld-bg)) 0%, rgb(var(--ld-bg)) 26%, rgb(var(--ld-bg) / 0.72) 48%, rgb(var(--ld-bg) / 0.16) 78%, rgb(var(--ld-bg) / 0.24) 100%),
+    linear-gradient(to right, rgb(var(--ld-bg) / 0.35), transparent 40%);
+}
+@media (max-width: 767px) {
+  .ld-rozc-podnik .ld-rozc-zavoj, .ld-rozc-host .ld-rozc-zavoj {
+    background: linear-gradient(to top, rgb(var(--ld-bg)) 0%, rgb(var(--ld-bg)) 40%, rgb(var(--ld-bg) / 0.7) 75%, rgb(var(--ld-bg) / 0.55) 100%);
+  }
 }
 
 .ld-rozc-hlava { position: relative; z-index: 2; display: flex; align-items: center; height: 2.5rem; }
@@ -618,25 +646,40 @@ html:has(.ld-root) body::after { display: none; }
   .ld-rozc-vizual > span { animation-name: ld-rozc-bod; animation-duration: 500ms; animation-delay: calc(200ms + var(--i) * 22ms); }
   .ld-rozc-pul:hover .ld-rozc-vizual { transform: translateY(-4px); }
   .ld-rozc-vizual { transition: transform 600ms var(--ld-ease); }
+  /* Fotka se pomalu rozsvítí a usadí; pod myší se lehce přiblíží. */
+  .ld-rozc-pul > .ld-rozc-foto { animation: ld-rozc-foto 1400ms var(--ld-ease) backwards; transition: transform 1200ms var(--ld-ease); }
+  .ld-rozc-host > .ld-rozc-foto { animation-delay: 120ms; }
+  @media (hover: hover) { .ld-rozc-pul:hover > .ld-rozc-foto { transform: scale(1.035); } }
 }
+@keyframes ld-rozc-foto { from { opacity: 0; transform: scale(1.08); } }
 @keyframes ld-rozc-vstup { from { opacity: 0; transform: translateY(14px); } }
 @keyframes ld-rozc-prolnuti { from { opacity: 0; } }
 @keyframes ld-rozc-bod { from { opacity: 0; transform: scale(0.6); } }
 
-/* Odchod do stránky pro podniky. */
-.ld-rozc[data-odchazi] { position: fixed; inset: 0; z-index: 60; height: 100svh; min-height: 0; pointer-events: none; }
+/* Odchod. Podnik: poloviny odjedou do stran jako dveře a pod nimi je prodejní
+   stránka. Zákazník: jeho polovina zabere celé okno (na telefonu ho zalije
+   papír) a přejde se na /client/login. */
+.ld-rozc[data-odchazi] { pointer-events: none; overflow: hidden; }
 .ld-rozc[data-odchazi] .ld-rozc-pozn { opacity: 0; transition: opacity 200ms ease; }
+.ld-rozc[data-odchazi="podnik"] { background: transparent; }
 @media (prefers-reduced-motion: no-preference) {
-  .ld-rozc[data-odchazi] .ld-rozc-pul { transition: transform 720ms cubic-bezier(0.7, 0, 0.2, 1), flex-grow 0ms; }
-  .ld-rozc[data-odchazi] .ld-rozc-podnik { transform: translateX(-100%); }
-  .ld-rozc[data-odchazi] .ld-rozc-host { transform: translateX(100%); }
+  .ld-rozc[data-odchazi="podnik"] .ld-rozc-pul { transition: transform 720ms cubic-bezier(0.7, 0, 0.2, 1), flex-grow 0ms; }
+  .ld-rozc[data-odchazi="podnik"] .ld-rozc-podnik { transform: translateX(-100%); }
+  .ld-rozc[data-odchazi="podnik"] .ld-rozc-host { transform: translateX(100%); }
   @media (max-width: 767px) {
-    .ld-rozc[data-odchazi] .ld-rozc-podnik { transform: translateY(-100%); }
-    .ld-rozc[data-odchazi] .ld-rozc-host { transform: translateY(100%); }
+    .ld-rozc[data-odchazi="podnik"] .ld-rozc-podnik { transform: translateY(-100%); }
+    .ld-rozc[data-odchazi="podnik"] .ld-rozc-host { transform: translateY(100%); }
+  }
+  @media (min-width: 768px) {
+    .ld-rozc[data-odchazi="host"] .ld-rozc-pul { transition: flex-grow 560ms cubic-bezier(0.7, 0, 0.2, 1); }
+    .ld-rozc[data-odchazi="host"] .ld-rozc-podnik { flex-grow: 0.0001; }
+  }
+  @media (max-width: 767px) {
+    .ld-rozc[data-odchazi="host"]::after { content: ""; position: fixed; inset: 0; z-index: 5; background: rgb(243 244 240); animation: ld-rozc-prolnuti 480ms ease both; }
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ld-rozc[data-odchazi] { opacity: 0; transition: opacity 150ms ease; }
+  .ld-rozc[data-odchazi="podnik"] { opacity: 0; transition: opacity 150ms ease; }
 }
 
 /* ——— Přihlášení v hlavičce: malá nabídka ————————————————————— */
