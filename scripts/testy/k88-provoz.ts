@@ -3,7 +3,7 @@
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
-import { stavNastaveni, POVINNE } from '../../lib/zdravi.ts';
+import { rezimPlateb, stavNastaveni, POVINNE } from '../../lib/zdravi.ts';
 import { podpisoveTajemstvi } from '../../lib/tajemstvi.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -23,6 +23,8 @@ export default async function ({ eq, ok }: Testy) {
   eq('zdraví: e-mail zapnutý', plne.funkce.email, true);
   eq('zdraví: platby vypnuté', plne.funkce.platby, false);
   ok('zdraví: výstup neobsahuje hodnoty', !JSON.stringify(plne).includes('tajne-heslo-123'));
+  eq('zdraví: režim plateb podle klíčů (bez hodnot)', [rezimPlateb({}), rezimPlateb({ STRIPE_SECRET_KEY: 'sk_test_x', NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_y' }), rezimPlateb({ STRIPE_SECRET_KEY: 'sk_live_x', NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_y' })],
+    [{ rezim: null, nesoulad: false }, { rezim: 'test', nesoulad: false }, { rezim: 'live', nesoulad: true }]);
   eq('zdraví: náhled nepotřebuje NEXTAUTH_URL', stavNastaveni({ VERCEL_ENV: 'preview' }).povinneChybi.includes('NEXTAUTH_URL'), false);
   eq('zdraví: produkce NEXTAUTH_URL potřebuje', stavNastaveni({ VERCEL_ENV: 'production' }).povinneChybi.includes('NEXTAUTH_URL'), true);
   eq('zdraví: mezery = nevyplněno', stavNastaveni({ DATABASE_URL: '  ' }).povinneChybi.includes('DATABASE_URL'), true);

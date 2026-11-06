@@ -27,6 +27,9 @@ const ZIVA = 'iframe[title^="Živá ukázka"]';
 /** Kontext s měřením CLS a záznamem požadavků. */
 async function novy({ viewport = { width: 1280, height: 900 }, reducedMotion = 'no-preference', js = true, mobil = false } = {}) {
   const ctx = await b.newContext({ viewport, locale: 'cs-CZ', reducedMotion, javaScriptEnabled: js, isMobile: mobil, hasTouch: mobil });
+  // Prodejní stránka bez rozcestníku podnik / zákazník (cookie volby podniku, jako vracející se
+  // návštěvník): sonda hlídá hero a ukázku, rozcestník je první obrazovka jen pro nové návštěvníky.
+  await ctx.addCookies([{ name: 'mg_volba', value: 'podnik', url: BASE }]);
   await ctx.addInitScript(() => {
     window.__cls = 0;
     try {

@@ -73,7 +73,15 @@ const matcher = mw.slice(mw.indexOf('matcher:'), mw.indexOf(']', mw.indexOf('mat
 if (/well-known/.test(matcher)) chyby.push('middleware.ts: matcher chytá .well-known, ověření domény by prošlo přesměrováním');
 const cfg = readFileSync('next.config.js', 'utf8');
 if (!/apple-app-site-association/.test(cfg) || !/application\/json/.test(cfg)) chyby.push('next.config.js: chybí hlavička Content-Type: application/json pro apple-app-site-association');
-if (/redirects\s*\(/.test(cfg)) chyby.push('next.config.js: redirects() může přesměrovat .well-known; ověřit');
+// redirects(): každé pravidlo musí .well-known výslovně vynechat (negativní lookahead ve `source`),
+// jinak by ověření domény (apple-app-site-association, assetlinks.json) mohlo dostat přesměrování.
+if (/redirects\s*\(/.test(cfg)) {
+  const { createRequire } = await import('node:module');
+  const pravidla = await createRequire(import.meta.url)('../next.config.js').redirects();
+  for (const r of pravidla) {
+    if (!/\(\?![^)]*\\\.well-known/.test(r.source)) chyby.push(`next.config.js: přesměrování ${r.source} nevynechává .well-known`);
+  }
+}
 
 if (chyby.length) {
   console.error('Kontrola .well-known selhala:');

@@ -34,6 +34,9 @@ export const ucet: Obsluha = (p, k) => {
   const meId = KDO_JSEM[s.role];
   const opr = new Set(mojeRole(s).opravneni);
 
+  // ---- Dvě strany účtu (podnik / host, /api/strana): ukázka má jen stranu podniku ----
+  if (cesta === '/api/strana') return metoda === 'GET' ? ok({ strana: 'podnik', druha: null, zapamatovana: null }) : ok({ cil: null });
+
   // ---- Nastavení › Notifikace: zařízení s push oznámeními ----
   if (cesta === '/api/account/zarizeni') return metoda === 'GET' ? ok({ zarizeni: [] }) : ok({ ok: true });
 
