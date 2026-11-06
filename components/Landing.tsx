@@ -1,6 +1,7 @@
 import Pricing from './Pricing';
 import ForceLight from './landing/ForceLight';
 import LandingHeader from './landing/LandingHeader';
+import Rozcestnik from './landing/Rozcestnik';
 import Jeviste from './landing/sekce/Jeviste';
 import DenSPodnikem from './landing/sekce/DenSPodnikem';
 import MistoCeho from './landing/sekce/MistoCeho';
@@ -28,7 +29,10 @@ import './landing/landing.css';
 //
 // ForceLight: aplikace v ukázce i tokeny tlačítek zůstávají ve světlém motivu;
 // tma stránky je jeviště z landing.css, ne tmavý motiv aplikace.
-export default async function Landing() {
+//
+// Rozcestník (podnik / zákazník) je první obrazovka, dokud si návštěvník
+// v tomhle prohlížeči nevybral podnik; rozhoduje app/page.tsx.
+export default async function Landing({ rozcestnik = false }: { rozcestnik?: boolean }) {
   // Jazyk stránky: přepínač (cookie), jinak jazyk prohlížeče, jinak země návštěvníka (lib/i18n/jazykPozadavku.ts).
   const t = await getT(['landing']);
   const f = firma();
@@ -39,6 +43,13 @@ export default async function Landing() {
       <a href="#ukazka-okno" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 ld-btn ld-btn-sm ld-btn-svetle">{t('Přeskočit na ukázku')}</a>
       <a href="#cenik" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 ld-btn ld-btn-sm ld-btn-svetle">{t('Přeskočit na ceník')}</a>
 
+      {rozcestnik && (
+        <>
+          {/* Odkaz s kotvou (/#cenik) míří do prodejní stránky: rozcestník zmizí dřív, než se vykreslí. */}
+          <script dangerouslySetInnerHTML={{ __html: "if(location.hash)document.documentElement.dataset.bezRozcestniku=''" }} />
+          <Rozcestnik />
+        </>
+      )}
       <LandingHeader />
 
       <main>

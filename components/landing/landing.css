@@ -512,23 +512,132 @@ html:has(.ld-root) body::after { display: none; }
 .ld-cela-tabulka summary { color: var(--ld-text-2); }
 .ld-cela-tabulka[open] summary { color: var(--ld-papir); }
 
-/* ——— Volba nad ukázkou: kam patříš ————————————————————————————
-   Dvě stejně velké dlaždice, žádná z nich není limetková (v hlavičce už
-   limetka svítí). Rozdíl dělá jen text a tlačítka. Na telefonu pod sebou. */
-.ld-volba { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.875rem; text-align: left; }
-@media (min-width: 768px) { .ld-volba { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; } }
-.ld-volba-dlazdice {
-  display: flex; flex-direction: column; gap: 0.5rem;
-  padding: 1.25rem; border-radius: 1.5rem;
-  background: rgb(var(--ld-fg) / 0.045);
-  box-shadow: inset 0 0 0 1px var(--ld-linka);
+/* ——— Rozcestník: první obrazovka napůl ————————————————————————
+   Vlevo podnik na inkoustu s limetkou, vpravo zákazník na papíře (barvy
+   se otočí přes --ld-bg/--ld-fg, komponenty zůstanou stejné). Celá
+   polovina je jeden odkaz (roztažené hlavní tlačítko), vedlejší odkaz leží
+   nad ním. Na počítači se polovina pod myší rozšíří; na telefonu jsou pod
+   sebou. Odchod podniku: rozcestník se vyjme z toku (fixed) a poloviny
+   odjedou do stran jako dveře. */
+.ld-rozc {
+  position: relative; display: flex; flex-direction: column;
+  min-height: 100svh;
 }
-@media (min-width: 640px) { .ld-volba-dlazdice { padding: 1.5rem; } }
-.ld-volba-stitek { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; font-weight: 650; letter-spacing: 0.01em; color: var(--ld-text-2); }
-.ld-volba-text { color: var(--ld-papir); font-size: 1.0625rem; line-height: 1.4; font-weight: 550; max-width: 34ch; text-wrap: pretty; }
-.ld-volba-akce { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
-.ld-volba-akce > .ld-btn { flex: 1 1 11rem; justify-content: center; }
-.ld-volba-pozn { margin-top: 0.875rem; text-align: center; }
+@media (min-width: 768px) { .ld-rozc { flex-direction: row; height: 100svh; min-height: 36rem; } }
+:root[data-bez-rozcestniku] .ld-rozc { display: none; }
+
+.ld-rozc-pul {
+  position: relative; flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 2rem;
+  min-height: 50svh;
+  padding: clamp(1.25rem, 4vw, 3.5rem) var(--ld-okraj);
+  padding-bottom: clamp(2rem, 5vw, 4.5rem);
+  background: rgb(var(--ld-bg)); color: rgb(var(--ld-fg));
+  overflow: hidden; isolation: isolate;
+}
+@media (min-width: 768px) {
+  .ld-rozc-pul { min-height: 0; padding-bottom: clamp(4rem, 8vh, 6rem); }
+  .ld-rozc-pul { transition: flex-grow 700ms var(--ld-ease); }
+  @media (hover: hover) { .ld-rozc-pul:hover { flex-grow: 1.22; } }
+}
+.ld-rozc-host {
+  /* Odvozené tokeny se počítají na .ld-root, na papíře se proto definují znovu. */
+  --ld-bg: 243 244 240; --ld-fg: 22 24 26;
+  --ld-ink: rgb(var(--ld-bg)); --ld-papir: rgb(var(--ld-fg));
+  --ld-text-2: rgb(var(--ld-fg) / 0.66); --ld-text-3: rgb(var(--ld-fg) / 0.5);
+  --ld-linka: rgb(var(--ld-fg) / 0.1); --ld-linka-2: rgb(var(--ld-fg) / 0.18);
+}
+
+.ld-rozc-hlava { position: relative; z-index: 2; display: flex; align-items: center; height: 2.5rem; }
+.ld-rozc-host .ld-rozc-vizual { margin-top: 2.5rem; }
+@media (max-width: 767px) { .ld-rozc-host .ld-rozc-vizual { margin-top: 0; } }
+
+.ld-rozc-obsah { max-width: 30rem; }
+.ld-rozc-stitek {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-size: 0.8125rem; font-weight: 650; letter-spacing: 0.02em; color: var(--ld-text-2);
+}
+.ld-rozc-host .ld-tecka { background: rgb(var(--ld-fg)); }
+.ld-rozc-nadpis {
+  margin-top: 0.875rem;
+  font-weight: 700; font-size: clamp(2.5rem, 5.4vw, 5rem); line-height: 0.98; letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+.ld-rozc-text { margin-top: 1rem; max-width: 34ch; font-size: clamp(1rem, 1.25vw, 1.1875rem); line-height: 1.45; color: var(--ld-text-2); text-wrap: pretty; }
+.ld-rozc-akce { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.75rem; }
+.ld-rozc-hlavni { background: var(--ld-lime); color: #16181A; }
+/* Na papíře je hlavní tlačítko inkoustové, limetka zůstane jen v razítku odměny. */
+.ld-rozc-host .ld-rozc-hlavni { background: var(--ld-papir); color: var(--ld-ink); }
+@media (hover: hover) {
+  .ld-rozc-podnik:hover .ld-rozc-hlavni { background: #D6FA6A; }
+  .ld-rozc-host:hover .ld-rozc-hlavni { background: #000; }
+  .ld-rozc-pul:hover .ld-rozc-hlavni > .ld-sipka { transform: translateX(3px); }
+}
+/* Roztažené tlačítko: kliknout jde kamkoli do poloviny. */
+.ld-rozc-roztazeny::after { content: ""; position: absolute; inset: 0; z-index: 1; }
+/* Stisk tlačítka zmenšuje přes transform (.ld-btn i globální button:active), ten by
+   z tlačítka udělal kotvu ::after a plocha poloviny by se uprostřed kliku smrskla na
+   tlačítko. Dvojitá třída, aby přebila button:active:not(:disabled). */
+.ld-rozc-roztazeny.ld-rozc-roztazeny:active { transform: none; }
+.ld-rozc-roztazeny:focus-visible::after { outline: none; }
+.ld-rozc-nad { position: relative; z-index: 2; }
+
+.ld-rozc-pozn {
+  position: absolute; left: 50%; bottom: 1rem; z-index: 3; transform: translateX(-50%);
+  width: max-content; max-width: calc(100% - 2 * var(--ld-okraj));
+  padding: 0.375rem 0.875rem; border-radius: 9999px;
+  font-size: 0.8125rem; line-height: 1.4; text-align: center;
+  background: #16181A; color: rgb(243 244 240 / 0.66);
+  box-shadow: inset 0 0 0 1px rgb(243 244 240 / 0.14);
+  pointer-events: none;
+}
+@media (max-width: 767px) { .ld-rozc-pozn { position: static; transform: none; width: auto; max-width: none; margin: 0; border-radius: 0; padding: 1rem var(--ld-okraj); text-align: left; box-shadow: none; } }
+
+/* Náhledy: týden směn a věrnostní karta, jen kresba. */
+.ld-rozc-vizual { position: relative; align-self: flex-start; }
+.ld-rozc-smeny { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.375rem; width: min(100%, 17rem); }
+.ld-rozc-smeny > span { height: 1.75rem; border-radius: 0.5rem; box-shadow: inset 0 0 0 1px var(--ld-linka); }
+.ld-rozc-smeny > span[data-s="1"] { background: rgb(var(--ld-fg) / 0.14); box-shadow: none; }
+.ld-rozc-smeny > span[data-s="2"] { background: var(--ld-lime); box-shadow: none; }
+.ld-rozc-karta { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; width: min(100%, 15rem); }
+.ld-rozc-karta > span {
+  display: grid; place-items: center; aspect-ratio: 1; border-radius: 9999px;
+  box-shadow: inset 0 0 0 1.5px var(--ld-linka-2);
+}
+.ld-rozc-karta > span[data-ano] { background: rgb(var(--ld-fg)); box-shadow: none; }
+.ld-rozc-karta > span[data-odmena] { background: var(--ld-lime); color: #16181A; box-shadow: none; }
+@media (max-width: 767px) { .ld-rozc-vizual, .ld-rozc-host .ld-rozc-hlava { display: none; } .ld-rozc-podnik { justify-content: flex-start; } .ld-rozc-podnik .ld-rozc-obsah { margin-top: auto; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ld-rozc-obsah > *, .ld-rozc-vizual > span { animation: ld-rozc-vstup 700ms var(--ld-ease) backwards; }
+  .ld-rozc-obsah > :nth-child(2) { animation-delay: 60ms; }
+  .ld-rozc-obsah > :nth-child(3) { animation-delay: 120ms; }
+  /* Řádek s tlačítky jen prolne: transform by z .ld-rozc-akce udělal kotvu
+     roztaženého ::after a plocha poloviny by do konce animace nebyla klikací. */
+  .ld-rozc-obsah > .ld-rozc-akce { animation-name: ld-rozc-prolnuti; animation-delay: 180ms; }
+  .ld-rozc-vizual > span { animation-name: ld-rozc-bod; animation-duration: 500ms; animation-delay: calc(200ms + var(--i) * 22ms); }
+  .ld-rozc-pul:hover .ld-rozc-vizual { transform: translateY(-4px); }
+  .ld-rozc-vizual { transition: transform 600ms var(--ld-ease); }
+}
+@keyframes ld-rozc-vstup { from { opacity: 0; transform: translateY(14px); } }
+@keyframes ld-rozc-prolnuti { from { opacity: 0; } }
+@keyframes ld-rozc-bod { from { opacity: 0; transform: scale(0.6); } }
+
+/* Odchod do stránky pro podniky. */
+.ld-rozc[data-odchazi] { position: fixed; inset: 0; z-index: 60; height: 100svh; min-height: 0; pointer-events: none; }
+.ld-rozc[data-odchazi] .ld-rozc-pozn { opacity: 0; transition: opacity 200ms ease; }
+@media (prefers-reduced-motion: no-preference) {
+  .ld-rozc[data-odchazi] .ld-rozc-pul { transition: transform 720ms cubic-bezier(0.7, 0, 0.2, 1), flex-grow 0ms; }
+  .ld-rozc[data-odchazi] .ld-rozc-podnik { transform: translateX(-100%); }
+  .ld-rozc[data-odchazi] .ld-rozc-host { transform: translateX(100%); }
+  @media (max-width: 767px) {
+    .ld-rozc[data-odchazi] .ld-rozc-podnik { transform: translateY(-100%); }
+    .ld-rozc[data-odchazi] .ld-rozc-host { transform: translateY(100%); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ld-rozc[data-odchazi] { opacity: 0; transition: opacity 150ms ease; }
+}
 
 /* ——— Přihlášení v hlavičce: malá nabídka ————————————————————— */
 .ld-menu { position: relative; }
