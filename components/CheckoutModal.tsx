@@ -1,16 +1,19 @@
 'use client';
 
-// Platební okno: pokladna Stripe vložená do naší aplikace. Vlevo (nahoře na
-// mobilu) shrnutí tarifu v našem designu, uvnitř rám Stripe s kartou, Apple
-// Pay / Google Pay, DIČ a promo kódem. Karta nikdy neprojde naším kódem.
+// Platební okno „Vyzkoušet Pro / Předplatit“ — celé v designu Manageru. Vlevo (nahoře na
+// mobilu) shrnutí tarifu, vpravo vlastní pokladna (components/pokladna/VlastniPokladna.tsx):
+// Stripe Checkout Sessions v režimu `elements`, kde Stripe kreslí jen platební pole (karta,
+// Apple Pay / Google Pay, Klarna…) a všechno ostatní je naše. Karta nikdy neprojde naším kódem.
+// Tlačítko platby je v patičce okna, ať je na telefonu vždycky po ruce.
 //
-// Bez veřejného klíče (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) se okno rovnou
-// přepne na přesměrování do pokladny Stripe, aby platba šla vždycky.
+// Bez veřejného klíče (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY), nebo když se Stripe.js nenačte
+// (blokátor), se okno přepne na přesměrování do hostované pokladny Stripe, aby platba šla vždycky.
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { loadStripe, type Stripe, type StripeEmbeddedCheckout } from '@stripe/stripe-js';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Icon } from './Icons';
+import { Button } from './ui/Button';
 import { useModal } from '@/lib/useModal';
 import { PLAN_NAMES, PRICES, TRIAL_DAYS, MAX_EXTRAS, type Interval } from '@/lib/plan';
 import { DiscardGuard } from './ui/DiscardGuard';
@@ -18,15 +21,25 @@ import { useJazyk, useT } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { tg } from '@/lib/i18n/stav';
 import { cestaDokumentu } from '@/lib/pravni/odkazy';
+import VlastniPokladna, { type DataPokladny, type PokladnaHandle, type StavPaticky } from './pokladna/VlastniPokladna';
 
 const stripePromise = new Map<string, Promise<Stripe | null>>();
 function stripeJs(jazyk: string): Promise<Stripe | null> | null {
   const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   if (!pk) return null;
-  // Pokladna Stripe mluví jazykem aplikace (cs, en, de, sk, pl).
+  // Platební pole i hlášky Stripe mluví jazykem aplikace (cs, en, de, sk, pl).
   let p = stripePromise.get(jazyk);
-  if (!p) { p = loadStripe(pk, { locale: jazyk as 'cs' }); stripePromise.set(jazyk, p); }
+  if (!p) { p = loadStripe(pk, { locale: jazyk as 'cs' }).catch(() => null); stripePromise.set(jazyk, p); }
   return p;
+}
+
+async function otevriPokladnu(body: object, chybaVychozi: string): Promise<any> {
+  const res = await fetch('/api/billing/checkout', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error ? tg(d.error) : chybaVychozi);
+  return d;
 }
 
 export default function CheckoutModal({ plan, interval, trial, onClose, onDone }: {
@@ -43,52 +56,50 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
   tRef.current = t;
   const czk = (n: number) => `${n.toLocaleString(LOCALE_PRO_JAZYK[jazyk])} Kč`;
   const proBody = [t('Neomezený tým'), t('Kiosk pro tablet na prodejně'), t('Odměny, úrovně a hodnocení směn'), t('CSV exporty a měsíční přehled'), t('Sdílené menu ve vašich barvách')];
-  const m = useModal(true, onClose, t('Předplatit {plan}', { plan: PLAN_NAMES[plan] }));
-  const frame = useRef<HTMLDivElement>(null);
-  const checkout = useRef<StripeEmbeddedCheckout | null>(null);
+  // Během platby (3D Secure, potvrzení) okno nejde zavřít: zavření by zahodilo rozjetou platbu.
+  const placeniRef = useRef(false);
+  const zavrit = useCallback(() => { if (!placeniRef.current) onClose(); }, [onClose]);
+  const m = useModal(true, zavrit, t('Předplatit {plan}', { plan: PLAN_NAMES[plan] }));
   const [state, setState] = useState<'loading' | 'ready' | 'redirecting' | 'error'>('loading');
   const [err, setErr] = useState('');
+  const [stripeObj, setStripeObj] = useState<Stripe | null>(null);
+  const [data, setData] = useState<DataPokladny | null>(null);
+  const pokladna = useRef<PokladnaHandle>(null);
+  const [paticka, setPaticka] = useState<StavPaticky>({ pripraveno: false, placeni: false, text: '' });
+  const onStav = useCallback((s: StavPaticky) => { placeniRef.current = s.placeni; setPaticka(s); }, []);
+  const chybaNacteni = useCallback((zprava: string) => { setErr(zprava); setState('error'); }, []);
 
   useEffect(() => {
     let alive = true;
     const t = tRef.current;
     const js = stripeJs(jazyk);
+    const vychozi = t('Pokladnu se nepodařilo otevřít.');
+    const presmeruj = (url?: string) => {
+      if (!url) throw new Error(vychozi);
+      setState('redirecting'); window.location.href = url;
+    };
     (async () => {
       try {
-        const res = await fetch('/api/billing/checkout', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plan, interval, embedded: !!js }),
-        });
-        const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.error ? tg(d.error) : t('Pokladnu se nepodařilo otevřít.'));
+        // Bez veřejného klíče: rovnou hostovaná pokladna Stripe.
+        if (!js) { const d = await otevriPokladnu({ plan, interval }, vychozi); if (alive) presmeruj(d.url); return; }
+        const [d, stripe] = await Promise.all([otevriPokladnu({ plan, interval, ui: 'elements' }, vychozi), js]);
         if (!alive) return;
-        // Bez veřejného klíče: přesměrování na Stripe.
-        if (!js || !d.clientSecret) {
-          if (d.url) { setState('redirecting'); window.location.href = d.url; return; }
-          throw new Error(t('Pokladnu se nepodařilo otevřít.'));
+        // Stripe.js se nenačetl (blokátor, síť): platba přesto jde, přes hostovanou pokladnu.
+        if (!stripe || d.ui !== 'elements' || !d.clientSecret) {
+          const h = await otevriPokladnu({ plan, interval }, vychozi);
+          if (alive) presmeruj(h.url);
+          return;
         }
-        const stripe = await js;
-        if (!stripe) throw new Error(t('Stripe se nepodařilo načíst.'));
-        if (!alive) return;
-        const ec = await stripe.createEmbeddedCheckoutPage({
-          clientSecret: d.clientSecret,
-          onComplete: () => { onDone(); },
-        });
-        if (!alive) { ec.destroy(); return; }
-        checkout.current = ec;
-        if (frame.current) ec.mount(frame.current);
+        setStripeObj(stripe);
+        setData({ clientSecret: String(d.clientSecret), ico: d.ico ?? null, firma: String(d.firma ?? ''), souhlas: !!d.souhlas, trial: !!d.trial });
         setState('ready');
       } catch (e: any) {
         if (!alive) return;
-        setErr(String(e?.message ?? t('Pokladnu se nepodařilo otevřít.')));
+        setErr(String(e?.message ?? vychozi));
         setState('error');
       }
     })();
-    return () => {
-      alive = false;
-      try { checkout.current?.destroy(); } catch { /* ignore */ }
-      checkout.current = null;
-    };
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, interval]);
 
@@ -97,7 +108,7 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
   const points = plan === 'max' ? [...proBody.slice(0, 2), ...MAX_EXTRAS.map(x => t(x))] : proBody;
 
   return (
-    <div className="fixed inset-0 modal-overlay z-[80] flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 modal-overlay z-[80] flex items-end sm:items-center justify-center sm:p-4" onClick={zavrit}>
       <div ref={m.ref} {...m.dialogProps} onClick={e => e.stopPropagation()}
         className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
         <DiscardGuard guard={m.guard} />
@@ -106,11 +117,11 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
             <h3 className="t-section truncate">{trial ? t('Vyzkoušet {plan} na {n} dní zdarma', { plan: PLAN_NAMES[plan], n: TRIAL_DAYS }) : t('Předplatit {plan}', { plan: PLAN_NAMES[plan] })}</h3>
             <p className="t-meta">{trial ? t('Karta se zadá teď, první platba {castka} až po {n} dnech.', { castka: czk(amount), n: TRIAL_DAYS }) : (interval === 'year' ? t('{castka} ročně za podnik.', { castka: czk(amount) }) : t('{castka} měsíčně za podnik.', { castka: czk(amount) }))}</p>
           </div>
-          <button onClick={m.guard.attemptClose} className="shrink-0 btn-icon" aria-label={t('Zavřít')}><Icon name="close" size={15} /></button>
+          <button onClick={m.guard.attemptClose} disabled={paticka.placeni} className="shrink-0 btn-icon" aria-label={t('Zavřít')}><Icon name="close" size={15} /></button>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin grid grid-cols-1 md:grid-cols-[260px_1fr]">
-          {/* Shrnutí v našem designu */}
+          {/* Shrnutí tarifu */}
           <aside className="px-6 pb-4 md:pb-6 md:pr-4">
             <div className={`card p-5 ${plan === 'pro' ? 'card-accent' : 'card-info'}`}>
               <p className="t-label">{PLAN_NAMES[plan]}</p>
@@ -133,8 +144,8 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
             </div>
           </aside>
 
-          {/* Pokladna Stripe */}
-          <section className="px-6 pb-6 md:pl-0 min-h-[420px]">
+          {/* Pokladna */}
+          <section className="px-6 pb-6 md:pl-0 min-h-[420px] min-w-0" aria-label={t('Platba')}>
             {state === 'loading' && (
               <div className="h-full min-h-[420px] rounded-2xl well flex flex-col items-center justify-center gap-3">
                 <div className="spinner" />
@@ -152,9 +163,25 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
                 <button onClick={onClose} className="btn btn-secondary">{t('Zavřít')}</button>
               </div>
             )}
-            <div ref={frame} className={`rounded-2xl overflow-hidden ${state === 'ready' ? '' : 'hidden'}`} />
+            {state === 'ready' && stripeObj && data && (
+              <VlastniPokladna ref={pokladna} stripe={stripeObj} data={data} onStav={onStav} onHotovo={onDone} onChybaNacteni={chybaNacteni} />
+            )}
           </section>
         </div>
+
+        {/* Patička: hlavní akce okna (52, přes šířku na telefonu, pod pokladnou na monitoru). */}
+        {state === 'ready' && (
+          <div className="border-t border-[var(--surface-line)] pt-3 pb-4 md:grid md:grid-cols-[260px_1fr]">
+            <div className="hidden md:block" />
+            <div className="px-6 md:pl-0">
+              <Button variant="accent" size="lg" className="w-full" data-zaplatit
+                disabled={!paticka.pripraveno} loading={paticka.placeni}
+                onClick={() => pokladna.current?.zaplatit()}>
+                {paticka.text || t('Zaplatit')}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

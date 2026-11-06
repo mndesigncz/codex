@@ -205,5 +205,8 @@
   "Neznámá strana": "Unknown side",
   "Moc pokusů, zkuste to za chvíli.": "Too many attempts, try again in a moment.",
   "Druhou stranu tenhle účet nemá.": "This account has no other side.",
-  "Do správy podniku se přihlas heslem.": "Sign in to business management with your password."
+  "Do správy podniku se přihlas heslem.": "Sign in to business management with your password.",
+  "IČO nesedí: má 8 číslic a platný kontrolní součet.": "This company ID (IČO) is not valid: it has 8 digits and a valid check digit.",
+  "Bez souhlasu s obchodními podmínkami předplatné objednat nejde.": "You can't order the subscription without agreeing to the business terms.",
+  "Pokladna vypršela. Zavřete ji a otevřete znovu.": "The checkout has expired. Close it and open it again."
 }

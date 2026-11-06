@@ -205,5 +205,8 @@
   "Neznámá strana": "Neznáma strana",
   "Moc pokusů, zkuste to za chvíli.": "Priveľa pokusov, skúste to o chvíľu.",
   "Druhou stranu tenhle účet nemá.": "Druhú stranu tento účet nemá.",
-  "Do správy podniku se přihlas heslem.": "Do správy podniku sa prihlás heslom."
+  "Do správy podniku se přihlas heslem.": "Do správy podniku sa prihlás heslom.",
+  "IČO nesedí: má 8 číslic a platný kontrolní součet.": "IČO nesedí: má 8 číslic a platný kontrolný súčet.",
+  "Bez souhlasu s obchodními podmínkami předplatné objednat nejde.": "Bez súhlasu s obchodnými podmienkami predplatné objednať nejde.",
+  "Pokladna vypršela. Zavřete ji a otevřete znovu.": "Platobná brána vypršala. Zatvorte ju a otvorte znova."
 }
