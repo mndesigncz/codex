@@ -122,7 +122,7 @@ export default function ({ eq, ok }: Testy) {
   const profil = zdroj('app/api/client/admin/profile/route.ts');
   ok('profil: nová pole mají oprávnění a zapnutí propadání kreditu si pamatuje den', profil.includes("credit_expire_days: 'vernost.pravidla'") && profil.includes('credit_expire_since'));
   const hostApi = zdroj('app/api/client/b/[slug]/route.ts');
-  ok('host: kredit a snížená úroveň na stránce podniku', hostApi.includes('creditExpiring') && hostApi.includes('levelDegraded') && zdroj('components/client/BusinessPage.tsx').includes('creditExpiring'));
+  ok('host: kredit a snížená úroveň na stránce podniku', hostApi.includes('creditExpiring') && hostApi.includes('levelDegraded') && ['components/client/BusinessPage.tsx', 'components/client/host/podnik/Zahlavi.tsx', 'components/client/host/podnik/MojeKarta.tsx', 'components/client/host/podnik/CoDostanes.tsx', 'components/client/host/podnik/OPodniku.tsx'].map(zdroj).join('\n').includes('creditExpiring'));
   ok('host: pravidla získávání zmiňují uvítání, propadání kreditu a pokles úrovně', zdroj('components/client/loyalty/HostPravidla.tsx').includes("case 'propadani_kreditu'") && zdroj('lib/hostPrehled.ts').includes("druh: 'pokles_urovne'"));
   const tabs = zdroj('components/client/LoyaltyTabs.tsx');
   ok('věrnost: nová pravidla (násobiče, uvítání, kredit) jsou v obrazovce a tarif Max se vysvětluje předem', tabs.includes('<BodyNasobiceKredit') && tabs.includes('!maMax'));

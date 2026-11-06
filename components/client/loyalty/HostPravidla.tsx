@@ -7,9 +7,10 @@ import { useT } from '@/lib/i18n/client';
 import { formatMoney } from '@/lib/money';
 import { pravidlaZisku, urovneSeSlevou, type PravidloZisku } from '@/lib/hostPrehled';
 
-export default function HostPravidla({ b, campaigns }: {
+export default function HostPravidla({ b, campaigns, className = '' }: {
   b: { pointsPer100: number; cashbackPct: number; pointsExpireDays: number; creditExpireDays?: number; welcomePoints?: number; birthdayPoints?: number; referralPoints?: number; pointsOrders?: boolean; pointsPerReservation?: number; voucherPointsPer100?: number; currency: string; tiers?: any };
   campaigns: { name: string; required: number; reward?: string }[];
+  className?: string;
 }) {
   const t = useT('klient-host');
   const pravidla = pravidlaZisku({
@@ -41,11 +42,11 @@ export default function HostPravidla({ b, campaigns }: {
     }
   };
   return (
-    <section aria-labelledby="h-pravidla" className="mt-5 border-t border-black/[0.06] pt-4">
-      <h3 id="h-pravidla" className="t-card mb-1.5">{t('Jak získat body a odměny')}</h3>
-      <ul className="space-y-1.5 text-sm text-black/70">
+    <section aria-labelledby="h-jak-ziskat" className={className}>
+      <h3 id="h-jak-ziskat" className="hp-silny mb-2">{t('Jak získat body a odměny')}</h3>
+      <ul className="space-y-1.5 hp-text text-[var(--hp-muted)]">
         {pravidla.map((r, i) => (
-          <li key={i} className="flex gap-2"><span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-black/30" /><span className="min-w-0 text-pretty break-words">{veta(r)}</span></li>
+          <li key={i} className="flex gap-2.5"><span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--hp-faint)]" /><span className="min-w-0 text-pretty break-words">{veta(r)}</span></li>
         ))}
       </ul>
     </section>

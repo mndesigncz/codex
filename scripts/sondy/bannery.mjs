@@ -58,7 +58,7 @@ for (const sirka of [390, 1280]) {
   // Banner „kupon“ přepne záložku na Věrnost.
   await p.locator('[data-banner="2"]').getByRole('button', { name: 'Ukázat kupony' }).click();
   await p.waitForTimeout(300);
-  tvrdi(`${sirka}: odkaz na kupony otevře Věrnost`, await p.getByRole('tab', { name: /Věrnost/ }).getAttribute('aria-selected') === 'true');
+  tvrdi(`${sirka}: odkaz na kupony otevře Odměny`, await p.getByRole('tab', { name: /Odměny/ }).getAttribute('aria-selected') === 'true');
   await p.screenshot({ path: new URL(`./shots/bannery-${sirka}.png`, import.meta.url).pathname }).catch(() => {});
   await ctx.close();
 }

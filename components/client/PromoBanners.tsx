@@ -46,10 +46,12 @@ function jednouZobrazen(slug: string | undefined, id: number) {
   posliUdalost(slug, id, 'view');
 }
 
-export default function PromoBanners({ banners, loyaltyOn, onGoTab, slug }: {
-  banners: PromoBanner[]; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void;
+export default function PromoBanners({ banners, loyaltyOn, onGoTab, slug, vzhled = 'sprava' }: {
+  banners: PromoBanner[]; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty' | 'events') => void;
   /** Slug podniku zapíná statistiku zobrazení a prokliků; bez něj (náhled v editoru) se nic neposílá. */
   slug?: string;
+  /** `penezenka` = aplikace hosta ve směru A (sklo, rádius 22, tokeny --hp-*); `sprava` = náhled v editoru. */
+  vzhled?: 'sprava' | 'penezenka';
 }) {
   const t = useT('klient-host');
   const [i, setI] = useState(0);
@@ -87,16 +89,16 @@ export default function PromoBanners({ banners, loyaltyOn, onGoTab, slug }: {
       {banners.map((b, k) => (
         <div key={b.id} role="group" aria-roledescription={t('snímek')} aria-label={t('Oznámení {n} z {total}', { n: k + 1, total: n })}
           hidden={k !== idx} data-banner={b.id}>
-          <Slide b={b} loyaltyOn={loyaltyOn} onGoTab={onGoTab} onClick={() => posliUdalost(slug, b.id, 'click')} />
+          <Slide b={b} loyaltyOn={loyaltyOn} onGoTab={onGoTab} onClick={() => posliUdalost(slug, b.id, 'click')} penezenka={vzhled === 'penezenka'} />
         </div>
       ))}
       {n > 1 && (
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
-            <button type="button" onClick={() => go(-1)} aria-label={t('Předchozí oznámení')} className="tap-target-sm h-9 w-9 grid place-items-center rounded-full hover:bg-black/[0.06]">
+            <button type="button" onClick={() => go(-1)} aria-label={t('Předchozí oznámení')} className={`tap-target-sm h-9 w-9 grid place-items-center rounded-full ${vzhled === 'penezenka' ? 'text-[var(--hp-fg)] hover:bg-[var(--hp-well)]' : 'hover:bg-black/[0.06]'}`}>
               <Icon name="arrowLeft" size={16} />
             </button>
-            <button type="button" onClick={() => go(1)} aria-label={t('Další oznámení')} className="tap-target-sm h-9 w-9 grid place-items-center rounded-full hover:bg-black/[0.06]">
+            <button type="button" onClick={() => go(1)} aria-label={t('Další oznámení')} className={`tap-target-sm h-9 w-9 grid place-items-center rounded-full ${vzhled === 'penezenka' ? 'text-[var(--hp-fg)] hover:bg-[var(--hp-well)]' : 'hover:bg-black/[0.06]'}`}>
               <Icon name="chevronRight" size={16} />
             </button>
           </div>
@@ -104,12 +106,12 @@ export default function PromoBanners({ banners, loyaltyOn, onGoTab, slug }: {
             {banners.map((b, k) => (
               <button key={b.id} type="button" onClick={() => setI(k)} aria-label={t('Oznámení {n} z {total}', { n: k + 1, total: n })} aria-current={k === idx ? 'true' : undefined}
                 className="tap-target-sm h-6 w-6 grid place-items-center rounded-full">
-                <span className={`block h-2 rounded-full transition-[width] ${k === idx ? 'w-5 h-tecka-on' : 'w-2 bg-black/20'}`} />
+                <span className={`block h-2 rounded-full transition-[width] ${k === idx ? (vzhled === 'penezenka' ? 'w-5 bg-[var(--hp-fg)]' : 'w-5 h-tecka-on') : (vzhled === 'penezenka' ? 'w-2 bg-[var(--hp-faint)]' : 'w-2 bg-black/20')}`} />
               </button>
             ))}
           </div>
           {!mene ? (
-            <button type="button" onClick={() => setPauza(p => !p)} aria-pressed={pauza} className="tap-target-sm text-[13px] font-semibold text-black/60 hover:text-black px-2 py-1 rounded-full">
+            <button type="button" onClick={() => setPauza(p => !p)} aria-pressed={pauza} className={`tap-target-sm text-[13px] font-semibold px-2 py-1 rounded-full ${vzhled === 'penezenka' ? 'text-[var(--hp-muted)] hover:text-[var(--hp-fg)]' : 'text-black/60 hover:text-black'}`}>
               {pauza ? t('Přehrávat') : t('Pozastavit')}
             </button>
           ) : <span className="w-9" aria-hidden />}
@@ -119,7 +121,7 @@ export default function PromoBanners({ banners, loyaltyOn, onGoTab, slug }: {
   );
 }
 
-function Slide({ b, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void; onClick?: () => void }) {
+function Slide({ b, loyaltyOn, onGoTab, onClick, penezenka = false }: { b: PromoBanner; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty' | 'events') => void; onClick?: () => void; penezenka?: boolean }) {
   const t = useT('klient-host');
   const foto = !!b.imageUrl;
   const url = b.linkKind === 'url' ? httpsOdkaz(b.linkRef) : null;
@@ -130,23 +132,28 @@ function Slide({ b, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; loyaltyOn: 
   const otevri = () => {
     onClick?.();
     if (veVernosti) onGoTab('loyalty');
-    else onGoTab('menu');
+    else onGoTab(b.linkKind === 'event' ? 'events' : 'menu');
     // Cíl na stránce (kupon, razítková karta, akce) se dohledá až po přepnutí záložky; chybí-li, zůstane se nahoře.
     const cil = b.linkKind === 'event' ? 'h-events' : b.linkKind === 'coupon' && b.linkRef ? `kupon-${b.linkRef}` : b.linkKind === 'campaign' && b.linkRef ? `karta-${b.linkRef}` : null;
     if (cil) setTimeout(() => document.getElementById(cil)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
   };
   // Tlačítko banneru je druhá důležitá akce stránky (limetka patří „Stát se členem“): inkoustové, na fotce bílé.
-  const cta = `tap-target btn btn-sm !gap-1.5 ${foto ? 'h-cta-foto' : 'btn-primary'}`;
+  const cta = penezenka
+    ? `tap-target hp-btn hp-btn-male !gap-1.5 ${foto ? 'bg-white !text-[#16181A]' : 'hp-btn-inkoust'}`
+    : `tap-target btn btn-sm !gap-1.5 ${foto ? 'h-cta-foto' : 'btn-primary'}`;
+  const obal = penezenka
+    ? `hpp-banner ${foto ? 'hpp-banner-foto' : 'lgx hp-sklo'}`
+    : `relative overflow-hidden ${foto ? 'rounded-3xl bg-[#16181A] text-white' : 'card'}`;
   return (
-    <div className={`relative overflow-hidden ${foto ? 'rounded-3xl bg-[#16181A] text-white' : 'card'}`}>
+    <div className={obal}>
       {foto && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={b.imageUrl!} alt="" className="absolute inset-0 h-full w-full object-cover" />
       )}
       {foto && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/90 via-[#16181A]/50 to-[#16181A]/10" aria-hidden />}
       <div className={`relative p-5 sm:p-6 flex flex-col gap-2 ${foto ? 'min-h-[11rem] sm:min-h-[13rem] justify-end' : 'min-h-[7rem]'}`}>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-[-0.02em] leading-tight text-balance break-words">{b.title}</h2>
-        {b.text && <p className={`text-sm sm:text-base leading-snug text-pretty break-words max-w-[60ch] ${foto ? 'text-white/85' : 'text-black/70'}`}>{b.text}</p>}
+        <h2 className={penezenka ? 'text-[20px] font-semibold tracking-[-0.02em] leading-tight text-balance break-words' : 'text-xl sm:text-2xl font-bold tracking-[-0.02em] leading-tight text-balance break-words'}>{b.title}</h2>
+        {b.text && <p className={`text-sm sm:text-base leading-snug text-pretty break-words max-w-[60ch] ${foto ? 'text-white/85' : penezenka ? 'text-[var(--hp-muted)]' : 'text-black/70'}`}>{b.text}</p>}
         {(url || vnitrni) && (
           <div className="mt-1">
             {url ? (

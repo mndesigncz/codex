@@ -1,0 +1,376 @@
+/* ===========================================================================
+   Managero client · směr A „Peněženka“ (Martin 2026-11: „Směr A je boží“)
+   ---------------------------------------------------------------------------
+   Sdílená vrstva aplikace hosta: tokeny, typografická škála, inkoustová karta
+   podniku jako předmět, balíček, lístek s perforací, řádek seznamu, obálka
+   podniku, dok a pozadí. Komponenty nad tím: components/client/penezenka/*.
+   Předloha: scratchpad klient/smery/A (index.html + PNG).
+
+   Pravidla, která tu drží:
+   · Barvy jen z palety Managera: inkoust #16181A, bílé a krémové plochy,
+     limetka #C8F542 jako JEDINÝ akcent (pokrok a hlavní akce). Barva značky
+     podniku v aplikaci hosta nikde (jen Wallet pass). Tvář podniku nese
+     krémová textura na inkoustu a monogram, ne barva.
+   · Sklo jen přes `.lgx` / `.lgx-strong` z globals.css (+ `.hp-sklo` mění
+     tón, rádius a tmavou variantu, žádný vlastní backdrop-filter).
+   · Inkoustové plochy mají PEVNOU background-color pod přechodem — sonda
+     dark.mjs měří kontrast proti background-color, přechod nevidí.
+   · Rádius karty i listu 22, pole 14; okraj stránky 20.
+   · Tmavý režim: `:root[data-theme="dark"]` (stejně jako zbytek aplikace).
+   =========================================================================== */
+
+:root {
+  --hp-ink: #16181A;
+  --hp-lime: #C8F542;
+  --hp-lime-ink: #4F6A07;
+  --hp-cream: #F0E9D6;
+  --hp-paper: #F4F1E8;            /* text na inkoustové kartě: krém do bíla */
+
+  /* Rozměry */
+  --hp-r-karta: 22px;             /* karta v peněžence, list, lístek, seznam */
+  --hp-r-pole: 14px;              /* pole, dlaždice, pole QR */
+  --hp-okraj: 20px;               /* okraj stránky na telefonu */
+  --hp-karta-v: 214px;            /* výška přední karty */
+  --hp-presah: 62px;              /* kolik ze zasunuté karty v balíčku kouká */
+  --hp-mono: 36px;                /* monogram v hlavičce karty */
+  --hp-dok-v: 66px;               /* výška doku */
+
+  /* Typografická škála (Geist, kontrast řezů) */
+  --hp-fs-display: 80px;          /* název podniku na obálce */
+  --hp-fs-cislo: 76px;            /* velké tenké číslo na kartě */
+  --hp-fs-titulek: 32px;          /* nadpis obrazovky */
+  --hp-fs-h2: 17px;
+  --hp-fs-text: 15px;
+  --hp-fs-meta: 13px;
+  --hp-fs-mikro: 11px;
+
+  /* Světlý motiv */
+  --hp-fg: #16181A;
+  --hp-muted: rgba(22,24,26,0.64);
+  --hp-faint: rgba(22,24,26,0.40);  /* jen ikony a linky, ne text */
+  --hp-line: rgba(22,24,26,0.08);
+  --hp-well: rgba(22,24,26,0.05);
+  --hp-surface: #FFFFFF;
+  --hp-pilulka: rgba(22,24,26,0.07);
+  --hp-btn-ink-bg: #16181A;
+  --hp-btn-ink-fg: #FFFFFF;
+  --hp-sklo-stin: 0 0 0 1px rgba(22,24,26,0.035), 0 18px 44px -22px rgba(25,35,15,0.20), inset 0 1px 0 rgba(255,255,255,0.92);
+
+  /* Inkoustová karta */
+  --hp-karta-bg: #1A1C1F;
+  --hp-karta-grad: linear-gradient(160deg, #2B2E32 0%, #1A1C1F 42%, #131517 100%);
+  --hp-karta-hrana: rgba(255,255,255,0.07);
+  --hp-karta-stin: 0 1px 0 rgba(255,255,255,0.10) inset, 0 26px 48px -22px rgba(22,24,26,0.55), 0 2px 6px rgba(22,24,26,0.12);
+  --hp-karta-tlume: rgba(244,241,232,0.64);
+  --hp-karta-stredni: rgba(244,241,232,0.86);
+}
+:root[data-theme="dark"] {
+  --hp-fg: #EDF2E4;
+  --hp-muted: rgba(237,242,228,0.64);
+  --hp-faint: rgba(237,242,228,0.38);
+  --hp-line: rgba(255,255,255,0.08);
+  --hp-well: rgba(255,255,255,0.06);
+  --hp-surface: #17191C;
+  --hp-pilulka: rgba(255,255,255,0.10);
+  --hp-btn-ink-bg: #EDF2E4;
+  --hp-btn-ink-fg: #16181A;
+  --hp-sklo-stin: inset 0 1px 0 rgba(255,255,255,0.07), 0 20px 40px -24px rgba(0,0,0,0.7);
+  --hp-karta-bg: #1F2225;
+  --hp-karta-grad: linear-gradient(160deg, #2E3236 0%, #1F2225 45%, #17191C 100%);
+  --hp-karta-hrana: rgba(255,255,255,0.10);
+  --hp-karta-stin: 0 1px 0 rgba(255,255,255,0.12) inset, 0 26px 48px -20px rgba(0,0,0,0.85);
+}
+
+/* ---------- Typografie (šest stupňů, nic mezi) ---------- */
+.hp-display { font-weight: 250; font-size: clamp(52px, 19vw, var(--hp-fs-display)); line-height: 0.86; letter-spacing: -0.055em; }
+.hp-cislo { font-weight: 250; font-size: clamp(56px, 18vw, var(--hp-fs-cislo)); line-height: 0.86; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
+.hp-titulek { font-weight: 620; font-size: var(--hp-fs-titulek); line-height: 1.05; letter-spacing: -0.032em; color: var(--hp-fg); text-wrap: balance; }
+.hp-h2 { font-weight: 600; font-size: var(--hp-fs-h2); line-height: 1.25; letter-spacing: -0.014em; color: var(--hp-fg); }
+.hp-text { font-weight: 450; font-size: var(--hp-fs-text); line-height: 1.35; letter-spacing: -0.006em; }
+.hp-silny { font-weight: 600; font-size: var(--hp-fs-text); line-height: 1.3; letter-spacing: -0.01em; }
+.hp-meta { font-weight: 400; font-size: var(--hp-fs-meta); line-height: 1.35; color: var(--hp-muted); }
+.hp-mikro { font-weight: 500; font-size: var(--hp-fs-mikro); line-height: 1.2; letter-spacing: 0.005em; }
+.hp-num { font-variant-numeric: tabular-nums; }
+/* Kódy (karta, kupon, poukaz): prostrkané, tabulkové číslice; čte je obsluha. */
+.hp-kod { font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: 0.16em; }
+
+/* ---------- Monogram (na krému) ---------- */
+.hp-mono {
+  --s: var(--hp-mono);
+  position: relative; flex: none; overflow: hidden;
+  display: grid; place-items: center;
+  width: var(--s); height: var(--s); border-radius: calc(var(--s) * 10 / 36);
+  background: var(--hp-cream); color: #16181A;
+  font-weight: 700; font-size: calc(var(--s) * 0.36); letter-spacing: -0.02em; line-height: 1;
+}
+.hp-mono-kruhy { font-weight: 300; font-size: calc(var(--s) * 0.42); letter-spacing: -0.04em; }
+.hp-mono-kruhy::after { content: ""; position: absolute; left: 25%; right: 25%; bottom: 22%; height: 1px; background: #16181A; opacity: 0.5; }
+.hp-mono-koleje { font-weight: 800; font-size: calc(var(--s) * 0.33); letter-spacing: 0.02em; }
+.hp-mono-koleje::before, .hp-mono-koleje::after { content: ""; position: absolute; left: 0; right: 0; height: max(1px, calc(var(--s) * 0.04)); background: #16181A; }
+.hp-mono-koleje::before { top: 25%; }
+.hp-mono-koleje::after { bottom: 25%; }
+.hp-mono-tecky { font-weight: 400; font-size: calc(var(--s) * 0.44); letter-spacing: -0.03em; }
+/* Tvar je všude stejný (zaoblený čtverec, rádius 10/36 velikosti) — podnik se liší písmem, ne obrysem. */
+/* Logo podniku: na krému, v odstínech inkoustu (barva značky v aplikaci hosta není). */
+.hp-mono-logo::before, .hp-mono-logo::after { display: none; }
+.hp-mono img { width: 100%; height: 100%; object-fit: contain; padding: 14%; filter: grayscale(1) contrast(1.1); mix-blend-mode: multiply; }
+
+/* ---------- Textury podniku (krém na inkoustu) ---------- */
+.hp-tex { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.hp-tex-kruhy { background: repeating-radial-gradient(circle at 92% 118%, rgba(240,233,214,0.085) 0 1px, transparent 1.5px 13px); }
+.hp-tex-koleje { background: repeating-linear-gradient(118deg, rgba(240,233,214,0.07) 0 1px, transparent 1.5px 10px); -webkit-mask: linear-gradient(90deg, transparent 30%, #000 100%); mask: linear-gradient(90deg, transparent 30%, #000 100%); }
+.hp-tex-tecky { background: radial-gradient(rgba(240,233,214,0.16) 1px, transparent 1.4px) 0 0 / 11px 11px; -webkit-mask: radial-gradient(circle at 100% 0%, #000 0%, transparent 70%); mask: radial-gradient(circle at 100% 0%, #000 0%, transparent 70%); }
+
+/* ---------- Inkoustová karta podniku ---------- */
+.hp-karta {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: flex; flex-direction: column;
+  width: 100%; padding: 18px; text-align: left;
+  border-radius: var(--hp-r-karta);
+  background-color: var(--hp-karta-bg); background-image: var(--hp-karta-grad);
+  color: var(--hp-paper);
+  border: 1px solid var(--hp-karta-hrana);
+  box-shadow: var(--hp-karta-stin);
+  -webkit-tap-highlight-color: transparent;
+}
+/* Odlesk na horní hraně (lamino). */
+.hp-karta::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(118deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.025) 34%, transparent 52%); }
+.hp-karta > :not(.hp-tex) { position: relative; z-index: 1; }
+.hp-karta-predni { min-height: var(--hp-karta-v); }
+.hp-karta-otevrena { min-height: 212px; }
+a.hp-karta, button.hp-karta { cursor: pointer; transition: transform 200ms var(--ease-out, ease-out), box-shadow 200ms ease; }
+@media (prefers-reduced-motion: no-preference) { a.hp-karta:active, button.hp-karta:active { transform: scale(0.99); } }
+/* Fokus z klávesnice: inkoustový obrys 2 px + limetkový prstenec vně (na světlém plátně má samotná
+   limetka jen ~1,2 : 1). V tmavém režimu krém + limetka (--hp-fg se přepne sám). */
+a.hp-karta:focus-visible, button.hp-karta:focus-visible { outline: none; box-shadow: var(--hp-karta-stin), 0 0 0 2px var(--hp-fg), 0 0 0 4px var(--hp-lime); }
+
+.hp-karta-hlava { display: flex; align-items: center; gap: 12px; min-height: var(--hp-mono); min-width: 0; }
+.hp-karta-jmeno { display: block; min-width: 0; flex: 1; }
+.hp-karta-jmeno > b { display: block; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-karta-jmeno > span { display: block; font-size: 12px; line-height: 1.3; color: var(--hp-karta-tlume); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-karta-hodnota { flex: none; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--hp-karta-stredni); white-space: nowrap; }
+.hp-karta-stred { display: flex; align-items: baseline; gap: 6px; min-width: 0; margin-top: auto; padding-top: 18px; }
+.hp-karta-z { flex: none; font-size: 22px; font-weight: 300; letter-spacing: -0.03em; color: var(--hp-karta-tlume); font-variant-numeric: tabular-nums; }
+.hp-karta-stitek { min-width: 0; margin-left: 6px; font-size: 13px; line-height: 1.3; color: var(--hp-karta-tlume); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-karta-pata { display: flex; align-items: center; gap: 10px; margin-top: 14px; min-width: 0; }
+
+/* Lišta razítek (přední karta): N dílků, limetka = získané; dárek na konci. */
+.hp-dilky { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.hp-dilky > i { height: 6px; border-radius: 3px; background: rgba(244,241,232,0.14); }
+.hp-dilky > i.hp-on { background: var(--hp-lime); }
+.hp-postup { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: rgba(244,241,232,0.14); overflow: hidden; }
+.hp-postup > i { display: block; height: 100%; border-radius: 3px; background: var(--hp-lime); }
+.hp-darek { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 9999px; border: 1px dashed rgba(244,241,232,0.45); color: rgba(244,241,232,0.85); }
+.hp-darek.hp-on { border-style: solid; border-color: var(--hp-lime); background: var(--hp-lime); color: #16181A; }
+/* Razítka v otevřené kartě: kolečka max 26 px, vejdou se i na 320. */
+.hp-kolecka { width: 100%; display: grid; gap: 6px; }
+.hp-kolecka > i { display: grid; place-items: center; aspect-ratio: 1; max-width: 26px; width: 100%; border-radius: 9999px; box-shadow: inset 0 0 0 1px rgba(244,241,232,0.22); color: rgba(244,241,232,0.85); }
+.hp-kolecka > i.hp-on { background: var(--hp-lime); box-shadow: none; color: #16181A; }
+.hp-kolecka > i.hp-odmena { box-shadow: none; border: 1px dashed rgba(244,241,232,0.5); }
+.hp-kolecka > i.hp-odmena.hp-on { border-color: var(--hp-lime); }
+@media (prefers-reduced-motion: no-preference) { .hp-kolecka > i.hp-nove { animation: h-pop 220ms var(--ease-out, ease-out) both; } }
+
+/* ---------- Balíček karet (Wallet stack) ---------- */
+.hp-balicek { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.hp-balicek > li { position: relative; }
+/* Zasunutá karta: kouká jen hlavička (presah), zbytek leží pod další kartou. */
+.hp-balicek > li.hp-zadni { height: calc(var(--hp-presah) + var(--hp-r-karta)); margin-bottom: calc(-1 * var(--hp-r-karta)); }
+.hp-balicek > li.hp-zadni > .hp-karta { height: calc(var(--hp-presah) + var(--hp-r-karta) + 40px); }
+.hp-balicek > li + li > .hp-karta { box-shadow: var(--hp-karta-stin), 0 -12px 22px -14px rgba(0,0,0,0.55); }
+
+/* Zasunuté karty dole pod otevřenou kartou („+2 karty“). */
+.hp-zasunute { position: relative; display: block; width: 100%; height: 76px; overflow: hidden; text-align: left; border-radius: var(--hp-r-karta) var(--hp-r-karta) 0 0; -webkit-tap-highlight-color: transparent; }
+.hp-zasunute > .hp-karta { position: absolute; left: 0; right: 0; height: 100px; }
+.hp-zasunute > .hp-karta:first-child { top: 0; transform: scale(0.93); transform-origin: 50% 0; opacity: 0.9; }
+.hp-zasunute > .hp-karta + .hp-karta { top: 14px; padding: 14px 18px; box-shadow: var(--hp-karta-stin), 0 -12px 22px -14px rgba(0,0,0,0.55); }
+.hp-zasunute:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--hp-fg), 0 0 0 4px var(--hp-lime); }
+/* Jen jedna zasunutá karta: druhá hrana se nekreslí. */
+.hp-zasunute-jedna > .hp-karta:first-child { transform: none; opacity: 1; padding: 14px 18px; }
+
+/* ---------- Sklo (s `.lgx`) ---------- */
+.lgx.hp-sklo, .lgx-strong.hp-sklo { border-radius: var(--hp-r-karta); border-color: rgba(255,255,255,0.75); box-shadow: var(--hp-sklo-stin); }
+:root[data-theme="dark"] .hp-sklo {
+  background: linear-gradient(150deg, rgba(255,255,255,0.075), rgba(255,255,255,0.035));
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: var(--hp-sklo-stin);
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="dark"] .hp-sklo { background: var(--hp-surface); }
+}
+
+/* ---------- Seznam a řádek ---------- */
+.hp-seznam { list-style: none; margin: 0; padding: 0; overflow: hidden; }
+.hp-seznam > li + li { border-top: 1px solid var(--hp-line); }
+.hp-radek { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 66px; padding: 14px 16px; text-align: left; color: var(--hp-fg); -webkit-tap-highlight-color: transparent; }
+a.hp-radek, button.hp-radek { cursor: pointer; transition: background-color 160ms ease; }
+@media (hover: hover) { a.hp-radek:hover, button.hp-radek:hover { background: var(--hp-well); } }
+a.hp-radek:active, button.hp-radek:active { background: var(--hp-well); }
+a.hp-radek:focus-visible, button.hp-radek:focus-visible { outline: 2px solid var(--hp-fg); outline-offset: -4px; border-radius: 16px; }
+.hp-radek-telo { flex: 1; min-width: 0; }
+.hp-radek-telo > * { overflow-wrap: anywhere; }
+.hp-jamka { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 9999px; background: var(--hp-well); color: var(--hp-fg); }
+.hp-sipka { flex: none; color: var(--hp-faint); }
+
+/* ---------- Hlavička obrazovky a sekce ---------- */
+.hp-hlavicka { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 10px 0 22px; min-width: 0; }
+.hp-hlavicka > div { min-width: 0; }
+.hp-hlavicka .hp-meta { margin-bottom: 6px; }
+/* Druhý sloupec na počítači začíná nadpisem sekce: bez horního okraje, ať lícuje s prvním sloupcem. */
+@media (min-width: 1024px) { .hp-sloupec > .hp-sekce:first-child, .hp-sloupec > :first-child > .hp-sekce:first-child { margin-top: 0; } }
+.hp-sekce { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 30px 0 12px; min-width: 0; }
+.hp-sekce a, .hp-sekce button { font-size: 13px; font-weight: 500; color: var(--hp-muted); }
+@media (hover: hover) { .hp-sekce a:hover, .hp-sekce button:hover { color: var(--hp-fg); } }
+
+/* ---------- Tlačítka ---------- */
+.hp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; padding: 0 22px; border-radius: 9999px; font-weight: 600; font-size: 15px; line-height: 1; letter-spacing: -0.01em; white-space: nowrap; transition: transform 160ms var(--ease-out, ease-out), background-color 160ms ease, opacity 160ms ease; }
+@media (prefers-reduced-motion: no-preference) { .hp-btn:active:not(:disabled) { transform: scale(0.98); } }
+.hp-btn:disabled, .hp-btn[aria-disabled="true"] { cursor: not-allowed; }
+.hp-btn:focus-visible { outline: 2px solid var(--hp-fg); outline-offset: 3px; }
+.hp-btn-limetka { background-color: var(--hp-lime); color: #16181A; }
+.hp-btn-limetka:focus-visible { outline-color: var(--hp-fg); }
+.hp-btn-inkoust { background-color: var(--hp-btn-ink-bg); color: var(--hp-btn-ink-fg); }
+.hp-btn-limetka:disabled, .hp-btn-inkoust:disabled, .hp-btn-limetka[aria-disabled="true"], .hp-btn-inkoust[aria-disabled="true"] { background-color: var(--hp-well); color: var(--hp-muted); }
+/* Skleněné tlačítko: s třídou `lgx` (sklo z globals.css). */
+.hp-btn-sklo { color: var(--hp-fg); border: 1px solid rgba(255,255,255,0.75); box-shadow: var(--hp-sklo-stin); }
+:root[data-theme="dark"] .hp-btn-sklo { background: linear-gradient(150deg, rgba(255,255,255,0.09), rgba(255,255,255,0.05)); border-color: rgba(255,255,255,0.10); }
+/* Ikona v tlačítku se nikdy nesmrskne (dlouhý text v úzkém tlačítku ji jinak stlačí na pár px). */
+.hp-btn > svg { flex: none; }
+.hp-btn-stredni { height: 44px; padding: 0 16px; font-size: 14px; }
+.hp-btn-male { height: 36px; padding: 0 14px; font-size: 13px; }
+.hp-btn-blok { width: 100%; }
+/* Kulaté ikonové tlačítko (40 px, cíl 44 přes .tap-target). */
+.hp-kruh { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 9999px; color: var(--hp-fg); }
+.hp-kruh:focus-visible { outline: 2px solid var(--hp-fg); outline-offset: 2px; }
+/* Na inkoustové obálce. */
+.hp-kruh-obalka { background: rgba(255,255,255,0.12); color: #FFFFFF; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); }
+@media (hover: hover) { .hp-kruh-obalka:hover { background: rgba(255,255,255,0.2); } }
+.hp-kruh-obalka:focus-visible { outline-color: var(--hp-lime); }
+
+/* Avatar hosta: inkoustový kruh s iniciálami (tmavě světlý). */
+.hp-avatar { display: inline-grid; place-items: center; flex: none; border-radius: 9999px; background-color: var(--hp-btn-ink-bg); color: var(--hp-btn-ink-fg); font-weight: 600; letter-spacing: 0.02em; }
+
+/* ---------- Segment, čipy, pole ---------- */
+/* Obal kolem ui/Segmented: skleněná dráha, vybraná položka inkoustová. */
+.h-plocha .hp-segment .seg-draha, .hp-segment .seg-draha { background: linear-gradient(150deg, rgba(255,255,255,0.80), rgba(255,255,255,0.50)); box-shadow: var(--hp-sklo-stin); border: 1px solid rgba(255,255,255,0.75); }
+.hp-segment .seg-jezdec { background: var(--hp-btn-ink-bg); box-shadow: none; }
+.hp-segment [role="tab"] { font-size: 13px; font-weight: 550; padding-left: 12px; padding-right: 12px; min-height: 44px; height: 44px; }
+.hp-segment .seg-vybrano { color: var(--hp-btn-ink-fg); }
+:root[data-theme="dark"] .hp-segment .seg-draha { background: linear-gradient(150deg, rgba(255,255,255,0.075), rgba(255,255,255,0.035)); border-color: rgba(255,255,255,0.08); }
+:root[data-theme="dark"] .hp-segment .seg-jezdec { background: var(--hp-btn-ink-bg); box-shadow: none; }
+:root[data-theme="dark"] .hp-segment .seg-vybrano { color: var(--hp-btn-ink-fg); }
+/* Vybraná záložka nese i výplň jezdce (dosedne po jeho přejezdu): jezdec je sourozenec, ne předek,
+   takže bez ní by text vybrané záložky měl kontrast jen proti dráze (v tmavém 1,09:1). */
+.hp-segment [role="tab"][aria-selected="true"] { background-color: var(--hp-btn-ink-bg); transition: color 200ms ease, background-color 0s linear 240ms; }
+.hp-segment [role="tab"][aria-selected="false"] { transition-property: color; }
+@media (prefers-reduced-motion: reduce) { .hp-segment [role="tab"][aria-selected="true"] { transition: none; } }
+.hp-cip { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 14px; border-radius: 9999px; background-color: var(--hp-surface); box-shadow: inset 0 0 0 1px var(--hp-line); color: var(--hp-fg); font-size: 13px; font-weight: 550; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hp-cip[aria-pressed="true"], .hp-cip[aria-checked="true"], .hp-cip[aria-selected="true"] { background-color: var(--hp-btn-ink-bg); color: var(--hp-btn-ink-fg); box-shadow: none; }
+.hp-cip:disabled { background: transparent; color: var(--hp-muted); text-decoration: line-through; }
+.hp-cip:focus-visible { outline: 2px solid var(--hp-fg); outline-offset: 2px; }
+.hp-pole { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 6px 0 16px; border-radius: var(--hp-r-pole); background-color: var(--hp-surface); box-shadow: inset 0 0 0 1px var(--hp-line), 0 1px 2px rgba(25,35,15,0.04); color: var(--hp-fg); font-size: 15px; }
+.hp-pole:focus-within { box-shadow: inset 0 0 0 1.5px var(--hp-fg); }
+.hp-pole > input { flex: 1; min-width: 0; height: 48px; background: transparent; border: 0; outline: none; color: inherit; font: inherit; }
+.hp-pole > input::placeholder { color: var(--hp-muted); }
+.hp-pole-popis { display: block; margin: 0 0 8px 2px; font-size: 13px; font-weight: 550; color: var(--hp-fg); }
+
+/* ---------- Lístek s perforací (odměna, kupon, poukaz) ---------- */
+/* Dvě poloviny, každá s vlastní maskou výseče: perforace sedí na švu, ať je horní část jakkoli vysoká. */
+.hp-listek { position: relative; display: flex; flex-direction: column; filter: drop-shadow(0 10px 22px rgba(25,35,15,0.07)); }
+:root[data-theme="dark"] .hp-listek { filter: none; }
+.hp-listek-horni, .hp-listek-dolni { position: relative; background-color: var(--hp-surface); color: var(--hp-fg); }
+.hp-listek-horni { border-radius: var(--hp-r-karta) var(--hp-r-karta) 0 0; padding: 16px 20px 14px;
+  -webkit-mask: radial-gradient(circle 10px at 0 100%, #0000 97%, #000 100%) left / 51% 100% no-repeat, radial-gradient(circle 10px at 100% 100%, #0000 97%, #000 100%) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle 10px at 0 100%, #0000 97%, #000 100%) left / 51% 100% no-repeat, radial-gradient(circle 10px at 100% 100%, #0000 97%, #000 100%) right / 51% 100% no-repeat; }
+.hp-listek-dolni { border-radius: 0 0 var(--hp-r-karta) var(--hp-r-karta); padding: 12px 20px 14px; display: flex; align-items: center; gap: 12px; min-width: 0;
+  -webkit-mask: radial-gradient(circle 10px at 0 0, #0000 97%, #000 100%) left / 51% 100% no-repeat, radial-gradient(circle 10px at 100% 0, #0000 97%, #000 100%) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle 10px at 0 0, #0000 97%, #000 100%) left / 51% 100% no-repeat, radial-gradient(circle 10px at 100% 0, #0000 97%, #000 100%) right / 51% 100% no-repeat; }
+.hp-listek-dolni::before { content: ""; position: absolute; left: 20px; right: 20px; top: 0; border-top: 1.5px dashed var(--hp-line); }
+:root[data-theme="dark"] .hp-listek-dolni::before { border-top-color: rgba(255,255,255,0.14); }
+/* Lístek bez spodní poloviny (bez kódu a akce): celý zaoblený, bez výsečí. */
+.hp-listek-horni.hp-listek-sam { border-radius: var(--hp-r-karta); -webkit-mask: none; mask: none; }
+.hp-listek-titulek { font-size: 24px; font-weight: 620; letter-spacing: -0.028em; line-height: 1.15; margin-top: 11px; overflow-wrap: anywhere; }
+.hp-listek-vypnuty .hp-listek-horni, .hp-listek-vypnuty .hp-listek-dolni { color: var(--hp-muted); }
+.hp-listek-vypnuty .hp-mono { opacity: 0.6; }
+
+/* ---------- Obálka podniku ---------- */
+.hp-obalka { position: relative; overflow: hidden; isolation: isolate; min-height: 330px; display: flex; flex-direction: column; color: var(--hp-paper); background-color: #1A1C1F; background-image: linear-gradient(170deg, #24272A, #16181A 70%); }
+:root[data-theme="dark"] .hp-obalka { background-color: #1C1F22; background-image: linear-gradient(170deg, #2A2D31, #17191C 70%); box-shadow: inset 0 -1px 0 rgba(255,255,255,0.06); }
+.hp-obalka > .hp-tex { background: repeating-radial-gradient(circle at 84% 102%, rgba(240,233,214,0.09) 0 1px, transparent 1.5px 15px); -webkit-mask: none; mask: none; }
+.hp-obalka::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(118deg, rgba(255,255,255,0.08), transparent 45%); }
+.hp-obalka > :not(.hp-tex) { position: relative; z-index: 1; }
+.hp-obalka-lista { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px var(--hp-okraj) 0; }
+.hp-obalka-nazev { margin-top: auto; padding: 0 var(--hp-okraj) 56px; min-width: 0; }
+.hp-obalka-nazev .hp-display { overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; padding-bottom: 0.06em; }
+.hp-obalka-nadpis { font-size: 13px; color: rgba(244,241,232,0.66); margin-bottom: 10px; }
+/* Na telefonu přes celou šířku a až nahoru pod stavový řádek (main má okraj 20 a horní odsazení). */
+@media (max-width: 767.98px) {
+  .hp-obalka-prosah { margin-left: calc(-1 * var(--hp-okraj)); margin-right: calc(-1 * var(--hp-okraj)); margin-top: calc(-1 * max(env(safe-area-inset-top), 20px)); padding-top: env(safe-area-inset-top); }
+}
+/* Počítač: obálka je karta 220 px a list (rádius 22) přes ni přetáhne spodních 40 px jako na telefonu. */
+@media (min-width: 768px) { .hp-obalka { border-radius: var(--hp-r-karta); min-height: 220px; } .hp-obalka-nazev { padding-bottom: 60px; } }
+/* List přes obálku: vyjede o 28 px přes spodní hranu obálky. */
+.hp-list { position: relative; z-index: 2; margin-top: -28px; border-radius: 28px 28px 0 0; padding: 24px var(--hp-okraj) 40px; background: linear-gradient(to bottom, #F6F7F3 0 64px, rgba(246,247,243,0) 560px); }
+:root[data-theme="dark"] .hp-list { background: linear-gradient(to bottom, #0C0D0F 0 64px, rgba(12,13,15,0) 560px); }
+@media (max-width: 767.98px) { .hp-list-prosah { margin-left: calc(-1 * var(--hp-okraj)); margin-right: calc(-1 * var(--hp-okraj)); } }
+@media (min-width: 768px) {
+  .hp-list { margin-top: -40px; border-radius: var(--hp-r-karta) var(--hp-r-karta) 0 0; padding: 28px 0 40px; background: linear-gradient(to bottom, #F6F7F3 0 96px, rgba(246,247,243,0) 640px); }
+  :root[data-theme="dark"] .hp-list { background: linear-gradient(to bottom, #0C0D0F 0 96px, rgba(12,13,15,0) 640px); }
+}
+
+/* ---------- Prázdný stav: malý vějíř inkoustových karet ---------- */
+.hp-prazdno { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 28px 8px 8px; }
+.hp-vejir { position: relative; width: 168px; height: 112px; margin-bottom: 18px; }
+.hp-vejir > .hp-karta { position: absolute; left: 14px; top: 10px; width: 140px; height: 88px; padding: 0; }
+.hp-vejir > .hp-karta:nth-child(1) { transform: rotate(-9deg); }
+.hp-vejir > .hp-karta:nth-child(2) { transform: rotate(-2deg); top: 14px; }
+.hp-vejir > .hp-karta:nth-child(3) { transform: rotate(6deg); top: 20px; }
+.hp-prazdno .hp-h2 { max-width: 30ch; text-wrap: balance; }
+.hp-prazdno .hp-meta { max-width: 36ch; margin-top: 6px; text-wrap: pretty; }
+
+/* ---------- Přidat (čárkovaný slot) ---------- */
+.hp-slot { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 0 16px; border-radius: var(--hp-r-karta); border: 1.5px dashed var(--hp-line); color: var(--hp-fg); font-size: 15px; font-weight: 550; text-align: left; }
+:root[data-theme="dark"] .hp-slot { border-color: rgba(255,255,255,0.14); }
+@media (hover: hover) { .hp-slot:hover { background: var(--hp-well); } }
+.hp-slot:focus-visible { outline: 2px solid var(--hp-fg); outline-offset: 2px; }
+.hp-slot > .hp-meta { margin-left: auto; text-align: right; }
+
+/* ---------- Dok (sklo s limetkovou pilulkou „U kasy“) ---------- */
+.hp-dok-obal { position: fixed; z-index: 30; left: 14px; right: 14px; bottom: max(env(safe-area-inset-bottom), 12px); }
+@media (max-width: 359.98px) { .hp-dok-obal { left: 8px; right: 8px; } }
+.hp-dok { position: relative; display: flex; align-items: center; gap: 2px; height: var(--hp-dok-v); max-width: 28rem; margin: 0 auto; padding: 0 8px 0 6px; border-radius: 33px; }
+.lgx-strong.hp-dok { border-color: rgba(255,255,255,0.8); box-shadow: var(--hp-sklo-stin), 0 14px 38px -12px rgba(25,35,15,0.24); }
+:root[data-theme="dark"] .hp-dok { background: linear-gradient(150deg, rgba(36,39,43,0.86), rgba(24,26,29,0.80)); border-color: rgba(255,255,255,0.08); box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 14px 38px -12px rgba(0,0,0,0.7); }
+@media (prefers-reduced-transparency: reduce) { :root[data-theme="dark"] .hp-dok { background: #1C1F22; } }
+.hp-dok-tab { position: relative; flex: 1 1 0; min-width: 0; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--hp-muted); border-radius: 18px; -webkit-tap-highlight-color: transparent; }
+.hp-dok-tab[aria-current="page"] { color: var(--hp-fg); }
+.hp-dok-tab:focus-visible { outline: 2px solid var(--hp-fg); outline-offset: -2px; }
+.hp-dok-pil { display: grid; place-items: center; width: 46px; height: 30px; border-radius: 9999px; transition: background-color 200ms ease; }
+.hp-dok-tab[aria-current="page"] .hp-dok-pil { background: var(--hp-pilulka); }
+.hp-dok-tab .hp-mikro { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-dok-tab[aria-current="page"] .hp-mikro { font-weight: 650; }
+.hp-dok-odznak { position: absolute; top: 2px; left: calc(50% + 8px); min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9999px; display: grid; place-items: center; background-color: var(--hp-btn-ink-bg); color: var(--hp-btn-ink-fg); font-size: 10.5px; font-weight: 650; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--bg, #F6F7F3); }
+:root[data-theme="dark"] .hp-dok-odznak { box-shadow: 0 0 0 2px #0C0D0F; }
+.hp-dok-kasa { flex: none; margin-left: 4px; display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 18px 0 15px; border-radius: 25px; background-color: var(--hp-lime); color: #16181A; font-weight: 650; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; box-shadow: 0 6px 16px -6px rgba(79,106,7,0.45); -webkit-tap-highlight-color: transparent; }
+:root[data-theme="dark"] .hp-dok-kasa { box-shadow: 0 6px 18px -8px rgba(200,245,66,0.35); }
+@media (prefers-reduced-motion: no-preference) { .hp-dok-kasa { transition: transform 160ms var(--ease-out, ease-out); } .hp-dok-kasa:active { transform: scale(0.97); } }
+.hp-dok-kasa:focus-visible { outline: 2px solid var(--hp-fg); outline-offset: 2px; }
+@media (max-width: 359.98px) { .hp-dok-kasa { width: 50px; padding: 0; justify-content: center; } .hp-dok-kasa > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+/* Pod dokem obsah dobledne do plátna (ať text nepodjíždí pod sklo ostře). */
+.hp-zaclona { position: fixed; left: 0; right: 0; bottom: 0; height: 130px; z-index: 29; pointer-events: none; background-image: linear-gradient(to bottom, rgba(246,247,243,0), rgba(246,247,243,0.92) 70%); }
+:root[data-theme="dark"] .hp-zaclona { background-image: linear-gradient(to bottom, rgba(12,13,15,0), rgba(12,13,15,0.92) 70%); }
+
+/* ---------- Pozadí: skvrny (.lg-blob) + tmavá inkoustová atmosféra ---------- */
+.hp-atmosfera { position: absolute; inset: 0; display: none; }
+:root[data-theme="dark"] .hp-atmosfera { display: block; background-image: radial-gradient(120% 70% at 10% -10%, rgba(46,50,54,0.55), rgba(46,50,54,0) 60%), radial-gradient(90% 60% at 100% 100%, rgba(36,39,43,0.45), rgba(36,39,43,0) 70%); }
+:root[data-theme="dark"] .h-pozadi .lg-blob-lime   { background: rgba(200,245,66,0.13); }
+:root[data-theme="dark"] .h-pozadi .lg-blob-lime-2 { background: rgba(200,245,66,0.06); }
+:root[data-theme="dark"] .h-pozadi .lg-blob-cream  { background: rgba(240,233,214,0.04); }
+
+/* ---------- Přepínač v aplikaci hosta ----------
+   Zapnutý přepínač inkoustem (v tmavém krémem) s bílým / inkoustovým knoflíkem: limetka patří jen
+   pokroku a hlavní akci. Sdílený Switch z components/ui kreslí limetku, tady se jen přebarví. */
+.h-plocha [role="switch"][aria-checked="true"] { background-color: var(--hp-btn-ink-bg); }
+.h-plocha [role="switch"][aria-checked="true"] > span { background-color: var(--hp-btn-ink-fg); }
+.h-plocha [role="switch"][aria-checked="false"] { background-color: var(--hp-pilulka); }
+/* Dotyková plocha přepínače 44 px (sdílený Switch má jen 36 přes tap-target-sm). */
+.h-plocha [role="switch"]::before { height: max(100%, 44px); width: max(100%, 52px); }

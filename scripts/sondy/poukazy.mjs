@@ -302,6 +302,8 @@ async function host(viewport, mobil) {
   // Přestavba hosta (2026-10-21): Moje už pole „Mám poukaz“ nemá (Odměny mají jedno pole „Mám kód“, které
   // poukaz rovnou přidá); ověření zůstatku bez účtu je na stránce podniku. Obě části proto jdou na podnik.
   await p.goto(BASE + '/client/kavarna-u-lipy', { waitUntil: 'networkidle' });
+  // Směr A: bez ?tab je ověření poukazu schované v řádku „Mám poukaz nebo kód“ (O podniku), rozbalí se klepnutím.
+  await p.getByRole('button', { name: /Mám poukaz nebo kód/ }).first().click();
   await p.getByLabel('Kód z poukazu').or(p.getByPlaceholder('Kód z poukazu')).first().waitFor({ timeout: 10000 });
   await p.getByPlaceholder('Kód z poukazu').fill('abcd 2345');
   tvrdi(`${jm} Moje: kód se formátuje`, (await p.getByPlaceholder('Kód z poukazu').inputValue()) === 'ABCD-2345');

@@ -6,7 +6,8 @@
 // karty a obsluha hned vidí body, razítka, kupony i členství.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Modal } from '../ui';
+import { Modal } from '../ui';
+import { Icon } from '../Icons';
 import { useT } from '@/lib/i18n/client';
 import { useObal } from '../ObalProvider';
 import { otevriVeSystemu } from '@/lib/stahni';
@@ -82,22 +83,18 @@ async function kartaJakoPng(karta: Karta, jmeno: string, popisek: string): Promi
   return new Promise(res => canvas.toBlob(res, 'image/png'));
 }
 
-/** Dlaždice akce pod kartičkou: ikona nad popiskem, šedá jamka, text se smí zalomit. */
-const DLAZDICE = '!h-auto min-h-[4.5rem] !rounded-[14px] !whitespace-normal flex-col !px-2 !py-3 text-center leading-tight [text-wrap:balance]';
-
-export default function KartaNastroje({ karta, podniky }: { karta: Karta; podniky: Podnik[] }) {
+/** Akce s kartou (uložit jako obrázek, přidat na plochu, Wallet pro vybraný podnik) — sdílí je
+ *  dlaždice v Moje (výchozí export) a menu ⋯ otevřené karty (NabidkaKarty). */
+function useNastrojeKarty(karta: Karta | null, vyber: string) {
   const t = useT('klient-host');
   // V aplikaci z obchodu (obal) je „Přidat na plochu“ k ničemu — aplikace na ploše už je.
   const { jeObal } = useObal();
-  const [velky, setVelky] = useState(false);
-  const [vyber, setVyber] = useState(podniky[0]?.slug ?? '');
   const [zprava, setZprava] = useState('');
   const [instalace, setInstalace] = useState<any>(null);
   const [pomocPlocha, setPomocPlocha] = useState(false);
   const [ios, setIos] = useState(false);
   const [android, setAndroid] = useState(false);
   const [nainstalovana, setNainstalovana] = useState(true);
-  const umiDrzet = useDrzDisplej(velky);
 
   useEffect(() => {
     setIos(jeIos()); setAndroid(jeAndroid()); setNainstalovana(jeNainstalovana());
@@ -105,10 +102,10 @@ export default function KartaNastroje({ karta, podniky }: { karta: Karta; podnik
     window.addEventListener('beforeinstallprompt', pred);
     return () => window.removeEventListener('beforeinstallprompt', pred);
   }, []);
-  useEffect(() => { if (!podniky.some(p => p.slug === vyber)) setVyber(podniky[0]?.slug ?? ''); }, [podniky, vyber]);
   useEffect(() => { if (zprava) { const id = setTimeout(() => setZprava(''), 5000); return () => clearTimeout(id); } }, [zprava]);
 
   const ulozObrazek = useCallback(async () => {
+    if (!karta) return;
     try {
       const blob = await kartaJakoPng(karta, karta.name ?? '', t('Karta'));
       if (!blob) { setZprava(t('Karta se nenačetla.')); return; }
@@ -135,59 +132,135 @@ export default function KartaNastroje({ karta, podniky }: { karta: Karta; podnik
     setPomocPlocha(v => !v);
   }, [instalace]);
 
-  const wallet = karta.wallet ?? {};
+  const wallet = karta?.wallet ?? {};
   const jdeApple = !!wallet.apple && ios && !!vyber;
   const jdeGoogle = !!wallet.google && android && !!vyber;
   // Wallet přes prohlížeč systému: v obalu by navigace WebView na .pkpass nebo odkaz Googlu skončila
   // prázdnou obrazovkou; SFSafariViewController / Custom Tabs kartu nabídnou do peněženky. Na webu nová záložka.
   // V obalu nemá prohlížeč systému přihlášení z aplikace: aplikace si řekne o podepsaný odkaz na 10 minut.
-  const otevri = (cesta: 'apple' | 'google') => {
+  const doWallet = (cesta: 'apple' | 'google') => {
     if (!jeObal) { otevriVeSystemu(`/api/client/card/wallet/${cesta}?team=${encodeURIComponent(vyber)}`); return; }
     fetch('/api/client/cards/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ team: vyber, druh: cesta }) })
       .then(okJson).then(x => { if (typeof x?.url === 'string') otevriVeSystemu(x.url); else setZprava(t('Nepovedlo se.')); })
       .catch(() => setZprava(t('Nepovedlo se.')));
   };
+  const textPlocha = ios ? t('V Safari klepni na Sdílet a pak na Přidat na plochu. Karta se pak otevře jedním klepnutím.') : t('V menu prohlížeče zvol Přidat na plochu (nebo Nainstalovat aplikaci). Karta se pak otevře jedním klepnutím.');
+  return {
+    jeObal, nainstalovana, zprava, setZprava, ulozObrazek, naPlochu, jdeApple, jdeGoogle, doWallet,
+    plochaJde: !nainstalovana && !jeObal,
+    pomocPlocha: pomocPlocha && !instalace && !jeObal, setPomocPlocha, textPlocha, maPrompt: !!instalace,
+  };
+}
+
+export default function KartaNastroje({ karta, podniky }: { karta: Karta; podniky: Podnik[] }) {
+  const t = useT('klient-host');
+  const [velky, setVelky] = useState(false);
+  const [vyber, setVyber] = useState(podniky[0]?.slug ?? '');
+  const n = useNastrojeKarty(karta, vyber);
+  const { nainstalovana, jeObal } = n;
+  const umiDrzet = useDrzDisplej(velky);
+  useEffect(() => { if (!podniky.some(p => p.slug === vyber)) setVyber(podniky[0]?.slug ?? ''); }, [podniky, vyber]);
 
   return (
     <section aria-label={t('Nástroje karty')} className="space-y-3">
-      {/* v3: akce s kartou jako tiché dlaždice pod sebou (ikona nad popiskem, šedá jamka) — žádná
-          tmavá plná tlačítka vedle kartičky, ta je na obrazovce hlavní. */}
-      <div className={`grid gap-2 ${!nainstalovana && !jeObal ? 'grid-cols-3' : 'grid-cols-2'}`}>
-        <Button size="sm" variant="secondary" icon="card" className={DLAZDICE} onClick={() => setVelky(true)} disabled={!karta.svg}>{t('Zvětšit QR')}</Button>
-        <Button size="sm" variant="secondary" icon="download" className={DLAZDICE} onClick={ulozObrazek} disabled={!karta.svg}>{t('Uložit kartu jako obrázek')}</Button>
-        {!nainstalovana && !jeObal && <Button size="sm" variant="secondary" icon="plus" className={DLAZDICE} onClick={naPlochu} aria-expanded={pomocPlocha}>{t('Přidat na plochu')}</Button>}
+      {/* Akce pod kartou hosta jako skleněné pilulky (směr A), ne šedé dlaždice. */}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="hp-btn lgx hp-btn-sklo hp-btn-stredni" onClick={() => setVelky(true)} disabled={!karta.svg}><Icon name="qr" size={17} aria-hidden />{t('Zvětšit QR')}</button>
+        <button type="button" className="hp-btn lgx hp-btn-sklo hp-btn-stredni" onClick={() => void n.ulozObrazek()} disabled={!karta.svg} aria-label={t('Uložit kartu jako obrázek')}><Icon name="download" size={17} aria-hidden />{t('Uložit')}</button>
+        {!nainstalovana && !jeObal && <button type="button" className="hp-btn lgx hp-btn-sklo hp-btn-stredni" onClick={() => void n.naPlochu()} aria-expanded={n.pomocPlocha}><Icon name="plus" size={17} aria-hidden />{t('Přidat na plochu')}</button>}
       </div>
 
-      {(jdeApple || jdeGoogle) && (
+      {(n.jdeApple || n.jdeGoogle) && (
         <div className="flex flex-wrap items-center gap-2">
           {podniky.length > 1 && (
             <select value={vyber} onChange={e => setVyber(e.target.value)} aria-label={t('Podnik pro kartu v peněžence')} className="field !py-2 text-sm min-w-0 max-w-full w-full sm:w-auto">
               {podniky.map(p => <option key={p.slug} value={p.slug}>{p.name}</option>)}
             </select>
           )}
-          {jdeApple && <Button size="sm" variant="accent" icon="card" onClick={() => otevri('apple')}>{t('Přidat do Apple Wallet')}</Button>}
-          {jdeGoogle && <Button size="sm" variant="accent" icon="card" onClick={() => otevri('google')}>{t('Přidat do Google Wallet')}</Button>}
+          {n.jdeApple && <button type="button" className="hp-btn hp-btn-inkoust hp-btn-stredni" onClick={() => n.doWallet('apple')}><Icon name="card" size={16} aria-hidden />{t('Přidat do Apple Wallet')}</button>}
+          {n.jdeGoogle && <button type="button" className="hp-btn hp-btn-inkoust hp-btn-stredni" onClick={() => n.doWallet('google')}><Icon name="card" size={16} aria-hidden />{t('Přidat do Google Wallet')}</button>}
         </div>
       )}
 
-      {pomocPlocha && !instalace && !jeObal && (
-        <p className="note text-sm px-4 py-3 text-pretty">
-          {ios ? t('V Safari klepni na Sdílet a pak na Přidat na plochu. Karta se pak otevře jedním klepnutím.') : t('V menu prohlížeče zvol Přidat na plochu (nebo Nainstalovat aplikaci). Karta se pak otevře jedním klepnutím.')}
-        </p>
-      )}
-      {zprava && <p role="status" className="text-sm text-black/60">{zprava}</p>}
+      {n.pomocPlocha && <p className="hp-meta rounded-[14px] bg-[color:var(--hp-well)] px-4 py-3 text-pretty">{n.textPlocha}</p>}
+      {n.zprava && <p role="status" className="hp-meta">{n.zprava}</p>}
 
-      <Modal open={velky} onClose={() => setVelky(false)} title={t('Karta')} size="sm">
-        <div className="rounded-[22px] bg-white border border-black/[0.08] p-4 w-full aspect-square grid place-items-center [&_svg]:w-full [&_svg]:h-full">
+      <Modal open={velky} onClose={() => setVelky(false)} title={t('Karta')} size="sm" className="h-list-sklo h-plocha">
+        <div className="h-qr-pole w-full aspect-square p-4 shadow-[0_0_0_1px_rgba(22,24,26,0.06)]">
           {karta.svg && <span dangerouslySetInnerHTML={{ __html: karta.svg }} className="block w-full h-full" aria-hidden />}
         </div>
-        <p className="mt-4 text-center font-mono text-2xl font-bold tracking-[0.14em]">{karta.code}</p>
-        <p className="mt-3 text-sm text-black/60 text-center text-pretty">
+        <p className="hp-kod mt-4 text-center text-[22px]">{karta.code}</p>
+        <p className="hp-meta mt-3 text-center text-pretty">
           {umiDrzet
             ? t('Displej zůstane svítit. Pro rychlé načtení zvyš jas displeje na maximum.')
             : t('Zvyš jas displeje na maximum a nenech ho zhasnout, ať se QR načte hned.')}
         </p>
       </Modal>
     </section>
+  );
+}
+
+/** Menu ⋯ otevřené karty: Wallet pro tenhle podnik, uložit kartu jako obrázek, přidat na plochu.
+ *  Tlačítko s aria-haspopup, seznam s role=menu; šipky nahoru/dolů, Escape menu zavře (jen menu,
+ *  okno pod ním zůstane) a fokus se vrátí na ⋯. */
+export function NabidkaKarty({ karta, slug, className = '' }: { karta: Karta | null; slug: string; className?: string }) {
+  const t = useT('klient-host');
+  const n = useNastrojeKarty(karta, slug);
+  const [otevreno, setOtevreno] = useState(false);
+  const tlacitko = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const zavri = useCallback((fokus = true) => { setOtevreno(false); if (fokus) tlacitko.current?.focus(); }, []);
+
+  useEffect(() => {
+    if (!otevreno) return;
+    const polozky = () => Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []);
+    const id = setTimeout(() => polozky()[0]?.focus(), 0);
+    // Zachytává se na window (před posluchačem okna na dokumentu): Escape zavře jen menu.
+    const klavesa = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); zavri(); return; }
+      if (e.key === 'Tab') { zavri(false); return; }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+      const p = polozky(); if (!p.length) return;
+      e.preventDefault();
+      const i = p.indexOf(document.activeElement as HTMLElement);
+      const dalsi = e.key === 'Home' ? 0 : e.key === 'End' ? p.length - 1 : e.key === 'ArrowDown' ? (i + 1) % p.length : (i - 1 + p.length) % p.length;
+      p[dalsi]?.focus();
+    };
+    const mimo = (e: PointerEvent) => {
+      const c = e.target as Node;
+      if (menu.current?.contains(c) || tlacitko.current?.contains(c)) return;
+      zavri(false);
+    };
+    window.addEventListener('keydown', klavesa, true);
+    document.addEventListener('pointerdown', mimo, true);
+    return () => { clearTimeout(id); window.removeEventListener('keydown', klavesa, true); document.removeEventListener('pointerdown', mimo, true); };
+  }, [otevreno, zavri]);
+
+  const akce = (f: () => void) => () => { zavri(); f(); };
+  const POLOZKA = 'flex w-full min-h-[48px] items-center gap-3 rounded-[14px] px-3.5 text-left text-[15px] font-medium text-[color:var(--hp-fg)] hover:bg-[color:var(--hp-well)] focus-visible:bg-[color:var(--hp-well)] focus-visible:outline-none disabled:opacity-50';
+  const poznamka = n.pomocPlocha ? n.textPlocha : n.zprava;
+
+  return (
+    <div className={`relative ${className}`}>
+      <button ref={tlacitko} type="button" onClick={() => setOtevreno(v => !v)} aria-haspopup="menu" aria-expanded={otevreno}
+        aria-label={t('Další akce s kartou')} title={t('Další akce s kartou')} className="hp-kruh tap-target lgx hp-btn-sklo">
+        <Icon name="more" size={18} strokeWidth={1.6} />
+      </button>
+      {otevreno && (
+        <div ref={menu} role="menu" aria-label={t('Další akce s kartou')}
+          className="lgx-strong hp-sklo absolute right-0 top-full z-10 mt-2 w-[min(17rem,calc(100vw-40px))] p-1.5">
+          {n.jdeApple && <button type="button" role="menuitem" className={POLOZKA} onClick={akce(() => n.doWallet('apple'))}><Icon name="card" size={18} strokeWidth={1.6} aria-hidden />{t('Přidat do Apple Wallet')}</button>}
+          {n.jdeGoogle && <button type="button" role="menuitem" className={POLOZKA} onClick={akce(() => n.doWallet('google'))}><Icon name="card" size={18} strokeWidth={1.6} aria-hidden />{t('Přidat do Google Wallet')}</button>}
+          <button type="button" role="menuitem" className={POLOZKA} disabled={!karta?.svg} onClick={akce(() => void n.ulozObrazek())}><Icon name="download" size={18} strokeWidth={1.6} aria-hidden />{t('Uložit kartu jako obrázek')}</button>
+          {n.plochaJde && <button type="button" role="menuitem" className={POLOZKA} onClick={akce(() => { if (n.maPrompt) void n.naPlochu(); else n.setPomocPlocha(true); })}><Icon name="plus" size={18} strokeWidth={1.6} aria-hidden />{t('Přidat na plochu')}</button>}
+        </div>
+      )}
+      {!otevreno && poznamka && (
+        <div role="status" className="lgx-strong hp-sklo absolute right-0 top-full z-10 mt-2 w-[min(17rem,calc(100vw-40px))] px-4 py-3 text-left">
+          <p className="hp-meta text-pretty">{poznamka}</p>
+          {n.pomocPlocha && <button type="button" onClick={() => n.setPomocPlocha(false)} className="hp-btn hp-btn-male lgx hp-btn-sklo mt-2 tap-target-sm">{t('Rozumím')}</button>}
+        </div>
+      )}
+    </div>
   );
 }

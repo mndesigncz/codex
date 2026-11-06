@@ -2282,3 +2282,48 @@ kterém stála skleněná prodejní stránka (třídy zůstaly v `app/globals.cs
   vůbec, takže `prefers-reduced-motion` nemá co tlumit.
 - **Správa** zůstává ve stylu aplikace; skleněný povrch má jen rám náhledu hosta (`RamTelefonu`: Věrnost,
   Stránka podniku), ať náhled odpovídá tomu, co host uvidí.
+
+## Host: směr A „Peněženka“ (2026-11)
+
+Martin vybral směr A („Směr A je boží“): karty podniků jako fyzické inkoustové karty v balíčku. Sdílená
+vrstva: `components/client/penezenka/*` (komponenty), `app/host-penezenka.css` (tokeny `--hp-*`, třídy
+`.hp-*`, každá s tmavou variantou), vzorník všech prvků na `/client/demo/vzornik`. Starší `.h-*` a
+`KartaPodniku` zůstávají kvůli náhledům ve správě.
+
+- **Tokeny:** rádius karty, listu, lístku i seznamu 22 (`--hp-r-karta`), pole 14, okraj stránky 20
+  (`--hp-okraj`), přední karta 214, z zasunuté karty kouká 62, monogram 36, dok 66.
+- **Písmo (Geist, kontrast řezů):** `.hp-display` 80/250 (název na obálce), `.hp-cislo` 76/250
+  (číslo na kartě), `.hp-titulek` 32/620, `.hp-h2` 17/600, `.hp-text`/`.hp-silny` 15, `.hp-meta` 13,
+  `.hp-mikro` 11; čísla tabulárně (`.hp-num`), kódy prostrkaně (`.hp-kod`, 0.16em).
+- **Inkoustová karta** (`InkoustovaKarta`, varianty `zasunuta` / `predni` / `otevrena`): jednotná
+  hlavička — monogram na krému, jméno 15/600, popis 12, hodnota vpravo tabulárně; tvář podniku je
+  krémová textura (kruhy / koleje / tečky podle slugu), **nikdy barva značky** (logo jen v odstínech
+  inkoustu na krému). Limetka jen na pokroku (dílky razítek, kolečka, lišta bodů) a na hlavní akci.
+- **Balíček** (`BalicekKaret`): zadní karty zasunuté, přední vysunutá s „7 / 10“; ťuk = otevřená karta
+  přes celou obrazovku (QR, kód, razítka); `ZasunuteKarty` dole „+2 karty“.
+- **Lístek s perforací** (`Listek`) pro odměny, kupony a poukazy; **seznam** (`Seznam` + `Radek`) na
+  skle `.lgx.hp-sklo`; žádné karty v kartách.
+- **Obálka podniku** (`ObalkaPodniku` + `ListObalky`): inkoust s letokruhy a velkým lehkým názvem, list
+  vyjede o 28 px přes ni (na počítači o 40 px přes obálku 220 px).
+- **Dok:** sklo `.lgx-strong.hp-dok`, `Karty · Podniky · Odměny · Aktivita` + limetková pilulka „U kasy“
+  vpravo (pod 360 px jen ikona); aktivní položka tichá inkoustová pilulka; pod dokem `.hp-zaclona`.
+- **Tmavý režim:** vlastní inkoustová atmosféra (`.hp-atmosfera` pod skvrnami), karty o tón světlejší
+  inkoust, sklo bílé 3–8 %. Inkoustové plochy mají pevnou `background-color` (sonda dark.mjs).
+- **Stav odměny z jednoho zdroje** (`components/client/host/model.ts`): když hotová odměna čeká,
+  dárek na kartě svítí limetkou (`razitka.ceka` / `postup.ceka`) a štítek říká obojí („Odměna čeká ·
+  další za 2“); Domů, otevřená karta, U kasy i Moje karta na stránce podniku berou stejné věty
+  (`odmenaCekaNazev`, `odmenaCekaVeta`).
+- **Monogram** jen přes `Monogram`: vždy zaoblený čtverec (rádius 10/36 velikosti) na krému, 36 v
+  hlavičkách karet a řádků, 28 na lístku, 56 jen pod obálkou podniku.
+- **Počítač (1280):** jeden kontejner `max-w-5xl`, levá hrana obsahu = hrana loga. Domů 400 px balíček
+  + otevřená karta (řádek nástrojů má šířku karty); podnik: obálka 220 px, list ji překryje o 40 px,
+  vlevo hlavička + Moje karta + O podniku, vpravo záložky; Odměny / Podniky / Profil dva sloupce;
+  Aktivita filtry vlevo (sticky); co zůstává v jednom sloupci, má 672 px od levé hrany (ne na střed).
+- **Přepínač** (`role=switch`) v aplikaci hosta zapnutý inkoustem (v tmavém krémem), ne limetkou.
+- **Červená** je v aplikaci hosta jen v potvrzovacím okně nevratné akce (smazání účtu) a v chybové
+  hlášce; tlačítko, které okno otevře, je skleněné s ikonou koše. Jantar se nepoužívá: brzy končící
+  platnost je tučně inkoustem („Končí za 3 dny · do 9. 11.“).
+- **Fokus z klávesnice** na inkoustové kartě: obrys `--hp-fg` 2 px + limetkový prstenec vně.
+- **Dotykové cíle 44:** segmenty `.hp-segment` mají 44 px, textové odkazy a čipy `.tap-target`.
+- **Slovník po oblastech:** nové věty hosta jdou do `locales/<j>/klient-host.<část>.json`
+  (`domov`, `podnik`, `odmeny`, `ucet`; `CASTI_SEKCI` v `lib/i18n/slovniky.ts`), za běhu jedna sekce.

@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
+// Managero client, směr A „Peněženka“ (tokeny --hp-*, třídy .hp-*): globálně, ať ho má i náhled hosta ve správě.
+import './host-penezenka.css';
 import { SessionProvider } from './providers';
 import { ObalProvider } from '@/components/ObalProvider';
 import { obalZHlavicek } from '@/lib/obal';

@@ -5,7 +5,6 @@
 // „dnes“ (rezervace, objednávka, kupon, kterému končí platnost). Čisté funkce bez fetch.
 
 import { tierForMember, dayKey } from '@/lib/clientSlots';
-import type { KartaPodnikuProps } from '../karta/KartaPodniku';
 import type { Hodnoty } from '@/lib/i18n/core';
 
 type T = (cs: string, p?: Hodnoty) => string;
@@ -42,54 +41,147 @@ export function dniDo(den: string | null | undefined, dnes: string): number | nu
   return Math.round((b - a) / 86_400_000);
 }
 
-/** Props karty podniku pro domov a U kasy. */
-export function kartaZClenstvi(m: any, odmeny: Odmena[], t: T): KartaPodnikuProps & { razitka: { pocet: number; cil: number; data: (string | null)[]; kampanId: number } | null } {
-  const moje = odmeny.filter(o => o.slug === m.slug);
-  const lv = tierForMember({ visits: Number(m.visits), spend: Number(m.spend), lastVisitAt: m.lastVisitAt }, m.tiers);
-  const uroven = lv.id !== 'bronze' ? t(lv.label) : '';
+/** Úroveň hosta v podniku pro trojici pod QR (body · úroveň a sleva · kolik zbývá do další). */
+export interface UrovenHosta {
+  id: string;
+  nazev: string;
+  sleva: number;
+  /** Další úroveň (přeložená), null = nejvyšší. */
+  dalsi: string | null;
+  /** Kolik návštěv (nebo útraty v měně podniku) zbývá do další úrovně. */
+  zbyva: number | null;
+  jednotka: 'visits' | 'spend';
+  /** Měna podniku pro útratu (z členství). */
+  mena: string;
+}
+
+/** Karta podniku ve směru A: props pro InkoustovaKarta (balíček, otevřená karta, U kasy) a pár čísel navíc. */
+export interface KartaHosta {
+  slug: string;
+  nazev: string;
+  klic: string;
+  logoUrl: string | null;
+  /** Druhý řádek hlavičky („Káva podle výběru · Stříbrný host“, „Body · Zlatý host“). */
+  popis: string;
+  /** Hodnota vpravo v hlavičce zasunuté karty („8 / 10“, „320 b.“). */
+  hodnota: string;
+  /** Velké číslo přední a otevřené karty a menší „/ 10“ nebo „b.“ za ním. */
+  cislo: number;
+  z: string;
+  /** Štítek za číslem v balíčku („ještě 2 do odměny“, „Káva je připravená“). */
+  stitek: string;
+  /** Štítek za číslem na otevřené kartě („poslední 4. 11.“); bez návštěvy stejný jako `stitek`. */
+  stitekOtevrena: string;
+  /** Věta pod otevřenou kartou („Ještě 2 razítka a Káva podle výběru je tvoje“). */
+  veta: string;
+  /** `ceka` = hotová odměna čeká na uplatnění: dárek na kartě svítí limetkou. */
+  razitka: { pocet: number; cil: number; popis: string; ceka?: boolean } | null;
+  postup: { podil: number; popis: string; ceka?: boolean } | null;
+  /** Hotová odměna čeká (stejný stav ukazuje balíček, otevřená karta i U kasy). */
+  odmenaCeka: boolean;
+  /** Odměny tohohle podniku připravené k uplatnění. */
+  pripravene: Odmena[];
+  /** Jak blízko je host odměně (0–1, připravená odměna 2): přední karta balíčku je ta nejbližší. */
+  blizkost: number;
+  body: number;
+  uroven: UrovenHosta;
+  /** Celá věta pro odečítač. */
+  aria: string;
+}
+
+/** Karta podniku z členství (domov, otevřená karta, U kasy). Barvu podniku záměrně nenese. */
+export function kartaZClenstvi(m: any, odmeny: Odmena[], t: T): KartaHosta {
+  const slug = String(m?.slug ?? '');
+  const nazev = String(m?.name ?? '');
+  const moje = odmeny.filter(o => o.slug === slug);
+  const lv = tierForMember({ visits: Number(m?.visits), spend: Number(m?.spend), lastVisitAt: m?.lastVisitAt }, m?.tiers);
+  const jmenoUrovne = lv.id !== 'bronze' ? t(lv.label) : '';
+  const hodnotaUrovne = lv.unit === 'spend' ? Number(m?.spend) || 0 : Number(m?.visits) || 0;
+  const uroven: UrovenHosta = {
+    id: lv.id, nazev: t(lv.label), sleva: Number(lv.discount) || 0,
+    dalsi: lv.nextLabel ? t(lv.nextLabel) : null,
+    zbyva: lv.nextAt != null ? Math.max(0, Math.ceil(lv.nextAt - hodnotaUrovne)) : null,
+    jednotka: lv.unit === 'spend' ? 'spend' : 'visits',
+    mena: String(m?.currency || 'CZK'),
+  };
+  const body = Number(m?.points) || 0;
+  const pripravena = moje[0] ?? null;
+  const vetaPripravena = pripravena ? odmenaCekaVeta(pripravena, t) : '';
+  /** Štítek s hotovou odměnou: obě informace naráz („Odměna čeká · další za 2“). */
+  const stitekCeka = (zbyva: string | null) => (zbyva ? t('Odměna čeká · další za {n}', { n: zbyva }) : t('Odměna čeká'));
+  const zaklad = { slug, nazev, klic: slug || nazev, logoUrl: m?.logoUrl || null, pripravene: moje, body, uroven };
+  const posledniDen = (den: unknown) => (den ? t('poslední {datum}', { datum: denMesicRok(String(den)) }) : '');
+
+  const razitkova = (pocetRaw: number, cil: number, nazevKampane: string, odmena: string, data: (string | null)[]): KartaHosta => {
+    const pocet = Math.max(0, Math.min(pocetRaw || 0, cil));
+    const zbyva = Math.max(0, cil - pocet);
+    const stitek = pripravena ? stitekCeka(zbyva > 0 ? String(zbyva) : null)
+      : zbyva > 0 ? t('ještě {n} do odměny', { n: zbyva }) : t('karta je plná');
+    const veta = vetaPripravena
+      || (zbyva === 0 ? t('Karta je plná — odměnu ti obsluha vydá u kasy')
+        : odmena ? t('Ještě {n, plural, one {# razítko} few {# razítka} other {# razítek}} a {odmena} je tvoje', { n: zbyva, odmena })
+        : t('Ještě {n, plural, one {# razítko} few {# razítka} other {# razítek}} do odměny', { n: zbyva }));
+    const posledni = [...data].reverse().find(Boolean) ?? (pocet > 0 ? m?.lastVisitAt : null);
+    const popis = [nazevKampane || t('Razítka'), jmenoUrovne || (nazevKampane ? t('razítka') : '')].filter(Boolean).join(' · ');
+    const hodnota = `${pocet} / ${cil}`;
+    return {
+      ...zaklad, popis, hodnota, cislo: pocet, z: `/ ${cil}`, stitek,
+      stitekOtevrena: pripravena ? stitek : posledniDen(posledni) || stitek, veta,
+      razitka: { pocet, cil, ceka: !!pripravena, popis: [t('{n} z {cil} razítek', { n: pocet, cil }), pripravena ? t('Odměna čeká') : ''].filter(Boolean).join(', ') },
+      postup: null, odmenaCeka: !!pripravena,
+      blizkost: pripravena ? 2 : pocet / Math.max(1, cil),
+      aria: [nazev, popis, hodnota, stitek].filter(Boolean).join(', '),
+    };
+  };
+
   const kamp = hlavniKampan(m);
-  const pripraveno = moje.length ? t('Připraveno') : null;
-  const zaklad = { nazev: String(m.name ?? ''), logoUrl: m.logoUrl || null, barva: m.accent || null, pripraveno };
   if (kamp) {
     const cil = Number(kamp.required);
-    const pocet = Math.min(Number(kamp.stamps) || 0, cil);
-    const zbyva = Math.max(0, cil - pocet);
-    const odmena = String(kamp.reward || m.stampReward || '');
-    return {
-      ...zaklad,
-      podtitul: [t('razítka'), uroven].filter(Boolean).join(' · '),
-      cislo: pocet, jednotka: t('/ {n, plural, one {# razítko} few {# razítek} other {# razítek}}', { n: cil }),
-      veta: moje.length ? t('{odmena} — ukaž kartu u kasy', { odmena: moje[0].title })
-        : odmena ? t('Ještě {n, plural, one {# razítko} few {# razítka} other {# razítek}} a {odmena} je tvoje', { n: zbyva, odmena })
-        : t('Ještě {n, plural, one {# razítko} few {# razítka} other {# razítek}} do odměny', { n: zbyva }),
-      razitka: { pocet, cil, data: (m.razitkaData?.[String(kamp.id)] ?? []) as (string | null)[], kampanId: Number(kamp.id) },
-    };
+    return razitkova(Number(kamp.stamps), cil, String(kamp.name ?? ''), String(kamp.reward || m?.stampReward || ''),
+      (m?.razitkaData?.[String(kamp.id)] ?? []) as (string | null)[]);
   }
-  if (Number(m.stampTarget) > 0 && !(Number(m.points) > 0)) {
-    const cil = Number(m.stampTarget);
-    const pocet = Math.min(Number(m.stamps) || 0, cil);
-    return {
-      ...zaklad,
-      podtitul: [t('razítka'), uroven].filter(Boolean).join(' · '),
-      cislo: pocet, jednotka: t('/ {n, plural, one {# razítko} few {# razítek} other {# razítek}}', { n: cil }),
-      veta: moje.length ? t('{odmena} — ukaž kartu u kasy', { odmena: moje[0].title })
-        : t('Ještě {n, plural, one {# razítko} few {# razítka} other {# razítek}} do odměny', { n: Math.max(0, cil - pocet) }),
-      razitka: { pocet, cil, data: [], kampanId: 0 },
-    };
+  if (Number(m?.stampTarget) > 0 && !(Number(m?.points) > 0)) {
+    return razitkova(Number(m?.stamps), Number(m.stampTarget), '', String(m?.stampReward ?? ''), []);
   }
-  const body = Number(m.points) || 0;
-  const zebricek: { title: string; cost: number }[] = Array.isArray(m.zebricek) ? m.zebricek : [];
-  const dalsi = zebricek.find(z => z.cost > body);
+
+  const zebricek: { title: string; cost: number }[] = Array.isArray(m?.zebricek) ? m.zebricek : [];
+  const dalsi = zebricek.find(z => z.cost > body) ?? null;
+  const popis = [t('Body'), jmenoUrovne].filter(Boolean).join(' · ');
+  const hodnota = `${body} ${t('b.')}`;
+  const stitek = pripravena ? stitekCeka(dalsi ? t('{n} b.', { n: dalsi.cost - body }) : null)
+    : dalsi ? t('ještě {n} b. do odměny', { n: dalsi.cost - body }) : '';
+  const veta = vetaPripravena
+    || (m?.expiring ? t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: m.expiring.points, kdy: denMesicRok(m.expiring.till) })
+      : dalsi ? t('Ještě {n} b. do odměny {odmena}', { n: dalsi.cost - body, odmena: dalsi.title }) : '');
   return {
-    ...zaklad,
-    podtitul: [t('body'), uroven].filter(Boolean).join(' · '),
-    cislo: body, jednotka: t('b.'),
-    prahy: zebricek.length ? { body, prahy: zebricek.slice(0, 3).map(z => ({ at: z.cost, nazev: z.title })) } : null,
-    veta: moje.length ? t('{odmena} — ukaž kartu u kasy', { odmena: moje[0].title })
-      : m.expiring ? t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: m.expiring.points, kdy: denMesicRok(m.expiring.till) })
-      : dalsi ? t('Ještě {n} b. do odměny {odmena}', { n: dalsi.cost - body, odmena: dalsi.title }) : undefined,
+    ...zaklad, popis, hodnota, cislo: body, z: t('b.'), stitek,
+    stitekOtevrena: pripravena ? stitek : posledniDen(m?.lastVisitAt) || stitek, veta,
     razitka: null,
+    postup: dalsi || pripravena ? {
+      podil: dalsi ? body / dalsi.cost : 1, ceka: !!pripravena,
+      popis: [dalsi ? t('{n} z {cil} b. do odměny {odmena}', { n: body, cil: dalsi.cost, odmena: dalsi.title }) : '', pripravena ? t('Odměna čeká') : ''].filter(Boolean).join(', '),
+    } : null,
+    odmenaCeka: !!pripravena,
+    blizkost: pripravena ? 2 : dalsi ? body / dalsi.cost : 0,
+    aria: [nazev, popis, hodnota, stitek].filter(Boolean).join(', '),
   };
+}
+
+/** Název hotové odměny pro přepínač u kasy a lístky („Káva podle výběru čeká“). Jeden zdroj pro Domů, kartu i U kasy. */
+export function odmenaCekaNazev(o: Pick<Odmena, 'title'>, t: T): string {
+  return t('{odmena} čeká', { odmena: o.title });
+}
+
+/** Věta pod otevřenou kartou, když odměna čeká („Káva podle výběru čeká — ukaž kartu u kasy“). */
+export function odmenaCekaVeta(o: Pick<Odmena, 'title'>, t: T): string {
+  return t('{odmena} čeká — ukaž kartu u kasy', { odmena: o.title });
+}
+
+/** Index karty, která má v balíčku jít dopředu: připravená odměna, jinak nejblíž odměně (při shodě první). */
+export function indexPredni(karty: Pick<KartaHosta, 'blizkost'>[]): number {
+  let nej = 0;
+  karty.forEach((k, i) => { if (k.blizkost > karty[nej].blizkost) nej = i; });
+  return nej;
 }
 
 /** „2026-11-12“ → „12. 11.“ */

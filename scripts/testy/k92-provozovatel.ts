@@ -10,5 +10,7 @@ export default function ({ ok }: Testy) {
   ok('komponenta: věta z lib/firma.ts a právní odkazy (vč. Podpory)', /identifikace\(f, jazyk\)/.test(k) && /firma\(\{\}\)/.test(k) && /<PravniOdkazy/.test(k));
   ok('věta nese jméno, IČO, sídlo, zápis a DPH', [/Martin Nemeškal/, /IČO 17944953/, /Javorník/, /živnostenském rejstříku/, /Neplátce DPH/].every(r => r.test(identifikace(firma({})))));
   ok('Nastavení → O aplikaci', /<ProvozovatelInfo/.test(cti('components/Settings.tsx')));
-  ok('Managero client → Moje (účet hosta)', /<ProvozovatelInfo/.test(cti('components/client/UcetHosta.tsx')));
+  // Host (směr A): právní dokumenty jako řádkový seznam a pod ním stejná věta o provozovateli.
+  const u = cti('components/client/UcetHosta.tsx');
+  ok('Managero client → Moje (účet hosta)', /<ProvozovatelInfo/.test(u) || (/identifikace\(f, jazyk\)/.test(u) && /firma\(\{\}\)/.test(u) && /ODKAZY_PRAVNI/.test(u) && /'podpora'/.test(u)));
 }

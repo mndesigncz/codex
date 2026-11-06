@@ -43,13 +43,14 @@ await p.goto(BASE + '/client/cafe-am-ring?tab=reserve', { waitUntil: 'networkidl
 await p.waitForTimeout(2000);
 
 console.log('Rezervace, když uprostřed odesílání vypadne spojení:');
-const okno = p.getByRole('dialog');
+// Směr A: rezervace je přímo na stránce podniku (sklo v sekci #rezervovat), ne v okně; ?tab=reserve na ni skočí.
+const okno = p.locator('#rezervovat');
 const cas = okno.locator('button', { hasText: /^\d{1,2}:\d{2}$/ }).first();
 if (await cas.count() === 0) { bad('nejsou nabídnuté časy — fixture?'); }
 else {
   await cas.click();
   await p.waitForTimeout(400);
-  const odeslat = okno.getByRole('button', { name: /^(Rezervovat \d|Odeslat|Odesílám)/ }).first();
+  const odeslat = okno.getByRole('button', { name: /^(Rezervovat \d|Rezervovat ·|Odeslat|Odesílám)/ }).first();
   if (await odeslat.count() === 0) { bad('tlačítko odeslat není'); }
   else {
     await odeslat.click();

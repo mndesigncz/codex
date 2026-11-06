@@ -18,11 +18,13 @@ import { useJazyk, useT } from '@/lib/i18n/client';
 //
 // Žádné vlajky: vlajka není jazyk (cs/sk, de/at).
 
-export default function JazykMenu({ nabizet = JAZYKY, align = 'right', className = '', onZmena }: {
+export default function JazykMenu({ nabizet = JAZYKY, align = 'right', className = '', tlacitkoClassName, onZmena }: {
   /** Jazyky v nabídce; host vidí jen ty, které podnik nabízí. */
   nabizet?: readonly Jazyk[];
   align?: 'left' | 'right';
   className?: string;
+  /** Vlastní vzhled tlačítka místo šedého čipu (aplikace hosta: skleněná pilulka). */
+  tlacitkoClassName?: string;
   onZmena?: (j: Jazyk) => void;
 }) {
   const t = useT();
@@ -50,7 +52,7 @@ export default function JazykMenu({ nabizet = JAZYKY, align = 'right', className
         aria-label={`${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`}
         // Vizuálně malá pilulka, dotyková plocha 44 px: `before` ji roztahuje, rozvržení se nehýbe.
         // v4 (P18, audit V13): v liště vedle kruhů 40 má pilulka jazyka jejich výšku (dřív 24 vedle 36 a 40).
-        className="chip chip-muted relative inline-flex h-10 items-center gap-1.5 cursor-pointer select-none before:absolute before:-inset-x-1 before:-inset-y-0.5 before:content-['']"
+        className={`${tlacitkoClassName ?? 'chip chip-muted h-10'} relative inline-flex items-center gap-1.5 cursor-pointer select-none before:absolute before:-inset-x-1 before:-inset-y-0.5 before:content-['']`}
       >
         <Icon name="globe" size={13} className="shrink-0" />
         <span className="tabular-nums font-semibold tracking-wide">{JAZYK_KOD[jazyk]}</span>

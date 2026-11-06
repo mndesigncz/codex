@@ -79,7 +79,7 @@ export default function ({ eq, ok }: Testy) {
   ok('oznámení rozesílky jen se souhlasem podniku', /procNedostanePush\(x\) === null/.test(bc) && /notifyUsers\(pushIds/.test(bc));
   ok('e-mail rozesílky: IČO a odkaz po podnicích', /ico: kontext\.ico/.test(bc) && /odkazOdhlaseni\(odkazovyZaklad\(\), p\.id, Number\(row\.team_id\)\)/.test(bc));
   ok('vstup do členství: novinky jen s výslovným true', /b\?\.novinky === true/.test(cti('app/api/client/b/[slug]/join/route.ts')));
-  ok('stránka podniku: zaškrtávátko „Chci novinky od …“ výchozí NE', /useState\(false\)/.test(cti('components/client/BusinessPage.tsx')) && /Chci novinky od \{podnik\}/.test(cti('components/client/BusinessPage.tsx')));
+  ok('stránka podniku: zaškrtávátko „Chci novinky od …“ výchozí NE', /\[chciNovinky, setChciNovinky\] = useState\(false\)/.test(cti('components/client/BusinessPage.tsx')) && /Chci novinky od \{podnik\}/.test(cti('components/client/host/podnik/MojeKarta.tsx')));
   const db = cti('lib/consentsDb.ts');
   ok('tabulka se jen doplňuje (žádný UPDATE ani DELETE nad consents)', !/UPDATE consents|DELETE FROM consents/.test(db));
   ok('převod: kanál „prevod“ a jen pro ty, kdo o novinkách ještě nic nemají', /'prevod'/.test(db) && /NOT EXISTS \(SELECT 1 FROM consents c WHERE c\.user_id = u\.id AND c\.typ IN \('novinky_push', 'novinky_email'\)\)/.test(db));

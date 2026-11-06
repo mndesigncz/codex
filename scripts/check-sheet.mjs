@@ -31,6 +31,9 @@ const nalezy = [];
 for (const soubor of KOREN.flatMap(souboryTsx)) {
   const txt = readFileSync(soubor, 'utf8');
   if (!PREKRYV.test(txt) || !KRESLI.test(txt)) continue;
+  // Okno přes CELOU obrazovku (otevřená karta hosta, směr A) nevisí uprostřed — zakryje všechno
+  // a vlastní plátno je záměr. Přihlásí se komentářem `check-sheet: cela-obrazovka`.
+  if (txt.includes('check-sheet: cela-obrazovka')) continue;
   const chybi = [];
   if (!txt.includes('modal-overlay')) chybi.push('modal-overlay');
   if (!txt.includes('modal-sheet')) chybi.push('modal-sheet');

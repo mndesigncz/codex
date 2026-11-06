@@ -32,6 +32,16 @@ export type Sekce = (typeof SEKCE)[number];
  */
 export const SEKCE_VZDY: readonly Sekce[] = SEKCE;
 
+/**
+ * Části slovníku sekce v samostatných souborech `locales/<jazyk>/<sekce>.<část>.json`, které se slučují
+ * se základním `<sekce>.json`. Přestavba hosta (směr A „Peněženka“) jde po oblastech souběžně: každá
+ * oblast píše nové věty jen do své části, takže žádný soubor slovníku nesdílí (domov = Domů a karta,
+ * podnik = Podniky a podnik, odmeny = Odměny a aktivita, ucet = Účet a vstup). Za běhu je to jedna sekce.
+ */
+export const CASTI_SEKCI: Partial<Record<Sekce, readonly string[]>> = {
+  'klient-host': ['domov', 'podnik', 'odmeny', 'ucet'],
+};
+
 const rozpracovano = new Map<string, Promise<Slovnik>>();
 
 /** Jeden soubor slovníku; nikdy nevyhazuje (chyba = prázdný slovník). */
@@ -40,9 +50,13 @@ export function nactiSoubor(jazyk: Jazyk, sekce: Sekce): Promise<Slovnik> {
   const klic = `${jazyk}/${sekce}`;
   let p = rozpracovano.get(klic);
   if (!p) {
-    p = import(`../../locales/${jazyk}/${sekce}.json`)
+    const zaklad = import(`../../locales/${jazyk}/${sekce}.json`)
       .then((m: any) => (m?.default ?? m) as Slovnik)
       .catch(() => ({} as Slovnik));
+    const casti = CASTI_SEKCI[sekce] ?? [];
+    p = !casti.length ? zaklad : Promise.all([zaklad, ...casti.map(c => import(`../../locales/${jazyk}/${sekce}.${c}.json`)
+      .then((m: any) => (m?.default ?? m) as Slovnik)
+      .catch(() => ({} as Slovnik)))]).then(xs => Object.assign({}, ...xs) as Slovnik);
     rozpracovano.set(klic, p);
   }
   return p;

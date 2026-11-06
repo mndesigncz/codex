@@ -64,7 +64,7 @@ export default function ({ ok }: Testy) {
 
   // ---- Drobnosti z obchodů ----
   const kn = zdroj('components/client/KartaNastroje.tsx');
-  ok('obal: „Přidat na plochu“ se v aplikaci z obchodu neukazuje', /!nainstalovana && !jeObal && <Button/.test(kn) && kn.includes('useObal()'));
+  ok('obal: „Přidat na plochu“ se v aplikaci z obchodu neukazuje', /!nainstalovana && !jeObal && <(Button|button)/.test(kn) && kn.includes('useObal()'));
   ok('Wallet: přes prohlížeč systému, ne window.location', kn.includes('otevriVeSystemu(') && !kn.includes('window.location'));
   ok('Wallet v obalu: podepsaný odkaz (prohlížeč systému nemá přihlášení)', kn.includes("fetch('/api/client/cards/wallet'") && zdroj('app/api/client/cards/wallet/route.ts').includes('overOdkaz('));
 }

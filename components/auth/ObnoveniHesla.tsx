@@ -9,18 +9,25 @@ import Link from 'next/link';
 import { LogoMark } from '../Icons';
 import { useT } from '@/lib/i18n/client';
 import { tg } from '@/lib/i18n/stav';
+import Pole from '../client/host/ucet/Pole';
 
 // v3: „Přihlásit" v hlavičce hosta (ClientShell) je inkoustová pilulka, limetka patří hlavní
 // akci obrazovky — tady tlačítku formuláře, vysokému a přes šířku (jako v inspiracích).
-const hlavniTlacitko = (_klient: boolean) => 'btn btn-accent btn-lg w-full';
+// Host (směr A „Peněženka“): limetková pilulka .hp-btn-limetka přes šířku.
+const hlavniTlacitko = (klient: boolean) => klient ? 'hp-btn hp-btn-limetka hp-btn-blok' : 'btn btn-accent btn-lg w-full';
+
+// Host: titulek .hp-titulek 32, věta .hp-text tlumeně; provoz beze změny.
+const nadpis = (klient: boolean) => klient ? 'hp-titulek' : 't-page';
+const veta = (klient: boolean) => klient ? 'hp-text mt-2.5 text-[color:var(--hp-muted)] text-pretty' : 't-meta mt-2 text-pretty';
+const odkazZpet = (klient: boolean) => klient
+  ? 'tap-target-sm inline-flex items-center min-h-[44px] font-semibold text-[color:var(--hp-fg)] underline-offset-2 hover:underline'
+  : 'tap-target-sm inline-flex items-center font-semibold underline-offset-2 hover:underline';
 
 function Obal({ klient, children }: { klient: boolean; children: React.ReactNode }) {
   const karta = <div className="card p-6 sm:p-8 max-w-md w-full">{children}</div>;
-  // Host: na telefonu formulář leží přímo na plátně (nadpis, věta, pole, tlačítko), karta až od md.
+  // Host (směr A): formulář leží na plátně (titulek, věta, pole, tlačítko) i na počítači, úzký sloupec uprostřed.
   if (klient) return (
-    <div className="grid place-items-start md:place-items-center pt-2">
-      <div className="max-w-md w-full karta-od-md md:p-8">{children}</div>
-    </div>
+    <div className="mx-auto w-full max-w-[420px] pt-2 md:pt-12">{children}</div>
   );
   return (
     <main className="min-h-[100dvh] flex flex-col items-center justify-center gap-6 p-4 pb-[max(env(safe-area-inset-bottom),16px)]">
@@ -53,21 +60,27 @@ export function ZapomenuteHesloForm({ klient }: { klient: boolean }) {
 
   return (
     <Obal klient={klient}>
-      <h1 className="t-page">{t('Zapomenuté heslo')}</h1>
-      <p className="t-meta mt-2 text-pretty">{t('Napiš e-mail účtu. Pošleme odkaz, kterým si nastavíš nové heslo.')}</p>
+      <h1 className={nadpis(klient)}>{t('Zapomenuté heslo')}</h1>
+      <p className={veta(klient)}>{t('Napiš e-mail účtu. Pošleme odkaz, kterým si nastavíš nové heslo.')}</p>
       {hotovo ? (
         <p role="status" className="note note-ok mt-5">{hotovo}</p>
       ) : (
-        <form onSubmit={odeslat} className="mt-5 grid gap-4" noValidate>
-          <div>
-            <label htmlFor="zh-email" className="field-label">{t('E-mail')}</label>
-            <input id="zh-email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={e => setEmail(e.target.value)} className="field" />
-          </div>
+        <form onSubmit={odeslat} className={`grid gap-4 ${klient ? 'mt-6' : 'mt-5'}`} noValidate>
+          {klient ? (
+            <Pole id="zh-email" popis={t('E-mail')} ikona="mail">
+              <input id="zh-email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={e => setEmail(e.target.value)} />
+            </Pole>
+          ) : (
+            <div>
+              <label htmlFor="zh-email" className="field-label">{t('E-mail')}</label>
+              <input id="zh-email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={e => setEmail(e.target.value)} className="field" />
+            </div>
+          )}
           {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
           <button type="submit" disabled={busy || !email.trim()} className={`${hlavniTlacitko(klient)} tap-target disabled:opacity-50`}>{busy ? t('Posílám…') : t('Poslat odkaz')}</button>
         </form>
       )}
-      <p className="mt-5 text-sm text-center"><Link href={login} className="tap-target-sm inline-flex items-center font-semibold underline-offset-2 hover:underline">{t('Zpět na přihlášení')}</Link></p>
+      <p className={`text-center ${klient ? 'mt-4 hp-text' : 'mt-5 text-sm'}`}><Link href={login} className={odkazZpet(klient)}>{t('Zpět na přihlášení')}</Link></p>
     </Obal>
   );
 }
@@ -97,19 +110,25 @@ export function NoveHesloForm({ klient, token }: { klient: boolean; token: strin
 
   return (
     <Obal klient={klient}>
-      <h1 className="t-page">{t('Nové heslo')}</h1>
+      <h1 className={nadpis(klient)}>{t('Nové heslo')}</h1>
       {hotovo ? (
         <>
           <p role="status" className="note note-ok mt-5">{t('Heslo je změněné. Můžeš se přihlásit.')}</p>
           <Link href={login} className={`${hlavniTlacitko(klient)} tap-target mt-5 w-full`}>{t('Přihlásit se')}</Link>
         </>
       ) : (
-        <form onSubmit={odeslat} className="mt-5 grid gap-4" noValidate>
-          <div>
-            <label htmlFor="nh-heslo" className="field-label">{t('Nové heslo')}</label>
-            <input id="nh-heslo" type="password" autoComplete="new-password" required value={heslo} onChange={e => setHeslo(e.target.value)} className="field" />
-            <p className="mt-1.5 t-meta">{t('Aspoň 8 znaků.')}</p>
-          </div>
+        <form onSubmit={odeslat} className={`grid gap-4 ${klient ? 'mt-6' : 'mt-5'}`} noValidate>
+          {klient ? (
+            <Pole id="nh-heslo" popis={t('Nové heslo')} ikona="lock" napoveda={t('Aspoň 8 znaků.')}>
+              <input id="nh-heslo" type="password" autoComplete="new-password" required value={heslo} onChange={e => setHeslo(e.target.value)} aria-describedby="nh-heslo-napoveda" />
+            </Pole>
+          ) : (
+            <div>
+              <label htmlFor="nh-heslo" className="field-label">{t('Nové heslo')}</label>
+              <input id="nh-heslo" type="password" autoComplete="new-password" required value={heslo} onChange={e => setHeslo(e.target.value)} className="field" />
+              <p className="mt-1.5 t-meta">{t('Aspoň 8 znaků.')}</p>
+            </div>
+          )}
           {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
           <button type="submit" disabled={busy || !heslo} className={`${hlavniTlacitko(klient)} tap-target disabled:opacity-50`}>{busy ? t('Ukládám…') : t('Nastavit heslo')}</button>
         </form>

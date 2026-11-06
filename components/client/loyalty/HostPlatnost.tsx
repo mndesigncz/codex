@@ -7,17 +7,22 @@ import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import { platnostKuponu } from '@/lib/hostPrehled';
 
-/** Věta o platnosti kuponu; bez data platnosti nic. Brzy končící a prošlé jsou výraznější. */
+/** Věta o platnosti kuponu; bez data platnosti nic. Brzy končící jsou tučně inkoustem (jako lístek
+ *  v Odměnách: „Končí za 3 dny · do 9. 11.“) — jantar ani červená do aplikace hosta nepatří. */
 export function PlatnostKuponu({ validUntil, today, className = '' }: { validUntil: unknown; today: string; className?: string }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
   const p = platnostKuponu(validUntil, today);
   if (p.stav === 'bez' || !p.do) return null;
-  const datum = fmtDatum(p.do, { jazyk, styl: 'denKratce' });
-  const tone = p.stav === 'vyprsel' ? 'text-bad-ink' : p.stav === 'brzy' || p.stav === 'dnes' ? 'text-wait-ink font-semibold' : 'text-black/45';
-  const text = p.stav === 'vyprsel' ? t('Platnost skončila {datum}', { datum })
-    : p.stav === 'dnes' ? t('Vyprší dnes')
-    : p.stav === 'brzy' ? t('Vyprší za {n, plural, one {# den} few {# dny} other {# dní}} ({datum})', { n: p.dni ?? 0, datum })
-    : t('Platí do {datum}', { datum });
-  return <span className={`${tone} ${className}`}>{text}</span>;
+  const datum = fmtDatum(p.do, { jazyk, styl: 'kratce' });
+  if (p.stav === 'dnes' || p.stav === 'brzy') {
+    return (
+      <span className={className}>
+        <b className="font-semibold text-[color:var(--hp-fg)]">{p.stav === 'dnes' ? t('Končí dnes') : t('Končí za {n, plural, one {# den} few {# dny} other {# dní}}', { n: p.dni ?? 0 })}</b>
+        {' · '}{t('do {datum}', { datum })}
+      </span>
+    );
+  }
+  const text = p.stav === 'vyprsel' ? t('Platnost skončila {datum}', { datum }) : t('Platí do {datum}', { datum });
+  return <span className={`text-[color:var(--hp-muted)] ${className}`}>{text}</span>;
 }
