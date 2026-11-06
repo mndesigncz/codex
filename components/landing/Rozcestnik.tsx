@@ -14,7 +14,8 @@ import { COOKIE_ROZCESTNIK, ROZCESTNIK } from './obsah';
 // stojí (overflow v landing.css) a je inert, dokud si návštěvník nevybere.
 //
 // Volba se chová jako přechod na jinou stránku:
-// - Zákazník: polovina se roztáhne přes celé okno a odejde se na /client/login.
+// - Zákazník: polovina se roztáhne přes celé okno a odejde se na /client, přehled
+//   podniků (veřejný, přihlášení chce až akce v podniku). Vedle je přihlášení hosta.
 // - Podnik: poloviny odjedou do stran jako dveře, adresa se změní na /?pro=podnik
 //   (záznam v historii), takže tlačítko Zpět vrátí rozcestník. Volba platí do
 //   zavření prohlížeče (cookie bez max-age), app/page.tsx pak rozcestník nevykreslí.
@@ -50,14 +51,14 @@ export default function Rozcestnik() {
     setPryc(false);
   }
 
-  // Zákazník: polovina zabere celé okno, pak se přejde na jeho přihlášení.
+  // Zákazník: polovina zabere celé okno, pak se přejde na přehled podniků.
   // Klik s modifikátorem (nová karta) nechá prohlížeči.
   function doKaret(e: MouseEvent<HTMLAnchorElement>) {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     e.preventDefault();
     if (odchod) return;
     setOdchod('host');
-    window.setTimeout(() => router.push('/client/login'), klidne() ? 0 : 560);
+    window.setTimeout(() => router.push('/client'), klidne() ? 0 : 560);
   }
 
   // Zpět / Vpřed mezi rozcestníkem (/) a stránkou pro podniky (/?pro=podnik).
@@ -123,10 +124,10 @@ export default function Rozcestnik() {
           <h3 className="ld-rozc-nadpis">{t(ROZCESTNIK.host.nadpis)}</h3>
           <p className="ld-rozc-text">{t(ROZCESTNIK.host.text)}</p>
           <div className="ld-rozc-akce">
-            <Link href="/client/login" onClick={doKaret} className="ld-btn ld-rozc-hlavni ld-rozc-roztazeny">
+            <Link href="/client" onClick={doKaret} className="ld-btn ld-rozc-hlavni ld-rozc-roztazeny">
               {t(ROZCESTNIK.host.hlavni)} <Icon name="chevron" size={15} className="ld-sipka -rotate-90" aria-hidden />
             </Link>
-            <Link href="/client/register" className="ld-btn ld-btn-obrys ld-rozc-nad">{t(ROZCESTNIK.host.vedlejsi)}</Link>
+            <Link href="/client/login" className="ld-btn ld-btn-obrys ld-rozc-nad">{t(ROZCESTNIK.host.vedlejsi)}</Link>
           </div>
         </div>
       </div>

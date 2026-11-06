@@ -44,8 +44,8 @@ export const ROZCESTNIK = {
     stitek: 'Pro hosty',
     nadpis: 'Jsem zákazník',
     text: 'Věrnostní karty, odměny a rezervace v telefonu. Bez instalace.',
-    hlavni: 'Otevřít moje karty',
-    vedlejsi: 'Vytvořit účet hosta',
+    hlavni: 'Vybrat podnik',
+    vedlejsi: 'Přihlásit se',
   },
   jedenUcet: 'Jeden účet: stejný e-mail a heslo platí pro správu podniku i pro karty.',
 };
