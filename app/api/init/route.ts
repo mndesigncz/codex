@@ -145,6 +145,8 @@ export async function GET(request: Request) {
           UPDATE users SET heslo_od_spravce = true WHERE role NOT IN ('customer', 'kiosk') AND NOT EXISTS (SELECT 1 FROM teams t WHERE t.owner_id = users.id);
         END IF;
       END $$`);
+    // Totéž jako prostý ALTER (po bloku výš vždy no-op): check-sql čte schéma z DDL a do bloku DO nevidí.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS heslo_od_spravce BOOLEAN NOT NULL DEFAULT false`);
 
     // ---- Invitations ----
     await ddl(sql`
