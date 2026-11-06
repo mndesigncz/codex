@@ -2,6 +2,7 @@
 // spuštěním. Jen názvy proměnných a ano/ne, nikdy jejich hodnoty.
 
 import { chybejiciUdaje, firma } from './firma.ts';
+import { rezimZKlice, type StripeRezim } from './billingPravidla.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -31,6 +32,17 @@ const ma = (env: Env, k: string) => Boolean(env[k]?.trim());
 /** Náhled na Vercelu: NextAuth bez NEXTAUTH_URL vezme adresu nasazení z x-forwarded-host
  *  (next-auth/utils/detect-origin, větev VERCEL). Produkční adresa tam naopak nepatří. */
 const NEPOVINNE_V_NAHLEDU: readonly string[] = ['NEXTAUTH_URL'];
+
+/**
+ * Režim plateb podle klíčů (jen test/live, nikdy klíč): ostrý web na testovacím klíči pokladnu
+ * otevře v sandboxu, nebo ji Stripe odmítne. `nesoulad`: tajný a veřejný klíč z různých režimů.
+ */
+export function rezimPlateb(env: Env): { rezim: StripeRezim | null; nesoulad: boolean } {
+  const rezim = rezimZKlice(env.STRIPE_SECRET_KEY);
+  const pk = String(env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '').trim();
+  const verejny: StripeRezim | null = pk.startsWith('pk_live_') ? 'live' : pk.startsWith('pk_test_') ? 'test' : null;
+  return { rezim, nesoulad: !!rezim && !!verejny && rezim !== verejny };
+}
 
 export function stavNastaveni(env: Env): { povinneChybi: string[]; funkce: Record<string, boolean> } {
   const nahled = env.VERCEL_ENV === 'preview';
