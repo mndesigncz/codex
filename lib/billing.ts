@@ -260,6 +260,29 @@ async function nastavPatickuFaktury(s: Stripe, customer: string, ico: string | n
   }
 }
 
+/**
+ * Po změně jazyka podniku (Nastavení → Provoz podniku) přepíše jazyk už založeného zákazníka
+ * Stripe, aby další faktury, účtenky a e-maily Stripe šly v novém jazyce (preferred_locales se
+ * jinak nastavuje jen při založení v ensureCustomer). Zákazník z jiného režimu Stripe se
+ * nechá být. Nikdy nevyhazuje: uložení nastavení podniku kvůli Stripe nesmí selhat.
+ */
+export async function srovnejJazykZakaznika(teamId: number): Promise<void> {
+  try {
+    const s = stripe(); if (!s) return;
+    const t = await teamRow(teamId);
+    if (!t?.stripe_customer_id) return;
+    const rezim = stripeRezim();
+    if (!rezim) return;
+    const r = rozhodniOZdroji({ id: t.stripe_customer_id, ulozeny: t.stripe_mode, aktualni: rezim });
+    if (r === 'nahradit' || r === 'odmitnout') return;
+    const locale = stripeLocale(await jazykPodniku(teamId));
+    if (locale === 'auto') return;
+    await s.customers.update(String(t.stripe_customer_id), { preferred_locales: [locale] });
+  } catch (e) {
+    console.error('billing: jazyk zákazníka se nepodařilo srovnat', teamId, (e as { message?: string })?.message ?? e);
+  }
+}
+
 /** IČO podniku z Nastavení → Profil podniku, jen platné (kontrolní součet). Před migrací null. */
 async function icoPodnikuProFakturu(teamId: number): Promise<string | null> {
   try {
