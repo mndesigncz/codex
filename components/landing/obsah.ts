@@ -26,18 +26,23 @@ export const HERO = {
   podtitulek: 'Směny, sklad a uzávěrky pro tým, věrnostní karty a rezervace pro hosty. Pod tímhle je skutečná aplikace. Klikej, nic nerozbiješ.',
 };
 
-// ——— Volba na začátku: kam patříš ————————————————————————————
-// Dvě dlaždice nad ukázkou. Stejný účet (e-mail a heslo) platí pro správu
-// podniku i pro hostovskou část, ale přihlašují se do dvou různých míst.
-export const VOLBA = {
+// ——— Rozcestník: první obrazovka, kam patříš ————————————————————
+// Obrazovka rozdělená napůl (Rozcestnik.tsx). Stejný účet (e-mail a heslo)
+// platí pro správu podniku i pro hostovskou část, ale přihlašují se do dvou
+// různých míst. Volba podniku se pamatuje v cookie do zavření prohlížeče.
+export const COOKIE_ROZCESTNIK = 'mg_volba';
+export const ROZCESTNIK = {
   skupina: 'Vyber, kam patříš',
   podnik: {
-    stitek: 'Mám podnik',
+    stitek: 'Pro podniky',
+    nadpis: 'Řídím podnik',
     text: 'Směny, docházka, sklad a uzávěrky na jednom místě. Správa podniku a týmu.',
+    hlavni: 'Ukázat, co Managero umí',
     vedlejsi: 'Přihlásit do správy',
   },
   host: {
-    stitek: 'Chodím do podniku',
+    stitek: 'Pro hosty',
+    nadpis: 'Jsem zákazník',
     text: 'Věrnostní karty, odměny a rezervace v telefonu. Bez instalace.',
     hlavni: 'Otevřít moje karty',
     vedlejsi: 'Vytvořit účet hosta',
@@ -307,7 +312,7 @@ export const NAVIGACE: { id: string; label: string; dlouze?: string }[] = [
 export function vsechnyTexty(): string[] {
   const out: string[] = [ZKUSIT_ZDARMA, ZDARMA_VETA, FUNKCE_DALSI, V_UKAZCE_VPRAVO, UKAZ_V_UKAZCE, ...TYPY_PODNIKU];
   const plocha = (v: unknown): string[] => typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(plocha) : v && typeof v === 'object' ? Object.values(v).flatMap(plocha) : [];
-  out.push(...plocha(VOLBA), ...plocha(PRIHLASENI), ...plocha(HOSTE), ...HOSTE_FUNKCE.flatMap(f => [f.title, f.text]));
+  out.push(...plocha(ROZCESTNIK), ...plocha(PRIHLASENI), ...plocha(HOSTE), ...HOSTE_FUNKCE.flatMap(f => [f.title, f.text]));
   const objekty = [HERO, PRO_KOHO, FUNKCE_NADPIS, DEN_NADPIS, MISTO_NADPIS, MISTO_PATA, ZACATEK_NADPIS, MINI, JISTOTY_NADPIS, FAQ_NADPIS, ZAVER, PATICKA];
   for (const o of objekty) out.push(...Object.values(o));
   for (const [k, v] of Object.entries(MINI_JISTOTY)) if (k !== 'soubory') out.push(...(Array.isArray(v) ? v : [v]));

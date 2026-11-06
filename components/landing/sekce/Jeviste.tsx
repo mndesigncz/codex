@@ -6,10 +6,8 @@ import Ukazka from '../ukazka/Ukazka';
 import UkazVUkazce from '../UkazVUkazce';
 import { SCENY_UKAZKY } from '../ukazka/scenare';
 import { useT } from '@/lib/i18n/client';
-import Link from 'next/link';
-import { TRIAL_DAYS } from '@/lib/plan';
 import Hoste from './Hoste';
-import { FUNKCE, FUNKCE_DALSI, FUNKCE_NADPIS, HERO, PRO_KOHO, TYPY_PODNIKU, UKAZ_V_UKAZCE, V_UKAZCE_VPRAVO, VOLBA, ZKUSIT_ZDARMA } from '../obsah';
+import { FUNKCE, FUNKCE_DALSI, FUNKCE_NADPIS, HERO, PRO_KOHO, TYPY_PODNIKU, UKAZ_V_UKAZCE, V_UKAZCE_VPRAVO } from '../obsah';
 
 // Živé jeviště: hero, „pro koho" a funkce jako jeden celek.
 //
@@ -119,29 +117,8 @@ export default function Jeviste() {
       <section id="ukazka" className="relative" aria-labelledby="nadpis-hero">
         <div className="ld-obsah pt-8 sm:pt-[1.9rem] text-center">
           {/* LCP: obyčejné HTML bez animace vstupu. */}
-          <h1 id="nadpis-hero" className="ld-h1 mx-auto max-w-[14.5em]">{t(HERO.h1)}</h1>
+          <h1 id="nadpis-hero" tabIndex={-1} className="ld-h1 outline-none mx-auto max-w-[14.5em]">{t(HERO.h1)}</h1>
           <p className="ld-perex mx-auto mt-4 max-w-[40ch]">{t(HERO.podtitulek)}</p>
-
-          {/* Kam patříš: správa podniku a hostovská část mají jiná přihlášení, stejný účet. */}
-          <div className="ld-volba mt-8" role="group" aria-label={t(VOLBA.skupina)}>
-            <div className="ld-volba-dlazdice">
-              <h2 className="ld-volba-stitek"><Icon name="kanban" size={16} aria-hidden />{t(VOLBA.podnik.stitek)}</h2>
-              <p className="ld-volba-text">{t(VOLBA.podnik.text)}</p>
-              <div className="ld-volba-akce">
-                <Link href="/register" className="ld-btn ld-btn-svetle">{t(ZKUSIT_ZDARMA, { n: TRIAL_DAYS })}</Link>
-                <Link href="/login" className="ld-btn ld-btn-obrys">{t(VOLBA.podnik.vedlejsi)}</Link>
-              </div>
-            </div>
-            <div className="ld-volba-dlazdice">
-              <h2 className="ld-volba-stitek"><Icon name="card" size={16} aria-hidden />{t(VOLBA.host.stitek)}</h2>
-              <p className="ld-volba-text">{t(VOLBA.host.text)}</p>
-              <div className="ld-volba-akce">
-                <Link href="/client/login" className="ld-btn ld-btn-svetle">{t(VOLBA.host.hlavni)}</Link>
-                <Link href="/client/register" className="ld-btn ld-btn-obrys">{t(VOLBA.host.vedlejsi)}</Link>
-              </div>
-            </div>
-          </div>
-          <p className="ld-meta ld-volba-pozn">{t(VOLBA.jedenUcet)}</p>
         </div>
       </section>
 

@@ -11,6 +11,7 @@ import { COOKIE_STRANA, druhaStranaRelace } from '@/lib/dveStrany';
 import { getJazyk } from '@/lib/i18n/server';
 import { ZapisSlovniky } from '@/lib/i18n/client';
 import { nactiSekce } from '@/lib/i18n/slovniky';
+import { COOKIE_ROZCESTNIK } from '@/components/landing/obsah';
 
 // Canonical jen tady: úvodní stránka je jediná, která se má z adresy sama vyhlásit za originál.
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
   openGraph: { ...OG_ZAKLAD, url: '/' },
 };
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await getServerSession(authOptions);
   // Nativní obal: žádná prodejní stránka s cenami (Apple 3.1.1, Google Play Billing).
   // Hostovská aplikace se sem nedostane (brána v middleware), provozní jde rovnou na přihlášení.
@@ -29,7 +30,10 @@ export default async function Home() {
     // Slovník ceníku se zapíše před vykreslením Landing (důvod v app/employer/start/page.tsx).
     const jazyk = await getJazyk();
     const slovniky = jazyk === 'cs' ? null : await nactiSekce(jazyk, ['predplatne']);
-    return <>{slovniky && <ZapisSlovniky sekce={['predplatne']} slovniky={slovniky} />}<Landing /></>;
+    // Rozcestník podnik / zákazník: jen dokud si návštěvník nevybral podnik (cookie do zavření
+    // prohlížeče) a když nepřišel odkazem rovnou na prodejní stránku (?pro=…, např. z kampaně).
+    const rozcestnik = !(await cookies()).get(COOKIE_ROZCESTNIK) && !(await searchParams).pro;
+    return <>{slovniky && <ZapisSlovniky sekce={['predplatne']} slovniky={slovniky} />}<Landing rozcestnik={rozcestnik} /></>;
   }
   const role = (session.user as any)?.role;
   // Host v aplikaci pro podniky: přesměrování na /client by brána vrátila zpět (smyčka).
