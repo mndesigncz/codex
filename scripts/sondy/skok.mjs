@@ -8,6 +8,9 @@ import { browser, tvrdi, konec, BASE } from './k68-spolecne.mjs';
 const b = await browser();
 for (const w of [390, 768, 1280]) {
   const ctx = await b.newContext({ viewport: { width: w, height: 900 }, locale: 'cs-CZ' });
+  // Prodejní stránka bez rozcestníku podnik / zákazník (#378): sonda měří ukázku, ne rozcestník,
+  // který jinak občas přebírá kliknutí na záložky scén (pád na #379).
+  await ctx.addCookies([{ name: 'mg_volba', value: 'podnik', url: BASE }]);
   const p = await ctx.newPage();
   await p.goto(BASE + '/', { waitUntil: 'networkidle' });
   await p.evaluate(() => document.getElementById('ukazka-okno').scrollIntoView());

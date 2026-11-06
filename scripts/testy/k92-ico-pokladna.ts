@@ -24,7 +24,8 @@ export default function ({ eq, ok }: Testy) {
   eq('faktura: pole IČO', fakturacniPoleIco('17944953'), [{ name: 'IČO', value: '17944953' }]);
 
   const b = cti('lib/billing.ts');
-  ok('pokladna: custom_fields s IČO', /custom_fields: \[poleIcoPokladny\(icoPodniku, jazyk\)\]/.test(b));
+  // Hostovaná a vložená pokladna mají povinné pole IČO ve Stripe; vlastní pokladna (ui_mode elements) ho sbírá sama (k95).
+  ok('pokladna: custom_fields s IČO (hostovaná a vložená)', /custom_fields: \[poleIcoPokladny\(o\.icoPodniku, o\.jazyk\)\]/.test(cti('lib/pokladnaRezim.ts')) && /\.\.\.parametryRezimu\(mode, \{\s*icoPodniku, jazyk/.test(b));
   ok('pokladna: IČO z profilu jde na fakturu předem', /nastavPatickuFaktury\(s, customer, icoPodniku\)/.test(b) && /custom_fields: fakturacniPoleIco\(ico\)/.test(b));
   ok('webhook: checkout.session.completed ukládá IČO', /case 'checkout\.session\.completed'[\s\S]{0,200}ulozIcoZPokladny\(s, session\)/.test(b) && /UPDATE teams SET ico = \$\{ico\}/.test(b));
   ok('webhook: název firmy do jména zákazníka', /customer_details\?\.business_name/.test(b));

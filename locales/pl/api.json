@@ -205,5 +205,8 @@
   "Neznámá strana": "Nieznana strona",
   "Moc pokusů, zkuste to za chvíli.": "Za dużo prób, spróbuj za chwilę.",
   "Druhou stranu tenhle účet nemá.": "To konto nie ma drugiej strony.",
-  "Do správy podniku se přihlas heslem.": "Do zarządzania lokalem zaloguj się hasłem."
+  "Do správy podniku se přihlas heslem.": "Do zarządzania lokalem zaloguj się hasłem.",
+  "IČO nesedí: má 8 číslic a platný kontrolní součet.": "Numer IČO jest nieprawidłowy: ma 8 cyfr i poprawną sumę kontrolną.",
+  "Bez souhlasu s obchodními podmínkami předplatné objednat nejde.": "Bez zgody na warunki handlowe nie można zamówić subskrypcji.",
+  "Pokladna vypršela. Zavřete ji a otevřete znovu.": "Płatność wygasła. Zamknij ją i otwórz ponownie."
 }

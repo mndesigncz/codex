@@ -33,7 +33,7 @@ function bezpecnostniHlavicky({ ramovatSam }) {
     // (výchozí order_geo = block) nešlo nikomu. Cizí rámy ji dál nedostanou.
     { key: 'Permissions-Policy', value: ramovatSam
       ? 'camera=(), microphone=(), geolocation=(), payment=()'
-      : 'camera=(self), microphone=(), geolocation=(self), payment=(self "https://js.stripe.com" "https://checkout.stripe.com")' },
+      : 'camera=(self), microphone=(), geolocation=(self), payment=(self "https://js.stripe.com" "https://*.js.stripe.com" "https://checkout.stripe.com")' },
     { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
     // Poslední pojistka, kdyby se do stránky přece jen dostal cizí
     // skript: nemá odkud se načíst a nemá kam odeslat data.
@@ -58,18 +58,22 @@ function bezpecnostniHlavicky({ ramovatSam }) {
         "form-action 'self'",
       ] : [
         "default-src 'self'",
-        // Stripe: vložená pokladna (js.stripe.com) běží v rámu na naší
-        // stránce, karta nikdy neprojde naším kódem.
-        `script-src 'self' 'unsafe-inline'${evalVeVyvoji} https://js.stripe.com`,
+        // Stripe: vlastní pokladna (Stripe.js + Payment Element, components/pokladna)
+        // kreslí platební pole v rámech js.stripe.com na naší stránce, karta nikdy
+        // neprojde naším kódem. Rámy Elements teď vznikají přímo v našem dokumentu
+        // (ne uvnitř rámu vložené pokladny), takže platí naše CSP: *.js.stripe.com
+        // (Stripe.js spouští rámy na subdoménách) a link.com (Link v Payment Elementu)
+        // podle docs.stripe.com/security/guide#content-security-policy.
+        `script-src 'self' 'unsafe-inline'${evalVeVyvoji} https://js.stripe.com https://*.js.stripe.com`,
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data:",
         // https://vercel.com: přímé nahrávání velkých souborů do Vercel Blob (/api/blob, lib/nahrajSoubor).
-        "connect-src 'self' https://api.storyous.com https://login.storyous.com https://blob.vercel-storage.com https://vercel.com https://api.stripe.com https://checkout.stripe.com https://merchant-ui-api.stripe.com https://r.stripe.com",
+        "connect-src 'self' https://api.storyous.com https://login.storyous.com https://blob.vercel-storage.com https://vercel.com https://api.stripe.com https://checkout.stripe.com https://merchant-ui-api.stripe.com https://r.stripe.com https://link.com https://*.link.com",
         // 'self': prodejní stránka vkládá ukázku /demo jako <iframe> téhož
         // původu. Ostatní trasy zůstávají nerámovatelné (X-Frame-Options
         // DENY a frame-ancestors 'none' výše), takže 'self' tu nic dalšího neotevírá.
-        "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://hooks.stripe.com",
+        "frame-src 'self' https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com https://hooks.stripe.com https://link.com https://*.link.com",
         "frame-ancestors 'none'",
         "object-src 'none'",
         "base-uri 'self'",
@@ -125,6 +129,16 @@ const nextConfig = {
         headers: [
           { key: 'Content-Type', value: 'application/json' },
           { key: 'Cache-Control', value: 'public, max-age=300' },
+        ],
+      },
+      {
+        // Písmo Geist pro platební pole vlastní pokladny (lib/pokladnaVzhled.ts): pole kreslí
+        // Stripe ve svém rámu na js.stripe.com a písmo z cizího původu prohlížeč načte jen
+        // s CORS. Jen statický soubor písma, nic jiného se tím neotevírá.
+        source: '/fonts/:soubor*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Cache-Control', value: 'public, max-age=604800' },
         ],
       },
       {

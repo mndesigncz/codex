@@ -227,7 +227,11 @@ console.log('B7 Tablet: PIN');
     }
     await potvrdit.click();
     await dokud(() => posty.length === pokus + 1, 3000);
-    await p.waitForTimeout(150);
+    // Počkat, až okno odpověď zpracuje (PIN smazaný, nebo pauza): jinak smyčka pod zátěží CI
+    // uvidí ještě starých 6 číslic, klikne na tlačítko zamčené odesíláním a po smazání PINu
+    // zůstane navždy neaktivní (pád 6. 11. na #379).
+    await dokud(async () => (await okno.locator('[role="img"][aria-label^="Zadáno číslic"]').getAttribute('aria-label').catch(() => null)) === 'Zadáno číslic: 0'
+      || await okno.getByText(/Moc špatných PINů/).isVisible().catch(() => false), 5000);
   }
   const pauza = okno.getByText(/Moc špatných PINů\. Zkus to za \d+ s\./);
   tvrdi('B7: po pátém špatném PINu „Moc špatných PINů. Zkus to za N s." a příchod zamčený', await dokud(() => pauza.isVisible(), 3000) && await potvrdit.isDisabled(), await okno.innerText());

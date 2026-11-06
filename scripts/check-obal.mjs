@@ -31,6 +31,8 @@ const POVOLENE = {
   'components/Pro.tsx': 'zámky: OdemknoutButton, MaxGate, ProGate, UpgradeModal a odznaky v obalu používají useObal',
   'components/Billing.tsx': 'Nastavení → Předplatné; Settings.tsx ji v obalu nevykreslí (smiPlatby)',
   'components/CheckoutModal.tsx': 'pokladna; otevře ji jen OdemknoutButton / registrace, které v obalu nejsou',
+  'components/pokladna/VlastniPokladna.tsx': 'platební pole vlastní pokladny; vykresluje je jen CheckoutModal',
+  'lib/pokladnaVzhled.ts': 'jen typ Appearance ze Stripe.js pro vzhled polí vlastní pokladny (CheckoutModal)',
   'components/SpravovatPredplatneButton.tsx': 'stránka pozastaveno ji v obalu nevykreslí',
   'components/registrace/Cesta.tsx': 'cesta registrace: v obalu bez kroku tarifu a bez pokladny (smiPlatby)',
 };
