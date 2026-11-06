@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
-import { stavNastaveni } from '@/lib/zdravi';
+import { rezimPlateb, stavNastaveni } from '@/lib/zdravi';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +35,8 @@ export async function GET() {
       cas: new Date().toISOString(),
       povinneChybi: nastaveni.povinneChybi,
       funkce: nastaveni.funkce,
+      // „test“ na ostrém webu = pokladna běží v sandboxu (klíče do Vercelu jen z ostrého účtu Stripe).
+      platby: rezimPlateb(process.env),
     },
     { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
   );
