@@ -16,6 +16,7 @@ import { cistyIco, cistyDic, cistyPrah, pragySedi } from '@/lib/podnikProfil';
 import { cistePevneNaklady } from '@/lib/financeWidgety';
 import { cilMarze } from '@/lib/recepturyPrehled';
 import { nastaveniZRadku } from '@/lib/nastaveniPodniku';
+import { srovnejJazykZakaznika } from '@/lib/billing';
 
 export const dynamic = 'force-dynamic';
 
@@ -270,7 +271,11 @@ export async function PATCH(request: Request) {
   try {
     if (country === null || country === '') await sql`UPDATE teams SET country = NULL WHERE id = ${team.id}`;
     else if (cistaZeme(country)) await sql`UPDATE teams SET country = ${cistaZeme(country)!} WHERE id = ${team.id}`;
-    if (cistyJazyk(defaultLang)) await sql`UPDATE teams SET default_lang = ${cistyJazyk(defaultLang)!} WHERE id = ${team.id}`;
+    if (cistyJazyk(defaultLang)) {
+      const zmenaJazyka = await sql`UPDATE teams SET default_lang = ${cistyJazyk(defaultLang)!} WHERE id = ${team.id} AND default_lang IS DISTINCT FROM ${cistyJazyk(defaultLang)!} RETURNING id`;
+      // Faktury a e-maily Stripe v novém jazyce i u už založeného zákazníka (nevyhazuje).
+      if (zmenaJazyka.length) await srovnejJazykZakaznika(team.id);
+    }
     if (timeFormat === '24' || timeFormat === '12') await sql`UPDATE teams SET time_format = ${timeFormat} WHERE id = ${team.id}`;
     if (typeof timezone === 'string' && Object.values(PREDVOLBY_ZEMI).some(p => p.pasmo === timezone)) {
       await sql`UPDATE teams SET timezone = ${timezone} WHERE id = ${team.id}`;
