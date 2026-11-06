@@ -87,6 +87,20 @@ const nextConfig = {
   // ani obecné „bot/crawler/spider". Výchozí vzor je tu opsaný, ať se seznam
   // jen rozšiřuje, nikdy nezúží.
   htmlLimitedBots: /[\w-]+-Google|Google-[\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight|Seznam|bot\b|bot\/|crawler|spider|embedly|Pinterest|TelegramBot|Viber/i,
+  // Veřejná adresa produkce od Vercelu (pangea-eosin.vercel.app) — návštěvník má vidět jen
+  // managero.app. Trvalé přesměrování na www se stejnou cestou; /api zůstává (crony a
+  // webhooky Vercel/Stripe nesmí dostat přesměrování). Ostatní *.vercel.app adresy jsou
+  // náhledy a nasazení za přihlášením Vercelu, ty zůstávají.
+  async redirects() {
+    return [
+      {
+        source: '/:cesta((?!api/).*)',
+        has: [{ type: 'host', value: 'pangea-eosin.vercel.app' }],
+        destination: 'https://www.managero.app/:cesta',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
