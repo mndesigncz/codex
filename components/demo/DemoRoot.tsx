@@ -73,7 +73,7 @@ const RozhraniTabletu = dynamic(() => import('../kiosk/KioskApp'), { ssr: false 
 
 function uzivatel(role: RoleDema) {
   const c = clen(KDO_JSEM[role]);
-  return { id: String(c.id), name: c.name, email: c.email, role: c.role, avatar: c.avatar ?? undefined, jobTitle: c.jobTitle ?? undefined, superadmin: false };
+  return { id: String(c.id), name: c.name, email: c.email, role: c.role, avatar: c.avatar ?? undefined, jobTitle: c.jobTitle ?? undefined };
 }
 
 function Rozhrani({ role }: { role: RoleDema }) {

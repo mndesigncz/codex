@@ -11,7 +11,6 @@ export default async function EmployerOverviewPage({ searchParams }: { searchPar
     email: session?.user?.email,
     id: (session?.user as any)?.id,
     role: (session?.user as any)?.role,
-    superadmin: (session?.user as any)?.superadmin === true,
     avatar: (session?.user as any)?.avatar,
   };
   // Nový vlastník začíná průvodcem nastavení. Jen stav `nove`: kdo průvodce

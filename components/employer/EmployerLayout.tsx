@@ -120,7 +120,7 @@ const KLIENT = ['klient.prehled'];
 const UCTENKY = ['finance.uctenky_zobrazit', 'finance.uctenky_pridat'];
 
 interface Props {
-  user: { name?: string | null; email?: string | null; id?: string; role?: string; avatar?: string; superadmin?: boolean };
+  user: { name?: string | null; email?: string | null; id?: string; role?: string; avatar?: string };
 }
 
 /** Hledání uvnitř ProfileLinkProvideru (kvůli otevření profilu člověka). */
@@ -659,8 +659,6 @@ export default function EmployerLayout({ user }: Props) {
           { label: t('Nastavení'), icon: 'settings', onClick: openSettings },
           ...(smiTym ? [{ label: t('Tým'), icon: 'users', onClick: openTeam }] : []),
           { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setMoreOpen(false); setJazykOpen(true); } },
-          // Správce platformy podle prostředí (SUPERADMIN_USER_IDS), ne podle role.
-          ...(user.superadmin ? [{ label: t('Správa platformy'), icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),
           ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } }] : []),
           ...polozkaHosta,
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
