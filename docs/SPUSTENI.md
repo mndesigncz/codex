@@ -14,7 +14,8 @@ které za něj nikdo jiný nezapne. Stav nastavení kdykoli ukáže `GET https:/
    `DATABASE_URL` pro prostředí *Preview* na její connection string. Dokud to není, každý náhled pracuje
    s produkční databází.
 4. Proměnné z `.env.example` — povinné: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`,
-   `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`. Doporučené: `APP_SECRET_KEY`, `SUPERADMIN_USER_IDS`, `ADMIN_API_TOKEN`.
+   `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`. Doporučené: `APP_SECRET_KEY`, `SUPERADMIN_USER_IDS`, `ADMIN_API_TOKEN`
+   (správa platformy na admin.managero.app, §2a).
 5. Údaje provozovatele jsou výchozí hodnoty v `lib/firma.ts` (Martin Nemeškal, IČO 17944953); `FIRMA_*`
    nejsou potřeba, jen je přebíjejí na serveru (Nastavení → O aplikaci bere vždy výchozí hodnoty z kódu).
    Až bude DIČ: `FIRMA_DIC`. Podrobně `docs/PRAVNI.md` §3.
@@ -41,9 +42,44 @@ telefon) → potom ve Vercelu `STRIPE_SOUHLAS_PODMINEK=1`; výchozí patička fa
 e-mailem; Revenue recovery → po posledním pokusu zrušit předplatné; kupon `MAX30` s `duration = once`.
 Povinné pole IČO v pokladně si kód nastavuje sám (nic v dashboardu).
 
+## 2a. Správa platformy (admin.managero.app)
+
+Správa platformy (podniky, nahlášený obsah, historie zásahů, retence) **není v aplikaci**, ale na vlastní
+adrese `https://admin.managero.app`. Na `www.managero.app` adresa `/admin` neexistuje (404) a admin API
+odtamtud projde jen s `Authorization: Bearer <ADMIN_API_TOKEN>` (Claude/MCP, skripty). Podrobně `docs/ADMIN.md`.
+
+**Zřízení (jednou):**
+
+1. Vercel → projekt **pangea** → Settings → Domains → *Add* `admin.managero.app` (Production, bez přesměrování).
+2. Cloudflare → DNS zóny `managero.app` → záznam **CNAME** `admin` → `cname.vercel-dns.com`, proxy
+   **vypnutá** (šedý mráček, „DNS only“), jinak Vercel nevystaví certifikát. Počkat, až Vercel ukáže „Valid Configuration“.
+3. Prostředí (Production): `SUPERADMIN_USER_IDS` (id účtu správce; svoje id ukáže přihlášenému `/api/account`),
+   `APP_SECRET_KEY` (šifruje klíč autentizační aplikace a podepisuje cookie správy; bez něj se bere
+   `NEXTAUTH_SECRET`), volitelně `ADMIN_API_TOKEN` (MCP). `ADMIN_HOST` není potřeba (výchozí `admin.managero.app`).
+4. Po nasazení otevřít aplikaci vedením (migrace `/api/init` založí tabulku `admin_totp`).
+
+**Přihlášení:** e-mail a heslo účtu Managero (účet musí mít roli vedení a id v `SUPERADMIN_USER_IDS`) →
+šestimístný kód z autentizační aplikace (Google Authenticator, 1Password, Authy…). Při **prvním**
+přihlášení se místo kódu ukáže QR kód a klíč k ručnímu opisu (vydavatel „Managero správa“); první
+opsaný kód aplikaci potvrdí. Relace platí 12 hodin (cookie jen pro admin.managero.app), tlačítko Odhlásit
+ji smaže. Pět špatných hesel nebo kódů za čtvrt hodinu = pauza 15 minut.
+
+**Nouzový reset druhého faktoru** (ztracený nebo vyměněný telefon): v Neonu (produkční větev → SQL Editor)
+
+```sql
+DELETE FROM admin_totp WHERE user_id = <id účtu správce>;
+```
+
+Další přihlášení heslem pak znovu ukáže QR kód k nastavení. Reset dělej, až když se hned potom přihlásíš
+sám — do potvrzení prvním kódem si aplikaci může nastavit kdokoli, kdo zná heslo. Při podezření na únik
+hesla nejdřív změň heslo (aplikace → Nastavení → Zabezpečení), teprve potom reset.
+
+**Lokálně / sondy:** `http://admin.localhost:<port>` (prohlížeč ho pošle na vlastní počítač, správa ho bere
+vždy); jiný host jde nastavit proměnnou `ADMIN_HOST`.
+
 ## 3a. Retence osobních údajů
 
-Až **po nasazení** a po `/api/init` (nové sloupce): Správa platformy → Retence → „Spočítat náhled teď“,
+Až **po nasazení** a po `/api/init` (nové sloupce): Správa platformy (admin.managero.app) → Retence → „Spočítat náhled teď“,
 zkontrolovat počty, pak `RETENCE_ZAPNUTA=1` (Production) a redeploy. Cron `/api/retence` (denně 3:35)
 pak anonymizuje neaktivní hosty (24 měsíců, e-mail 30 dní předem) a maže zrušené podniky bez aktivity
 (90 dní, e-mail vlastníkovi a správcům předplatného 30 a 7 dní předem). Stav: `/api/health` →
@@ -147,6 +183,9 @@ vedení otevře aplikaci (migrace se spustí sama po nasazení), nebo z Vercelu 
   jejich dashboardy a stránky stavu.
 
 ## 7. Zbývá na Martinovi
+
+- [ ] **Správa platformy:** přidat doménu `admin.managero.app` do Vercel projektu *pangea* a v Cloudflare
+  CNAME `admin` → `cname.vercel-dns.com` (DNS only); pak první přihlášení a nastavení autentizační aplikace (§2a).
 
 - [ ] **Stripe:** dokončit ověření totožnosti a přidat bankovní účet pro výplaty (bez nich ostré platby
   neodejdou na účet); pak zkušební nákup a refund.

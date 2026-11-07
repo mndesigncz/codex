@@ -4,6 +4,11 @@ Jedna obrazovka, ze které provozovatel Managera vidí všechny podniky a umí
 jim zasáhnout do provozu: pozastavit účet, přepnout tarif, prodloužit
 zkušební dobu. A jeden MCP endpoint, přes který to samé umí Claude.
 
+**Kde:** jen na `https://admin.managero.app` — vlastní host, vlastní přihlášení
+(heslo účtu Managero + kód z autentizační aplikace) a vlastní cookie. V aplikaci
+na www žádný odkaz ani položka menu není a `/admin` tam vrací 404. Zřízení
+domény, první přihlášení a nouzový reset druhého faktoru: `docs/SPUSTENI.md` §2a.
+
 Tenhle dokument je zároveň plán, podle kterého to vzniklo, a návod, jak to
 provozovat. Sekce „Jak to zapnout" je to jediné, co provozovatel musí udělat
 rukou.
@@ -41,13 +46,13 @@ Z toho plynou tři rozhodnutí:
 
 | Akce | Kde | Co se stane |
 | --- | --- | --- |
-| Vidět všechny podniky | `/admin` | jméno, majitel, počet lidí, tarif, stav předplatného, poslední aktivita, blokace |
+| Vidět všechny podniky | `admin.managero.app/` | jméno, majitel, počet lidí, tarif, stav předplatného, poslední aktivita, blokace |
 | Pozastavit podnik | detail → „Pozastavit" | `teams.blocked_at` + důvod; všichni lidé podniku dostanou na API 423 a na stránkách `/pozastaveno` s důvodem; hostovská stránka podniku zmizí |
 | Obnovit podnik | detail → „Obnovit" | `blocked_at = NULL` |
 | Přepnout tarif | detail → Tarif | `teams.plan_override`: `free` / `pro` / `max`, nebo zpět na to, co platí ze Stripe. Platí okamžitě všude, kde se tarif počítá (`planInfoOf`) |
 | Prodloužit zkušební dobu | detail → Zkušební doba | `trial_ends_at` posune o N dní |
 | Poznámka k podniku | detail → Poznámka | interní, podnik ji nevidí |
-| Historie zásahů | `/admin/audit` | každý zásah: kdo, kdy, co, komu |
+| Historie zásahů | `admin.managero.app/audit` | každý zásah: kdo, kdy, co, komu |
 
 Co superadmin **neumí** a schválně: přihlásit se za někoho jiného, číst
 uzávěrky nebo mzdy podniku, mazat podniky. První je bezpečnostní díra,
@@ -110,7 +115,8 @@ Dvě proměnné prostředí, obě v Settings → Environment Variables projektu:
 
 | Proměnná | Hodnota | K čemu |
 | --- | --- | --- |
-| `SUPERADMIN_USER_IDS` | id účtů oddělená čárkou (např. `1` nebo `1,42`) | kdo je superadmin — přihlašuje se svým normálním účtem s rolí vedení. Své id zjistíš přihlášený na `/api/account` (pole `id`). |
+| `SUPERADMIN_USER_IDS` | id účtů oddělená čárkou (např. `1` nebo `1,42`) | kdo je superadmin — na admin.managero.app se přihlašuje e-mailem a heslem svého účtu s rolí vedení a kódem z autentizační aplikace. Své id zjistíš přihlášený na `/api/account` (pole `id`). |
+| `APP_SECRET_KEY` | náhodný řetězec (`openssl rand -base64 36`) | šifruje klíč autentizační aplikace v databázi a podepisuje cookie správy (bez něj `NEXTAUTH_SECRET`) |
 | `ADMIN_API_TOKEN` | náhodný řetězec, aspoň 32 znaků (`openssl rand -base64 36`) | přístup pro MCP a skripty bez prohlížeče |
 
 Po nasazení se migrace provede sama prvním otevřením aplikace vedením
@@ -183,12 +189,16 @@ Clauda: ne do repa, ne do snímku obrazovky, ne do chatu.
 | --- | --- |
 | `lib/superadmin.ts` | kdo je superadmin (id účtu z prostředí + role vedení) — čistá část |
 | `lib/superadminDb.ts` | totéž podle řádku v databázi; při přihlášení jde výsledek do tokenu |
-| `lib/superadminGate.ts` | brána pro API a MCP (session podle DB, nebo Bearer token) |
+| `lib/superadminGate.ts` | brána pro API a MCP (relace správy + DB, nebo Bearer token; relace aplikace ne) |
+| `lib/spravaHost.ts` | host správy: co middleware na admin.managero.app pustí, přepíše nebo vrátí 404; na www `/admin` 404 |
+| `lib/spravaRelace.ts`, `lib/spravaServer.ts` | cookie relace správy (`__Host-`, HMAC, 12 h) a kdo je přihlášený |
+| `lib/totp.ts`, `lib/spravaDb.ts` | kódy z autentizační aplikace (RFC 6238) a klíč v tabulce `admin_totp` (šifrovaně) |
+| `app/api/sprava/*` | přihlášení správy: heslo → kód (→ první nastavení QR), odhlášení |
 | `lib/admin.ts` | operace nad podniky; REST i MCP je jen volají |
 | `lib/blokace.ts` | čisté rozhodnutí „pustit / 423 / přesměrovat", otestované bez prohlížeče |
 | `middleware.ts` | vynucení blokace před každým požadavkem |
 | `app/api/admin/*` | REST pro obrazovku |
 | `app/api/mcp/route.ts` | MCP pro Clauda |
-| `app/admin/*` | obrazovky |
+| `app/admin/*` | obrazovky (na hostu správy `/`, `/teams/1`… → `app/admin/(sprava)/…`, přihlášení `app/admin/prihlaseni`) |
 | `app/pozastaveno/page.tsx` | co vidí lidé pozastaveného podniku |
 | `scripts/check-admin-auth.mjs` | CI: žádná admin routa bez `requireSuperadmin` |
