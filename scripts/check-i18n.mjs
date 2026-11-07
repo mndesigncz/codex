@@ -280,7 +280,34 @@ const apiPouzite = [...apiKlice].filter(k => !apiVynechat.has(k) && !/\s$/.test(
 const meta = JSON.parse(readFileSync('locales/_meta.json', 'utf8'));
 const chyby = [];
 const varovani = [];
-const nacti = (j, s) => { const p = `locales/${j}/${s}.json`; return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : null; };
+// Sekce může mít části `locales/<j>/<sekce>.<část>.json` (lib/i18n/slovniky.ts CASTI_SEKCI: přestavba hosta po oblastech):
+// za běhu jde o jednu sekci, tady se slučují. Stejná věta ve dvou souborech sekce musí mít stejný překlad.
+const castiSekce = (j, s) => existsSync(`locales/${j}`) ? readdirSync(`locales/${j}`).filter(f => f.startsWith(`${s}.`) && f.endsWith('.json') && f !== `${s}.json` && f.slice(s.length + 1, -5).indexOf('.') === -1).map(f => `locales/${j}/${f}`) : [];
+const _nacteno = new Map();
+const nacti = (j, s) => {
+  const klic = `${j}/${s}`;
+  if (_nacteno.has(klic)) return _nacteno.get(klic);
+  const p = `locales/${j}/${s}.json`;
+  const soubory = [...(existsSync(p) ? [p] : []), ...castiSekce(j, s)];
+  let out = null;
+  for (const f of soubory) {
+    const d = JSON.parse(readFileSync(f, 'utf8'));
+    out ??= {};
+    for (const [k, v] of Object.entries(d)) {
+      if (k in out && JSON.stringify(out[k]) !== JSON.stringify(v)) chyby.push(`${j}/${s}: věta „${k}“ má v ${f} jiný překlad než v jiné části sekce`);
+      out[k] = v;
+    }
+  }
+  _nacteno.set(klic, out);
+  return out;
+};
+/** Klíče, které jsou jen v základním souboru sekce s částmi (hlavní slovník hosta během přestavby po oblastech). */
+const jenVZakladu = (j, s) => {
+  if (!castiSekce(j, s).length || !existsSync(`locales/${j}/${s}.json`)) return new Set();
+  const z = new Set(Object.keys(JSON.parse(readFileSync(`locales/${j}/${s}.json`, 'utf8'))));
+  for (const f of castiSekce(j, s)) for (const k of Object.keys(JSON.parse(readFileSync(f, 'utf8')))) z.delete(k);
+  return z;
+};
 
 function podobnost(a, b) {
   const bi = s => { const r = new Map(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); r.set(g, (r.get(g) ?? 0) + 1); } return r; };
@@ -289,7 +316,7 @@ function podobnost(a, b) {
   return (2 * shoda) / Math.max(1, (a.length - 1) + (b.length - 1));
 }
 
-const sekce = new Set([...Object.keys(zKodu), 'api', ...JAZYKY.flatMap(j => existsSync(`locales/${j}`) ? readdirSync(`locales/${j}`).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5)) : [])]);
+const sekce = new Set([...Object.keys(zKodu), 'api', ...JAZYKY.flatMap(j => existsSync(`locales/${j}`) ? readdirSync(`locales/${j}`).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5).split('.')[0]) : [])]);
 let kontrolovano = 0;
 for (const s of sekce) {
   const vKodu = s === 'api' ? new Set(apiPouzite) : new Set((zKodu[s] ?? new Map()).keys());
@@ -307,7 +334,10 @@ for (const s of sekce) {
       const podobna = zastarale.map(z => [z, podobnost(z, k)]).sort((a, b) => b[1] - a[1])[0];
       hlas(`chybí překlad „${k}“${podobna && podobna[1] > 0.6 ? `\n      ↳ změněná věta? ve slovníku je „${podobna[0]}“ (${Math.round(podobna[1] * 100)} %); přenes ji: --rename "${podobna[0]}" "${k}"` : ''}`);
     }
-    for (const k of zastarale) if (!chybejici.some(c => podobnost(k, c) > 0.6)) chyby.push(`${j}/${s}: zastaralý klíč „${k}“ (v kódu není)`);
+    // Sekce s částmi (host během přestavby po oblastech): zastaralý klíč ZÁKLADNÍHO souboru je jen varování —
+    // základní soubor žádná oblast nevlastní, uklidí ho sloučení oblastí. Zastaralý klíč v části je chyba.
+    const zaklad = jenVZakladu(j, s);
+    for (const k of zastarale) if (!chybejici.some(c => podobnost(k, c) > 0.6)) (zaklad.has(k) ? varovani : chyby).push(`${j}/${s}: zastaralý klíč „${k}“ (v kódu není)${zaklad.has(k) ? ` — základní soubor sekce s částmi, smaž ho z locales/${j}/${s}.json při slučování` : ''}`);
     for (const [k, v] of Object.entries(slov)) {
       kontrolovano++;
       const cs = k.split('|')[0];

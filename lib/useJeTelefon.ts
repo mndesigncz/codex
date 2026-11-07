@@ -25,3 +25,18 @@ export function useJeTelefon(): boolean {
   }, []);
   return telefon;
 }
+
+/** Opak pro rozvržení: true až po připojení na obrazovce od `md`. Do té doby (a na serveru) false,
+ *  takže první HTML má podobu telefonu a počítač se přeskládá hned po připojení. */
+export function useJePocitac(): boolean {
+  const [pocitac, setPocitac] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(TELEFON_DOTAZ);
+    const zmer = () => setPocitac(!mq.matches);
+    zmer();
+    mq.addEventListener('change', zmer);
+    return () => mq.removeEventListener('change', zmer);
+  }, []);
+  return pocitac;
+}

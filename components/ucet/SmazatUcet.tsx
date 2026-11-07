@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { Icon } from '../Icons';
 import { odhlasit } from '@/lib/odhlaseni';
 import { useT } from '@/lib/i18n/client';
 import { tg } from '@/lib/i18n/stav';
@@ -17,7 +18,7 @@ import { vetaDopadu, type VlastnenyPodnik } from './dopadSmazani';
 
 interface Dopad { kod: string; zprava: string }
 
-export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
+export default function SmazatUcet({ jeHost, vzhledHosta = false }: { jeHost: boolean; /** Aplikace hosta (směr A): tlačítko inkoustem, červená jen v potvrzení. */ vzhledHosta?: boolean }) {
   const t = useT('spolecne');
   const [otevreno, setOtevreno] = useState(false);
   const [heslo, setHeslo] = useState('');
@@ -56,7 +57,9 @@ export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
           : t('Smaže se tvůj přístup, osobní údaje a členství v podnicích. Směny, docházka a uzávěrky zůstanou podniku bez tvého jména. Nejde to vrátit.')}
       </p>
       {/* v4 (V5): destruktivní akce jako řádkové tlačítko 44 přes celou šířku, červený text — ne osamělé vlevo. */}
-      <Button variant="danger" icon="trash" className="mt-4 w-full bg-black/[0.04]" onClick={() => setOtevreno(true)}>{t('Smazat účet')}</Button>
+      {vzhledHosta
+        ? <button type="button" className="hp-btn lgx hp-btn-sklo hp-btn-blok mt-4" onClick={() => setOtevreno(true)}><Icon name="trash" size={17} aria-hidden />{t('Smazat účet')}</button>
+        : <Button variant="danger" icon="trash" className="mt-4 w-full bg-black/[0.04]" onClick={() => setOtevreno(true)}>{t('Smazat účet')}</Button>}
 
       <Modal open={otevreno} onClose={zavrit} size="sm" title={dopad ? t('Smazat i podnik?') : t('Opravdu smazat účet?')}
         subtitle={dopad ? undefined : t('Potvrď to svým heslem. Nejde to vrátit.')}

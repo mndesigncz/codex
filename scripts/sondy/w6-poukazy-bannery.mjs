@@ -129,7 +129,13 @@ for (const sirka of [390, 1280]) {
   await p.goto(`${BASE}/client/me/odmeny`, { waitUntil: 'networkidle' });
   await p.getByRole('heading', { name: 'Moje poukazy' }).waitFor({ timeout: 15000 });
   const t = await p.locator('body').innerText();
-  tvrdi(`${L}: poukaz s kódem, zůstatkem a platností`, /DP-ABCD-2345/.test(t) && /Zůstatek\s*300/.test(t) && /platí do/.test(t), t.slice(0, 400));
+  // Směr A (2026-11): poukaz je inkoustová karta „Dárkový poukaz“ se zůstatkem vpravo v hlavičce („300 Kč“).
+  tvrdi(`${L}: poukaz s kódem, zůstatkem a platností`, /DP-ABCD-2345/.test(t) && /Dárkový poukaz/.test(t) && /300\s*Kč/.test(t) && /z\s*500\s*Kč/.test(t) && /platí do/.test(t), t.slice(0, 400));
+  // QR kód se rozbalí až na žádost.
+  tvrdi(`${L}: QR kód poukazu je zavřený`, await p.getByRole('img', { name: /QR kód poukazu DP-ABCD-2345/ }).count() === 0);
+  await p.getByRole('button', { name: 'Ukázat QR kód' }).first().click();
+  tvrdi(`${L}: „Ukázat QR kód“ rozbalí QR`, await p.getByRole('img', { name: /QR kód poukazu DP-ABCD-2345/ }).isVisible().catch(() => false));
+  await p.getByRole('button', { name: 'Skrýt QR kód' }).first().click();
   tvrdi(`${L}: vyčerpaný poukaz zůstává vidět se stavem`, /Vyčerpaný/.test(t));
   tvrdi(`${L}: bez vodorovného scrollu`, await bezPreteceni(p));
   // Odebrání z aplikace: nejdřív potvrzení, teprve pak zápis.

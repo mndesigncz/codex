@@ -1,0 +1,104 @@
+/* Stránka podniku a Podniky ve směru A „Peněženka“ — jen lokální doplňky ke sdíleným třídám
+   z app/host-penezenka.css (tokeny --hp-*). Žádná barva značky podniku; sklo jen přes .lgx. */
+
+/* ---------- Hlavička pod obálkou ---------- */
+.hpp-hlava { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.hpp-hlava .hp-mono { box-shadow: 0 0 0 1px rgba(22,24,26,0.06); }
+.hpp-nazev { font-size: 26px; overflow-wrap: anywhere; }
+.hpp-stav { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 14px; font-size: 13px; line-height: 1.35; min-width: 0; }
+.hpp-stav > i { flex: none; width: 7px; height: 7px; border-radius: 9999px; background: var(--hp-faint); }
+.hpp-stav > b { font-weight: 600; color: var(--hp-fg); }
+.hpp-stav.hpp-otevreno > i { background: var(--hp-lime-ink); }
+.hpp-stav.hpp-otevreno > b { color: var(--hp-lime-ink); }
+:root[data-theme="dark"] .hpp-stav.hpp-otevreno > i { background: var(--hp-lime); }
+:root[data-theme="dark"] .hpp-stav.hpp-otevreno > b { color: var(--hp-lime); }
+
+/* Řada akcí: Rezervovat (inkoust) · Menu (sklo) · kruhy 44 */
+.hpp-akce { display: flex; gap: 8px; margin-top: 18px; min-width: 0; }
+.hpp-akce > .hp-btn { min-width: 0; padding-left: 12px; padding-right: 12px; }
+.hpp-akce > .hp-btn:first-child { flex: 1.35 1 0; }
+.hpp-akce > .hp-btn + .hp-btn { flex: 1 1 0; }
+.hpp-akce > .hp-btn > span { overflow: hidden; text-overflow: ellipsis; }
+.hpp-akce > .hp-kruh { width: 44px; height: 44px; }
+@media (max-width: 359.98px) {
+  .hpp-akce { gap: 6px; }
+  .hpp-akce > .hp-btn { font-size: 13px; padding-left: 8px; padding-right: 8px; gap: 6px; }
+}
+
+/* ---------- Moje karta: zmenšená přední karta (číslo 46, bez pevné výšky) ---------- */
+.hpp-moje.hp-karta { min-height: 0; padding: 16px 18px 18px; }
+.hpp-moje .hp-cislo { font-size: 46px; }
+.hpp-moje .hp-karta-z { font-size: 18px; }
+.hpp-moje .hp-karta-stitek { margin-left: auto; padding-left: 8px; }
+.hpp-moje .hp-karta-hodnota { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 450; color: var(--hp-karta-tlume); }
+.hpp-moje-pozn { margin-top: 10px; display: grid; gap: 4px; }
+.hpp-varuje { font-weight: 600; color: var(--hp-fg); }
+
+/* Vstup do členství (nečlen): sklo, limetkové CTA */
+.hpp-vstup { padding: 18px 16px 12px; }
+
+/* ---------- Řádky „Co dostaneš“ ---------- */
+.hpp-pocet { flex: none; width: 56px; font-variant-numeric: tabular-nums; }
+.hpp-pocet > .hp-meta { display: block; margin-top: 1px; }
+.hpp-kod-odkaz { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: var(--hp-r-pole); background: var(--hp-well); color: var(--hp-fg); font-size: 14px; }
+
+/* ---------- Datová dlaždice (akce) na krému ---------- */
+.hpp-datum { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 48px; height: 52px; border-radius: 12px; background: var(--hp-cream); color: #16181A; }
+.hpp-datum > b { font-size: 20px; font-weight: 600; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.hpp-datum > span { font-size: 11px; margin-top: 3px; line-height: 1; }
+.hpp-foto { flex: none; width: 48px; height: 52px; border-radius: 12px; object-fit: cover; }
+
+/* ---------- Otevírací doba jako tabulka ---------- */
+.hpp-hodiny { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.hpp-hodiny th { text-align: left; font-weight: 400; color: var(--hp-muted); padding: 3px 0; }
+.hpp-hodiny td { text-align: right; padding: 3px 0; color: var(--hp-fg); white-space: nowrap; }
+.hpp-hodiny tr.hpp-dnes th, .hpp-hodiny tr.hpp-dnes td { font-weight: 600; color: var(--hp-fg); }
+
+/* ---------- Rezervace (sklo) ---------- */
+.hpp-rez { padding: 18px 16px 16px; }
+.hpp-krokovac { display: flex; align-items: center; gap: 4px; flex: none; }
+.hpp-krokovac > button { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9999px; background-color: var(--hp-surface); box-shadow: inset 0 0 0 1px var(--hp-line); color: var(--hp-fg); }
+.hpp-krokovac > button::before { content: ""; position: absolute; inset: -4px; }
+.hpp-krokovac > button:disabled { opacity: 0.4; }
+.hpp-krokovac > button:focus-visible { outline: 2px solid var(--hp-fg); outline-offset: 2px; }
+.hpp-krokovac > span { width: 28px; text-align: center; }
+.hpp-cara { height: 1px; background: var(--hp-line); margin: 16px 0; }
+.hpp-dny { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }
+.hpp-dny::-webkit-scrollbar { display: none; }
+.hpp-casy { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.hpp-casy > .hp-cip, .hpp-dny > .hp-cip { position: relative; height: 40px; }
+.hpp-casy > .hp-cip { padding: 0 4px; }
+.hpp-casy > .hp-cip::before, .hpp-dny > .hp-cip::before, .hpp-cipy > .hp-cip::before { content: ""; position: absolute; left: 0; right: 0; top: -2px; bottom: -2px; }
+.hpp-dny > .hp-cip { min-height: 44px; flex: none; }
+.hpp-cipy { display: flex; flex-wrap: wrap; gap: 8px; }
+.hpp-cipy > .hp-cip { position: relative; min-height: 40px; }
+.hpp-poznamka { min-height: 48px; }
+
+/* ---------- Menu jako tiché sklo ---------- */
+.hpp-oddil { padding: 6px 16px; }
+.hpp-oddil > ul { list-style: none; margin: 0; padding: 0; }
+.hpp-oddil > ul > li + li { border-top: 1px solid var(--hp-line); }
+
+/* ---------- Bannery v aplikaci hosta ---------- */
+.hpp-banner { position: relative; overflow: hidden; border-radius: var(--hp-r-karta); }
+.hpp-banner-foto { background-color: #16181A; color: #FFFFFF; }
+
+/* ---------- Podniky ---------- */
+.hpp-moje-karty { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.hpp-moje-karty > li { min-width: 0; }
+.hpp-moje-karty .hp-karta { min-height: 0; padding: 16px 18px; }
+.hpp-filtry { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 12px calc(-1 * var(--hp-okraj)) 0; padding: 0 var(--hp-okraj) 4px; }
+.hpp-filtry::-webkit-scrollbar { display: none; }
+.hpp-filtry > .hp-cip { position: relative; flex: none; }
+.hpp-filtry > .hp-cip::before { content: ""; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px; }
+@media (min-width: 768px) { .hpp-filtry { margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; } }
+.hpp-sken { min-width: 44px; min-height: 44px; }
+
+/* ---------- Úvod nepřihlášeného: vějíř tří karet ---------- */
+.hpp-vejir { position: relative; height: 236px; margin: 8px 6px 26px; }
+.hpp-vejir > .hp-karta { position: absolute; left: 0; right: 0; top: 18px; height: 200px; min-height: 0; padding: 18px 20px; }
+.hpp-vejir > .hp-karta:nth-child(1) { transform: rotate(-5deg) translateY(-8px) scale(0.96); opacity: 0.85; }
+.hpp-vejir > .hp-karta:nth-child(2) { transform: rotate(-2deg) translateY(2px) scale(0.98); }
+.hpp-vejir > .hp-karta:nth-child(3) { transform: rotate(3deg) translateY(16px); }
+.hpp-vejir .hp-cislo { font-size: 64px; }
+@media (min-width: 768px) { .hpp-vejir { max-width: 420px; } }

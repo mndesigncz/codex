@@ -46,6 +46,9 @@ const walk = (dir) => {
       // se jmenuje „Zlatá a krémová" a to `id` nikdo nevidí; přejmenovat by
       // ho navíc znamenalo rozbít data podnikům, které si ji vybraly.
       if (/\bid:\s*['"`]/.test(line)) return;
+      // Seznam druhů podniků, který se z názvu odřezává (monogram, krátký název na obálce), není
+      // text pro člověka, ale pravidlo nad daty. Takový řádek nese komentář `generic-ok`.
+      if (/generic-ok/.test(line)) return;
       let m;
       STRING.lastIndex = 0;
       while ((m = STRING.exec(line))) {

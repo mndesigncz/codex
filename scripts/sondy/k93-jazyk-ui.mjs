@@ -8,7 +8,8 @@
 // českých slov bez diakritiky.
 //
 // Co se nepočítá: data ukázky (jména, poznámky, názvy podniků, položky menu — všechny řetězce
-// z lib/demo/** a lib/klient/demo/**, celá i po slovech u jmen), údaje provozovatele (lib/firma.ts),
+// z lib/demo/** a lib/klient/demo/**, celá i po slovech u jmen, i krátká podoba názvu podniku na obálce
+// „U Lípy“ přes kratkyNazev), údaje provozovatele (lib/firma.ts),
 // endonymy jazyků v přepínači (Čeština, Slovenčina) a měna Kč (formát peněz řídí podnik).
 //
 // Vědomě vynecháno: Managero client → Stránka podniku (BrandTab.tsx) — v kole 93 ji přebarvuje
@@ -18,6 +19,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { kratkyNazev } from '../../components/client/host/podnik/util.ts';
 
 const BASE = process.env.SONDY_ZAKLAD ?? process.env.SONDY_BASE ?? 'http://localhost:3000';
 const ROOT = new URL('../../', import.meta.url).pathname;
@@ -32,7 +34,7 @@ for (const f of zdroje) {
   const s = readFileSync(f, 'utf8');
   for (const m of s.matchAll(/'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`([^`]*)`/g)) {
     const v = m[1] ?? m[2] ?? m[3] ?? '';
-    for (const kus of v.split(/\$\{[^}]*\}/)) { const k = kus.trim(); if (k.length >= 3 && /\p{L}/u.test(k)) data.add(k); }
+    for (const kus of v.split(/\$\{[^}]*\}/)) { const k = kus.trim(); if (k.length >= 3 && /\p{L}/u.test(k)) { data.add(k); data.add(kratkyNazev(k)); } }
     // Jména („Eliška Nováková") se v UI zkracují („Eliška N.", „Dobrý den, Eliška") — whitelist i po slovech.
     if (/^\p{Lu}\p{Ll}+( \p{Lu}\p{Ll}+){1,2}$/u.test(v)) for (const sl of v.split(' ')) slovaJmen.add(sl);
   }

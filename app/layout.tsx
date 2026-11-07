@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
+// Managero client, směr A „Peněženka“ (tokeny --hp-*, třídy .hp-*): globálně, ať ho má i náhled hosta ve správě.
+import './host-penezenka.css';
 import { SessionProvider } from './providers';
 import { ObalProvider } from '@/components/ObalProvider';
 import { obalZHlavicek } from '@/lib/obal';
@@ -34,8 +36,11 @@ export async function generateMetadata(): Promise<Metadata> {
     title: SITE_TITULEK,
     description: popis,
     applicationName: SITE_NAZEV,
-    manifest: '/manifest.webmanifest',
+    // Odkaz na manifest píše <head> níž sám (crossOrigin="use-credentials", viz app/manifest.webmanifest/route.ts).
     appleWebApp: { capable: true, title: 'Managero', statusBarStyle: 'default' },
+    // Next 15 z appleWebApp.capable píše jen standardní `mobile-web-app-capable`; starší
+    // iOS Safari pro „Přidat na plochu“ jako samostatnou aplikaci čte jen tuhle značku.
+    other: { 'apple-mobile-web-app-capable': 'yes' },
     openGraph: { ...OG_ZAKLAD, description: popis },
     twitter: {
       card: 'summary_large_image',
@@ -72,6 +77,7 @@ export default async function RootLayout({
   return (
     <html lang={jazyk} className={`${sans.variable} ${mono.variable}`} data-obal={obal ?? undefined} suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var p=location.pathname;var c=p==='/'||p==='/demo'||p.indexOf('/demo/')===0||/[?&]mode=client(&|$)/.test(location.search);var k=p==='/client'||p.indexOf('/client/')===0;var h=document.documentElement;if(k)window.__motivVychozi='system';var t=c?null:(localStorage.getItem('managero-theme')||localStorage.getItem('pangea-theme')||localStorage.getItem('managero-theme-server')||(k?'system':null));if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark'&&!c)h.setAttribute('data-theme','dark');var v=c?{}:JSON.parse(localStorage.getItem('managero-vzhled')||'{}');if(v.hustota==='kompaktni')h.setAttribute('data-density','compact');if(v.pismo==='vetsi')h.setAttribute('data-fontsize','large');if(v.pismo==='nejvetsi')h.setAttribute('data-fontsize','xlarge');if(v.pohyb===true)h.setAttribute('data-motion','reduce');if(v.kontrast===true)h.setAttribute('data-contrast','high');}catch(e){}`,

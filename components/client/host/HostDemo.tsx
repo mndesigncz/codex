@@ -13,6 +13,7 @@ import Odmeny from './Odmeny';
 import Aktivita from './Aktivita';
 import Profil from './Profil';
 import BusinessPage from '../BusinessPage';
+import Vzornik from '../penezenka/Vzornik';
 
 let odinstaluj: (() => void) | null = null;
 
@@ -32,5 +33,7 @@ export default function HostDemo({ cesta }: { cesta: string[] }) {
   if (a === 'aktivita') return <Aktivita />;
   if (a === 'profil') return <Profil />;
   if (a === 'p' && b) return <BusinessPage slug={b} />;
+  // Vzorník sdílené vrstvy směru A (components/client/penezenka) — jen v ukázce, nic na něj neodkazuje.
+  if (a === 'vzornik') return <Vzornik />;
   return <Domov />;
 }

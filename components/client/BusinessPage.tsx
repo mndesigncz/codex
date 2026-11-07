@@ -1,22 +1,23 @@
 'use client';
 
-// Stránka podniku jako jeho mini-web (koncept B 2, audit C §6 4). Inkoustová hlavička s dlaždicí loga
-// (logo, název, „Otevřeno do 20:00 · adresa“), pod ní řada čtyř akcí Rezervovat · Menu · Navigovat ·
-// Zavolat (bez telefonu Sdílet), pak moje karta razítek s daty návštěv (nebo vstup do členství
-// s tím, co host dostane hned), „Dnes“ (běžící bonus a bannery), žebříček odměn (co za razítka
-// a body dostaneš), moje rezervace tady, akce, menu, novinky a informace. Žádné záložky pod
-// ohybem: všechno je na jedné stránce a akce nahoře na ně skočí. Objednávka od stolu (QR na stole,
-// ?tab=order) má vlastní pohled se šipkou zpět. Barva podniku jen v hlavičce a na kartě.
+// Stránka podniku ve směru A „Peněženka“ (předloha 04). Nahoře inkoustová obálka s velkým lehkým
+// názvem (na telefonu přes celou šířku, na počítači karta s rádiusem 22), pod ní list: monogram,
+// název, adresa, stav otevření a řada akcí Rezervovat · Menu · Navigovat · Zavolat. Pak segment
+// Odměny · Menu · Akce · Info (role tab, ?tab= v adrese). Odměny = moje karta (QR u kasy) nebo vstup
+// do členství, „Dnes“ (bonus a bannery), co dostaneš, moje rezervace, rezervace přímo na stránce,
+// co se chystá, o podniku a pravidla s historií. Objednávka od stolu (QR na stole, ?tab=order) má
+// vlastní pohled se šipkou zpět. Barva značky podniku tu není nikde: tvář je textura a monogram.
 
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useJePocitac } from '@/lib/useJeTelefon';
 import Link from 'next/link';
 import { Icon } from '../Icons';
-import { Skeleton, EmptyState, ErrorState } from '../ui';
-import TableMap, { placedTables } from './TableMap';
+import { Skeleton, EmptyState, Segmented } from '../ui';
+import { placedTables } from './TableMap';
+import TableMap from './TableMap';
 import { RES_STATUS } from '@/lib/clientSlots';
 import { useJazyk, useT } from '@/lib/i18n/client';
-import { fmtDatum, fmtDenVTydnu, fmtMesic } from '@/lib/i18n/format';
-import { pragueHM } from '@/lib/pragueTime';
+import { fmtDatum, fmtMesic } from '@/lib/i18n/format';
 import { useModal } from '@/lib/useModal';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -25,17 +26,23 @@ import { okJson, apiMessage } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import PromoBanners from './PromoBanners';
-import MamPoukaz from './MamPoukaz';
 import { SkonceneKarticky } from './loyalty/KartaRazitek';
 import HostHistorie from './loyalty/HostHistorie';
 import HostPravidla from './loyalty/HostPravidla';
-import { PlatnostKuponu } from './loyalty/HostPlatnost';
-import { LogoPodniku } from './karta/KartaPodniku';
-import RazitkaMrizka from './karta/RazitkaMrizka';
 import Rezervace from './host/Rezervace';
 import { useCesta } from './host/cesty';
 import { obnovHosta } from './host/data';
-import { stavOtevreni, popisOtevreni } from './host/model';
+import { ListObalky, NadpisSekce, Seznam, PrazdnyStav, KruhoveTlacitko } from './penezenka';
+import { ObalkaStranky, HlavickaPodniku } from './host/podnik/Zahlavi';
+import { MojeKarta, VstupDoClenstvi } from './host/podnik/MojeKarta';
+import { CoDostanes } from './host/podnik/CoDostanes';
+import { OPodniku } from './host/podnik/OPodniku';
+import './host/podnik/podnik.css';
+
+type Zalozka = 'odmeny' | 'menu' | 'akce' | 'info';
+/** ?tab= v adrese → záložka (staré odkazy: loyalty, reserve, menu; order má vlastní pohled). */
+const ZE_TAB: Record<string, Zalozka> = { loyalty: 'odmeny', reserve: 'odmeny', odmeny: 'odmeny', menu: 'menu', akce: 'akce', events: 'akce', info: 'info' };
+const DO_TAB: Record<Zalozka, string | null> = { odmeny: null, menu: 'menu', akce: 'akce', info: 'info' };
 
 export default function BusinessPage({ slug }: { slug: string }) {
   // Jazyk stránky je jazyk hosta (?lang=, cookie, jazyk prohlížeče; viz lib/i18n/client).
@@ -50,7 +57,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
   const [dotaz] = useState(() => (typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)));
   // QR na stole vede rovnou na objednávku: /client/<podnik>?tab=order&table=3
   const [objednavka, setObjednavka] = useState(() => dotaz.get('tab') === 'order');
-  const [rezervace, setRezervace] = useState(false);
+  const jePocitac = useJePocitac();
+  const [zalozka, setZalozkaStav] = useState<Zalozka>(() => ZE_TAB[dotaz.get('tab') ?? ''] ?? 'odmeny');
   const [flash, setFlash] = useState('');
   const [joining, setJoining] = useState(false);
   // „Chci novinky od <podnik>“ při vstupu do členství (spuštění, balík G): výchozí NE.
@@ -68,27 +76,53 @@ export default function BusinessPage({ slug }: { slug: string }) {
   }, [slug, jazyk, t]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (flash) { const i = setTimeout(() => setFlash(''), 4500); return () => clearTimeout(i); } }, [flash]);
-  // ?tab=reserve: s ?rezervace=ID skok na moji rezervaci (připomínka), bez něj rovnou okno rezervace.
+
+  /** Přepne záložku a zapíše ji do adresy (?tab=), ostatní parametry nechá. */
+  const setZalozka = useCallback((z: Zalozka) => {
+    setZalozkaStav(z);
+    try {
+      const u = new URL(window.location.href);
+      const tab = DO_TAB[z];
+      if (tab) u.searchParams.set('tab', tab); else if (u.searchParams.get('tab') !== 'reserve' && u.searchParams.get('tab') !== 'loyalty') u.searchParams.delete('tab');
+      window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash);
+    } catch { /* bez history API zůstane adresa */ }
+  }, []);
+  /** Skok na prvek na stránce (po přepnutí záložky až po vykreslení). */
+  const skok = useCallback((id: string, z?: Zalozka, block: ScrollLogicalPosition = 'start') => {
+    if (z) setZalozka(z);
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ block, behavior: 'smooth' }), z ? 120 : 0);
+  }, [setZalozka]);
+
+  // ?tab=reserve: s ?rezervace=ID skok na moji rezervaci (připomínka), bez něj na rezervaci stolu.
   // ?tab=loyalty: skok na kartu a odměny.
   const skocil = useRef(false);
   useEffect(() => {
     if (!d || skocil.current) return;
     skocil.current = true;
     const tab = dotaz.get('tab');
-    const kam = tab === 'reserve' && dotaz.get('rezervace') ? `rezervace-${dotaz.get('rezervace')}` : tab === 'loyalty' ? 'vernost' : tab === 'menu' ? 'menu' : null;
-    if (tab === 'reserve' && !dotaz.get('rezervace') && d.business?.reservationsOn) setRezervace(true);
+    const kam = tab === 'reserve' ? (dotaz.get('rezervace') ? `rezervace-${dotaz.get('rezervace')}` : 'rezervovat') : tab === 'loyalty' ? 'vernost' : null;
     if (kam) setTimeout(() => document.getElementById(kam)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 200);
   }, [d, dotaz]);
 
-  if (notFound) return <EmptyState icon="location" title={t('Podnik tu není')} hint={t('Buď má jinou adresu, nebo Managero client zatím nezapnul.')} action={<Link href={cesta('/client')} className="tap-target btn btn-secondary">{t('Zpět na podniky')}</Link>} />;
-  if (loadErr && !d) return (
-    <ErrorState
-      title={t('Stránka podniku se nenačetla')}
-      hint={`${/[.!?…]$/.test(loadErr) ? loadErr : loadErr + '.'} ${t('Podnik tu nejspíš je — jen se k němu teď nedovoláme.')}`}
-      onRetry={() => { void load(); }}
-    />
+  if (notFound) return (
+    <div className="pt-10">
+      <PrazdnyStav titulek={t('Podnik tu není')} text={t('Buď má jinou adresu, nebo Managero client zatím nezapnul.')}
+        akce={<Link href={cesta('/client')} className="hp-btn hp-btn-inkoust hp-btn-stredni tap-target">{t('Zpět na podniky')}</Link>} />
+    </div>
   );
-  if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-[28px]" /><Skeleton className="h-20 rounded-3xl" /><Skeleton className="h-64 rounded-3xl" /></div>;
+  if (loadErr && !d) return (
+    <div className="pt-10" role="alert">
+      <PrazdnyStav titulek={t('Stránka podniku se nenačetla')}
+        text={`${/[.!?…]$/.test(loadErr) ? loadErr : loadErr + '.'} ${t('Podnik tu nejspíš je — jen se k němu teď nedovoláme.')}`}
+        akce={<button type="button" onClick={() => { void load(); }} className="hp-btn hp-btn-inkoust hp-btn-stredni tap-target"><Icon name="refresh" size={16} strokeWidth={1.6} />{t('Zkusit znovu')}</button>} />
+    </div>
+  );
+  if (!d) return (
+    <div className="space-y-4" aria-busy="true">
+      <Skeleton className="h-[300px] -mx-5 md:mx-0 -mt-5 md:mt-0 md:rounded-[22px]" />
+      <Skeleton className="h-16 rounded-[22px]" /><Skeleton className="h-48 rounded-[22px]" />
+    </div>
+  );
 
   const b = d.business; const me = d.me; const today: string = d.today; const signedIn = !!d.signedIn;
   const lzeObjednat = !!b.orderingOn && (d.tables?.length ?? 0) > 0;
@@ -103,16 +137,15 @@ export default function BusinessPage({ slug }: { slug: string }) {
       setFlash(x.error ? t(x.error) : t('Přidat se teď nepovedlo. Zkus to prosím znovu.'));
     } finally { setJoining(false); }
   };
-  const skok = (id: string) => document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
 
   if (objednavka && lzeObjednat) {
     return (
       <div className="space-y-5">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => setObjednavka(false)} className="tap-target btn-icon shrink-0" aria-label={t('Zpět na stránku podniku')}><Icon name="arrowLeft" size={17} /></button>
+          <KruhoveTlacitko ikona="arrowLeft" popis={t('Zpět na stránku podniku')} onClick={() => setObjednavka(false)} />
           <div className="min-w-0">
-            <p className="t-meta truncate">{b.name}</p>
-            <h1 className="t-page !text-[26px]">{t('Objednat od stolu')}</h1>
+            <p className="hp-meta truncate">{b.name}</p>
+            <h1 className="hp-titulek !text-[26px]">{t('Objednat od stolu')}</h1>
           </div>
         </div>
         {flash && <p role="status" className="toast-in note note-ok">{flash}</p>}
@@ -121,306 +154,134 @@ export default function BusinessPage({ slug }: { slug: string }) {
     );
   }
 
-  return (
-    <div>
-      <Hlavicka b={b} today={today} onRezervovat={b.reservationsOn ? () => setRezervace(true) : null} onMenu={() => skok('menu')} />
-
-      {flash && <p role="status" className="mt-5 toast-in note note-ok">{flash}</p>}
-      {/* Telefon: jeden sloupec. Monitor: vlevo moje karta, dnes, odměny a rezervace (drží se při posouvání),
-          vpravo akce, menu, novinky a informace — host u stolu na tabletu nemá kartu přes celou šířku. */}
-      <div className="mt-5 md:mt-8 grid grid-cols-1 md:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] gap-8 sm:gap-10 items-start">
-        <div className="space-y-8 sm:space-y-10 md:sticky md:top-24 min-w-0">
-
-        {/* Členství: karta podniku s razítky a daty návštěv, nebo vstup s tím, co host dostane hned. */}
-        <section id="vernost" aria-label={t('Věrnost')} className="scroll-mt-6 space-y-3">
-          {me?.member ? <MojeKarta b={b} me={me} today={today} /> : b.loyaltyOn ? (
-            <div className="card p-4 sm:p-5" data-vstup-clenstvi>
-              <div className="flex items-start gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/[0.05]" aria-hidden><Icon name="gift" size={18} /></span>
-                <div className="min-w-0">
-                  <p className="t-card !text-[17px]">{b.welcomePoints > 0 ? t('Přidej se a dostaneš hned {n} bodů', { n: b.welcomePoints }) : t('Přidej se a sbírej razítka a body')}</p>
-                  <p className="t-meta mt-0.5 text-pretty">
-                    {(d.stampCampaigns ?? [])[0] ? t('{n, plural, one {# razítko} few {# razítka} other {# razítek}} a {odmena} je tvoje. Kód ukážeš u kasy, nic dalšího.', { n: d.stampCampaigns[0].required, odmena: d.stampCampaigns[0].reward || t('odměna') })
-                      : t('{body} bodů za každých {castka} útraty. Kód ukážeš u kasy, nic dalšího.', { body: b.pointsPer100, castka: formatMoney(100, b.currency) })}
-                  </p>
-                </div>
-              </div>
-              <button type="button" onClick={join} disabled={joining} className="mt-4 tap-target btn btn-accent w-full !h-[52px] disabled:opacity-60"><Icon name="plus" size={16} /> {t('Stát se členem')}</button>
-              {/* Souhlas s novinkami je dobrovolný a po podnicích: výchozí NE, jde změnit v profilu. */}
-              <label className="mt-1 min-h-[44px] flex items-center gap-2.5 text-sm cursor-pointer select-none text-black/70">
-                <input type="checkbox" checked={chciNovinky} onChange={e => setChciNovinky(e.target.checked)} className="h-5 w-5 shrink-0 accent-[#16181A]" />
-                <span className="min-w-0 break-words">{t('Chci novinky od {podnik}', { podnik: b.name })}</span>
-              </label>
-            </div>
-          ) : null}
-        </section>
-
-        {/* Dnes: běžící bonus („Dnes dvojnásobné body do 18:00“) a bannery podniku (data podniku). */}
-        {((d.bonus && b.loyaltyOn) || (d.banners?.length ?? 0) > 0) && (
-          <section aria-label={t('Dnes')} className="space-y-3">
-            {d.bonus && b.loyaltyOn && <BonusPruh bonus={d.bonus} />}
-            {(d.banners?.length ?? 0) > 0 && <PromoBanners banners={d.banners} loyaltyOn={!!b.loyaltyOn} onGoTab={tab => skok(tab === 'loyalty' ? 'odmeny-podniku' : 'menu')} slug={slug} />}
-          </section>
-        )}
-
-        {b.loyaltyOn && <Zebricek slug={slug} b={b} me={me} today={today} campaigns={d.stampCampaigns ?? []} coupons={d.coupons ?? []} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); void obnovHosta(); }} />}
-
-        {d.signedIn && b.reservationsOn && (me?.reservations?.length ?? 0) > 0 && <MojeRezervace slug={slug} me={me} onDone={(m: string) => { setFlash(m); load(); }} />}
-        </div>
-        <div className="space-y-8 sm:space-y-10 min-w-0">
-
-        {(d.events?.length ?? 0) > 0 && <Akce events={d.events} b={b} slug={slug} signedIn={d.signedIn} />}
-
-        <section id="menu" aria-labelledby="h-menu" className="scroll-mt-6">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 id="h-menu" className="t-section">{t('Menu')}</h2>
-            {lzeObjednat && <button type="button" onClick={() => { setObjednavka(true); window.scrollTo({ top: 0 }); }} className="btn btn-secondary btn-sm !h-9 shrink-0"><Icon name="cup" size={15} />{t('Objednat od stolu')}</button>}
-          </div>
-          <Menu menu={d.menu} currency={b.currency} />
-        </section>
-
-        {(d.news?.length ?? 0) > 0 && (
-          <section aria-labelledby="h-novinky">
-            <h2 id="h-novinky" className="t-section mb-3">{t('Novinky')}</h2>
-            <ul className="card list px-4 sm:px-5">
-              {d.news.map((n: any) => (
-                <li key={n.id} className="py-3.5">
-                  <p className="text-[15px] font-semibold leading-snug">{n.title}</p>
-                  {n.body && <p className="text-sm text-black/65 mt-0.5 text-pretty">{n.body}</p>}
-                  <p className="t-meta mt-1 cz-sentence">{fmtDatum(String(n.sent_at).slice(0, 10), { jazyk, styl: 'denDlouze' })}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <Info b={b} gallery={b.gallery} />
-
-        {b.loyaltyOn && (
-          <section aria-labelledby="h-pravidla" className="card p-4 sm:p-5">
-            <h2 id="h-pravidla" className="sr-only">{t('Pravidla věrnosti')}</h2>
-            <HostPravidla b={b} campaigns={d.stampCampaigns ?? []} />
-            {me?.member && <SkonceneKarticky list={me.endedCampaigns ?? []} />}
-            {signedIn && <HostHistorie slug={slug} className="mt-5 border-t border-black/[0.06] pt-4" />}
-            {/* Zůstatek dárkového poukazu jde ověřit i bez účtu (kód z poukazu, jen čtení). */}
-            <div className="mt-5 border-t border-black/[0.06] pt-4"><MamPoukaz slug={slug} prihlasen={signedIn} /></div>
-            <p className="mt-4 t-meta text-pretty">{t('Máš promo kód nebo dárkový poukaz?')} <Link href={cesta('/client/me/odmeny')} className="font-semibold text-black/80 underline underline-offset-2 tap-target-sm">{t('Zadej ho v Odměnách')}</Link></p>
-          </section>
-        )}
-        </div>
-      </div>
-
-      {rezervace && <Rezervace slug={slug} nazev={b.name} adresa={b.address} maxOsob={b.maxParty || 8} dnes={today} prihlasen={!!d.signedIn} hodiny={b.hours} krok={b.slotMinutes} dopredu={b.leadDays} onClose={() => setRezervace(false)} onHotovo={(m: string) => { setFlash(m); load(); }} />}
-    </div>
-  );
-}
-
-/** Hlavička (inkoustová plocha v paletě Managera; barva podniku jen na dlaždici loga) + řada akcí.
- *  Na telefonu přes celou šířku až k hornímu okraji. */
-function Hlavicka({ b, today, onRezervovat, onMenu }: { b: any; today: string; onRezervovat: (() => void) | null; onMenu: () => void }) {
-  const t = useT('klient-host');
-  const cesta = useCesta();
-  const o = stavOtevreni(b.hours, today, pragueHM());
-  const mapa = b.address ? `https://mapy.cz/zakladni?q=${encodeURIComponent(`${b.name}, ${b.address}`)}` : null;
-  const sdilet = () => {
-    const url = typeof window === 'undefined' ? '' : window.location.href.split('?')[0];
-    if (navigator.share) navigator.share({ title: b.name, url }).catch(() => {});
-    else navigator.clipboard?.writeText(url).catch(() => {});
-  };
-  const akce: { key: string; label: string; icon: string; onClick?: () => void; href?: string }[] = [
-    ...(onRezervovat ? [{ key: 'r', label: t('Rezervovat'), icon: 'calendar', onClick: onRezervovat }] : []),
-    { key: 'm', label: t('Menu'), icon: 'menu', onClick: onMenu },
-    ...(mapa ? [{ key: 'n', label: t('Navigovat'), icon: 'navigate', href: mapa }] : []),
-    b.phone ? { key: 'z', label: t('Zavolat'), icon: 'phone', href: `tel:${String(b.phone).replace(/\s/g, '')}` } : { key: 's', label: t('Sdílet'), icon: 'share', onClick: sdilet },
+  const events: any[] = d.events ?? [];
+  const news: any[] = d.news ?? [];
+  const zalozky = [
+    { id: 'odmeny' as const, label: t('Odměny') },
+    { id: 'menu' as const, label: t('Menu') },
+    { id: 'akce' as const, label: t('Akce', undefined, 'zalozka') },
+    { id: 'info' as const, label: t('Info') },
   ];
-  return (
-    <div>
-      {/* Hlavička jako sklo nad skvrnami pozadí (korekce 2026-10-27: „glass + blur a pozadí“), ne plná
-          inkoustová plocha — inkoust patří jen Moje kartě s QR. Text je inkoust na bílém skle, limetka prosvítá. */}
-      <section className="h-sklo relative -mx-4 !border-t-0 sm:!border-t min-[360px]:-mx-5 sm:mx-0 -mt-[max(env(safe-area-inset-top),20px)] md:mt-0 !rounded-t-none sm:!rounded-t-[28px] !rounded-b-[28px] px-5 sm:px-7 pt-[calc(max(env(safe-area-inset-top),20px)+4px)] md:pt-6 pb-14">
-        <div className="flex items-center justify-between">
-          <Link href={cesta('/client')} className="tap-target h-kruh-svetle" aria-label={t('Zpět na podniky')}><Icon name="chevronLeft" size={18} /></Link>
-          <button type="button" onClick={sdilet} className="tap-target h-kruh-svetle" aria-label={t('Sdílet podnik')}><Icon name="share" size={17} /></button>
-        </div>
-        <div className="mt-5 flex items-end gap-4">
-          <LogoPodniku nazev={b.name} logoUrl={b.logoUrl} barva={b.accent || null} velikost={64} />
-        </div>
-        <h1 className="mt-4 text-[1.875rem] sm:text-[2.5rem] font-semibold leading-[1.05] tracking-[-0.025em] text-balance break-words">{b.name}</h1>
-        <p className="mt-2 text-[14px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 h-karta-tlume">
-          <span className={`h-2 w-2 rounded-full shrink-0 ${o.otevreno ? 'bg-[#C8F542] ring-2 ring-[#C8F542]/30' : 'h-karta-ryska'}`} aria-hidden />
-          <span>{popisOtevreni(o, t)}</span>
-          {b.address && <span className="min-w-0 break-words">· {b.address}</span>}
-        </p>
-      </section>
-      <nav aria-label={t('Akce podniku')} className="card -mt-8 mx-1 sm:mx-6 relative px-2 py-2 h-akce">
-        {akce.map(a => a.href
-          ? <a key={a.key} href={a.href} target={a.href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"><span className="h-akce-kruh" aria-hidden><Icon name={a.icon} size={18} /></span>{a.label}</a>
-          : <button key={a.key} type="button" onClick={a.onClick}><span className="h-akce-kruh" aria-hidden><Icon name={a.icon} size={18} /></span>{a.label}</button>)}
-      </nav>
-    </div>
-  );
-}
-
-/** Moje karta v podniku: razítka s daty návštěv (kampaně), body, úroveň, kredit a co propadá. */
-function MojeKarta({ b, me, today }: { b: any; me: any; today: string }) {
-  const t = useT('klient-host');
-  const { jazyk } = useJazyk();
-  const datum = (x: string) => fmtDatum(x, { jazyk, styl: 'kratce' });
-  const kampane: any[] = (me.campaigns ?? []).filter((c: any) => Number(c.required) > 0);
-  const souhrn = (
-    <p className="text-[13px] h-karta-tlume mt-3 flex flex-wrap gap-x-3 gap-y-1">
-      <span className="tabular-nums">{t('{n} b.', { n: me.points })}</span>
-      {me.levelLabel && <span>{t(me.levelLabel)}{me.discount > 0 ? ` · ${me.discountSource === 'skupina' && me.discountName ? t('sleva {n} % ({skupina})', { n: me.discount, skupina: me.discountName }) : t('sleva {n} %', { n: me.discount })}` : ''}</span>}
-      {me.credit > 0 && <span className="tabular-nums">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</span>}
-    </p>
-  );
-  const upozorneni = (
-    <>
-      {me.expiring && <p className="mt-2 text-xs font-semibold text-wait-ink">{t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: me.expiring.points, kdy: denKratce(me.expiring.till) })}</p>}
-      {me.creditExpiring && <p className="mt-1 text-xs font-semibold text-wait-ink">{t('Kredit {castka} propadne do {kdy}', { castka: formatMoney(me.creditExpiring.amount, b.currency), kdy: denKratce(me.creditExpiring.till) })}</p>}
-      {me.levelDegraded && <p className="mt-1 t-meta">{t('Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.')}</p>}
-      {me.nextTierAt && <p className="mt-1 t-meta">{me.nextTierUnit === 'spend' ? t('do „{level}“ ještě {castka}', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) }) : t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
-    </>
-  );
-  if (!kampane.length) {
-    return (
-      <div>
-        <div className="h-karta">
-          <p className="text-[15px] font-semibold">{b.stampTarget > 0 && !(me.campaigns?.length) ? t('Moje razítka') : t('Moje body')}</p>
-          {b.stampTarget > 0 && !(me.campaigns?.length) ? (
-            <div className="mt-3">
-              <RazitkaMrizka pocet={me.stamps} cil={b.stampTarget} popis={t('{stamps} z {target} razítek', { stamps: me.stamps, target: b.stampTarget })} />
-              <p className="mt-3 text-[13px] h-karta-tlume">{t('Za {n, plural, one {# návštěvu} few {# návštěvy} other {# návštěv}}:', { n: b.stampTarget })} {b.stampReward || t('odměna')}</p>
-            </div>
-          ) : (
-            <p className="mt-3 flex items-baseline gap-1.5"><span className="text-[2.125rem] font-semibold leading-none tabular-nums tracking-[-0.03em]">{me.points}</span><span className="h-karta-tlume">{t('b.')}</span></p>
-          )}
-          {souhrn}
-        </div>
-        {upozorneni}
+  const doMenu = () => skok('h-menu', 'menu');
+  const pravidla = b.loyaltyOn ? (
+    <section id="pravidla" aria-labelledby="h-pravidla" className="scroll-mt-24">
+      <NadpisSekce id="h-pravidla" titulek={t('Pravidla věrnosti')} />
+      <div className="lgx hp-sklo p-4 space-y-4">
+        <HostPravidla b={b} campaigns={d.stampCampaigns ?? []} />
+        {me?.member && <SkonceneKarticky list={me.endedCampaigns ?? []} />}
+        {signedIn && <HostHistorie slug={slug} className="border-t border-[var(--hp-line)] pt-3" />}
       </div>
-    );
-  }
-  return (
-    <div className="space-y-3">
-      {kampane.map(k => {
-        const zbyva = Math.max(0, k.required - k.stamps);
-        return (
-          <div key={k.id} id={`karta-${k.id}`}>
-            <div className="h-karta">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-[15px] font-semibold min-w-0 truncate">{k.name || t('Moje razítka')}</p>
-                <p className="text-[13px] font-semibold tabular-nums h-karta-tlume shrink-0">{k.stamps} / {k.required}</p>
-              </div>
-              <div className="mt-3"><RazitkaMrizka pocet={k.stamps} cil={k.required} data={me.razitkaData?.[String(k.id)] ?? []} popis={t('{name}: {stamps} z {required} razítek', { name: k.name, stamps: k.stamps, required: k.required })} /></div>
-              <p className="mt-3 text-[13px] h-karta-tlume text-pretty">
-                {zbyva > 0 ? t('Ještě {n, plural, one {# razítko} few {# razítka} other {# razítek}} do odměny {odmena}', { n: zbyva, odmena: k.reward || t('odměna') }) : t('Karta je plná — {odmena} je připravená', { odmena: k.reward || t('odměna') })}
-                {k.validTill ? ` · ${t('Karta platí do {datum}.', { datum: datum(k.validTill) })}` : ''}
-              </p>
-              {k.expired && <p role="status" className="mt-1.5 text-xs font-semibold">{t('Rozdělaná karta vypršela, {n, plural, one {# razítko propadlo} few {# razítka propadla} other {# razítek propadlo}}. Další razítko začne novou kartu.', { n: k.expiredStamps })}</p>}
-              {!k.expired && k.finishBy && k.stamps > 0 && <p className="mt-1.5 text-xs font-semibold">{k.daysLeft === 0 ? t('Dosbírej kartu dnes, jinak razítka propadnou.') : t('Dosbírej kartu do {datum}, jinak razítka propadnou.', { datum: datum(k.finishBy) })}</p>}
-              {k.nextCardFrom && <p className="mt-1.5 text-xs h-karta-tlume">{t('Další kartu jde sbírat od {datum}.', { datum: datum(k.nextCardFrom) })}</p>}
-              {k.finishedForever && <p className="mt-1.5 text-xs h-karta-tlume">{k.limit > 1 ? t('Limit karet je splněný ({n}×).', { n: k.limit }) : t('Tuhle kartu už máš dokončenou, další se nesbírá.')}</p>}
-              {k.okno && (k.okno.days?.length || k.okno.from) && <p className="mt-1.5 text-xs h-karta-tlume">{t('Razítko dává jen {kdy}.', { kdy: [k.okno.days?.length ? k.okno.days.map((x: number) => fmtDenVTydnu(x - 1, { jazyk })).join(', ') : '', k.okno.from && k.okno.till ? `${k.okno.from}–${k.okno.till}` : ''].filter(Boolean).join(', ') })}</p>}
-              {k.conditions && (
-                <details className="mt-2 text-xs">
-                  <summary className="cursor-pointer font-semibold tap-target-sm">{t('Podmínky')}</summary>
-                  <p className="mt-1 whitespace-pre-line text-pretty h-karta-tlume">{k.conditions}</p>
-                </details>
-              )}
-              {souhrn}
-            </div>
-          </div>
-        );
-      })}
-      {upozorneni}
-    </div>
-  );
-}
-
-/** Žebříček odměn: co za razítka (kampaně) a za body (kupony) dostaneš; připravené odměny s kódem. */
-function Zebricek({ slug, b, me, today, campaigns, coupons, signedIn, onDone }: { slug: string; b: any; me: any; today: string; campaigns: any[]; coupons: any[]; signedIn: boolean; onDone: (m: string) => void }) {
-  const t = useT('klient-host');
-  const cesta = useCesta();
-  const [busy, setBusy] = useState<number | null>(null);
-  const [err, setErr] = useState('');
-  const claim = async (id: number) => {
-    if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
-    setBusy(id); setErr('');
-    try {
-      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/coupons/${id}/claim`, { method: 'POST' });
-      const x = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(x.error ? t(x.error) : t('Kupon se nepodařilo vzít.')); return; }
-      onDone(t('Kupon je tvůj. Kód {kod} ukaž u kasy.', { kod: x.code }));
-    } catch {
-      setErr(t('Kupon se nepodařilo vzít — vypadlo připojení. Zkus to znovu.'));
-    } finally { setBusy(null); }
-  };
-  const mojeKampane = new Map<number, any>((me?.campaigns ?? []).map((c: any) => [Number(c.id), c]));
-  const kampane = (campaigns ?? []).filter((c: any) => Number(c.required) > 0);
-  const claims: any[] = me?.claims ?? [];
-  if (!kampane.length && !(coupons ?? []).length && !claims.length) return null;
-  return (
-    <section id="odmeny-podniku" aria-labelledby="h-zebricek" className="scroll-mt-6 space-y-3">
-      <h2 id="h-zebricek" className="t-section">{t('Co dostaneš')}</h2>
-      {err && <p role="alert" className="note note-danger">{err}</p>}
-      {claims.length > 0 && (
-        <ul className="card list px-4 sm:px-5" aria-label={t('Připravené odměny')}>
-          {claims.map((c: any) => (
-            <li key={c.id} className="list-row !py-3.5">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#C8F542] on-accent" aria-hidden><Icon name="gift" size={18} /></span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-semibold leading-tight truncate">{c.title}</p>
-                <PlatnostKuponu validUntil={c.valid_until} today={today} className="block t-meta mt-0.5" />
-              </div>
-              <Link href={cesta('/client/me/odmeny')} className="h-kod text-[14px] shrink-0 well px-2.5 py-1.5">{c.code}</Link>
-            </li>
-          ))}
-        </ul>
-      )}
-      {(kampane.length > 0 || (coupons ?? []).length > 0) && (
-        <ul className="card list px-4 sm:px-5">
-          {kampane.map((k: any) => {
-            const muj = mojeKampane.get(Number(k.id));
-            const zbyva = muj ? Math.max(0, Number(k.required) - Number(muj.stamps)) : Number(k.required);
-            return (
-              <li key={`k${k.id}`} className="list-row !py-3.5">
-                <span className="w-10 shrink-0 text-[17px] font-semibold tabular-nums">{k.required}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-medium leading-tight">{k.reward || k.name}</p>
-                  <p className="t-meta mt-0.5">{t('{n, plural, one {# razítko} few {# razítka} other {# razítek}}', { n: k.required })}{k.rewardItems?.length ? ` · ${k.rewardItems.join(', ')}` : ''}</p>
-                </div>
-                <span className="text-[13px] text-black/55 shrink-0 tabular-nums">{muj ? (zbyva === 0 ? t('připraveno') : t('zbývá {n}', { n: zbyva })) : ''}</span>
-              </li>
-            );
-          })}
-          {(coupons ?? []).map((c: any) => {
-            const cena = Number(c.cost_points) || 0;
-            const can = me?.member && Number(me.points) >= cena && !c.blocked;
-            const chybi = me?.member ? Math.max(0, cena - Number(me.points)) : 0;
-            return (
-              <li key={c.id} id={`kupon-${c.id}`} className={`list-row !py-3.5 !gap-3 ${c.blocked ? 'opacity-60' : ''}`}>
-                <span className="w-10 shrink-0 text-[15px] font-semibold tabular-nums leading-tight">{cena === 0 ? t('zdarma') : t('{n} b.', { n: cena })}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-medium leading-snug">{c.title}{c.benefit && <span className="ml-2 chip chip-sm chip-ok align-middle">{c.benefit}</span>}</p>
-                  {c.description && <p className="text-sm text-black/55 text-pretty">{c.description}</p>}
-                  {(c.badges?.length > 0 || c.valid_until) && (
-                    <p className="text-xs text-black/55 mt-0.5">
-                      {(c.badges ?? []).join(' · ')}{c.badges?.length > 0 && c.valid_until ? ' · ' : ''}
-                      <PlatnostKuponu validUntil={c.valid_until} today={today} />
-                    </p>
-                  )}
-                  {c.blocked && <p className="text-xs text-wait-ink mt-0.5">{t(c.blocked)}</p>}
-                  {!c.blocked && chybi > 0 && <p className="text-xs text-black/55 mt-0.5 tabular-nums">{t('chybí {n} b.', { n: chybi })}</p>}
-                </div>
-                <button type="button" onClick={() => claim(c.id)} disabled={busy === c.id || (signedIn && me?.member && !can)}
-                  className="tap-target btn btn-secondary btn-sm shrink-0 !h-9 disabled:opacity-40">{busy === c.id ? '…' : cena ? t('Vyměnit') : t('Vzít si')}</button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </section>
+  ) : null;
+
+  // Počítač: vlevo předmět (hlavička, Moje karta, O podniku), vpravo záložky. Telefon: jeden sloupec.
+  // Do připojení platí telefon (stejné HTML ze serveru), počítač se přeskládá hned po něm.
+  const sloupec = jePocitac;
+  const vernost = (
+    <section id="vernost" aria-label={t('Věrnost')} className="scroll-mt-24 mt-[22px]">
+      {me?.member ? <MojeKarta b={b} me={me} coupons={d.coupons ?? []} /> : b.loyaltyOn ? (
+        <VstupDoClenstvi b={b} kampan={(d.stampCampaigns ?? [])[0] ?? null} joining={joining} chciNovinky={chciNovinky} setChciNovinky={setChciNovinky} onJoin={join} />
+      ) : null}
+    </section>
+  );
+  const oPodniku = <OPodniku b={b} today={today} signedIn={signedIn} poukazOtevreny={dotaz.get('tab') === 'loyalty'} />;
+
+  return (
+    <div className="hpp-stranka">
+      <ObalkaStranky b={b} />
+      <ListObalky>
+        <div className="md:grid md:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] md:gap-10 md:items-start">
+          <div className="min-w-0">
+            <HlavickaPodniku b={b} today={today} bonus={b.loyaltyOn ? d.bonus : null}
+              onRezervovat={b.reservationsOn ? () => skok('rezervovat', 'odmeny', 'center') : null} onMenu={doMenu} />
+            {sloupec && vernost}
+            {sloupec && oPodniku}
+          </div>
+          <div className="min-w-0">
+            {flash && <p role="status" className="mt-5 md:mt-0 toast-in note note-ok">{flash}</p>}
+            <div className="hp-segment mt-[22px] md:mt-0">
+              <Segmented ariaLabel={t('Stránka podniku', undefined, 'host')} value={zalozka} onChange={z => setZalozka(z)} options={zalozky} />
+            </div>
+
+            {zalozka === 'odmeny' && (
+              <div role="tabpanel" aria-label={t('Odměny')}>
+                {/* Členství: moje karta (QR u kasy), nebo vstup s tím, co host dostane hned. */}
+                {!sloupec && vernost}
+
+                {/* Dnes: běžící bonus a bannery podniku (data podniku). */}
+                {((d.bonus && b.loyaltyOn) || (d.banners?.length ?? 0) > 0) && (
+                  <section aria-label={t('Dnes')} className={`${sloupec ? 'mt-[22px]' : 'mt-6'} space-y-3`}>
+                    {d.bonus && b.loyaltyOn && <BonusPruh bonus={d.bonus} />}
+                    {(d.banners?.length ?? 0) > 0 && <PromoBanners vzhled="penezenka" banners={d.banners} loyaltyOn={!!b.loyaltyOn} slug={slug}
+                      onGoTab={tab => { if (tab === 'loyalty') skok('odmeny-podniku', 'odmeny'); else if (tab === 'events') skok('h-events', 'akce'); else doMenu(); }} />}
+                  </section>
+                )}
+
+                {b.loyaltyOn && <CoDostanes slug={slug} me={me} today={today} campaigns={d.stampCampaigns ?? []} coupons={d.coupons ?? []} signedIn={signedIn}
+                  onDone={(m: string) => { setFlash(m); load(); void obnovHosta(); }} onPravidla={() => skok('pravidla')} />}
+
+                {signedIn && b.reservationsOn && (me?.reservations?.length ?? 0) > 0 && <MojeRezervace slug={slug} me={me} onDone={(m: string) => { setFlash(m); load(); }} />}
+
+                {b.reservationsOn && (
+                  <section id="rezervovat" aria-labelledby="h-rezervovat" className="scroll-mt-24">
+                    <NadpisSekce id="h-rezervovat" titulek={t('Rezervace')} />
+                    <Rezervace slug={slug} nazev={b.name} adresa={b.address} maxOsob={b.maxParty || 8} dnes={today} prihlasen={signedIn} hodiny={b.hours} krok={b.slotMinutes} dopredu={b.leadDays} onHotovo={(m: string) => { setFlash(m); load(); }} />
+                  </section>
+                )}
+
+                {events.length > 0 && <CoSeChysta events={events.slice(0, 2)} b={b} slug={slug} signedIn={signedIn}
+                  vpravo={events.length > 2 ? <button type="button" onClick={() => skok('h-events', 'akce')} className="tap-target">{t('Všechny akce')}</button> : null} />}
+
+                {!sloupec && oPodniku}
+
+                {pravidla}
+              </div>
+            )}
+
+            {zalozka === 'menu' && (
+              <div role="tabpanel" aria-label={t('Menu')}>
+                <section id="menu" aria-labelledby="h-menu" className="scroll-mt-24">
+                  <NadpisSekce id="h-menu" titulek={t('Menu')} className="!mt-[22px]"
+                    vpravo={lzeObjednat ? <button type="button" onClick={() => { setObjednavka(true); window.scrollTo({ top: 0 }); }} className="hp-btn hp-btn-inkoust hp-btn-male tap-target !text-[13px] !text-[var(--hp-btn-ink-fg)]"><Icon name="cup" size={15} strokeWidth={1.6} />{t('Objednat od stolu')}</button> : null} />
+                  <Menu menu={d.menu} currency={b.currency} />
+                </section>
+              </div>
+            )}
+
+            {zalozka === 'akce' && (
+              <div role="tabpanel" aria-label={t('Akce', undefined, 'zalozka')}>
+                {d.bonus && b.loyaltyOn && <div className="mt-[22px]"><BonusPruh bonus={d.bonus} /></div>}
+                {events.length > 0
+                  ? <CoSeChysta events={events} b={b} slug={slug} signedIn={signedIn} />
+                  : <div className="mt-6"><PrazdnyStav titulek={t('Zatím se nic nechystá')} text={t('Akce podniku se objeví tady.')} /></div>}
+                {news.length > 0 && (
+                  <section aria-labelledby="h-novinky">
+                    <NadpisSekce id="h-novinky" titulek={t('Novinky')} />
+                    <Seznam>
+                      {news.map((n: any) => (
+                        <li key={n.id} className="px-4 py-3.5">
+                          <p className="hp-silny">{n.title}</p>
+                          {n.body && <p className="hp-text text-[var(--hp-muted)] mt-0.5 text-pretty">{n.body}</p>}
+                          <p className="hp-meta mt-1 cz-sentence">{fmtDatum(String(n.sent_at).slice(0, 10), { jazyk, styl: 'denDlouze' })}</p>
+                        </li>
+                      ))}
+                    </Seznam>
+                  </section>
+                )}
+              </div>
+            )}
+
+            {zalozka === 'info' && (
+              <div role="tabpanel" aria-label={t('Info')}>
+                {/* Na počítači je O podniku vlevo pod kartou; tady jen fotky. */}
+                <OPodniku b={b} today={today} signedIn={signedIn} galerie jenGalerie={sloupec} />
+                {pravidla}
+              </div>
+            )}
+          </div>
+        </div>
+      </ListObalky>
+    </div>
   );
 }
 
@@ -464,41 +325,41 @@ function MojeRezervace({ slug, me, onDone }: { slug: string; me: any; onDone: (m
     }
   };
   return (
-    <section id="rezervace" aria-labelledby="h-moje-rez" className="scroll-mt-6">
-      <h2 id="h-moje-rez" className="t-section mb-3">{t('Moje rezervace tady')}</h2>
+    <section id="rezervace" aria-labelledby="h-moje-rez" className="scroll-mt-24">
+      <NadpisSekce id="h-moje-rez" titulek={t('Moje rezervace tady')} />
       {err && <p role="alert" className="mb-3 note note-danger">{err}</p>}
-      <ul className="card list px-4 sm:px-5">
+      <Seznam>
         {me.reservations.map((r: any) => {
           const st = RES_STATUS[r.status] ?? RES_STATUS.requested;
           const potvrzeno = !!r.guest_confirmed_at || !!potvrzene[r.id];
           const zvyraznit = zPripominky === r.id;
           return (
-            <li key={r.id} id={`rezervace-${r.id}`} className={`py-3.5 scroll-mt-24 ${zvyraznit ? '-mx-3 px-3 rounded-2xl bg-black/[0.045]' : ''}`}>
-              <div className="flex items-start gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/[0.05]" aria-hidden><Icon name="calendar" size={18} /></span>
+            <li key={r.id} id={`rezervace-${r.id}`} className={`px-4 py-3.5 scroll-mt-24 ${zvyraznit ? 'bg-[var(--hp-well)]' : ''}`}>
+              <div className="flex items-start gap-3.5">
+                <span className="hp-jamka" aria-hidden><Icon name="calendar" size={18} strokeWidth={1.6} /></span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold leading-tight cz-sentence">{fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} · {r.time}</p>
-                  <p className="t-meta mt-0.5">{t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: r.party })}{r.note ? ` · ${r.note}` : ''}</p>
-                  {zvyraznit && !potvrzeno && r.status === 'confirmed' && <p className="text-xs text-black/60 mt-1">{t('Dorazíš? Potvrď, nebo rezervaci zruš — uvolníš místo jiným.')}</p>}
+                  <p className="hp-silny cz-sentence">{fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} · {r.time}</p>
+                  <p className="hp-meta mt-0.5">{t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: r.party })}{r.note ? ` · ${r.note}` : ''}</p>
+                  {zvyraznit && !potvrzeno && r.status === 'confirmed' && <p className="hp-meta mt-1">{t('Dorazíš? Potvrď, nebo rezervaci zruš — uvolníš místo jiným.')}</p>}
                 </div>
-                <span className={`chip chip-sm shrink-0 ${st.tone === 'ok' ? 'chip-ok' : st.tone === 'wait' ? 'chip-wait' : 'chip-muted'}`}>{st.tone === 'ok' && <Icon name="check" size={11} />}{t(st.label)}</span>
+                <span className={`shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-full hp-mikro ${st.tone === 'ok' ? 'bg-[var(--hp-btn-ink-bg)] text-[var(--hp-btn-ink-fg)]' : 'bg-[var(--hp-well)] text-[var(--hp-fg)]'}`}>{st.tone === 'ok' && <Icon name="check" size={11} />}{t(st.label)}</span>
               </div>
               {['requested', 'confirmed'].includes(r.status) && (
                 <div className="mt-3 pl-[52px] grid grid-cols-2 gap-2">
                   {r.status === 'confirmed' ? (potvrzeno
-                    ? <span className="chip chip-ok !h-9 justify-center"><Icon name="check" size={13} />{t('Potvrzeno tebou')}</span>
+                    ? <span className="hp-btn hp-btn-male bg-[var(--hp-well)] text-[var(--hp-fg)] !font-medium"><Icon name="check" size={13} />{t('Potvrzeno tebou')}</span>
                     : <button type="button" onClick={() => { void potvrdit(r.id); }} disabled={potvrzuji === r.id}
-                        className="tap-target inline-flex items-center justify-center gap-1.5 btn btn-primary btn-sm !h-9 disabled:opacity-50"
+                        className="tap-target hp-btn hp-btn-inkoust hp-btn-male min-w-0 disabled:opacity-50"
                         aria-label={t('Potvrdit rezervaci {kdy}', { kdy: `${fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} ${r.time}` })}>
                         <Icon name="check" size={14} />{potvrzuji === r.id ? '…' : t('Potvrdit', undefined, 'rezervace')}
                       </button>) : <span />}
-                  <button type="button" onClick={() => setZrusitId(r.id)} className="tap-target btn btn-secondary btn-sm !h-9">{t('Zrušit', undefined, 'rezervace')}</button>
+                  <button type="button" onClick={() => setZrusitId(r.id)} className="tap-target hp-btn lgx hp-btn-sklo hp-btn-male min-w-0">{t('Zrušit', undefined, 'rezervace')}</button>
                 </div>
               )}
             </li>
           );
         })}
-      </ul>
+      </Seznam>
       <Modal open={zrusitId !== null} onClose={() => setZrusitId(null)} size="sm" title={t('Zrušit rezervaci?')}
         subtitle={t('Podnik se o zrušení dozví a termín se uvolní.')}
         footer={<>
@@ -511,69 +372,66 @@ function MojeRezervace({ slug, me, onDone }: { slug: string; me: any; onDone: (m
   );
 }
 
-function Akce({ events, b, slug, signedIn }: { events: any[]; b: any; slug: string; signedIn: boolean }) {
+/** „Co se chystá“: akce podniku jako řádky s datovou dlaždicí na krému (nebo fotkou). */
+function CoSeChysta({ events, b, slug, signedIn, vpravo }: { events: any[]; b: any; slug: string; signedIn: boolean; vpravo?: React.ReactNode }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
   const [evDetail, setEvDetail] = useState<any | null>(null);
   return (
-    <section aria-labelledby="h-events">
-      <h2 id="h-events" className="t-section mb-3">{t('Co se u nás chystá')}</h2>
-      <ul className="card list px-4 sm:px-5">
+    <section aria-labelledby="h-events" className="scroll-mt-24">
+      <NadpisSekce id="h-events" titulek={t('Co se chystá')} vpravo={vpravo} />
+      <Seznam>
         {events.map((e: any) => (
           <li key={e.id}>
-            <button type="button" onClick={() => setEvDetail(e)} className="w-full text-left flex gap-3.5 py-3.5 items-center">
-              {e.photos?.[0] ? (
+            <button type="button" onClick={() => setEvDetail(e)} className="hp-radek">
+              {e.photos?.[0]
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={e.photos[0]} alt="" className="shrink-0 h-12 w-12 rounded-[14px] object-cover" />
-              ) : (
-                <span className="shrink-0 grid place-items-center content-center rounded-[14px] h-12 w-12 text-center leading-none bg-black/[0.05]">
-                  <span className="block text-[17px] font-semibold tabular-nums">{Number(String(e.date).slice(8, 10))}</span>
-                  <span className="block text-[11px] font-medium text-black/55 mt-0.5">{fmtMesic(Number(String(e.date).slice(5, 7)), { jazyk, styl: 'kratky' })}</span>
-                </span>
-              )}
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold leading-tight">{e.title}</span>
-                <span className="block t-meta mt-0.5 truncate cz-sentence">{fmtDatum(e.date, { jazyk, styl: 'denKratce' })}{e.start_time ? ` · ${e.start_time}` : ''}{e.going > 0 ? ` · ${t('{n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}', { n: e.going })}` : ''}{e.capacity ? ` · ${t('kapacita {n}', { n: e.capacity })}` : ''}</span>
+                ? <img src={e.photos[0]} alt="" className="hpp-foto" />
+                : <span className="hpp-datum" aria-hidden><b>{Number(String(e.date).slice(8, 10))}</b><span>{fmtMesic(Number(String(e.date).slice(5, 7)), { jazyk, styl: 'kratky' })}</span></span>}
+              <span className="hp-radek-telo">
+                <span className="hp-silny block">{e.title}</span>
+                <span className="hp-meta hp-num block mt-0.5 cz-sentence">{fmtDatum(e.date, { jazyk, styl: 'denKratce' })}{e.start_time ? ` · ${e.start_time}` : ''}{e.going > 0 ? ` · ${t('{n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}', { n: e.going })}` : ''}{e.capacity ? ` · ${t('kapacita {n}', { n: e.capacity })}` : ''}</span>
               </span>
-              <Icon name="chevronRight" size={18} className="shrink-0 text-black/40" />
+              <span className="hp-sipka" aria-hidden><Icon name="chevronRight" size={18} strokeWidth={1.6} /></span>
             </button>
           </li>
         ))}
-      </ul>
+      </Seznam>
       {evDetail && <EventSheet e={evDetail} currency={b.currency} slug={slug} signedIn={signedIn} businessName={b.name} address={b.address} onClose={() => setEvDetail(null)} />}
     </section>
   );
 }
 
+/** Menu: oddíly jako tiché sklo, čipy částí nabídky nahoře. */
 function Menu({ menu, currency }: { menu: any; currency: string }) {
   const t = useT('klient-host');
   // Ceny v menu smějí mít haléře (4,50 €) — formatMoney by je zaokrouhlil na celé.
   const money = (n: number) => formatPrice(n, currency);
   const sekce: any[] = menu?.sections ?? [];
   const [vybrana, setVybrana] = useState<number | null>(null);
-  if (!sekce.length) return <EmptyState icon="leaf" title={t('Nabídka zatím není zveřejněná')} hint={t('Podnik ji doplní v aplikaci.')} compact />;
+  if (!sekce.length) return <PrazdnyStav titulek={t('Nabídka zatím není zveřejněná')} text={t('Podnik ji doplní v aplikaci.')} />;
   const ukaz = vybrana == null ? sekce : sekce.filter(s => s.id === vybrana);
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {sekce.length > 1 && (
-        <div className="-mx-4 min-[360px]:-mx-5 sm:mx-0 px-4 min-[360px]:px-5 sm:px-0 flex gap-2 overflow-x-auto scroll-fade-x pb-1" role="radiogroup" aria-label={t('Části nabídky')}>
-          <button type="button" role="radio" aria-checked={vybrana == null} onClick={() => setVybrana(null)} className="h-cip shrink-0 tap-target-sm">{t('Všechno')}</button>
-          {sekce.map(s => <button key={s.id} type="button" role="radio" aria-checked={vybrana === s.id} onClick={() => setVybrana(s.id)} className="h-cip shrink-0 tap-target-sm">{s.title}</button>)}
+        <div className="hpp-filtry overflow-x-auto scroll-fade-x !mt-0" role="radiogroup" aria-label={t('Části nabídky')}>
+          <button type="button" role="radio" aria-checked={vybrana == null} onClick={() => setVybrana(null)} className="hp-cip">{t('Všechno')}</button>
+          {sekce.map(s => <button key={s.id} type="button" role="radio" aria-checked={vybrana === s.id} onClick={() => setVybrana(s.id)} className="hp-cip">{s.title}</button>)}
         </div>
       )}
       {ukaz.map((s: any) => (
-        <section key={s.id} className="card h-sklo-tichy px-4 sm:px-5 py-2">
-          <h3 className="t-card pt-2.5 pb-1">{s.title}</h3>
-          <ul className="list">
+        <section key={s.id} className="lgx hp-sklo hpp-oddil">
+          <h3 className="hp-h2 pt-2.5 pb-1">{s.title}</h3>
+          <ul>
             {s.items.map((it: any) => (
               <li key={it.id} className={`py-3 flex items-baseline gap-3 ${it.soldOut ? 'opacity-50' : ''}`}>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-medium leading-tight">{it.name}{it.soldOut && <span className="ml-2 chip chip-sm chip-muted align-middle">{t('vyprodáno')}</span>}</p>
-                  {it.description && <p className="text-sm text-black/55 mt-0.5 text-pretty">{it.description}</p>}
+                  <p className="hp-silny !font-medium">{it.name}{it.soldOut && <span className="ml-2 hp-mikro text-[var(--hp-muted)] align-middle">{t('vyprodáno')}</span>}</p>
+                  {it.description && <p className="hp-meta mt-0.5 text-pretty">{it.description}</p>}
                   {/* Alergeny jen u položek, kde je podnik vyplnil: prázdné neznamená „bez alergenů“. */}
-                  {Array.isArray(it.alergeny) && it.alergeny.length > 0 && <p className="text-xs text-black/55 mt-0.5"><span className="font-semibold">{t('Alergeny')}:</span> {it.alergeny.join(', ')}</p>}
+                  {Array.isArray(it.alergeny) && it.alergeny.length > 0 && <p className="hp-meta !text-[12px] mt-0.5"><span className="font-semibold">{t('Alergeny')}:</span> {it.alergeny.join(', ')}</p>}
                 </div>
-                <span className="tabular-nums font-semibold shrink-0">{money(it.price)}</span>
+                <span className="hp-num font-semibold shrink-0 text-[var(--hp-fg)]">{money(it.price)}</span>
               </li>
             ))}
           </ul>
@@ -581,59 +439,14 @@ function Menu({ menu, currency }: { menu: any; currency: string }) {
       ))}
       {/* Legenda alergenů a věta o složení přicházejí ze serveru v jazyce hosta (formální „Sie“ u němčiny, právně citlivé). */}
       {menu?.alergenyNazvy && Object.keys(menu.alergenyNazvy).length > 0 && (
-        <div className="text-xs text-black/55 leading-relaxed space-y-1">
-          <p><span className="font-semibold text-black/70">{t('Alergeny')}:</span> {Object.entries(menu.alergenyNazvy).map(([k, n]) => `${k} ${n}`).join(' · ')}</p>
+        <div className="hp-meta !text-[12px] leading-relaxed space-y-1">
+          <p><span className="font-semibold text-[var(--hp-fg)]">{t('Alergeny')}:</span> {Object.entries(menu.alergenyNazvy).map(([k, n]) => `${k} ${n}`).join(' · ')}</p>
           {menu.alergenyPoznamka && <p>{menu.alergenyPoznamka}</p>}
           {menu.alergenyNeuplne && <p>{t('U některých položek alergeny nejsou vyplněny — zeptejte se obsluhy.')}</p>}
         </div>
       )}
     </div>
   );
-}
-
-function Info({ b, gallery }: { b: any; gallery?: string[] }) {
-  const t = useT('klient-host');
-  const { jazyk } = useJazyk();
-  return (
-    <section aria-labelledby="h-info" className="space-y-3">
-      <h2 id="h-info" className="t-section">{t('O podniku')}</h2>
-      {(gallery?.length ?? 0) > 0 && (
-        <ul aria-label={t('Fotky z podniku')} className="-mx-4 min-[360px]:-mx-5 sm:mx-0 flex gap-2.5 overflow-x-auto px-4 min-[360px]:px-5 sm:px-0 scrollbar-thin snap-x">
-          {gallery!.slice(0, 8).map((g, i) => (
-            <li key={g} className={`shrink-0 snap-start rounded-2xl overflow-hidden ${i === 0 ? 'w-64 aspect-[4/3]' : 'w-40 aspect-square'}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={g} alt="" loading="lazy" className="h-full w-full object-cover" />
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="card p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="min-w-0">
-          {b.tagline && <p className="t-card mb-1.5 text-pretty">{b.tagline}</p>}
-          {b.description && <p className="text-sm text-black/70 leading-relaxed text-pretty">{b.description}</p>}
-          {b.address && <p className="mt-3 text-sm text-black/70 flex items-start gap-1.5"><Icon name="location" size={15} className="text-black/45 shrink-0 mt-0.5" /><span className="min-w-0 break-words">{b.address}</span></p>}
-          {b.phone && <p className="mt-2 text-sm"><a href={`tel:${String(b.phone).replace(/\s/g, '')}`} className="inline-flex items-center gap-1.5 text-black/70 tap-target-sm"><Icon name="phone" size={15} className="text-black/45" />{b.phone}</a></p>}
-        </div>
-        <div className="min-w-0">
-          <h3 className="t-card mb-1">{t('Otevírací doba')}</h3>
-          <ul className="text-sm divide-y divide-black/[0.06]">
-            {[0, 1, 2, 3, 4, 5, 6].map(i => {
-              const n = fmtDenVTydnu(i, { jazyk, styl: 'dlouhy' });
-              const day = b.hours?.[String(i)];
-              const txt = !day ? t('neuvedeno') : day.closed || !day.open ? t('zavřeno') : `${day.open}–${day.close}`;
-              return <li key={i} className="py-1.5 flex justify-between gap-3"><span className="cz-sentence">{n}</span><span className="tabular-nums text-black/70">{txt}</span></li>;
-            })}
-          </ul>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/** 2026-11-12 na „12. 11." (pořadí den, měsíc platí pro všechny jazyky stránky). */
-function denKratce(den: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(den);
-  return m ? `${Number(m[3])}. ${Number(m[2])}.` : den;
 }
 
 const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
@@ -659,11 +472,11 @@ function BonusPruh({ bonus }: { bonus: { name: string; multiplier: number; stamp
   }
   if (!radky.length) return null;
   return (
-    <section aria-label={bonus.name} className="card px-4 py-3.5 flex items-start gap-3 min-w-0">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/[0.05] text-black/70" aria-hidden><Icon name="gift" size={17} /></span>
+    <section aria-label={bonus.name} className="lgx hp-sklo px-4 py-3.5 flex items-center gap-3.5 min-w-0">
+      <span className="hp-jamka" aria-hidden><Icon name="sparkle" size={18} strokeWidth={1.6} /></span>
       <div className="min-w-0">
-        <p className="t-label break-words">{bonus.name}</p>
-        {radky.map(r => <p key={r} className="text-sm font-semibold leading-snug text-pretty">{r}</p>)}
+        <p className="hp-meta break-words">{bonus.name}</p>
+        {radky.map(r => <p key={r} className="hp-silny text-pretty">{r}</p>)}
       </div>
     </section>
   );
@@ -744,11 +557,11 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
   return (
     <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 md:gap-10 items-start">
       <div className="space-y-5">
-        <div className="glass-card p-5 grid gap-2">
+        <div className="lgx hp-sklo p-5 grid gap-2">
           {qrTable ? (
             <>
               <p className={label}>{t('Kde sedíš')}</p>
-              <p className="flex items-center gap-2 flex-wrap"><span className="chip chip-ink">{qrTable.name}</span><span className="t-meta">{t('podle QR na stole')}</span></p>
+              <p className="flex items-center gap-2 flex-wrap"><span className="inline-flex items-center h-8 px-3 rounded-full bg-[var(--hp-btn-ink-bg)] text-[var(--hp-btn-ink-fg)] text-[13px] font-semibold">{qrTable.name}</span><span className="hp-meta">{t('podle QR na stole')}</span></p>
               <TableMap tables={tables} plan={plan} selectedId={qrTable.id} caption={t('Tvůj stůl na plánku podniku.')} />
             </>
           ) : qrOnly ? (
@@ -772,11 +585,11 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
             </>
           )}
           {geoMode !== 'off' && (!qrOnly || token) && (
-            <p className={`text-xs flex items-center gap-1.5 ${geo.status === 'ok' ? 'text-ok-ink' : geo.status === 'denied' ? (geoMode === 'block' ? 'text-bad-ink' : 'text-wait-ink') : 'text-black/50'}`}>
+            <p className={`text-xs flex items-center gap-1.5 ${geo.status === 'ok' ? 'text-ok-ink' : geo.status === 'denied' ? (geoMode === 'block' ? 'text-bad-ink' : 'font-semibold text-[color:var(--hp-fg)]') : 'text-black/50'}`}>
               <Icon name="location" size={13} />
               {geo.status === 'ok' ? t('Poloha ověřena.') : geo.status === 'asking' || geo.status === 'idle' ? t('Ověřujeme, že sedíš u stolu…')
                 : geoMode === 'block' ? t('Bez polohy objednat nejde. Povol ji v prohlížeči.') : t('Bez polohy objednávku nejdřív potvrdí obsluha.')}
-              {geo.status === 'denied' && <button type="button" onClick={() => askGeo()} className="tap-target-sm underline font-medium">{t('Zkusit znovu')}</button>}
+              {geo.status === 'denied' && <button type="button" onClick={() => askGeo()} className="tap-target underline font-medium">{t('Zkusit znovu')}</button>}
             </p>
           )}
         </div>
@@ -817,7 +630,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
         )}
       </div>
       <aside className="space-y-4 md:sticky md:top-24">
-        <div className="glass-card p-5 space-y-3">
+        <div className="lgx hp-sklo p-5 space-y-3">
           <h2 className="t-section">{t('Objednávka')}</h2>
           {lines.length === 0 ? <p className="text-sm text-black/55">{t('Zatím prázdná. Přidej něco z nabídky.')}</p> : (
             <ul className="divide-y divide-black/[0.06] text-sm">
@@ -833,7 +646,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
             <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder={t('Bez cukru, mléko zvlášť…')} className={input} maxLength={300} />
           </div>
           {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-          <button type="button" onClick={submit} disabled={busy} className={`${btnPrimary} btn-lg w-full`}><Icon name="cup" size={16} /> {busy ? t('Odesílám…') : signedIn ? t('Objednat') : t('Přihlásit se a objednat')}</button>
+          <button type="button" onClick={submit} disabled={busy} className="hp-btn hp-btn-limetka hp-btn-blok tap-target disabled:opacity-50"><Icon name="cup" size={16} /> {busy ? t('Odesílám…') : signedIn ? t('Objednat') : t('Přihlásit se a objednat')}</button>
           <p className="text-xs text-black/45">{t('Platí se u obsluhy jako obvykle. Za každých 100 {mena} dostaneš {body} bodů.', { mena: cur, body: b.pointsPer100 })}</p>
         </div>
         {orders && orders.length > 0 && (
@@ -843,7 +656,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
               {orders.map(o => (
                 <li key={o.id} className="list-row">
                   <div className="min-w-0 flex-1">
-                    <span className={`chip chip-sm ${o.status === 'new' ? 'chip-wait' : o.status === 'confirmed' ? 'chip-info' : o.status === 'done' ? 'chip-ok' : 'chip-muted'}`}>{ORDER_LABEL[o.status] ? t(ORDER_LABEL[o.status]) : o.status}</span>
+                    <span className={`inline-flex items-center h-7 px-2.5 rounded-full hp-mikro ${o.status === 'done' ? 'bg-[var(--hp-btn-ink-bg)] text-[var(--hp-btn-ink-fg)]' : 'bg-[var(--hp-well)] text-[var(--hp-fg)]'}`}>{ORDER_LABEL[o.status] ? t(ORDER_LABEL[o.status]) : o.status}</span>
                     <p className="t-meta truncate mt-1">{(o.items ?? []).map((l: any) => `${l.count}× ${l.name}`).join(', ')}</p>
                   </div>
                   <span className="text-sm font-semibold tabular-nums shrink-0">{money(o.total)}{o.table_name ? ` · ${o.table_name}` : ''}</span>
@@ -930,7 +743,7 @@ function EventSheet({ e, currency, slug, signedIn, businessName, address, onClos
               <Icon name="location" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />{place}
               {mapQuery && (
                 <a href={`https://mapy.cz/zakladni?q=${encodeURIComponent(mapQuery)}`} target="_blank" rel="noopener noreferrer"
-                  className="tap-target-sm inline-block ml-2 py-1 text-[#0A5CC0] underline decoration-[#0A5CC0]/30 hover:decoration-[#0A5CC0]">{t('Mapa')}</a>
+                  className="tap-target inline-block ml-2 py-1 text-[#0A5CC0] underline decoration-[#0A5CC0]/30 hover:decoration-[#0A5CC0]">{t('Mapa')}</a>
               )}
             </p>
           )}

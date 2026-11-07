@@ -1,19 +1,21 @@
 'use client';
 
-// „Moje poukazy“ na stránce Moje: dárkové poukazy přiřazené hostovi (podnikem, nebo si je přidal sám kódem).
-// U každého je kód velkým písmem (obsluha ho opíše), QR kód (rozbalí se až na žádost), zůstatek a platnost.
-// Vyčerpaný a propadlý poukaz zůstává vidět se stavem, ať host ví, proč už nejde použít. Z aplikace se dá poukaz
-// odebrat (po potvrzení); zůstane platný, jen přestane být „jeho“. Hostovská část → vše přes t().
+// „Moje poukazy“ v Odměnách (směr A): dárkový poukaz jako zasunutá inkoustová karta v peněžence —
+// monogram podniku na krému, „Dárkový poukaz“, „podnik · kód“ a zůstatek vpravo tabulárními číslicemi.
+// Pod hlavičkou platnost a akce: QR kód se rozbalí až na žádost, odebrání z aplikace se nejdřív zeptá
+// (poukaz zůstane platný, jen přestane být „jeho“). Vyčerpaný a propadlý poukaz zůstává vidět tlumeně
+// se stavem, ať host ví, proč už nejde použít. Barva ani šablona poukazu podniku se tu neukazuje.
+// Hostovská část → vše přes t().
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '../../Icons';
+import { Monogram, NadpisSekce, tvarPodniku } from '../penezenka';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import { formatMoney } from '@/lib/money';
-import { sablona } from '@/lib/poukazySablony';
 import type { PoukazHosta } from '@/lib/poukazyHostDb';
 
-type Poukaz = Pick<PoukazHosta, 'id' | 'code' | 'balance' | 'value' | 'currency' | 'validUntil' | 'stav' | 'design' | 'business'>;
+type Poukaz = Pick<PoukazHosta, 'id' | 'code' | 'balance' | 'value' | 'currency' | 'validUntil' | 'stav' | 'design' | 'business'> & { slug?: string | null };
 
 /** QR kód s kódem poukazu: knihovna se načte až při rozbalení. */
 function Qr({ kod, popisek }: { kod: string; popisek: string }) {
@@ -21,24 +23,29 @@ function Qr({ kod, popisek }: { kod: string; popisek: string }) {
   const [chyba, setChyba] = useState(false);
   useEffect(() => {
     let zije = true;
-    import('qrcode').then(m => m.default.toString(kod, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }))
+    import('qrcode').then(m => m.default.toString(kod, { type: 'svg', margin: 0, errorCorrectionLevel: 'M', color: { dark: '#16181A', light: '#00000000' } }))
       .then(x => { if (zije) setSvg(x); }).catch(() => { if (zije) setChyba(true); });
     return () => { zije = false; };
   }, [kod]);
-  if (chyba) return <p className="text-xs text-black/55">{kod}</p>;
+  if (chyba) return <p className="hp-kod text-center">{kod}</p>;
   // eslint-disable-next-line react/no-danger -- SVG vyrobila knihovna qrcode z našeho kódu, žádný text od uživatele
-  return <div role="img" aria-label={popisek} className="rounded-2xl bg-white p-3 w-40 h-40 mx-auto [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={svg ? { __html: svg } : undefined} />;
+  return <div role="img" aria-label={popisek} className="h-qr-pole mx-auto w-40 h-40 p-3 [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={svg ? { __html: svg } : undefined} />;
 }
+
+/** Tlačítko na inkoustové kartě: tlumené sklo na inkoustu, ohnisko limetkou. */
+const NA_KARTE = 'hp-btn hp-btn-male hp-kruh-obalka tap-target';
 
 function Karta({ p, onOdebrano }: { p: Poukaz; onOdebrano: (id: number) => void }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
+  const qrId = useId();
+  const [qr, setQr] = useState(false);
   const [ptam, setPtam] = useState(false);
   const [busy, setBusy] = useState(false);
   const [chyba, setChyba] = useState('');
-  const v = sablona(p.design);
   const platny = p.stav === 'active';
   const stav = p.stav === 'active' ? null : p.stav === 'used' ? t('Vyčerpaný') : t('Propadlý');
+  const tvar = tvarPodniku(p.slug || p.business);
 
   const odeber = async () => {
     setBusy(true); setChyba('');
@@ -52,45 +59,60 @@ function Karta({ p, onOdebrano }: { p: Poukaz; onOdebrano: (id: number) => void 
     }
   };
 
+  const meta = [
+    p.balance !== p.value ? t('z {castka}', { castka: formatMoney(p.value, p.currency) }) : '',
+    p.validUntil ? t('platí do {datum}', { datum: fmtDatum(p.validUntil, { jazyk, styl: 'cislo' }) }) : t('bez omezení platnosti'),
+  ].filter(Boolean).join(' · ');
+
   return (
-    <li className="rounded-2xl border-2 px-4 py-3" style={{ borderColor: platny ? v.barva : undefined, background: platny ? v.podklad : undefined, opacity: platny ? 1 : 0.75 }}>
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-black/55 truncate">{p.business}</p>
-          <p className="text-[1.375rem] font-bold tracking-[-0.02em] tabular-nums leading-tight">{t('Zůstatek {castka}', { castka: formatMoney(p.balance, p.currency) })}</p>
-          <p className="text-xs text-black/55">
-            {p.balance !== p.value ? `${t('z {castka}', { castka: formatMoney(p.value, p.currency) })} · ` : ''}
-            {p.validUntil ? t('platí do {datum}', { datum: fmtDatum(p.validUntil, { jazyk, styl: 'cislo' }) }) : t('bez omezení platnosti')}
-          </p>
-          {stav && <p role="status" className="mt-1.5 chip chip-sm chip-muted">{stav}</p>}
-        </div>
-        <p className="font-mono font-bold tracking-widest text-base shrink-0 break-all text-right max-w-[9rem]">{p.code}</p>
-      </div>
-      {platny && (
-        <details className="mt-2 group/qr">
-          <summary className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
-            <Icon name="chevron" size={15} className="transition-transform group-open/qr:rotate-180" />{t('Ukázat QR kód')}
-          </summary>
-          <div className="mt-2"><Qr kod={p.code} popisek={t('QR kód poukazu {kod}', { kod: p.code })} /></div>
-        </details>
-      )}
-      {chyba && <p role="alert" className="mt-2 text-sm text-bad-ink">{chyba}</p>}
-      <div className="mt-2 flex items-center gap-2 flex-wrap">
-        {!ptam ? (
-          <button type="button" onClick={() => setPtam(true)} className="tap-target-sm text-sm font-semibold text-black/55 hover:text-black">{t('Odebrat z aplikace')}</button>
-        ) : (
-          <div role="group" aria-label={t('Odebrat poukaz z aplikace?')} className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm text-black/70">{t('Poukaz zůstane platný, jen ho tu přestaneš vidět. Znovu ho přidáš kódem.')}</p>
-            <button type="button" disabled={busy} onClick={odeber} className="tap-target-sm btn btn-primary text-sm disabled:opacity-50">{busy ? '…' : t('Odebrat')}</button>
-            <button type="button" disabled={busy} onClick={() => setPtam(false)} className="tap-target-sm text-sm font-semibold text-black/60 hover:text-black px-2">{t('Ponechat')}</button>
+    <li>
+      <div className={`hp-karta hp-karta-zasunuta ${platny ? '' : 'opacity-70'}`} role="group" aria-label={t('Dárkový poukaz {podnik}', { podnik: p.business })}>
+        <span className={`hp-tex hp-tex-${tvar}`} aria-hidden />
+        <span className="hp-karta-hlava">
+          <Monogram nazev={p.business} klic={p.slug ?? null} />
+          <span className="hp-karta-jmeno">
+            <b>{t('Dárkový poukaz')}</b>
+            <span>{p.business} · <span className="hp-kod !tracking-[0.06em]">{p.code}</span></span>
+          </span>
+          {stav
+            ? <span className="hp-karta-hodnota !text-[13px]" role="status">{stav}</span>
+            : <span className="hp-karta-hodnota hp-num">{formatMoney(p.balance, p.currency)}</span>}
+        </span>
+        <p className="mt-3 text-[12px] leading-snug text-[color:var(--hp-karta-tlume)] hp-num">
+          {stav && <>{t('Zůstatek {castka}', { castka: formatMoney(p.balance, p.currency) })} · </>}{meta}
+        </p>
+        {!ptam && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {platny && (
+              <button type="button" onClick={() => setQr(v => !v)} aria-expanded={qr} aria-controls={qrId} className={NA_KARTE}>
+                <Icon name="qr" size={15} strokeWidth={1.6} />{qr ? t('Skrýt QR kód') : t('Ukázat QR kód')}
+              </button>
+            )}
+            <button type="button" onClick={() => setPtam(true)} className={NA_KARTE}>{t('Odebrat z aplikace')}</button>
+          </div>
+        )}
+        {platny && qr && (
+          <div id={qrId} className="mt-4 mb-1">
+            <Qr kod={p.code} popisek={t('QR kód poukazu {kod}', { kod: p.code })} />
+            <p className="mt-2.5 text-center text-[12px] text-[color:var(--hp-karta-tlume)]">{t('Kód ukaž obsluze u kasy.')}</p>
+          </div>
+        )}
+        {ptam && (
+          <div role="group" aria-label={t('Odebrat poukaz z aplikace?')} className="mt-3.5 border-t border-[rgba(244,241,232,0.12)] pt-3.5">
+            <p className="text-[13px] leading-snug text-[color:var(--hp-karta-stredni)]">{t('Poukaz zůstane platný, jen ho tu přestaneš vidět. Znovu ho přidáš kódem.')}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" disabled={busy} onClick={odeber} className="hp-btn hp-btn-male tap-target bg-[var(--hp-paper)] text-[#16181A] focus-visible:!outline-[var(--hp-lime)] disabled:opacity-60">{busy ? '…' : t('Odebrat')}</button>
+              <button type="button" disabled={busy} onClick={() => setPtam(false)} className={NA_KARTE}>{t('Ponechat')}</button>
+            </div>
           </div>
         )}
       </div>
+      {chyba && <p role="alert" className="mt-2 text-sm text-bad-ink">{chyba}</p>}
     </li>
   );
 }
 
-/** Seznam poukazů hosta (z odpovědi /api/client/me). Bez poukazů se oddíl neukáže (na přidání je „Mám poukaz“ níž). */
+/** Seznam poukazů hosta (z odpovědi /api/client/me). Bez poukazů se oddíl neukáže (přidává se polem „Mám kód“ nahoře). */
 export default function HostPoukazy({ poukazy }: { poukazy: Poukaz[] }) {
   const t = useT('klient-host');
   const [seznam, setSeznam] = useState(poukazy);
@@ -99,10 +121,9 @@ export default function HostPoukazy({ poukazy }: { poukazy: Poukaz[] }) {
   useEffect(() => { if (prvni.current) { prvni.current = false; return; } setSeznam(poukazy); }, [poukazy]);
   if (seznam.length === 0) return null;
   return (
-    <section aria-labelledby="h-poukazy" className="max-w-md">
-      <h2 id="h-poukazy" className="t-section">{t('Moje poukazy')}</h2>
-      <p className="text-sm text-black/55 mt-1 mb-3">{t('Kód ukaž obsluze u kasy.')}</p>
-      <ul className="space-y-2">{seznam.map(p => <Karta key={p.id} p={p} onOdebrano={id => setSeznam(s => s.filter(x => x.id !== id))} />)}</ul>
+    <section aria-labelledby="h-poukazy">
+      <NadpisSekce id="h-poukazy" titulek={t('Moje poukazy')} />
+      <ul className="flex flex-col gap-2.5">{seznam.map(p => <Karta key={p.id} p={p} onOdebrano={id => setSeznam(s => s.filter(x => x.id !== id))} />)}</ul>
     </section>
   );
 }

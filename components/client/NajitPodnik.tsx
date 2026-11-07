@@ -13,7 +13,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button, Field, Input, Modal } from '../ui';
+import { Modal } from '../ui';
+import { Icon } from '../Icons';
 import { cestaZKoduPodniku, cestaZQr } from '@/lib/nativni/most';
 import { useT } from '@/lib/i18n/client';
 import { useCesta } from './host/cesty';
@@ -103,31 +104,46 @@ export default function NajitPodnik({ open, onClose, skenovatHned, jeObal }: {
   };
 
   return (
-    <Modal open={open} onClose={onClose} size="sm" title={t('Najít podnik')}
+    <Modal open={open} onClose={onClose} size="sm" title={t('Najít podnik')} className="lgx-strong hp-sklo h-list-sklo h-plocha"
       subtitle={umi ? t('Naskenuj QR kód na stole nebo u pultu, nebo zadej kód podniku.') : t('Zadej kód podniku ze stojánku nebo letáku.')}>
       <div className="space-y-4">
         {umi && (
           <div className="space-y-3">
-            <Button variant="accent" size="lg" icon="camera" block className="!w-full" onClick={() => void skenuj()} disabled={!nativni && !kamera}>
+            {/* Jedna limetka na okno: když jde skenovat, je hlavní akcí sken a kód je druhá cesta (sklo). */}
+            <button type="button" className="hp-btn hp-btn-limetka hp-btn-blok" onClick={() => void skenuj()} disabled={!nativni && !kamera}>
+              <Icon name="camera" size={18} strokeWidth={1.7} aria-hidden />
               {kameraZap ? t('Zavřít kameru') : t('Naskenovat QR kód')}
-            </Button>
+            </button>
             {kameraZap && !nativni && (
               <KameraQr onCesta={otevri} onCizi={() => setChyba(t('Tohle není QR kód podniku z Managera. Zkus jiný, nebo zadej kód podniku.'))}
                 onChyba={() => { setKameraZap(false); setChyba(t('Kamera není k dispozici. Zadej kód podniku.')); }} />
             )}
             {/* „nebo" jako tichý předěl mezi dvěma cestami, ne další štítek. */}
-            <p className="t-label flex items-center gap-3 before:h-px before:flex-1 before:bg-black/[0.08] after:h-px after:flex-1 after:bg-black/[0.08]" aria-hidden>{t('nebo')}</p>
+            <p className="hp-meta flex items-center gap-3 before:h-px before:flex-1 before:bg-[color:var(--hp-line)] after:h-px after:flex-1 after:bg-[color:var(--hp-line)]" aria-hidden>{t('nebo')}</p>
           </div>
         )}
         <form onSubmit={odeslat} className="space-y-3" noValidate>
-          <Field id="kod-podniku" label={t('Kód podniku')} hint={t('Najdeš ho pod QR kódem na stojánku nebo na letáku, třeba cafe-demo.')}>
-            <Input id="kod-podniku" value={kod} onChange={e => { setKod(e.target.value); setChyba(''); }} placeholder="cafe-demo"
-              autoCapitalize="none" autoCorrect="off" autoComplete="off" spellCheck={false} inputMode="url" enterKeyHint="go" maxLength={300} data-transient />
-          </Field>
-          {/* Jedna limetka na okno: když jde skenovat, je hlavní akcí sken a kód je druhá cesta (šedá). */}
-          <Button type="submit" variant={umi ? 'secondary' : 'accent'} size="lg" block className="!w-full" loading={hleda}>{t('Otevřít podnik')}</Button>
+          <div>
+            <label htmlFor="kod-podniku" className="hp-pole-popis">{t('Kód podniku')}</label>
+            <div className="hp-pole">
+              <Icon name="search" size={18} strokeWidth={1.6} className="shrink-0 text-[color:var(--hp-muted)]" aria-hidden />
+              <input id="kod-podniku" value={kod} onChange={e => { setKod(e.target.value); setChyba(''); }} placeholder="cafe-demo"
+                aria-describedby="kod-podniku-napoveda" aria-invalid={chyba ? true : undefined}
+                autoCapitalize="none" autoCorrect="off" autoComplete="off" spellCheck={false} inputMode="url" enterKeyHint="go" maxLength={300} data-transient />
+            </div>
+            <p id="kod-podniku-napoveda" className="hp-meta mt-2 px-0.5 text-pretty">{t('Najdeš ho pod QR kódem na stojánku nebo na letáku, třeba cafe-demo.')}</p>
+          </div>
+          <button type="submit" className={`hp-btn hp-btn-blok ${umi ? 'lgx hp-btn-sklo' : 'hp-btn-limetka'}`} disabled={hleda} aria-busy={hleda || undefined}>
+            {hleda && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />}
+            {t('Otevřít podnik')}
+          </button>
         </form>
-        {chyba && <p role="alert" className="note note-danger text-sm">{chyba}</p>}
+        {chyba && (
+          <p role="alert" className="flex items-start gap-2.5 rounded-[14px] bg-[color:var(--hp-well)] px-4 py-3 text-[14px] leading-snug text-[color:var(--hp-fg)]">
+            <Icon name="warning" size={17} strokeWidth={1.7} className="mt-0.5 shrink-0" aria-hidden />
+            <span className="min-w-0">{chyba}</span>
+          </p>
+        )}
       </div>
     </Modal>
   );
@@ -161,5 +177,5 @@ function KameraQr({ onCesta, onCizi, onChyba }: { onCesta: (c: string) => void; 
     })();
     return () => { hotovo = true; if (timer) clearInterval(timer); stream?.getTracks().forEach(s => s.stop()); };
   }, []);
-  return <video ref={ref} muted playsInline className="w-full aspect-square object-cover rounded-2xl bg-black/80" aria-label={t('Náhled kamery')} />;
+  return <video ref={ref} muted playsInline className="w-full aspect-square object-cover rounded-[22px] bg-[#16181A]" aria-label={t('Náhled kamery')} />;
 }

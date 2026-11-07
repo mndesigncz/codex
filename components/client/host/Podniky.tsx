@@ -1,14 +1,14 @@
 'use client';
 
-// Podniky (přihlášený host, audit C §6 8): hledání, filtry Otevřeno teď / Rezervace / Od stolu,
-// „Moje“ s jedním číslem karty a „Další podniky“ s cestou dovnitř. Sken QR stojánku nebo stolu
-// je tady v hlavičce (dřív prostřední tlačítko doku — to teď patří U kasy).
+// Podniky (přihlášený host) ve směru A: hlavička obrazovky se skenem QR vpravo, hledání v poli,
+// filtry jako čipy (Otevřeno teď / Rezervace / Od stolu), „Moje podniky“ jako zasunuté inkoustové
+// karty se stavem karty vpravo a ostatní podniky jako seznam na skle s monogramem. Sken QR stojánku
+// nebo stolu je tady v hlavičce (prostřední místo doku patří U kasy). Barva značky podniku nikde.
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../../Icons';
-import { Skeleton, EmptyState, ErrorState } from '../../ui';
-import { LogoPodniku } from '../karta/KartaPodniku';
+import { Skeleton } from '../../ui';
+import { HlavickaObrazovky, NadpisSekce, Seznam, Radek, Monogram, InkoustovaKarta, PrazdnyStav } from '../penezenka';
 import { useCesta } from './cesty';
 import { useHostShell } from '../ClientShell';
 import { useHostMe, useTed } from './data';
@@ -17,6 +17,7 @@ import { useT } from '@/lib/i18n/client';
 import { okJson } from '@/lib/api';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { obsahujeNekde } from '@/lib/hledani';
+import './podnik/podnik.css';
 
 type Filtr = 'otevreno' | 'rezervace' | 'odstolu';
 
@@ -47,67 +48,76 @@ export default function Podniky() {
   const moje = vse.filter(b => b.member || clenstvi.has(b.slug));
   const dalsi = vse.filter(b => !(b.member || clenstvi.has(b.slug)));
 
+  const pocetMych = (seznam ?? []).filter(b => b.member || clenstvi.has(b.slug)).length;
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="flex items-center gap-3">
-        <h1 className="t-page flex-1 min-w-0">{t('Podniky')}</h1>
-        <button type="button" onClick={otevriNajit} className="btn btn-secondary !h-11 shrink-0" aria-label={skenIkona === 'camera' ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}>
-          <Icon name={skenIkona} size={17} />{skenPopis}
-        </button>
+    <div>
+      <HlavickaObrazovky
+        nadtitulek={pocetMych > 0 ? t('{n, plural, one {# tvůj podnik} few {# tvoje podniky} other {# tvých podniků}}', { n: pocetMych }) : undefined}
+        titulek={t('Podniky')}
+        vpravo={
+          <button type="button" onClick={otevriNajit} className="hp-btn lgx hp-btn-sklo hp-btn-stredni hpp-sken tap-target" aria-label={skenIkona === 'camera' ? t('Naskenovat QR kód nebo zadat kód podniku') : t('Zadat kód podniku')}>
+            <Icon name={skenIkona} size={18} strokeWidth={1.6} /><span className="max-[359px]:sr-only">{skenPopis}</span>
+          </button>
+        } />
+      <div className="max-w-2xl">
+      <div className="hp-pole">
+        <Icon name="search" size={18} strokeWidth={1.6} className="shrink-0 text-[var(--hp-muted)]" />
+        <input value={q} onChange={e => setQ(e.target.value)} type="search" placeholder={t('Název, ulice nebo kód podniku')} aria-label={t('Hledat podnik')} data-transient />
       </div>
-      <div className="mt-4 relative">
-        <Icon name="search" size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/45 pointer-events-none" />
-        <input value={q} onChange={e => setQ(e.target.value)} type="search" placeholder={t('Název, ulice nebo kód podniku')} aria-label={t('Hledat podnik')} data-transient className="field !pl-10" />
-      </div>
-      <div className="mt-3 -mx-4 min-[360px]:-mx-5 sm:mx-0 px-4 min-[360px]:px-5 sm:px-0 flex gap-2 overflow-x-auto scroll-fade-x pb-1" aria-label={t('Filtry')}>
+      <div className="hpp-filtry overflow-x-auto scroll-fade-x" role="group" aria-label={t('Filtry')}>
         {([['otevreno', t('Otevřeno teď')], ['rezervace', t('Rezervace')], ['odstolu', t('Od stolu')]] as const).map(([id, label]) => (
-          <button key={id} type="button" aria-pressed={filtry.has(id)} onClick={() => prepni(id)} className="h-cip shrink-0 tap-target-sm">{label}</button>
+          <button key={id} type="button" aria-pressed={filtry.has(id)} onClick={() => prepni(id)} className="hp-cip">{label}</button>
         ))}
       </div>
+      </div>
 
-      <div className="mt-6 space-y-8">
-        {chyba && !seznam ? <ErrorState title={t('Podniky se nenačetly')} hint={chyba} onRetry={nacti} />
-          : !seznam ? <div className="space-y-3"><Skeleton className="h-16 rounded-2xl" /><Skeleton className="h-16 rounded-2xl" /><Skeleton className="h-16 rounded-2xl" /></div>
-          : !vse.length ? <EmptyState icon="search" title={t('Nic takového tu není')} hint={t('Zkus jiné slovo, nebo vypni filtry.')} />
-          : <>
-            {moje.length > 0 && (
-              <section aria-labelledby="h-moje">
-                <h2 id="h-moje" className="t-label mb-2">{t('Moje')}</h2>
-                <ul className="card list px-4 sm:px-5">{moje.map(b => <Radek key={b.slug} b={b} m={clenstvi.get(b.slug)} href={cesta(`/client/${b.slug}`)} dnes={dnes} hm={hm} />)}</ul>
-              </section>
-            )}
-            {dalsi.length > 0 && (
-              <section aria-labelledby="h-dalsi">
-                <h2 id="h-dalsi" className="t-label mb-2">{t('Další podniky')}</h2>
-                <ul className="card list px-4 sm:px-5">{dalsi.map(b => <Radek key={b.slug} b={b} href={cesta(`/client/${b.slug}`)} dnes={dnes} hm={hm} />)}</ul>
-              </section>
-            )}
-          </>}
+      <div className="mt-2">
+        {chyba && !seznam ? (
+          <div className="pt-6"><PrazdnyStav titulek={t('Podniky se nenačetly')} text={chyba} akce={<button type="button" onClick={nacti} className="hp-btn hp-btn-inkoust hp-btn-stredni tap-target">{t('Zkusit znovu')}</button>} /></div>
+        ) : !seznam ? (
+          <div className="mt-6 space-y-3" aria-busy="true"><Skeleton className="h-[76px] rounded-[22px]" /><Skeleton className="h-[76px] rounded-[22px]" /><Skeleton className="h-40 rounded-[22px]" /></div>
+        ) : !vse.length ? (
+          <div className="pt-6"><PrazdnyStav titulek={t('Nic takového tu není')} text={t('Zkus jiné slovo, nebo vypni filtry.')} /></div>
+        ) : <div className={moje.length && dalsi.length ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-16' : 'max-w-2xl'}>
+          {moje.length > 0 && (
+            <section aria-labelledby="h-moje">
+              <NadpisSekce id="h-moje" titulek={t('Moje podniky')} />
+              <ul className="hpp-moje-karty">
+                {moje.map(b => <li key={b.slug}><MojeKartaPodniku b={b} m={clenstvi.get(b.slug)} href={cesta(`/client/${b.slug}`)} dnes={dnes} hm={hm} /></li>)}
+              </ul>
+            </section>
+          )}
+          {dalsi.length > 0 && (
+            <section aria-labelledby="h-dalsi">
+              <NadpisSekce id="h-dalsi" titulek={moje.length ? t('Další podniky') : t('Podniky')} />
+              <Seznam>{dalsi.map(b => <RadekPodniku key={b.slug} b={b} href={cesta(`/client/${b.slug}`)} dnes={dnes} hm={hm} />)}</Seznam>
+            </section>
+          )}
+        </div>}
       </div>
     </div>
   );
 }
 
-function Radek({ b, m, href, dnes, hm }: { b: any; m?: any; href: string; dnes: string; hm: string }) {
+/** Můj podnik: zasunutá inkoustová karta (hlavička s monogramem), vpravo stav karty. */
+function MojeKartaPodniku({ b, m, href, dnes, hm }: { b: any; m?: any; href: string; dnes: string; hm: string }) {
   const t = useT('klient-host');
   const o = stavOtevreni(b.hours, dnes, hm);
   const kamp = m ? hlavniKampan(m) : null;
-  const hodnota = m ? (kamp ? `${Math.min(kamp.stamps, kamp.required)}/${kamp.required}` : t('{n} b.', { n: m.points ?? 0 })) : null;
+  const hodnota = m ? (kamp ? `${Math.min(kamp.stamps, kamp.required)} / ${kamp.required}` : t('{n} b.', { n: m.points ?? 0 })) : null;
   return (
-    <li>
-      <Link href={href} className="flex items-center gap-3 py-3 min-h-[64px]">
-        <LogoPodniku nazev={b.name} logoUrl={b.logoUrl} barva={b.accent || null} velikost={40} />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold leading-tight truncate">{b.name}</span>
-          <span className="block t-meta truncate mt-0.5">
-            <span className={o.otevreno ? 'text-ok-ink font-medium' : ''}>{popisOtevreni(o, t)}</span>
-            {b.address ? ` · ${b.address}` : b.tagline ? ` · ${b.tagline}` : ''}
-          </span>
-        </span>
-        {hodnota ? <span className="text-[15px] font-semibold tabular-nums shrink-0">{hodnota}</span>
-          : <span className="chip chip-sm chip-muted shrink-0">{t('Přidat se')}</span>}
-        <Icon name="chevronRight" size={18} className="text-black/40 shrink-0" />
-      </Link>
-    </li>
+    <InkoustovaKarta varianta="zasunuta" nazev={b.name} klic={b.slug} logoUrl={b.logoUrl} href={href}
+      popis={[popisOtevreni(o, t), b.address || b.tagline].filter(Boolean).join(' · ')} hodnota={hodnota} />
+  );
+}
+
+/** Další podnik: řádek seznamu s monogramem, stav otevření a adresa. */
+function RadekPodniku({ b, href, dnes, hm }: { b: any; href: string; dnes: string; hm: string }) {
+  const t = useT('klient-host');
+  const o = stavOtevreni(b.hours, dnes, hm);
+  return (
+    <Radek href={href} vlevo={<Monogram nazev={b.name} klic={b.slug} logoUrl={b.logoUrl} velikost={36} />}
+      titulek={b.name}
+      popis={<>{popisOtevreni(o, t)}{b.address ? ` · ${b.address}` : b.tagline ? ` · ${b.tagline}` : ''}</>} />
   );
 }

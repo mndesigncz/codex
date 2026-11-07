@@ -3,10 +3,12 @@
 // Plastové karty hosta (Moje → pod kartičkou): které plastové karty od podniků má host
 // připojené a formulář „Mám plastovou kartu“. Host opíše kód z karty; nová karta se mu
 // přiřadí, karta, kterou dostal u kasy bez aplikace, se převezme i s body a razítky.
-// Server: /api/client/cards/moje (lib/kartyFyzickeDb.ts, pripojKartu).
+// Server: /api/client/cards/moje (lib/kartyFyzickeDb.ts, pripojKartu). V ukázce (`demo`) se nic nevolá.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Input } from '../ui';
+import { NadpisSekce, Seznam, Radek } from './penezenka';
+import Pole from './host/ucet/Pole';
+import { useJeDemo } from './host/cesty';
 import { okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 
@@ -16,6 +18,7 @@ const formatuj = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-
 
 export default function KartickyHosta() {
   const t = useT('klient-host');
+  const demo = useJeDemo();
   const [karty, setKarty] = useState<Karta[]>([]);
   const [otevreno, setOtevreno] = useState(false);
   const [kod, setKod] = useState('');
@@ -24,14 +27,17 @@ export default function KartickyHosta() {
   const [hotovo, setHotovo] = useState('');
 
   const nacti = useCallback(() => {
+    // Ukázka nemá účet ani databázi: seznam zůstane prázdný a nic se nenačítá.
+    if (demo) { setKarty([]); return; }
     fetch('/api/client/cards/moje').then(okJson).then(x => setKarty(Array.isArray(x?.karty) ? x.karty : [])).catch(() => setKarty([]));
-  }, []);
+  }, [demo]);
   useEffect(() => { nacti(); }, [nacti]);
   useEffect(() => { if (hotovo) { const id = setTimeout(() => setHotovo(''), 6000); return () => clearTimeout(id); } }, [hotovo]);
 
   const pripoj = async (e: React.FormEvent) => {
     e.preventDefault();
     if (kod.replace(/[^A-Z0-9]/g, '').length !== 8) { setErr(t('Kód karty má osm znaků, třeba ABCD-EFGH.')); return; }
+    if (demo) { setErr(t('V ukázce se karta nepřipojí. Přihlas se a zkus to na svém účtu.')); return; }
     setBusy(true); setErr('');
     try {
       const r = await fetch('/api/client/cards/moje', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kod }) });
@@ -46,44 +52,41 @@ export default function KartickyHosta() {
     setBusy(false);
   };
 
+  // Směr A: nadpis sekce, karty jako řádky na skle (podnik, kód prostrkaný) a poslední řádek
+  // „Mám plastovou kartu“; bez karet zůstane jen ten tichý řádek. Formulář se otevře místo něj.
   return (
-    <section aria-labelledby="h-plastove" className="space-y-3" data-testid="plastove-karty">
-      {karty.length > 0 && (
-        <div className="card p-4 sm:p-5">
-          <h2 id="h-plastove" className="t-card">{t('Plastové karty')}</h2>
-          <p className="t-meta mt-0.5">{t('U kasy fungují stejně jako karta v aplikaci.')}</p>
-          <ul className="list mt-2">
-            {karty.map(k => (
-              <li key={k.id} className="list-row">
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-[15px] leading-snug truncate">{k.podnik}</span>
-                  <span className="block font-mono text-[13px] tracking-wider text-black/60">{k.kod}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {karty.length === 0 && <h2 id="h-plastove" className="sr-only">{t('Plastové karty')}</h2>}
-
+    <section aria-labelledby="h-plastove" data-testid="plastove-karty">
+      <NadpisSekce id="h-plastove" titulek={t('Plastové karty')} />
       {!otevreno ? (
-        <Button variant="secondary" icon="card" className="w-full" aria-expanded={false} onClick={() => { setOtevreno(true); setErr(''); }}>{t('Mám plastovou kartu')}</Button>
+        <Seznam>
+          {karty.map(k => (
+            <Radek key={k.id} ikona="card" titulek={k.podnik} popis={<span className="hp-kod">{k.kod}</span>} />
+          ))}
+          <Radek ikona={karty.length ? 'plus' : 'card'} titulek={t('Mám plastovou kartu')}
+            popis={t('U kasy fungují stejně jako karta v aplikaci.')} onClick={() => { setOtevreno(true); setErr(''); }} />
+        </Seznam>
       ) : (
-        <form onSubmit={pripoj} className="card p-4 sm:p-5 space-y-3 max-w-xl" noValidate>
-          <div>
-            <label htmlFor="pk-kod" className="field-label">{t('Kód z plastové karty')}</label>
-            <Input id="pk-kod" value={kod} onChange={e => setKod(formatuj(e.target.value))} placeholder="ABCD-EFGH" autoComplete="off" autoCapitalize="characters"
-              spellCheck={false} inputMode="text" maxLength={9} className="font-mono tracking-[0.2em] uppercase" aria-describedby="pk-napoveda" />
-            <p id="pk-napoveda" className="t-meta mt-1 text-pretty">{t('Kód je na kartě vedle QR. Body a razítka, které jsi na kartu nasbíral, se připíšou na tvůj účet.')}</p>
-          </div>
-          {err && <p role="alert" className="note note-danger text-sm">{err}</p>}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="primary" loading={busy} className="w-full sm:w-auto justify-center">{t('Připojit kartu')}</Button>
-            <Button type="button" variant="ghost" onClick={() => { setOtevreno(false); setErr(''); setKod(''); }} className="w-full sm:w-auto justify-center">{t('Zrušit')}</Button>
-          </div>
-        </form>
+        <>
+          {karty.length > 0 && (
+            <Seznam className="mb-3">
+              {karty.map(k => <Radek key={k.id} ikona="card" titulek={k.podnik} popis={<span className="hp-kod">{k.kod}</span>} />)}
+            </Seznam>
+          )}
+          <form onSubmit={pripoj} className="lgx hp-sklo p-4 sm:p-5 grid gap-3" noValidate>
+            <Pole id="pk-kod" popis={t('Kód z plastové karty')} ikona="card"
+              napoveda={t('Kód je na kartě vedle QR. Body a razítka, které jsi na kartu nasbíral, se připíšou na tvůj účet.')}>
+              <input id="pk-kod" value={kod} onChange={e => setKod(formatuj(e.target.value))} placeholder="ABCD-EFGH" autoComplete="off" autoCapitalize="characters"
+                spellCheck={false} inputMode="text" maxLength={9} className="hp-kod uppercase" aria-describedby="pk-kod-napoveda" autoFocus />
+            </Pole>
+            {err && <p role="alert" className="note note-danger text-sm">{err}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => { setOtevreno(false); setErr(''); setKod(''); }} className="hp-btn lgx hp-btn-sklo hp-btn-stredni min-w-0">{t('Zrušit')}</button>
+              <button type="submit" disabled={busy} aria-busy={busy} className="hp-btn hp-btn-inkoust hp-btn-stredni min-w-0">{busy ? '…' : t('Připojit kartu')}</button>
+            </div>
+          </form>
+        </>
       )}
-      {hotovo && <p role="status" className="note note-ok text-sm">{hotovo}</p>}
+      {hotovo && <p role="status" className="note note-ok text-sm mt-3">{hotovo}</p>}
     </section>
   );
 }

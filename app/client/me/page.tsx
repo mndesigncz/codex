@@ -5,9 +5,9 @@ import { authOptions } from '@/lib/auth';
 import Domov from '@/components/client/host/Domov';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Karta · Managero client' };
+export const metadata: Metadata = { title: 'Karty · Managero client' };
 
-// Karta = domov přihlášeného hosta (QR, karty podniků, co je dnes).
+// Karty = domov přihlášeného hosta (balíček karet podniků, otevřená karta s QR, co tě čeká).
 export default async function Page() {
   const session = await getServerSession(authOptions);
   const u = session?.user as any;

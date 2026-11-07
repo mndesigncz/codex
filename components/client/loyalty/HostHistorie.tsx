@@ -76,17 +76,17 @@ function HostHistorie({ slug, showBusiness = false }: { slug?: string; showBusin
   if (polozky.length === 0) return <EmptyState compact icon="clock" title={t('Zatím tu nic není')} hint={t('Jakmile získáš body, razítko nebo kupon, uvidíš to tady.')} />;
   return (
     <div>
-      <ul className="list">
+      <ul className="divide-y divide-[var(--hp-line)]">
         {polozky.map(p => {
           const h = hodnota(p);
           const dne = pragueDaySafe(p.at);
           return (
             <li key={p.key} className="py-2.5 flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium leading-tight text-pretty break-words">{popis(p)}</p>
-                <p className="text-xs text-black/50 mt-0.5 truncate">{[dne ? fmtDatum(dne, { jazyk, styl: 'cislo' }) : '', showBusiness ? p.business : ''].filter(Boolean).join(' · ')}</p>
+                <p className="hp-text !text-[14px] font-medium leading-tight text-pretty break-words">{popis(p)}</p>
+                <p className="hp-meta !text-[12px] mt-0.5 truncate">{[dne ? fmtDatum(dne, { jazyk, styl: 'cislo' }) : '', showBusiness ? p.business : ''].filter(Boolean).join(' · ')}</p>
               </div>
-              {h && <p className={`shrink-0 text-sm font-semibold tabular-nums ${p.points < 0 || p.credit < 0 ? 'text-black/55' : ''}`}>{h}</p>}
+              {h && <p className={`shrink-0 text-sm font-semibold tabular-nums ${p.points < 0 || p.credit < 0 ? 'text-[var(--hp-muted)]' : 'text-[var(--hp-fg)]'}`}>{h}</p>}
             </li>
           );
         })}
@@ -94,7 +94,7 @@ function HostHistorie({ slug, showBusiness = false }: { slug?: string; showBusin
       {chyba && <p role="alert" className="mt-2 text-sm text-bad-ink">{chyba}</p>}
       {dalsi && (
         <button type="button" disabled={nacitam} onClick={() => { void nacti(strana + 1, false); }}
-          className="tap-target mt-3 inline-flex items-center justify-center btn btn-secondary btn-sm active:scale-[0.98] disabled:opacity-50 transition">
+          className="tap-target mt-3 hp-btn lgx hp-btn-sklo hp-btn-male disabled:opacity-50">
           {nacitam ? '…' : t('Načíst další')}
         </button>
       )}
@@ -112,9 +112,9 @@ export default function HostHistorieOddil({ slug, showBusiness = false, classNam
   return (
     <details className={`group ${className}`} onToggle={e => { if ((e.currentTarget as HTMLDetailsElement).open) setOtevreno(true); }}>
       {/* Řádek přes šířku s šipkou vpravo (jako řádek seznamu), ne osamělý textový odkaz uprostřed karty. */}
-      <summary className="flex w-full min-h-[44px] items-center justify-between gap-3 text-[15px] font-semibold text-[#16181A] cursor-pointer list-none">
+      <summary className="flex w-full min-h-[44px] items-center justify-between gap-3 hp-silny text-[var(--hp-fg)] cursor-pointer list-none">
         <span className="min-w-0">{t('Historie bodů a kuponů')}</span>
-        <Icon name="chevron" size={16} className="shrink-0 text-black/45 transition-transform group-open:rotate-180" />
+        <Icon name="chevron" size={16} className="shrink-0 text-[var(--hp-muted)] transition-transform group-open:rotate-180" />
       </summary>
       <div className="mt-3 max-w-xl">{otevreno && <HostHistorie slug={slug} showBusiness={showBusiness} />}</div>
     </details>

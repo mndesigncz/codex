@@ -1,32 +1,24 @@
 'use client';
 
-// Registrace a přihlášení hosta. Popisek nad polem, chyba pod ním.
+// Registrace a přihlášení hosta ve směru A „Peněženka“ (předloha 06): balíček karet jako předmět,
+// titulek 32, segment Kód e-mailem · Heslo, pole .hp-pole s ikonou a limetková hlavní akce přes šířku.
 
 import { useState } from 'react';
 import { signIn, signOut, getSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Icon } from '../Icons';
+import { Segmented } from '../ui';
+import Pole, { popisPole } from './host/ucet/Pole';
+import BalicekVstup from './host/ucet/BalicekVstup';
 import { mistniCesta } from '@/lib/bezpecnaUrl';
 import { useObal } from '../ObalProvider';
 import { HLASKA_ROLE_V_CLIENTU } from '@/lib/obal';
-import PravniOdkazy from '../pravni/PravniOdkazy';
 import SouhlasPodminek from '../pravni/SouhlasPodminek';
-import { useT, useJazyk } from '@/lib/i18n/client';
+import { useT } from '@/lib/i18n/client';
 import { kamPoPrihlaseni } from '@/lib/dveStranyKlient';
 
-const input = 'field text-sm';
-const label = 'field-label';
-
-function Field({ id, label: l, hint, error, children }: { id: string; label: string; hint?: string; error?: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-2">
-      <label htmlFor={id} className={label}>{l}</label>
-      {children}
-      {error ? <p className="text-xs text-bad-ink">{error}</p> : hint ? <p className="t-meta text-pretty">{hint}</p> : null}
-    </div>
-  );
-}
+// Odkaz pod formulářem: tučně v barvě textu, dotykový cíl 44 px.
+const ODKAZ = 'tap-target-sm inline-flex items-center min-h-[44px] font-semibold text-[color:var(--hp-fg)] underline-offset-2 hover:underline';
 
 export function RegisterForm() {
   const t = useT('klient-host');
@@ -59,33 +51,35 @@ export function RegisterForm() {
     router.push(next); router.refresh();
   };
   return (
-    <AuthCard title={t('Založit účet hosta')} lead={t('Jeden účet pro všechny podniky, kam chodíš.')}>
+    <Vstup titulek={t('Založit účet hosta')} uvod={t('Jeden účet pro všechny podniky, kam chodíš.')}>
       <form onSubmit={submit} className="grid gap-4" noValidate>
-        <Field id="r-name" label={t('Jméno')}><input id="r-name" className={input} value={name} onChange={e => setName(e.target.value)} autoComplete="name" required /></Field>
-        <Field id="r-email" label={t('E-mail')}><input id="r-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
-        <Field id="r-pw" label={t('Heslo')} hint={t('Aspoň 8 znaků.')}><input id="r-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" required /></Field>
-        <Field id="r-ref" label={t('Kód od kamaráda')} hint={t('Nepovinné. Až se přidáš do podniku, kde je členem, dostanete oba body.')}><input id="r-ref" className={`${input} font-mono tracking-widest placeholder:font-sans placeholder:tracking-normal`} value={ref} onChange={e => setRef(e.target.value.toUpperCase())} placeholder="ABCD-EFGH" autoComplete="off" /></Field>
-        <label className="flex items-start gap-3 text-sm text-black/70 cursor-pointer">
-          <input type="checkbox" checked={novinky} onChange={e => setNovinky(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-[#16181A]" />
-          <span>{t('Chci dostávat novinky a akce od podniků, kde jsem členem. Nepovinné, půjde to kdykoli vypnout v profilu.')}</span>
+        <Pole id="r-name" popis={t('Jméno')} ikona="user"><input id="r-name" value={name} onChange={e => setName(e.target.value)} autoComplete="name" required /></Pole>
+        <Pole id="r-email" popis={t('E-mail')} ikona="mail"><input id="r-email" type="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Pole>
+        <Pole id="r-pw" popis={t('Heslo')} ikona="lock" napoveda={t('Aspoň 8 znaků.')}><input id="r-pw" type="password" value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" aria-describedby={popisPole('r-pw', null, true)} required /></Pole>
+        <Pole id="r-ref" popis={t('Kód od kamaráda')} ikona="gift" napoveda={t('Nepovinné. Až se přidáš do podniku, kde je členem, dostanete oba body.')}>
+          <input id="r-ref" className="hp-kod placeholder:font-sans placeholder:tracking-normal" value={ref} onChange={e => setRef(e.target.value.toUpperCase())} placeholder="ABCD-EFGH" autoComplete="off" aria-describedby={popisPole('r-ref', null, true)} />
+        </Pole>
+        <label className="flex items-start gap-3 min-h-[44px] py-1 cursor-pointer">
+          <input type="checkbox" checked={novinky} onChange={e => setNovinky(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 [accent-color:var(--hp-fg)]" />
+          <span className="hp-meta !text-[14px] text-pretty">{t('Chci dostávat novinky a akce od podniků, kde jsem členem. Nepovinné, půjde to kdykoli vypnout v profilu.')}</span>
         </label>
-        <SouhlasPodminek id="r-souhlas" checked={souhlas} chyba={chybaSouhlasu}
-          onChange={v => { setSouhlas(v); if (v && vek) setChybaSouhlasu(null); }}
-          vek={{ checked: vek, onChange: v => { setVek(v); if (v && souhlas) setChybaSouhlasu(null); } }} />
+        <div>
+          <SouhlasPodminek id="r-souhlas" checked={souhlas} chyba={chybaSouhlasu}
+            onChange={v => { setSouhlas(v); if (v && vek) setChybaSouhlasu(null); }}
+            vek={{ checked: vek, onChange: v => { setVek(v); if (v && souhlas) setChybaSouhlasu(null); } }} />
+        </div>
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-        <button type="submit" disabled={busy} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">
-          {busy ? t('Zakládám…') : <><Icon name="plus" size={16} /> {t('Založit účet')}</>}
+        <button type="submit" disabled={busy} className="hp-btn hp-btn-limetka hp-btn-blok mt-1">
+          {busy ? t('Zakládám…') : t('Založit účet')}
         </button>
-        <p className="text-sm text-black/55 text-center">{t('Už účet máš?')} <Link href={`/client/login?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Přihlas se')}</Link></p>
+        <p className="hp-meta text-center">{t('Už účet máš?')} <Link href={`/client/login?next=${encodeURIComponent(next)}`} className={ODKAZ}>{t('Přihlas se')}</Link></p>
       </form>
-    </AuthCard>
+    </Vstup>
   );
 }
 
 export function LoginForm() {
   const t = useT('klient-host');
-  // Právní stránky existují česky a anglicky; ostatní jazyky dostanou anglické.
-  const jazykPravni = useJazyk().jazyk === 'cs' ? 'cs' : 'en';
   const router = useRouter();
   const { jeObal } = useObal();
   const params = useSearchParams();
@@ -137,72 +131,80 @@ export function LoginForm() {
     const s = await signIn('host-kod', { email, kod, redirect: false });
     await poPrihlaseni(s?.error, t('Kód nesedí nebo už neplatí. Pošli si nový.'));
   };
+  const odkazy = (
+    <div className="mt-1 flex flex-wrap items-center justify-center gap-x-6 text-[14px]">
+      <Link href="/client/zapomenute-heslo" className={ODKAZ}>{t('Zapomenuté heslo')}</Link>
+      <Link href={`/client/register?next=${encodeURIComponent(next)}`} className={ODKAZ}>{t('Založit účet')}</Link>
+    </div>
+  );
   return (
-    <AuthCard title={t('Přihlásit se')} lead={t('Tvoje podniky, rezervace a body na jednom místě.')}>
-      <div className="grid grid-cols-2 gap-1 p-1 rounded-full bg-black/[0.05] mb-5" role="tablist" aria-label={t('Způsob přihlášení')}>
-        {(['kod', 'heslo'] as const).map(z => (
-          <button key={z} type="button" role="tab" aria-selected={zpusob === z} onClick={() => { setZpusob(z); setErr(''); }}
-            className={`h-9 rounded-full text-sm font-medium transition ${zpusob === z ? 'seg-jezdec seg-vybrano' : 'seg-off'}`}>{z === 'kod' ? t('Kód e-mailem') : t('Heslo')}</button>
-        ))}
+    <Vstup balicek titulek={t('Všechny tvoje karty na jednom místě')} uvod={t('Razítka, body, odměny a rezervace z kaváren a restaurací, kam chodíš.')}>
+      <div className="hp-segment mb-3">
+        <Segmented ariaLabel={t('Způsob přihlášení')} value={zpusob} onChange={z => { setZpusob(z); setErr(''); }}
+          options={[{ id: 'kod', label: t('Kód e-mailem') }, { id: 'heslo', label: t('Heslo') }]} />
       </div>
       {zpusob === 'kod' ? (
         poslano ? (
-          <form onSubmit={overit} className="grid gap-4" noValidate>
-            <p className="text-sm text-black/70 text-pretty">{t('Poslali jsme šestimístný kód na {email}. Platí 10 minut.', { email: email.trim() })}</p>
-            <Field id="l-kod" label={t('Kód z e-mailu')}>
-              <input id="l-kod" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={`${input} h-kod !text-[22px] !tracking-[0.4em] text-center`} value={kod}
-                onChange={e => setKod(e.target.value.replace(/\D/g, '').slice(0, 6))} autoFocus required />
-            </Field>
+          <form onSubmit={overit} className="grid gap-3" noValidate>
+            <p className="hp-text text-pretty">{t('Poslali jsme šestimístný kód na {email}. Platí 10 minut.', { email: email.trim() })}</p>
+            <Pole id="l-kod" popis={t('Kód z e-mailu')} skrytyPopis ikona="key">
+              <input id="l-kod" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="hp-kod !text-[22px] !tracking-[0.4em] text-center" value={kod}
+                onChange={e => setKod(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" autoFocus required />
+            </Pole>
             {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-            <button type="submit" disabled={busy || kod.length !== 6} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">{busy ? t('Přihlašuji…') : t('Přihlásit se')}</button>
+            <button type="submit" disabled={busy || kod.length !== 6} className="hp-btn hp-btn-limetka hp-btn-blok">{busy ? t('Přihlašuji…') : t('Přihlásit se')}</button>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => { setPoslano(false); setErr(''); }} className="btn btn-secondary min-w-0">{t('Jiný e-mail')}</button>
-              <button type="button" onClick={() => void poslatKod()} disabled={busy} className="btn btn-secondary min-w-0">{t('Poslat znovu')}</button>
+              <button type="button" onClick={() => { setPoslano(false); setErr(''); }} className="hp-btn lgx hp-btn-sklo hp-btn-stredni min-w-0">{t('Jiný e-mail')}</button>
+              <button type="button" onClick={() => void poslatKod()} disabled={busy} className="hp-btn lgx hp-btn-sklo hp-btn-stredni min-w-0">{t('Poslat znovu')}</button>
             </div>
-            <p className="t-meta text-center text-pretty">{t('Kód nepřišel? Mrkni do spamu, nebo se přihlas heslem.')}</p>
+            <p className="hp-meta text-center text-pretty">{t('Kód nepřišel? Mrkni do spamu, nebo se přihlas heslem.')}</p>
           </form>
         ) : (
-          <form onSubmit={poslatKod} className="grid gap-4" noValidate>
-            <Field id="l-email" label={t('E-mail')} hint={t('Pošleme ti kód. Heslo si pamatovat nemusíš.')}><input id="l-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
+          <form onSubmit={poslatKod} className="grid gap-3" noValidate>
+            <Pole id="l-email" popis={t('E-mail')} skrytyPopis ikona="mail">
+              <input id="l-email" type="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" placeholder={t('E-mail')} aria-describedby="l-email-veta" required />
+            </Pole>
             {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-            <button type="submit" disabled={busy} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">{busy ? t('Posílám…') : t('Poslat kód')}</button>
-            <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
-            <p className="text-sm text-black/55 text-center">{t('Ještě účet nemáš?')} <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Založ si ho')}</Link></p>
+            <button type="submit" disabled={busy} className="hp-btn hp-btn-limetka hp-btn-blok">{busy ? t('Posílám…') : t('Poslat kód')}</button>
+            <p id="l-email-veta" className="hp-meta text-center text-pretty">{t('Pošleme ti kód. Heslo si pamatovat nemusíš.')}</p>
+            {odkazy}
           </form>
         )
       ) : (
-        <form onSubmit={submit} className="grid gap-4" noValidate>
-          <Field id="l-email" label={t('E-mail')}><input id="l-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
-          <Field id="l-pw" label={t('Heslo')}><input id="l-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" required /></Field>
-          <p className="-mt-2 text-sm"><Link href="/client/zapomenute-heslo" className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Zapomenuté heslo')}</Link></p>
+        <form onSubmit={submit} className="grid gap-3" noValidate>
+          <Pole id="l-email" popis={t('E-mail')} skrytyPopis ikona="mail">
+            <input id="l-email" type="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" placeholder={t('E-mail')} required />
+          </Pole>
+          <Pole id="l-pw" popis={t('Heslo')} skrytyPopis ikona="lock">
+            <input id="l-pw" type="password" value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" placeholder={t('Heslo')} required />
+          </Pole>
           {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-          <button type="submit" disabled={busy} className="tap-target btn btn-accent btn-lg w-full mt-1 disabled:opacity-50">
+          <button type="submit" disabled={busy} className="hp-btn hp-btn-limetka hp-btn-blok">
             {busy ? t('Přihlašuji…') : t('Přihlásit se')}
           </button>
-          <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
-          <p className="text-sm text-black/55 text-center">{t('Ještě účet nemáš?')} <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Založ si ho')}</Link></p>
+          {odkazy}
         </form>
       )}
-      {/* Kdo hledá správu podniku, je tu omylem: jeden odkaz ho pošle na správný vchod. */}
+      {/* Kdo hledá správu podniku, je tu omylem: jeden odkaz ho pošle na správný vchod. Právní odkazy
+          jsou hned pod tím v patičce obalu (ClientShell), tady by se opakovaly. */}
       {!jeObal && (
-        <p className="mt-6 pt-5 border-t border-black/[0.07] text-sm text-black/55 text-center">
-          {t('Máš podnik?')} <Link href="/login" className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Přihlásit se do správy podniku')}</Link>
-        </p>
+        <p className="hp-meta mt-6 text-center">{t('Máš podnik?')} <Link href="/login" className={ODKAZ}>{t('Přihlásit se do správy podniku')}</Link></p>
       )}
-    </AuthCard>
+    </Vstup>
   );
 }
 
-export function AuthCard({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
+/** Obrazovka vstupu (předloha A 06): na telefonu balíček karet, titulek, věta a formulář pod sebou;
+ *  na počítači balíček vlevo a titulek s formulářem vpravo. Formulář leží na plátně, žádná karta. */
+function Vstup({ titulek, uvod, balicek = false, children }: { titulek: string; uvod: string; balicek?: boolean; children: React.ReactNode }) {
   return (
-    // v3 (jako přihlášení ve World App / [untitled]): na telefonu formulář leží přímo na plátně —
-    // velký nadpis, jedna věta, pole a hlavní tlačítko přes šířku. Karta s linkou až od md, vedle nadpisu.
-    <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-7 md:gap-14 items-start">
-      <div className="md:pt-8">
-        <h1 className="t-page sm:text-[2.5rem] sm:leading-[1.05] text-balance">{title}</h1>
-        <p className="mt-2 text-[15px] sm:text-base text-black/60 leading-relaxed max-w-[40ch] text-pretty">{lead}</p>
+    <div className="mx-auto w-full max-w-[440px] md:max-w-[980px] md:grid md:grid-cols-[minmax(0,1fr)_400px] md:gap-14 lg:gap-20 md:items-center md:min-h-[min(620px,calc(100dvh-240px))]">
+      <div className={balicek ? 'pt-1 md:pt-0' : 'hidden md:block'}><BalicekVstup /></div>
+      <div className="min-w-0">
+        <h1 className={`hp-titulek ${balicek ? 'mt-5' : 'mt-2'} md:mt-0 md:!text-[40px]`}>{titulek}</h1>
+        <p className="hp-text mt-2.5 mb-6 text-[color:var(--hp-muted)] text-pretty">{uvod}</p>
+        {children}
       </div>
-      <div className="w-full max-w-md karta-od-md md:p-8">{children}</div>
     </div>
   );
 }

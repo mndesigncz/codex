@@ -70,8 +70,8 @@ for (const sirka of [390, 1280]) {
   // Přestavba hosta: stránka podniku nemá záložky; banner na kupon skočí na „Co dostaneš“ (odměny podniku).
   tvrdi(`${L}: banner na kupon skočil na odměny podniku`, await p.evaluate(() => { const r = document.getElementById('odmeny-podniku')?.getBoundingClientRect(); return !!r && r.top < window.innerHeight && r.bottom > 0; }));
   const text = await p.locator('body').innerText();
-  tvrdi(`${L}: kupon, který brzy končí, má „Vyprší za 3 dny“`, /Vyprší za 3 dny/.test(text), text.slice(0, 200));
-  tvrdi(`${L}: vyzvednutý kupon má platnost`, (text.match(/Vyprší za 3 dny/g) ?? []).length >= 2);
+  tvrdi(`${L}: kupon, který brzy končí, má „Končí za 3 dny“ (jako lístek v Odměnách)`, /Končí za 3 dny/.test(text), text.slice(0, 200));
+  tvrdi(`${L}: vyzvednutý kupon má platnost`, (text.match(/Končí za 3 dny/g) ?? []).length >= 2);
   tvrdi(`${L}: dálku platnosti ukáže jako „Platí do“`, /Platí do/.test(text));
   tvrdi(`${L}: kdy karta vyprší`, /Dosbírej kartu do/.test(text));
   tvrdi(`${L}: „Jak získat body a odměny“`, /jak získat body a odměny/i.test(text) && /Za každých 100\s*Kč útraty dostaneš 10 bodů/.test(text) && /Na narozeniny dostaneš 50 bodů/.test(text), text.slice(-900));

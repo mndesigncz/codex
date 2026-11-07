@@ -9,14 +9,17 @@
 // Před migrací tabulky zůstává původní jeden přepínač „od podniků“.
 // Systémové povolení oznámení v nativní aplikaci se žádá až tady, v kontextu, ne při startu.
 
-import { useCallback, useEffect, useState } from 'react';
-import { Button, SwitchRow } from '../ui';
-import ProvozovatelInfo from '../pravni/ProvozovatelInfo';
+import { useCallback, useEffect, useId, useState } from 'react';
+import { Switch } from '../ui';
+import { Icon } from '../Icons';
+import { Monogram, NadpisSekce, Seznam, Radek } from './penezenka';
+import { firma, identifikace } from '@/lib/firma';
+import { ODKAZY_PRAVNI, cestaDokumentu } from '@/lib/pravni/odkazy';
 import SmazatUcet from '../ucet/SmazatUcet';
 import ZamekAplikace from '../ucet/ZamekAplikace';
 import { jeNativni, nativniMost, stavNativnihoPushe } from '@/lib/nativni/most';
 import { ulozZAdresy } from '@/lib/stahni';
-import { useT } from '@/lib/i18n/client';
+import { useJazyk, useT } from '@/lib/i18n/client';
 
 interface SouhlasPodniku { teamId: number; podnik: string; slug: string | null; push: boolean; email: boolean }
 
@@ -130,79 +133,129 @@ export default function UcetHosta({ novinky, novinkyEmail = true, onFlash, cast 
     try { setStazeno(await ulozZAdresy('/api/client/account/export', 'managero-client-moje-data.json')); }
     finally { setStahuji(false); }
   };
-  const exportBlok = (linka: boolean) => (
-    <div className={linka ? 'mt-5 pt-4 border-t border-black/[0.07]' : 'mt-3'} data-export-hosta>
-      <h3 className="t-card">{t('Stáhnout moje data')}</h3>
-      <p className="t-meta mt-0.5 text-pretty">{t('Soubor JSON se vším, co o tobě v podnicích vedeme: členství, body a jejich historie, razítka, kredit, kupony, objednávky, rezervace, hodnocení a souhlasy.')}</p>
-      <Button variant="secondary" icon="download" className="mt-3 w-full justify-center" loading={stahuji} onClick={stahnout}>{t('Stáhnout moje data')}</Button>
-      <p role="status" aria-live="polite" className="t-meta mt-1.5 min-h-[1.25rem]">
+  // Stažení dat jako řádek na skle (jamka, titulek, popis); stav pod ním pro odečítač.
+  const exportBlok = (
+    <div data-export-hosta>
+      <Seznam>
+        <li>
+          <button type="button" onClick={() => { if (!stahuji) void stahnout(); }} aria-busy={stahuji} className="hp-radek">
+            <span className="hp-jamka" aria-hidden><Icon name="download" size={18} strokeWidth={1.6} /></span>
+            <span className="hp-radek-telo">
+              <span className="hp-silny block">{t('Stáhnout moje data')}</span>
+              <span className="hp-meta block mt-0.5 text-pretty">{t('Soubor JSON se vším, co o tobě v podnicích vedeme: členství, body a jejich historie, razítka, kredit, kupony, objednávky, rezervace, hodnocení a souhlasy.')}</span>
+            </span>
+            {stahuji && <span className="spinner shrink-0" aria-hidden />}
+          </button>
+        </li>
+      </Seznam>
+      <p role="status" aria-live="polite" className="hp-meta mt-1.5 px-1 min-h-[1.25rem]">
         {stazeno === 'stazeno' ? t('Soubor je stažený.') : stazeno === 'sdileno' ? t('Soubor je připravený ke sdílení.') : ''}
       </p>
       {stazeno === 'nejde' && <p role="alert" className="note note-danger">{t('Data se nepodařilo stáhnout. Zkus to za chvíli znovu.')}</p>}
     </div>
   );
+  // Smazání účtu je sdílená komponenta s vlastním nadpisem a linkou nahoře: tady leží na skle bez linky.
+  const soukromi = (
+    <>
+      {exportBlok}
+      <PravniSeznam />
+      <div className="lgx hp-sklo mt-4 p-4 sm:p-5 [&>section]:!mt-0 [&>section]:!pt-0 [&>section]:!border-0">
+        <SmazatUcet jeHost vzhledHosta />
+      </div>
+    </>
+  );
 
   // Profil hosta (přestavba): oznámení a soukromí jsou dvě sekce pod sebou; `cast` vybere jednu.
   if (cast === 'soukromi') return (
-    <section id="soukromi" aria-labelledby="h-soukromi-hosta" className="card p-4 sm:p-5 scroll-mt-24">
-      <h2 id="h-soukromi-hosta" className="t-section">{t('Soukromí a data')}</h2>
-      {exportBlok(false)}
-      <ProvozovatelInfo className="mt-3 text-sm text-black/60" />
-      <SmazatUcet jeHost />
+    <section id="soukromi" aria-labelledby="h-soukromi-hosta" className="scroll-mt-24">
+      <NadpisSekce id="h-soukromi-hosta" titulek={t('Soukromí a data')} />
+      {soukromi}
     </section>
   );
 
   return (
-    <section id="ucet" aria-labelledby="h-ucet-hosta" className="card p-4 sm:p-5 scroll-mt-24">
-      <h2 id="h-ucet-hosta" className="t-section">{cast === 'oznameni' ? t('Oznámení a novinky') : t('Oznámení a soukromí')}</h2>
+    <section id="ucet" aria-labelledby="h-ucet-hosta" className="scroll-mt-24">
+      <NadpisSekce id="h-ucet-hosta" titulek={cast === 'oznameni' ? t('Oznámení a novinky') : t('Oznámení a soukromí')} />
       {nativni && (
-        <ul className="list mt-2">
-          <SwitchRow title={t('Upozornění v telefonu')} checked={pushZapnut} onChange={zmenPush}
-            hint={pushOdmitnut ? t('Oznámení jsou v systému vypnutá. Povolte je v nastavení telefonu.') : t('Potvrzení rezervace, stav objednávky.')} />
-          <ZamekAplikace />
-        </ul>
+        <Seznam className="mb-4">
+          <RadekPrepinac titulek={t('Upozornění v telefonu')} checked={pushZapnut} onChange={zmenPush} ikona="bell"
+            popis={pushOdmitnut ? t('Oznámení jsou v systému vypnutá. Povolte je v nastavení telefonu.') : t('Potvrzení rezervace, stav objednávky.')} />
+          <li className="px-4"><ul className="list-none"><ZamekAplikace /></ul></li>
+        </Seznam>
       )}
 
       {poPodnicich ? (
-        <div className="mt-4" data-souhlasy-podniku>
-          <h3 className="t-card">{t('Novinky a akce od podniků')}</h3>
-          <p className="t-meta mt-0.5 text-pretty">{t('U každého podniku zvlášť. Nepovinné, jen s tvým souhlasem a kdykoli jde vypnout.')}</p>
-          {podniky === null ? (
-            <p className="t-meta mt-3" aria-busy="true">{t('Načítám…')}</p>
-          ) : podniky.length === 0 ? (
-            <p className="t-meta mt-3 text-pretty">{t('Zatím nejsi členem žádného podniku. Novinky si zapneš, až se k nějakému přidáš.')}</p>
-          ) : (
-            <ul className="list mt-1">
-              {podniky.map(x => (
-                <li key={x.teamId} className="py-1">
-                  <SwitchRow as="div" title={x.podnik} checked={x.push} disabled={ukladam != null}
-                    onChange={v => void zmenPodnik(x, 'novinky_push', v)}
-                    hint={x.push ? (x.email ? t('Oznámení v aplikaci i e-mail') : t('Jen oznámení v aplikaci')) : t('Novinky nechodí')} />
-                  {x.push && (
-                    <SwitchRow as="div" className="pl-4 !py-1.5 !min-h-[2.75rem]" title={t('Také e-mailem')} checked={x.email} disabled={ukladam != null}
-                      onChange={v => void zmenPodnik(x, 'novinky_email', v)} />
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+        <div data-souhlasy-podniku>
+          <h3 className="hp-silny px-1">{t('Novinky a akce od podniků')}</h3>
+          <p className="hp-meta mt-0.5 mb-3 px-1 text-pretty">{t('U každého podniku zvlášť. Nepovinné, jen s tvým souhlasem a kdykoli jde vypnout.')}</p>
+          <Seznam>
+            {podniky === null ? (
+              <li className="hp-radek"><span className="hp-meta" aria-busy="true">{t('Načítám…')}</span></li>
+            ) : podniky.length === 0 ? (
+              <li className="hp-radek"><span className="hp-jamka" aria-hidden><Icon name="bell" size={18} strokeWidth={1.6} /></span>
+                <span className="hp-meta text-pretty">{t('Zatím nejsi členem žádného podniku. Novinky si zapneš, až se k nějakému přidáš.')}</span></li>
+            ) : podniky.map(x => (
+              <li key={x.teamId}>
+                <RadekPrepinac as="div" titulek={x.podnik} checked={x.push} disabled={ukladam != null}
+                  vlevo={<Monogram nazev={x.podnik} klic={x.slug} />}
+                  onChange={v => void zmenPodnik(x, 'novinky_push', v)}
+                  popis={x.push ? (x.email ? t('Oznámení v aplikaci i e-mail') : t('Jen oznámení v aplikaci')) : t('Novinky nechodí')} />
+                {x.push && (
+                  <RadekPrepinac as="div" className="!pl-[66px] !min-h-[52px] !py-2" titulek={t('Také e-mailem')} checked={x.email} disabled={ukladam != null}
+                    onChange={v => void zmenPodnik(x, 'novinky_email', v)} />
+                )}
+              </li>
+            ))}
+          </Seznam>
         </div>
       ) : (
-        <ul className="list mt-2">
-          <SwitchRow title={t('Novinky a akce od podniků')} checked={souhlas} onChange={zmenSouhlas}
-            hint={t('Zprávy od podniků, kde jsi členem. Nepovinné, jen s tvým souhlasem a kdykoli jde vypnout.')} />
+        <Seznam>
+          <RadekPrepinac titulek={t('Novinky a akce od podniků')} checked={souhlas} onChange={zmenSouhlas} ikona="mail"
+            popis={t('Zprávy od podniků, kde jsi členem. Nepovinné, jen s tvým souhlasem a kdykoli jde vypnout.')} />
           {souhlas && (
-            <SwitchRow title={t('E-maily od podniků')} checked={email} onChange={zmenEmail}
-              hint={t('Novinky ti přijdou i e-mailem. Odhlásit se jde i odkazem přímo v e-mailu.')} />
+            <RadekPrepinac titulek={t('E-maily od podniků')} checked={email} onChange={zmenEmail} className="!pl-[68px]"
+              popis={t('Novinky ti přijdou i e-mailem. Odhlásit se jde i odkazem přímo v e-mailu.')} />
           )}
-        </ul>
+        </Seznam>
       )}
 
-      {cast !== 'oznameni' && <>
-        {exportBlok(true)}
-        <ProvozovatelInfo className="mt-3 text-sm text-black/60" />
-        <SmazatUcet jeHost />
-      </>}
+      {cast !== 'oznameni' && <div className="mt-6">{soukromi}</div>}
     </section>
+  );
+}
+
+/** Řádek nastavení na skle (směr A): jamka nebo monogram, titulek 15/600 s popisem a přepínač vpravo.
+ *  Klepnutí na text přepíná taky; přístupný název nese jen titulek, popis jde jako popis. */
+function RadekPrepinac({ titulek, popis, checked, onChange, disabled, ikona, vlevo, as: Tag = 'li', className = '' }: {
+  titulek: React.ReactNode; popis?: React.ReactNode; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean;
+  ikona?: string; vlevo?: React.ReactNode; as?: 'li' | 'div'; className?: string;
+}) {
+  const uid = useId();
+  const obsah = (
+    <div className={`hp-radek ${className}`}>
+      {vlevo ?? (ikona ? <span className="hp-jamka" aria-hidden><Icon name={ikona} size={18} strokeWidth={1.6} /></span> : null)}
+      <label htmlFor={`${uid}-p`} className={`hp-radek-telo ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+        <span id={`${uid}-n`} className="hp-silny block">{titulek}</span>
+        {popis && <span id={`${uid}-h`} className="hp-meta block mt-0.5 text-pretty">{popis}</span>}
+      </label>
+      <Switch id={`${uid}-p`} checked={checked} onChange={onChange} disabled={disabled} labelledBy={`${uid}-n`} describedBy={popis ? `${uid}-h` : undefined} />
+    </div>
+  );
+  return Tag === 'li' ? <li>{obsah}</li> : obsah;
+}
+
+/** Právní dokumenty jako jeden řádkový seznam (smazání účtu je karta pod ním, ne další odkaz)
+ *  a pod ním provozovatel jednou větou (§ 435 OZ). */
+function PravniSeznam() {
+  const jazyk = useJazyk().jazyk === 'cs' ? 'cs' : 'en';
+  const f = firma({});
+  const odkazy = ODKAZY_PRAVNI.filter(o => ['soukromi', 'podminky', 'podpora'].includes(o.klic));
+  return (
+    <div className="mt-1" data-provozovatel>
+      <Seznam>
+        {odkazy.map(o => <Radek key={o.klic} ikona={o.klic === 'podpora' ? 'info' : 'book'} titulek={o[jazyk]} href={cestaDokumentu(o.klic, jazyk)} />)}
+      </Seznam>
+      <p className="hp-meta mt-2 px-1 text-pretty">{identifikace(f, jazyk)}</p>
+    </div>
   );
 }

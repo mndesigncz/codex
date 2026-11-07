@@ -138,7 +138,7 @@ await host.p.goto(BASE + '/client/me?kasa=1', { waitUntil: 'networkidle' });
 const list = host.p.getByRole('dialog');
 await list.waitFor({ timeout: 20000 });
 const prepinac = list.getByRole('switch');
-tvrdi('E1 (390): U kasy nabízí připravenou odměnu s přepínačem', await dokud(() => prepinac.first().isVisible().catch(() => false), 8000) && /Filtr dne jako odměna je připravená/.test(await list.innerText()));
+tvrdi('E1 (390): U kasy nabízí připravenou odměnu s přepínačem', await dokud(() => prepinac.first().isVisible().catch(() => false), 8000) && /Filtr dne jako odměna čeká/.test(await list.innerText()));
 await prepinac.first().click();
 tvrdi('E1: přibalení pošle PUT me/zamer { slug, claimId }', await dokud(() => svet.zapisy.some(z => z.kdo === 'host' && z.m === 'PUT' && z.slug === PODNIK.slug && z.claimId === 5), 3000), JSON.stringify(svet.zapisy));
 tvrdi('E1: host vidí „Obsluha ji uplatní při načtení."', await dokud(async () => /Obsluha ji uplatní při načtení/.test(await list.innerText()), 3000));

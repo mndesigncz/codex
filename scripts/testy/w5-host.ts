@@ -89,18 +89,21 @@ export default function ({ eq, ok }: Testy) {
   eq('úrovně: chybí data', urovneSeSlevou(null), false);
 
   // ---- Zapojení do stránek hosta ----
-  const bp = zdroj('components/client/BusinessPage.tsx');
+  // Směr A: stránka podniku je rozdělená do components/client/host/podnik/*; karta je InkoustovaKarta s razítky.
+  const bp = ['components/client/BusinessPage.tsx', 'components/client/host/podnik/Zahlavi.tsx', 'components/client/host/podnik/MojeKarta.tsx', 'components/client/host/podnik/CoDostanes.tsx', 'components/client/host/podnik/OPodniku.tsx'].map(zdroj).join('\n');
   ok('stránka podniku: legacy „x/10“ se při kampaních skryje', bp.includes('b.stampTarget > 0 && !(me.campaigns?.length)'));
   ok('stránka podniku: platnost kuponu přes PlatnostKuponu', bp.includes('<PlatnostKuponu validUntil={c.valid_until}'));
   // Přestavba hosta: karta razítek je kolečka s daty návštěv (RazitkaMrizka) v barvě podniku; pravidla karty (vyprší, okno, limit) jsou pod ní.
-  ok('stránka podniku: karta (vyprší, kdy, limit) přes RazitkaMrizka a věty pravidel', bp.includes('<RazitkaMrizka pocet={k.stamps}') && bp.includes('Dosbírej kartu do {datum}') && bp.includes('Tuhle kartu už máš dokončenou'));
+  ok('stránka podniku: karta (vyprší, kdy, limit) přes RazitkaMrizka a věty pravidel', bp.includes('razitka={{ pocet: k.stamps') && bp.includes('Dosbírej kartu do {datum}') && bp.includes('Tuhle kartu už máš dokončenou'));
   ok('stránka podniku: pravidla z nastavení podniku', bp.includes('<HostPravidla b={b}'));
   ok('stránka podniku: historie jen pro přihlášeného', bp.includes('{signedIn && <HostHistorie slug={slug}'));
-  ok('stránka podniku: bannery posílají statistiku', bp.includes('slug={slug} />') && bp.includes('<PromoBanners banners={d.banners}'));
+  ok('stránka podniku: bannery posílají statistiku', /<PromoBanners [^>]*banners=\{d\.banners\}[^>]*slug=\{slug\}/.test(bp));
   // Přestavba hosta: Moje se rozdělila na Kartu, Odměny a Profil; historie napříč podniky je v Odměnách → Historie.
+  // Směr A: historie je vlastní seznam v host/odmeny/Historie.tsx, dnešní konec platnosti je „Končí dnes“.
   const odm = zdroj('components/client/host/Odmeny.tsx');
-  ok('Odměny: historie napříč podniky', odm.includes("/api/client/me/historie"));
-  ok('Odměny: platnost odměny (dny do konce, datum)', odm.includes('dniDo(o.validUntil') && odm.includes('platí jen dnes'));
+  const odmHist = zdroj('components/client/host/odmeny/Historie.tsx');
+  ok('Odměny: historie napříč podniky', odm.includes('<Historie') && odmHist.includes("/api/client/me/historie"));
+  ok('Odměny: platnost odměny (dny do konce, datum)', odm.includes('dniDo(o.validUntil') && odm.includes('Končí dnes'));
   const api = zdroj('app/api/client/b/[slug]/route.ts');
   ok('API podniku: kdy karta vyprší jde z kartaProHosta (dosbírat do, propadlá razítka)', api.includes('kartaProHosta(c,') && api.includes('endedCampaigns'));
   ok('API podniku: platnost kuponu v seznamu vyzvednutých', api.includes('c.title, c.valid_until FROM client_coupon_claims'));
