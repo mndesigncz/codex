@@ -25,7 +25,7 @@ export default function Zasahy() {
           {z.data!.map(x => (
             <ListRow
               key={x.id}
-              title={<span className="flex flex-wrap items-center gap-2">{ZASAH_NAZEV[x.action] ?? x.action}{x.teamId != null && <Link href={`/admin/teams/${x.teamId}`} className="font-medium underline-offset-2 hover:underline">{x.teamName ?? `podnik ${x.teamId}`}</Link>}</span>}
+              title={<span className="flex flex-wrap items-center gap-2">{ZASAH_NAZEV[x.action] ?? x.action}{x.teamId != null && <Link href={`/teams/${x.teamId}`} className="font-medium underline-offset-2 hover:underline">{x.teamName ?? `podnik ${x.teamId}`}</Link>}</span>}
               meta={x.detail ?? undefined}
               right={<span className="flex items-center gap-2"><Chip tone={x.actor === 'api-token' ? 'info' : 'muted'} size="sm">{x.actor === 'api-token' ? 'MCP / skript' : x.actor}</Chip><span className="t-meta whitespace-nowrap">{x.createdAt ? dbTimeDayHM(x.createdAt) : '—'}</span></span>}
             />

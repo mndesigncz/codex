@@ -69,7 +69,7 @@ export default function NahlaseniSprava() {
             {z.data!.nahlaseni.map(n => (
               <ListRow key={n.id}
                 title={<span className="flex flex-wrap items-center gap-x-2">{jeWeb(n) ? nazevKategorieDsa(n.reason) : nazevDuvodu(n.reason)}
-                  {n.teamId != null && <Link href={`/admin/teams/${n.teamId}`} className="font-normal text-black/60 underline-offset-2 hover:underline">{n.teamName ?? `podnik ${n.teamId}`}</Link>}</span>}
+                  {n.teamId != null && <Link href={`/teams/${n.teamId}`} className="font-normal text-black/60 underline-offset-2 hover:underline">{n.teamName ?? `podnik ${n.teamId}`}</Link>}</span>}
                 meta={`${n.createdAt ? dbTimeDayHM(n.createdAt) : '—'} · ${coJe(n)}${n.escalatedAt ? ' · e-mail odešel' : n.status === 'open' ? ' · e-mail neodešel' : ''}`}
                 detail={<>
                   {jeWeb(n) ? (

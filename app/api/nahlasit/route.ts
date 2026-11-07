@@ -1,5 +1,5 @@
 // Veřejné oznámení nezákonného obsahu (DSA čl. 16) z formuláře /nahlasit — i bez účtu.
-// Uloží se do content_reports se zdrojem „web“, jde provozovateli (e-mail + správa /admin/nahlaseni)
+// Uloží se do content_reports se zdrojem „web“, jde provozovateli (e-mail + správa platformy → Nahlášené)
 // a oznamovatel dostane potvrzení přijetí. Pravidla: lib/dsa.ts, databáze a e-maily: lib/dsaDb.ts.
 
 import { NextResponse } from 'next/server';

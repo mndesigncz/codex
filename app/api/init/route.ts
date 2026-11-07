@@ -874,6 +874,17 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS admin_audit_time ON admin_audit (created_at DESC)`);
+    // Druhý faktor správy platformy (admin.managero.app, lib/spravaDb.ts): klíč TOTP
+    // šifrovaně (lib/secretBox), potvrzení prvním kódem a krok posledního přijatého
+    // kódu (zákaz opakování). Nouzový reset = smazat řádek (docs/SPUSTENI.md).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS admin_totp (
+        user_id INTEGER PRIMARY KEY,
+        secret_enc TEXT NOT NULL,
+        confirmed_at TIMESTAMP,
+        last_step BIGINT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
 
     // ---- Zákaznické menu (iPad před podnikem + QR do mobilu hosta) ----
     await ddl(sql`

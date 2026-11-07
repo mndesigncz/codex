@@ -2,7 +2,8 @@
 // provozovateli. Pravidla a texty jsou čisté v lib/moderace.ts.
 
 import { neon } from '@neondatabase/serverless';
-import { sendSpravaEmail, odkazovyZaklad } from './email';
+import { sendSpravaEmail } from './email';
+import { odkazSpravy } from './spravaHost';
 import { emailEskalace, kontaktModerace, type DruhObsahu, type StavNahlaseni } from './moderace';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -35,14 +36,14 @@ export async function vyridNahlaseni(reportId: number, stav: StavNahlaseni, kdo:
 /**
  * Nové nahlášení pošle provozovateli platformy (MODERACE_EMAIL, jinak FIRMA_EMAIL_PODPORY) a zapíše
  * `escalated_at`. Bez adresy nebo bez Resendu se nic nepošle a nahlášení zůstane jen ve správě
- * (/admin/nahlaseni), kde ho správce stejně uvidí. Nikdy nevyhazuje.
+ * (správa → Nahlášené), kde ho správce stejně uvidí. Nikdy nevyhazuje.
  */
 export async function eskalujNahlaseni(v: { id: number; teamId: number; druh: DruhObsahu; duvod: string }): Promise<boolean> {
   try {
     const komu = kontaktModerace(process.env);
     if (!komu) return false;
     const [t] = await sql`SELECT name FROM teams WHERE id = ${v.teamId}`;
-    const { subject, html } = emailEskalace({ id: v.id, podnik: String(t?.name ?? `podnik ${v.teamId}`), druh: v.druh, duvod: v.duvod, odkaz: `${odkazovyZaklad()}/admin/nahlaseni` });
+    const { subject, html } = emailEskalace({ id: v.id, podnik: String(t?.name ?? `podnik ${v.teamId}`), druh: v.druh, duvod: v.duvod, odkaz: odkazSpravy('/nahlaseni') });
     const r = await sendSpravaEmail(komu, subject, html);
     if (!r.sent) return false;
     await sql`UPDATE content_reports SET escalated_at = NOW() WHERE id = ${v.id}`;

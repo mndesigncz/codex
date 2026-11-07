@@ -17,7 +17,9 @@ export default function ({ eq, ok }: Testy) {
 
   const zakazane = (trasa: string) => SOUKROME_PREDPONY.some(p => trasa === p || trasa.startsWith(p.endsWith('/') ? p : p + '/') || trasa === p.replace(/\/$/, ''));
   eq('seo: žádná veřejná trasa není zakázaná v robots.txt', VEREJNE_TRASY.filter(zakazane), []);
-  for (const trasa of ['/employer', '/employee', '/kiosk', '/demo', '/admin', '/api/schedule']) {
+  // Správa platformy na www neexistuje (404, lib/spravaHost) — robots.txt ji nemá ani zmínit.
+  ok('seo: robots.txt na www nezmiňuje /admin', !SOUKROME_PREDPONY.some(p => p.startsWith('/admin')));
+  for (const trasa of ['/employer', '/employee', '/kiosk', '/demo', '/api/schedule']) {
     ok(`seo: ${trasa} je pro roboty zakázané`, zakazane(trasa));
   }
   ok('seo: úvodní stránka je v sitemap', (VEREJNE_TRASY as readonly string[]).includes('/'));

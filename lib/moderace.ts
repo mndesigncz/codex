@@ -7,7 +7,7 @@
 // síť, takže stačí: podmínky se zákazem nevhodného obsahu, nahlášení, blokace,
 // smazání zprávy a pohled vedení na nahlášené. Hostovský obsah (poznámka
 // k rezervaci, hodnocení) vidí jen podnik, žádný host-host obsah není.
-// Nové nahlášení jde navíc provozovateli platformy (eskalace níž, /admin/nahlaseni).
+// Nové nahlášení jde navíc provozovateli platformy (eskalace níž, správa → Nahlášené).
 
 import { firma } from './firma.ts';
 
@@ -78,7 +78,7 @@ export function smiZablokovat(meId: number, cilId: number): boolean {
 // Podmínky slibují, že hlášení vyřídíme do 24 hodin. Vedení podniku nahlášení dostane hned,
 // jenže to je stejný podnik, jehož člen obsah napsal, a o víkendu nemusí nikdo reagovat.
 // Proto jde každé nové nahlášení zároveň provozovateli (e-mail z prostředí) a správce platformy
-// ho vidí ve správě (/admin/nahlaseni) se lhůtou; vyřídit ho tam může i on.
+// ho vidí ve správě (správa → Nahlášené) se lhůtou; vyřídit ho tam může i on.
 
 /** Lhůta na vyřízení nahlášení (podmínky, lib/pravni/texty.ts). */
 export const LHUTA_NAHLASENI_HODIN = 24;

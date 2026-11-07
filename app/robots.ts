@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { SITE_URL, SOUKROME_PREDPONY } from '@/lib/web';
 
-// robots.txt. Přihlášená část, tablet, správa platformy a ukázka jsou
+// robots.txt. Přihlášená část, tablet a ukázka jsou
 // za přihlášením nebo jen vložené do prodejní stránky — do vyhledávačů
 // nepatří. Náhledová nasazení (Vercel preview) se neindexují vůbec, ať se
 // s produkcí nepletou duplicitním obsahem.

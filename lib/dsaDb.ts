@@ -1,13 +1,14 @@
 // DSA v databázi: uložení oznámení z veřejného formuláře, eskalace provozovateli, potvrzení
 // a rozhodnutí oznamovateli, odůvodnění omezení autorovi. Pravidla a texty: lib/dsa.ts.
 // Eskalace nahlášení z chatu (lib/moderaceDb.ts) zůstává, jak je; tady se jen používá stejná adresa
-// provozovatele (kontaktModerace) a stejná správa (/admin/nahlaseni).
+// provozovatele (kontaktModerace) a stejná správa (admin.managero.app → Nahlášené).
 
 import { neon } from '@neondatabase/serverless';
-import { sendSpravaEmail, sendPravniEmail, odkazovyZaklad } from './email';
+import { sendSpravaEmail, sendPravniEmail } from './email';
 import { kontaktModerace, nazevDuvodu } from './moderace';
 import { notifyUser } from './push';
 import { firma, jeEmail } from './firma';
+import { odkazSpravy } from './spravaHost';
 import {
   DRUH_WEB, emailNovehoOznameni, emailPotvrzeniOznameni, emailRozhodnutiOznameni, oduvodneni, opisOznameni, slugZOdkazu,
   type DruhOmezeni, type OznameniDsa, type RozhodnutiDsa,
@@ -57,7 +58,7 @@ export async function eskalujOznameniWeb(id: number, kategorie: string, podnik: 
   try {
     const komu = kontaktModerace(process.env);
     if (!komu) return false;
-    const { subject, html } = emailNovehoOznameni({ id, kategorie, podnik, odkaz: `${odkazovyZaklad()}/admin/nahlaseni` });
+    const { subject, html } = emailNovehoOznameni({ id, kategorie, podnik, odkaz: odkazSpravy('/nahlaseni') });
     const r = await sendSpravaEmail(komu, subject, html);
     if (!r.sent) return false;
     await sql`UPDATE content_reports SET escalated_at = NOW() WHERE id = ${id}`;

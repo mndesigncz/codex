@@ -20,11 +20,23 @@ import dynamic from 'next/dynamic';
 // Líně — stáhne se až v prohlížeči, na stránku bez přihlášení nic nepřidá.
 const NovaVerze = dynamic(() => import('@/components/pravni/NovaVerze'), { ssr: false });
 
-export function SessionProvider({ children, jazyk, slovniky }: { children: React.ReactNode; jazyk: Jazyk; slovniky?: Partial<Record<Jazyk, Slovnik>> }) {
+export function SessionProvider({ children, jazyk, slovniky, sprava = false }: { children: React.ReactNode; jazyk: Jazyk; slovniky?: Partial<Record<Jazyk, Slovnik>>; sprava?: boolean }) {
   // Veřejná ukázka /demo běží proti mock serveru v prohlížeči a nesmí
   // registrovat service worker ani push: worker by cachoval ukázku pod
   // skutečným původem aplikace a push by žádal o oprávnění za vymyšlený podnik.
   const demo = jeCestaDema(usePathname());
+  // Správa platformy (admin.managero.app): relace aplikace tam není a být nemá.
+  // Prázdná relace bez dotazování (/api/auth na hostu správy neexistuje), jen
+  // jazyk a motiv pro společné komponenty — žádný worker, push, synchronizace účtu.
+  if (sprava) {
+    return (
+      <NextAuthSessionProvider session={null} refetchOnWindowFocus={false}>
+        <I18nProvider jazyk={jazyk} slovniky={slovniky}>
+          <ThemeProvider>{children}</ThemeProvider>
+        </I18nProvider>
+      </NextAuthSessionProvider>
+    );
+  }
   return (
     <NextAuthSessionProvider>
       {/* Jazyk nad motivem: motiv ani postupy ho nepotřebují, ale všechno pod

@@ -64,7 +64,7 @@ export default async function ({ eq, ok }: Testy) {
   ok('moderace: e-mail říká podnik, důvod a vede do správy', /#7/.test(mail.subject) && /Obtěžování/.test(mail.subject) && mail.html.includes('/admin/nahlaseni') && mail.html.includes('Kavárna &lt;U Lípy&gt;'));
   const reportsRoute = zdroj('app/api/reports/route.ts');
   ok('moderace: nové nahlášení se eskaluje, e-mail nenese opis zprávy', /eskalujNahlaseni\(/.test(reportsRoute) && !/snapshot|opis/.test(zdroj('lib/moderaceDb.ts').split('export async function eskalujNahlaseni')[1] ?? 'snapshot'));
-  ok('moderace: správa platformy má stránku i API a zásah jde do historie', /\/admin\/nahlaseni/.test(zdroj('components/admin/AdminShell.tsx')) && /logAdmin\(/.test(zdroj('app/api/admin/nahlaseni/[id]/route.ts')) && /requireSuperadmin/.test(zdroj('app/api/admin/nahlaseni/route.ts')));
+  ok('moderace: správa platformy má stránku i API a zásah jde do historie', /'\/nahlaseni'/.test(zdroj('components/admin/AdminShell.tsx')) && /logAdmin\(/.test(zdroj('app/api/admin/nahlaseni/[id]/route.ts')) && /requireSuperadmin/.test(zdroj('app/api/admin/nahlaseni/route.ts')));
   ok('moderace: sloupec escalated_at je v DDL', /ALTER TABLE content_reports ADD COLUMN IF NOT EXISTS escalated_at/.test(zdroj('app/api/init/route.ts')));
 
   // ---- offline karta v obalu ----

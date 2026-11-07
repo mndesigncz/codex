@@ -189,6 +189,44 @@ async function dokonciPrihlaseni(user: RadekUzivatele, metoda: Metoda = 'heslo')
   } as any;
 }
 
+/**
+ * Účet podle e-mailu a hesla — jediné místo, kde se heslo ověřuje.
+ * Volá ho přihlášení aplikace (NextAuth níž) i přihlášení správy platformy
+ * (app/api/sprava/prihlaseni). Limity pokusů si každý volající drží sám.
+ * `email` je normalizovaný (normalizujEmail), `zadany` je, jak ho člověk napsal
+ * (rozhoduje pořadí dvojníků lišících se velikostí písmen).
+ */
+export async function najdiUcetHeslem(email: string, zadany: string, heslo: string, strana?: unknown) {
+  // Hledá se bez ohledu na velikost písmen: účty z doby před sjednocením
+  // mají e-mail uložený tak, jak ho člověk poprvé napsal („Jan@firma.cz"),
+  // a mobilní klávesnice ho dnes pošle malými. Kdyby z dřívějška existovaly
+  // dva účty lišící se jen velikostí písmen, zkusí se nejdřív ten, který
+  // přesně odpovídá zadání, a pustí se ten, jehož heslo sedí.
+  let nalezeni = await db.query.users.findMany({
+    where: sqlD`lower(${users.email}) = ${email}`,
+    limit: 5,
+  });
+  if (nalezeni.length === 0) return null;
+  // Smazaný účet se nepřihlásí. Převzatý host (kartička připojená k jinému
+  // účtu, lib/kartyFyzickeDb) si nechává adresu i heslo, jen dostane deleted_at.
+  try {
+    const ids = nalezeni.map((k) => k.id);
+    const smazani = await neon(process.env.DATABASE_URL!)`SELECT id FROM users WHERE id = ANY(${ids}) AND deleted_at IS NOT NULL` as any[];
+    const pryc = new Set(smazani.map((r) => Number(r.id)));
+    nalezeni = nalezeni.filter((k) => !pryc.has(k.id));
+  } catch (e) {
+    if (!chybiSloupec(e)) throw e; // jen před migrací deleted_at chybí; jinak se nepouští naslepo
+  }
+  if (nalezeni.length === 0) return null;
+  let user: (typeof nalezeni)[number] | null = null;
+  // Obě strany se zkouší (heslo je jedno), ale ta, kam se člověk hlásí, první.
+  for (const kandidat of seradPodleStrany(poradiKandidatu(zadany, nalezeni, 5), strana)) {
+    if (await bcrypt.compare(heslo, kandidat.passwordHash)) { user = kandidat; break; }
+  }
+  if (!user) return null;
+  return { user, nalezeni };
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -219,33 +257,10 @@ export const authOptions: NextAuthOptions = {
           // e-maily v aplikaci existují.
           return null;
         }
-        // Hledá se bez ohledu na velikost písmen: účty z doby před sjednocením
-        // mají e-mail uložený tak, jak ho člověk poprvé napsal („Jan@firma.cz"),
-        // a mobilní klávesnice ho dnes pošle malými. Kdyby z dřívějška existovaly
-        // dva účty lišící se jen velikostí písmen, zkusí se nejdřív ten, který
-        // přesně odpovídá zadání, a pustí se ten, jehož heslo sedí.
-        let nalezeni = await db.query.users.findMany({
-          where: sqlD`lower(${users.email}) = ${email}`,
-          limit: 5,
-        });
-        if (nalezeni.length === 0) return null;
-        // Smazaný účet se nepřihlásí. Převzatý host (kartička připojená k jinému
-        // účtu, lib/kartyFyzickeDb) si nechává adresu i heslo, jen dostane deleted_at.
-        try {
-          const ids = nalezeni.map((k) => k.id);
-          const smazani = await neon(process.env.DATABASE_URL!)`SELECT id FROM users WHERE id = ANY(${ids}) AND deleted_at IS NOT NULL` as any[];
-          const pryc = new Set(smazani.map((r) => Number(r.id)));
-          nalezeni = nalezeni.filter((k) => !pryc.has(k.id));
-        } catch (e) {
-          if (!chybiSloupec(e)) throw e; // jen před migrací deleted_at chybí; jinak se nepouští naslepo
-        }
-        if (nalezeni.length === 0) return null;
-        let user: (typeof nalezeni)[number] | null = null;
-        // Obě strany se zkouší (heslo je jedno), ale ta, kam se člověk hlásí, první.
-        for (const kandidat of seradPodleStrany(poradiKandidatu(credentials.email, nalezeni, 5), credentials.strana)) {
-          if (await bcrypt.compare(credentials.password, kandidat.passwordHash)) { user = kandidat; break; }
-        }
-        if (!user) return null;
+        const nalez = await najdiUcetHeslem(email, credentials.email, credentials.password, credentials.strana);
+        if (!nalez) return null;
+        const { nalezeni } = nalez;
+        let user = nalez.user;
         // Nativní obal: host patří do Managero client, ostatní do Managero. Kontrola
         // je AŽ po správném hesle, takže jiný chybový kód než „špatné heslo“ dostane
         // jen ten, kdo účet opravdu vlastní (nejde tak zjistit, které e-maily existují).

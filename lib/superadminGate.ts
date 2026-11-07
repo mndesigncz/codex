@@ -1,15 +1,19 @@
 // Jediná odpověď na „smí tohle správce platformy?" — pro REST, stránky i MCP.
 //
-// Dvě cesty dovnitř: přihlášená session, jejíž uživatel je podle DATABÁZE
-// správce (role vedení, id účtu v `SUPERADMIN_USER_IDS`),
-// nebo Bearer token pro Clauda a skripty. Obě končí stejným `actor`, který
-// se zapisuje do historie zásahů — takže je vždycky vidět, jestli podnik
-// pozastavil člověk z obrazovky, nebo Claude přes MCP.
+// Dvě cesty dovnitř:
+//  - Bearer token (`ADMIN_API_TOKEN`) pro Clauda, MCP a skripty — odkudkoli;
+//  - relace správy: cookie z přihlášení na admin.managero.app (heslo + kód
+//    z autentizační aplikace, app/api/sprava/*), jen na hostu správy, a účet
+//    musí být podle DATABÁZE správce (role vedení, id účtu v
+//    `SUPERADMIN_USER_IDS`) — ověřuje se při každém požadavku.
+// Relace aplikace (NextAuth) sem už nevede: kdo je přihlášený na www, do
+// správy se tím nedostane.
+//
+// Obě cesty končí stejným `actor`, který se zapisuje do historie zásahů — takže
+// je vždycky vidět, jestli podnik pozastavil člověk z obrazovky, nebo Claude přes MCP.
 
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { jeSpravcePodleDb } from '@/lib/superadminDb';
 import { adminTokenOk } from '@/lib/adminToken';
+import { spravceZPozadavku, hostPozadavku } from '@/lib/spravaServer';
 
 export type AdminActor =
   | { via: 'session'; email: string; userId: number }
@@ -22,13 +26,12 @@ export type Gate =
 export async function requireSuperadmin(request?: Request): Promise<Gate> {
   const auth = request?.headers.get('authorization') ?? null;
   if (auth && adminTokenOk(auth)) return { ok: true, actor: { via: 'token', email: 'api-token', userId: null } };
+  if (!request) return { ok: false, status: 401, error: 'Nepřihlášen' };
 
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return { ok: false, status: 401, error: 'Nepřihlášen' };
-  const userId = parseInt(String((s.user as { id?: string }).id));
-  // Podle databáze, ne podle e-mailu v tokenu: role musí být vedení a e-mail
-  // bez dvojníka. Viz rozhodniSpravce v lib/superadmin.ts.
-  if (!(await jeSpravcePodleDb(userId))) return { ok: false, status: 403, error: 'Tohle může jen správce platformy.' };
-  const email = String(s.user.email ?? '').trim().toLowerCase();
-  return { ok: true, actor: { via: 'session', email, userId } };
+  // Cookie relace správy + host správy + znovu podle databáze (jeSpravcePodleDb
+  // uvnitř spravceZPozadavku). Kdo nemá relaci, je nepřihlášený — neříká se,
+  // jestli by správcem byl.
+  const s = await spravceZPozadavku({ cookie: request.headers.get('cookie'), host: hostPozadavku(request.headers) });
+  if (!s) return { ok: false, status: 401, error: 'Nepřihlášen' };
+  return { ok: true, actor: { via: 'session', email: s.email || `ucet-${s.userId}`, userId: s.userId } };
 }
