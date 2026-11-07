@@ -4,7 +4,7 @@
 //
 // Veřejný formulář je /nahlasit (funguje i bez účtu). Oznámení se uloží do content_reports se zdrojem
 // „web“ a jde provozovateli platformy stejnou cestou jako nahlášení z chatu (MODERACE_EMAIL, správa
-// /admin/nahlaseni). Oznamovatel dostane potvrzení přijetí a později rozhodnutí (čl. 16 odst. 4 a 5).
+// správa → Nahlášené). Oznamovatel dostane potvrzení přijetí a později rozhodnutí (čl. 16 odst. 4 a 5).
 
 /** Kategorie nezákonného obsahu (podle taxonomie Komise pro databázi odůvodnění, zjednodušeně). */
 export const KATEGORIE_DSA: { id: string; nazev: string }[] = [

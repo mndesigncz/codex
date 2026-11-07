@@ -203,6 +203,8 @@ export const ZELENE = [
   'k92-ctecka-host',
   // kolo 93: v angličtině a němčině žádná čeština mimo data ukázky (/demo všechny role a záložky Managero client, /client/demo)
   'k93-jazyk-ui',
+  // správa platformy jen na admin.managero.app (lokálně admin.localhost): přihlášení heslem + TOTP, na www /admin 404
+  'sprava-host',
 ];
 
 const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy', 'preteceni-jadro']);

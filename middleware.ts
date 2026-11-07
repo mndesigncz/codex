@@ -16,16 +16,23 @@ import { rozhodni, ZPRAVA_423, VYJIMKY } from '@/lib/blokace';
 import { ciziPuvod } from '@/lib/puvod';
 import { obalZUserAgent, rozhodniObal } from '@/lib/obal';
 import { adresaVedeniZeZamestnance } from '@/lib/odkazVedeni';
+import { rozhodniHost, jeAdminHost, hostPozadavku } from '@/lib/spravaHost';
 
 // Matcher je široký kvůli bráně nativního obalu (lib/obal.ts): ta musí vidět i
 // úvodní stránku, přihlášení a registraci, jinak by aplikace hostů otevřela
 // prodejní stránku s cenami. Kontrola je porovnání řetězce, webu nic nepřidá.
 // `/.well-known` a statické soubory tu záměrně NEJSOU: ověření universal links
 // (apple-app-site-association, assetlinks.json) nesmí projít žádným přesměrováním.
+//
+// Správa platformy (lib/spravaHost.ts): na hostu správy (admin.managero.app, lokálně
+// admin.localhost) běží middleware na VŠECHNO kromě statických souborů Next — host
+// správy nesmí vydat nic, co tam nepatří (manifest, service worker, prodejní stránka).
+// Na ostatních hostech jen `/admin` (404) a cesty výše jako dřív.
 export const config = {
   matcher: [
     '/', '/login', '/register', '/register/:path*', '/zalozit-podnik', '/join', '/zapomenute-heslo', '/nove-heslo', '/s/:path*', '/admin/:path*', '/pozastaveno',
     '/api/:path*', '/employer/:path*', '/employee/:path*', '/kiosk/:path*', '/client/:path*',
+    { source: '/((?!_next/static/|_next/image).*)', has: [{ type: 'host', value: 'admin\\..+' }] },
   ],
 };
 
@@ -64,11 +71,43 @@ async function aktivniTym(userId: number): Promise<number | null | undefined> {
   }
 }
 
+/** Každá odpověď hostu správy: mimo vyhledávače. */
+function hlavickySpravy(r: NextResponse): NextResponse {
+  r.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  return r;
+}
+
+// Cíl přepisu pro „tahle stránka neexistuje": cesta, kterou aplikace nemá, takže Next
+// vykreslí obyčejnou 404 (app/not-found.tsx) — stejnou jako u kterékoli jiné neznámé adresy.
+const NEEXISTUJE = '/_neexistuje';
+
 export async function middleware(req: NextRequest) {
   // CSRF: mutace z cizí stránky se zamítne dřív, než se čte relace.
   if (req.nextUrl.pathname.startsWith('/api/')
     && ciziPuvod(req.method, req.headers.get('origin'), req.headers.get('x-forwarded-host') ?? req.headers.get('host'))) {
     return NextResponse.json({ error: 'Požadavek z cizí stránky byl zamítnut.' }, { status: 403 });
+  }
+  // Správa platformy jen na vlastním hostu (lib/spravaHost.ts). Na www je /admin 404
+  // (ne přesměrování — nic neprozrazovat) a admin API jen s Bearer tokenem.
+  const host = hostPozadavku(req.headers);
+  const naSprave = jeAdminHost(host);
+  const h = rozhodniHost({ host, pathname: req.nextUrl.pathname, authorization: req.headers.get('authorization') });
+  if (h.akce === 'pustit') return hlavickySpravy(NextResponse.next());
+  if (h.akce === 'robots') return hlavickySpravy(new NextResponse('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }));
+  if (h.akce === 'prepsat') {
+    const url = req.nextUrl.clone();
+    url.pathname = h.cesta;
+    return hlavickySpravy(NextResponse.rewrite(url));
+  }
+  if (h.akce === '404') {
+    // Mimo host správy přesně taková 404 jako u kterékoli neznámé adresy (i u API),
+    // ať se podle odpovědi nedá poznat, že tu správa kdysi byla.
+    if (naSprave && h.api) return hlavickySpravy(NextResponse.json({ error: 'Nenalezeno.' }, { status: 404 }));
+    const url = req.nextUrl.clone();
+    url.pathname = NEEXISTUJE;
+    url.search = '';
+    const r = NextResponse.rewrite(url, { status: 404 });
+    return naSprave ? hlavickySpravy(r) : r;
   }
   // Brána nativního obalu PŘED čtením relace: značka v User-Agentu práva jen
   // zužuje (hostovská aplikace smí jen /client a spol., provozní nepustí

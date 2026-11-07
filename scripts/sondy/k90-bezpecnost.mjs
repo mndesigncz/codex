@@ -26,8 +26,9 @@ console.log('B1 Server');
   const r = await fetch(BASE + '/employer/overview?view=tasks', { redirect: 'manual' });
   const kam = r.headers.get('location') ?? '';
   tvrdi('B1: /employer bez přihlášení → /login?callbackUrl=/employer/overview?view=tasks', [302, 303, 307, 308].includes(r.status) && /\/login\?callbackUrl=%2Femployer%2Foverview%3Fview%3Dtasks$/.test(kam), `${r.status} ${kam}`);
+  // Správa platformy je jen na admin.managero.app (lib/spravaHost): na www /admin neexistuje — 404, žádné přesměrování.
   const a = await fetch(BASE + '/admin', { redirect: 'manual' });
-  tvrdi('B1: /admin se v callbackUrl neprozrazuje', !/callbackUrl=%2Fadmin/.test(a.headers.get('location') ?? ''), a.headers.get('location') ?? '');
+  tvrdi('B1: /admin na www je 404 a nikam nepřesměrovává', a.status === 404 && !a.headers.get('location'), `${a.status} ${a.headers.get('location') ?? ''}`);
   for (const cesta of ['/api/account/overeni-emailu', '/api/upload/primo']) {
     const x = await fetch(BASE + cesta);
     tvrdi(`B1: GET ${cesta} bez přihlášení 401`, x.status === 401, String(x.status));

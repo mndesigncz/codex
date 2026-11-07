@@ -28,7 +28,7 @@ za tebe nikdo neudělá. Seřazený seznam kroků pro majitele je na konci (odd�
 | 21 | Skrytí plateb v UI obalu; založení podniku v aplikaci Managero není (`/register` → `/zalozit-podnik` bez odkazu, `/api/register` z obalu 403, Apple 3.1.3(f)) | hotovo | | |
 | 22 | Mazání účtu v aplikaci (Nastavení > Data a soukromí; host: Moje > Účet a soukromí) + veřejná stránka `/smazat-ucet` | hotovo | | |
 | 23 | Stránky `/soukromi`, `/podminky`, `/podpora`; údaje firmy `FIRMA_*` v prostředí | kód hotovo, **text schvaluje právník** | právník, ty | 1 den + právník |
-| 24 | Nahlášení a mazání zpráv, blokace v chatu (Managero); eskalace na provozovatele (e-mail na `MODERACE_EMAIL` / `FIRMA_EMAIL_PODPORY`, správa `/admin/nahlaseni` se lhůtou 24 h) | hotovo; **nastavit e-mail v prostředí** | ty | 5 minut |
+| 24 | Nahlášení a mazání zpráv, blokace v chatu (Managero); eskalace na provozovatele (e-mail na `MODERACE_EMAIL` / `FIRMA_EMAIL_PODPORY`, správa `admin.managero.app/nahlaseni` se lhůtou 24 h) | hotovo; **nastavit e-mail v prostředí** | ty | 5 minut |
 | 25 | Opt-in na marketingové push (client), kategorie oznámení | hotovo | | |
 | 26 | Stahování souborů (.ics, CSV, PNG) a tisk ve WebView | hotovo: `lib/stahni.ts` + Filesystem/Share; `<a download>` a nová okna řeší most | ověřit na zařízení | |
 | 27 | Karta hosta bez sítě v úložišti aplikace, tlačítka **Naskenovat** a **Zadat kód podniku** (Managero client) | hotovo, sonda `k88-klient-obal` | ověřit na zařízení | |

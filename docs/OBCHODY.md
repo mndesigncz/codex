@@ -29,7 +29,7 @@ Xcode, Gradle) se dělají zvlášť; tady je to, co musí umět server a web, a
 4. **Právní stránky** z jedné konfigurace firmy (`lib/firma.ts`). Bez vyplněných údajů zůstanou viditelná pole `{{NAZEV_FIRMY}}`,
    `{{ICO}}`, `{{ADRESA}}`, `{{EMAIL_PODPORY}}`, `{{REGION_DAT}}` a stránka sama varuje, že jde o návrh.
 5. **Moderace**: nahlášení zprávy a nápadu, blokace uživatele, smazání zprávy, přehled nahlášených v Nastavení (`tym.odebrat`);
-   každé nahlášení jde e-mailem provozovateli (`MODERACE_EMAIL`, jinak `FIRMA_EMAIL_PODPORY`) a do správy `/admin/nahlaseni` se lhůtou 24 h.
+   každé nahlášení jde e-mailem provozovateli (`MODERACE_EMAIL`, jinak `FIRMA_EMAIL_PODPORY`) a do správy `admin.managero.app/nahlaseni` se lhůtou 24 h.
 6. **Hosté**: zapomenuté heslo (token 256 bitů, v databázi jen otisk, platí hodinu, jednou; stejná odpověď pro existující i neexistující e-mail),
    souhlas s novinkami podniků (výchozí NE, opt-in při registraci a v profilu, odhlášení tamtéž), role po přihlášení,
    demo účty `scripts/seed-recenzent.mjs`.

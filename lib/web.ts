@@ -15,9 +15,9 @@ export const SITE_POPIS =
 /** Trasy, které mají mít vlastní záznam v sitemap.xml a smějí do vyhledávačů. */
 export const VEREJNE_TRASY = ['/', '/register', '/client', '/soukromi', '/podminky', '/podpora', '/smazat-ucet', '/nahlasit'] as const;
 
-/** Předpony, které vyhledávače nemají procházet (přihlášená část, tablet, správa, ukázka, API). */
+/** Předpony, které vyhledávače nemají procházet (přihlášená část, tablet, ukázka, API). Správa platformy tu není: na www neexistuje (404) a její host (admin.managero.app) má vlastní robots.txt „Disallow: /". */
 export const SOUKROME_PREDPONY = [
-  '/api/', '/employer', '/employee', '/kiosk', '/admin', '/demo', '/s/', '/join', '/login',
+  '/api/', '/employer', '/employee', '/kiosk', '/demo', '/s/', '/join', '/login',
   '/pozastaveno', '/client/me', '/client/login', '/client/register',
   '/zapomenute-heslo', '/nove-heslo', '/client/zapomenute-heslo', '/client/nove-heslo', '/client/odhlasit',
 ] as const;

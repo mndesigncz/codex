@@ -46,6 +46,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   entity_note_reads: 'smazat',
   // odkazy na ověření e-mailu (spuštění, balík S): jednorázové, bez účtu nemají smysl
   email_verifications: 'smazat',
+  // druhý faktor správy platformy (klíč TOTP, šifrovaně): bez účtu nemá smysl
+  admin_totp: 'smazat',
   // host
   client_cards: 'smazat', client_memberships: 'smazat', client_loyalty_ledger: 'smazat', client_stamp_progress: 'smazat', client_stamp_events: 'smazat', client_scan_actions: 'smazat',
   client_coupon_claims: 'smazat', client_promo_uses: 'smazat', client_group_members: 'smazat', client_event_follows: 'smazat',
@@ -261,6 +263,7 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
   k.push(volitelny('smazat osobní rozložení stránek', `DELETE FROM rozlozeni_stranek WHERE user_id = $1`, [id]));
   del('entity_note_reads');
   del('email_verifications');
+  del('admin_totp');
   k.push(volitelny('smazat blokace', `DELETE FROM user_blocks WHERE blocker_id = $1 OR blocked_id = $1`, [id]));
   k.push(volitelny('smazat počítadla přihlášení', `DELETE FROM auth_attempts WHERE key = ANY($1)`,
     [[`login:${u.email}`, `client-register:${u.email}`, `reset:${u.email}`, `smazani:${id}`]]));

@@ -70,7 +70,7 @@ export default function Podniky() {
           {seznam.data!.teams.map(t => (
             <ListRow
               key={t.id}
-              href={`/admin/teams/${t.id}`}
+              href={`/teams/${t.id}`}
               chevron
               lead={<span className="h-9 w-9 rounded-full bg-black/[0.06] grid place-items-center text-xs font-bold" aria-hidden>{iniciala(t.name)}</span>}
               title={t.name}
