@@ -5,7 +5,7 @@ import { jeClenem } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import { jeStavTrestu, posunDni, trestText, validujTrest, VETA_BEZ_PREMIE } from '@/lib/tresty';
-import { castkyDavky, lideDavky, penizeText, type KomuZaskok, type ZpusobZaskoku } from '@/lib/trestyPenize';
+import { VETA_BEZ_PRAV_PENIZE, castkyDavky, lideDavky, penizeText, type KomuZaskok, type ZpusobZaskoku } from '@/lib/trestyPenize';
 import { nactiPenize } from '@/lib/trestyPenizeDb';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { nactiTrest, oznamTrest, predMigraci, stropKraceniDb, tvarDruhu, tvarTrestu, zalozTrest } from './_spolecne';
@@ -20,7 +20,7 @@ import { bezPrav, chcePenize, ctiPenize, pripravPenize, ulozPenize } from './_pe
 //      a k tomu každý nepotvrzený (starší se nesmí ztratit, dokud ho člověk nepotvrdí).
 //      Kolo 96: item.penize (krácení, srážky se stavem souhlasu, záskok) — vlastní trest vždy,
 //      cizí jen s finance.mzdy (smi.penize); item.batchId = hromadný trest.
-// GET  ?strop=1&userId=&day= (tresty.udelit) → { strop, premie, uzKraceno, slozka, zaskok }:
+// GET  ?strop=1&userId=&day= (tresty.udelit + finance.mzdy) → { strop, premie, uzKraceno, slozka, zaskok }:
 //      kolik jde člověku ještě krátit za měsíc dne `day` (nenároková složka + nenárokové prémie).
 // POST { userId | userIds[], text, day?, shiftId?, closingId?, taskId?, typeId?, photoUrl?, points?, bonusCut?, sourceKey?,
 //        rozpocitat?, srazka?, nahrada?, zaskok? }
@@ -52,6 +52,8 @@ export async function GET(req: NextRequest) {
 
   if (q.get('strop') === '1') {
     if (!smiUdelit) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
+    // Strop prozrazuje nenárokovou složku, prémie a záskok člověka — jen pro toho, kdo vidí mzdy (okno ho bez nich nevolá).
+    if (!smiPenize) return chyba(VETA_BEZ_PRAV_PENIZE, 403);
     const userId = cislo('userId');
     const d = /^\d{4}-\d{2}-\d{2}$/.test(q.get('day') ?? '') ? q.get('day')! : pragueToday();
     if (!userId) return chyba('Chybí člověk.', 400);
@@ -156,11 +158,12 @@ export async function POST(req: NextRequest) {
   const lide = lideDavky(b);
   if (!lide.ok) return chyba(lide.chyba, 400);
   const ids = lide.ids;
-  const v = validujTrest({ ...b, userId: ids[0] }, dnes);
+  // „Rozpočítat X" mezi víc lidí: strop krácení platí na člověka (každý dostane díl ≤ 5 000).
+  const v = validujTrest({ ...b, userId: ids[0] }, dnes, { rozpocitatMezi: b.rozpocitat === true ? ids.length : 1 });
   if (!v.ok) return chyba(v.chyba, 400);
   const z = v.trest;
   if (ids.length > 1 && z.sourceKey) return chyba('Návrh trestu jde dát jen jednomu člověku.', 400);
-  const p = ctiPenize(b, dnes);
+  const p = ctiPenize(b, dnes, ids.length);
   if (!p.ok) return p.res;
   const smiPenize = c.role.opravneni.has('finance.mzdy');
   if ((z.bonusCut > 0 || chcePenize(p.v)) && !smiPenize) return bezPrav();

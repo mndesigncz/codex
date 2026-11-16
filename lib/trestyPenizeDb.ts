@@ -192,7 +192,9 @@ export async function prepocitejPenizeTrestu(teamId: number, trestId: number, kd
   const plati = p.status === 'plati';
   const kraceni = plati ? Math.max(0, Number(p.bonus_cut) || 0) : 0;
   const text = String(p.text ?? '').replace(/\s+/g, ' ').slice(0, 140);
-  const zamky = await zamkyOd(teamId, day);
+  // Všechny zámky podniku, ne jen od dne trestu: když se den trestu posune dopředu, dřívější řádky
+  // v uzavřeném měsíci musí zůstat (jinak by je srovnání vzalo jako otevřené a smazalo).
+  const zamky = await zamkyOd(teamId, '0000-01-01');
 
   await srovnejUpravy({ teamId, userId, source: ZDROJ_KRACENI, sourceRef: trestId, cil: kraceni ? [{ den: day, castka: -kraceni }] : [], note: `Trest: ${text}`, createdBy: kdo, zamky });
   try {
@@ -225,9 +227,11 @@ export async function prepocitejPenizeTrestu(teamId: number, trestId: number, kd
   try { prevody = await sql`SELECT id, user_id, amount, base, status FROM penalty_transfers WHERE team_id = ${teamId} AND penalty_id = ${trestId} ORDER BY id`; }
   catch (e) { if (!predMigraci(e)) throw e; return; }
   const platne = prevody.filter(t => t.status === 'plati');
-  // Plánovaný základ se změnil → podíly poměrně (snížení, zrušená srážka, nesouhlas).
+  // Plánovaný základ se změnil → podíly poměrně (snížení, zrušená srážka, nesouhlas). Spadne-li základ
+  // na 0 (jediná srážka bez souhlasu), plán zůstane, jak byl: nic nepřejde (kusy jsou prázdné) a po
+  // „Znovu požádat" + souhlasu se kolegům vrátí celý podíl (z nuly by se přeškálovat nedal).
   const stary = platne.length ? Number(platne[0].base) || 0 : 0;
-  if (platne.length && stary !== planovano) {
+  if (platne.length && stary !== planovano && planovano > 0) {
     const nove = preskalujPodily(platne.map(t => Number(t.amount) || 0), stary, planovano);
     for (let i = 0; i < platne.length; i++) {
       platne[i].amount = nove[i];

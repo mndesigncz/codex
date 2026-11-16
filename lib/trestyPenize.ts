@@ -269,11 +269,14 @@ export const stavNoveSrazky = (smlouva: unknown): StavSrazky => (potrebujeSouhla
 
 export interface VstupSrazky { castka: number; splatky: number }
 
-/** Přímá srážka { castka, splatky? } → platná, nebo chyba; null = žádná srážka. */
-export function validujSrazku(raw: unknown): { ok: true; srazka: VstupSrazky | null } | { ok: false; chyba: string } {
+/** Násobek stropu částky: „rozpočítat X" mezi `lidi` lidí = strop platí na člověka, ne na celek. */
+const lidiStropu = (lidi: number): number => Math.max(1, Math.min(MAX_LIDI_DAVKY, Math.floor(lidi) || 1));
+
+/** Přímá srážka { castka, splatky? } → platná, nebo chyba; null = žádná srážka. `rozpocitatMezi` = celková částka pro tolik lidí. */
+export function validujSrazku(raw: unknown, rozpocitatMezi = 1): { ok: true; srazka: VstupSrazky | null } | { ok: false; chyba: string } {
   if (raw == null || raw === false) return { ok: true, srazka: null };
   const b = raw as Record<string, unknown>;
-  const castka = celeVMezich(b.castka, 0, MAX_CASTKA_SRAZKY);
+  const castka = celeVMezich(b.castka, 0, MAX_CASTKA_SRAZKY * lidiStropu(rozpocitatMezi));
   if (castka === false) return { ok: false, chyba: 'Srážka musí být celé kladné číslo (nejvýš 200 000).' };
   if (!castka) return { ok: true, srazka: null };
   const splatky = celeVMezich(b.splatky, 1, MAX_SPLATEK);
@@ -294,8 +297,15 @@ export interface VstupNahrady {
   splatky: number;
 }
 
-/** Náhrada škody → platná, nebo chyba; null = žádná. Strop 4,5× průměru hlídá až server (stropNahrady). */
-export function validujNahradu(raw: unknown, dnes: string): { ok: true; nahrada: VstupNahrady | null } | { ok: false; chyba: string } {
+/** Věta, když by dávka „každý stejně" chtěla po lidech dohromady víc, než je škoda. */
+export const VETA_NAHRADA_NAD_SKODU = 'Dohromady by lidé nahradili víc, než je škoda — zvol Rozpočítat, nebo sniž částku.';
+
+/**
+ * Náhrada škody → platná, nebo chyba; null = žádná. Strop 4,5× průměru hlídá až server (stropNahrady).
+ * Dávka (`davka.lidi` > 1): „rozpočítat" = částka je celkem (strop na člověka); „každý stejně" = součet
+ * náhrad všech lidí nesmí přesáhnout škodu (§ 257 ZP — nahrazuje se nejvýš skutečná škoda).
+ */
+export function validujNahradu(raw: unknown, dnes: string, davka: { lidi: number; rozpocitat: boolean } = { lidi: 1, rozpocitat: false }): { ok: true; nahrada: VstupNahrady | null } | { ok: false; chyba: string } {
   if (raw == null || raw === false) return { ok: true, nahrada: null };
   const b = raw as Record<string, unknown>;
   const skoda = celeVMezich(b.skoda, 0, MAX_SKODA);
@@ -303,7 +313,9 @@ export function validujNahradu(raw: unknown, dnes: string): { ok: true; nahrada:
   if (!skoda) return { ok: true, nahrada: null };
   const druh = (DRUHY_SKODY as readonly unknown[]).includes(b.druh) ? (b.druh as DruhSkody) : null;
   if (!druh) return { ok: false, chyba: 'Vyber druh škody.' };
-  const castka = celeVMezich(b.castka ?? skoda, 1, MAX_CASTKA_SRAZKY);
+  const lidi = lidiStropu(davka.lidi);
+  const castka = celeVMezich(b.castka ?? skoda, 1, MAX_CASTKA_SRAZKY * (davka.rozpocitat ? lidi : 1));
+  if (castka !== false && castka !== null && !davka.rozpocitat && lidi > 1 && castka * lidi > skoda) return { ok: false, chyba: VETA_NAHRADA_NAD_SKODU };
   if (castka === false || castka === null) return { ok: false, chyba: 'Náhrada musí být celé kladné číslo (nejvýš 200 000).' };
   if (castka > skoda) return { ok: false, chyba: 'Náhrada nemůže být vyšší než škoda.' };
   const zavineni: Zavineni = b.zavineni === 'umysl' ? 'umysl' : 'nedbalost';

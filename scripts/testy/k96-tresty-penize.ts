@@ -10,9 +10,9 @@ import {
   penizeText, popisSlozky, potrebujeSouhlas, preskalujPodily, prumernyVydelek, prvniOtevrenyDen, rozdelZaskok, rozlozSplatky, rozpadUprav, rozpadVyplaty,
   rozpisPrevoduNaKusy, rozpocitej, rozvrhSplatek, slozkaZaObdobi, slozkaZeSloupcu, srovnejSZamky, stavNoveSrazky, stavSrazky,
   stropKraceniMesice, stropNahrady, ucinneKraceni, validujNahradu, validujOdmenu, validujSrazku, validujZaskok, vetaSouhlasu, vyberPenizeTrestu,
-  zneniDohodyOSrazce, ZDROJ_KRACENI, ZDROJ_NAHRADA, ZDROJ_SRAZKA, ZDROJ_ZASKOK,
+  zneniDohodyOSrazce, ZDROJ_KRACENI, ZDROJ_NAHRADA, ZDROJ_SRAZKA, ZDROJ_ZASKOK, VETA_NAHRADA_NAD_SKODU,
 } from '../../lib/trestyPenize.ts';
-import { ZDROJ_NENAROKOVE_PREMIE, vyberTresty } from '../../lib/tresty.ts';
+import { ZDROJ_NENAROKOVE_PREMIE, vyberTresty, validujTrest as validujTrestK } from '../../lib/tresty.ts';
 import { csvVyplatniListiny, vyplatniListina, type RadekSouhrnu } from '../../lib/dochazkaPrehled.ts';
 
 const kc = (n: number) => `${n} Kč`;
@@ -169,7 +169,7 @@ export default function ({ eq, ok }: Testy) {
   const db = cti('lib/trestyPenizeDb.ts');
   ok('bez souhlasu se nic nestrhne: do výplaty jdou jen uplatněné srážky', /plati && stav === 'uplatneno' && s\.apply_from \? rozvrhSplatek/.test(db));
   ok('nová srážka: stav podle smlouvy (potrebujeSouhlas → ceka, OSVČ uplatneno)', /const souhlas = potrebujeSouhlas\(o\.smlouva\);/.test(db) && /const stav: StavSrazky = souhlas \? 'ceka' : 'uplatneno';/.test(db));
-  ok('každá změna peněz jde přes srovnání se zámky období', /srovnejSZamky\(/.test(db) && /zamkyOd\(teamId, day\)/.test(db));
+  ok('každá změna peněz jde přes srovnání se zámky období', /srovnejSZamky\(/.test(db) && /zamkyOd\(teamId, '0000-01-01'\)/.test(db));
   const souhlas = cti('app/api/tresty/srazky/[id]/route.ts');
   ok('souhlas: jen dotčený, jen čekající, přesné znění, zápis do consents', /if \(!muj\) return chyba\('Souhlasit se srážkou může jen ten, koho se týká\.', 403\)/.test(souhlas)
     && /if \(stav !== 'ceka'\)/.test(souhlas) && /b\.zneni\.trim\(\) !== zneni/.test(souhlas) && /zapisSouhlasSrazky\(/.test(souhlas));
@@ -184,4 +184,20 @@ export default function ({ eq, ok }: Testy) {
   ok('export dat obsahuje srážky a záskoky', /FROM wage_deductions WHERE user_id = \$\{id\}/.test(cti('app/api/account/export/route.ts')) && /srazky: sekce\.srazky/.test(cti('lib/exportUctu.ts')));
   ok('ukázka umí peníze: srážka čeká na souhlas, souhlas, výběr lidí, složka, odměna', /stav: 'ceka'/.test(cti('lib/demo/routy/trestyPenize.ts')) && /\/api\/tresty\/vyber/.test(cti('lib/demo/routy/trestyPenize.ts'))
     && /\/api\/wage-adjustments\/davka/.test(cti('lib/demo/routy/trestyPenize.ts')) && /trestyPenize, tresty/.test(cti('lib/demo/mockApi.ts')));
+
+  // ---- nezávislá kontrola kola 96: dávky, záskok, zámky, oprávnění ----
+  const tresty = (b: Record<string, unknown>, o?: { rozpocitatMezi?: number }) => validujTrestK({ userId: 1, text: 'Rozbitý mlýnek', ...b }, DNES, o);
+  ok('krácení „rozpočítat": strop 5 000 na člověka, ne na celek', tresty({ bonusCut: 9000 }, { rozpocitatMezi: 3 }).ok && !tresty({ bonusCut: 9000 }).ok
+    && !tresty({ bonusCut: 15_001 }, { rozpocitatMezi: 3 }).ok && tresty({ bonusCut: 5000 }).ok);
+  ok('srážka „rozpočítat": strop 200 000 na člověka', validujSrazku({ castka: 300_000 }, 2).ok && !validujSrazku({ castka: 300_000 }).ok && !validujSrazku({ castka: 400_001 }, 2).ok);
+  eq('náhrada „každý stejně": dohromady nejvýš škoda', [
+    validujNahradu({ skoda: 1000, castka: 1000, druh: 'zavinena' }, DNES, { lidi: 3, rozpocitat: false }).ok,
+    validujNahradu({ skoda: 900, castka: 300, druh: 'zavinena' }, DNES, { lidi: 3, rozpocitat: false }).ok,
+    validujNahradu({ skoda: 300_000, castka: 300_000, druh: 'zavinena' }, DNES, { lidi: 2, rozpocitat: true }).ok,
+  ], [false, true, true]);
+  eq('náhrada „každý stejně" nad škodu: věta', validujNahradu({ skoda: 1000, druh: 'zavinena' }, DNES, { lidi: 2, rozpocitat: false }), { ok: false, chyba: VETA_NAHRADA_NAD_SKODU });
+  ok('přepočet bere všechny zámky (posun dne trestu nesmí smazat řádky v uzavřeném měsíci)', /const zamky = await zamkyOd\(teamId, '0000-01-01'\);/.test(db));
+  ok('záskok: nulový základ (srážka bez souhlasu) nepřepíše plán na 0', /stary !== planovano && planovano > 0/.test(db));
+  ok('strop krácení (složka, prémie, záskok) jen s finance.mzdy', /if \(!smiPenize\) return chyba\(VETA_BEZ_PRAV_PENIZE, 403\);/.test(post));
+  ok('výběr lidí nese smlouvu jen s finance.mzdy', /opravneni\.has\('finance\.mzdy'\)/.test(cti('app/api/tresty/vyber/route.ts')) && /smlouva:/.test(cti('app/api/tresty/vyber/route.ts')));
 }

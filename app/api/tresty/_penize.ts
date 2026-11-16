@@ -30,11 +30,15 @@ export interface PenizeOsoby {
 
 export interface VstupPenez { srazka: VstupSrazky | null; nahrada: VstupNahrady | null; zaskok: VstupZaskoku | null; rozpocitat: boolean }
 
-/** Přečte peněžní pole těla (srazka, nahrada, zaskok, rozpocitat). Chyba = 400 s větou. */
-export function ctiPenize(b: Record<string, unknown>, dnes: string): { ok: true; v: VstupPenez } | { ok: false; res: NextResponse } {
-  const s = validujSrazku(b.srazka);
+/**
+ * Přečte peněžní pole těla (srazka, nahrada, zaskok, rozpocitat). Chyba = 400 s větou. `lidi` = kolik lidí
+ * trest dostane (u „rozpočítat" platí stropy částek na člověka, u náhrady „každý" součet ≤ škoda).
+ */
+export function ctiPenize(b: Record<string, unknown>, dnes: string, lidi = 1): { ok: true; v: VstupPenez } | { ok: false; res: NextResponse } {
+  const rozpocitat = b.rozpocitat === true && lidi > 1;
+  const s = validujSrazku(b.srazka, rozpocitat ? lidi : 1);
   if (!s.ok) return { ok: false, res: chyba(s.chyba, 400) };
-  const n = validujNahradu(b.nahrada, dnes);
+  const n = validujNahradu(b.nahrada, dnes, { lidi, rozpocitat });
   if (!n.ok) return { ok: false, res: chyba(n.chyba, 400) };
   let zaskok: VstupZaskoku | null = null;
   if (b.zaskok !== undefined) {

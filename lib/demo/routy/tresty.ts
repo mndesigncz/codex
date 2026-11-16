@@ -130,6 +130,7 @@ export const tresty: Obsluha = (p, k) => {
 
   if (cesta === '/api/tresty') {
     if (metoda === 'GET') {
+      if (p.q.get('strop') === '1' && !smi.penize) return chyba(VETA_BEZ_PRAV_PENIZE, 403);
       if (p.q.get('strop') === '1') return ok({ strop: 1500, premie: 1500, uzKraceno: 0, slozka: 0, zaskok: 0 });
       const scope = p.q.get('scope') === 'team' && smi.tym ? 'team' : 'mine';
       const stav = p.q.get('status');
@@ -149,12 +150,12 @@ export const tresty: Obsluha = (p, k) => {
       // Jeden člověk nebo dávka (userIds) — každý vlastní záznam, společné batchId.
       const l = lideDavky(b);
       if (!l.ok) return chyba(l.chyba);
-      const v = validujTrest({ ...b, userId: l.ids[0] }, d);
+      const v = validujTrest({ ...b, userId: l.ids[0] }, d, { rozpocitatMezi: b.rozpocitat === true ? l.ids.length : 1 });
       if (!v.ok) return chyba(v.chyba);
       if (l.ids.length > 1 && v.trest.sourceKey) return chyba('Návrh trestu jde dát jen jednomu člověku.');
       const cizi = l.ids.find(id => !LIDE.some(x => x.id === id));
       if (cizi) return chyba('Člověk není v podniku.', 404, { userId: cizi });
-      const pv = ctiPenizeDema(b, d);
+      const pv = ctiPenizeDema(b, d, l.ids.length);
       if (!pv.ok) return chyba(pv.chyba);
       if ((v.trest.bonusCut > 0 || pv.chce) && !smi.penize) return chyba(VETA_BEZ_PRAV_PENIZE, 403);
       const druh = v.trest.typeId ? DRUHY.find(x => x.id === v.trest.typeId) ?? null : null;

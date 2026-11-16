@@ -88,10 +88,11 @@ export function penizeTrestuDema(t: Trest, vedeni: boolean): PenizeTrestu | null
 }
 
 /** Peněžní pole těla POST /api/tresty: chyba (věta), nebo plán pro `pridejPenizeDema`. */
-export function ctiPenizeDema(b: Record<string, unknown>, d: string): { ok: true; srazka: { castka: number; splatky: number } | null; nahrada: { castka: number; splatky: number; skoda: number } | null; zaskok: VstupZaskoku | null; chce: boolean } | { ok: false; chyba: string } {
-  const sr = validujSrazku(b.srazka);
+export function ctiPenizeDema(b: Record<string, unknown>, d: string, lidi = 1): { ok: true; srazka: { castka: number; splatky: number } | null; nahrada: { castka: number; splatky: number; skoda: number } | null; zaskok: VstupZaskoku | null; chce: boolean } | { ok: false; chyba: string } {
+  const rozpocitat = b.rozpocitat === true && lidi > 1;
+  const sr = validujSrazku(b.srazka, rozpocitat ? lidi : 1);
   if (!sr.ok) return { ok: false, chyba: sr.chyba };
-  const nh = validujNahradu(b.nahrada, d);
+  const nh = validujNahradu(b.nahrada, d, { lidi, rozpocitat });
   if (!nh.ok) return { ok: false, chyba: nh.chyba };
   const zs = b.zaskok === undefined ? null : validujZaskok(b.zaskok);
   if (zs && !zs.ok) return { ok: false, chyba: zs.chyba };
@@ -181,7 +182,7 @@ export const trestyPenize: Obsluha = (p, k) => {
     if (!opr.has('tresty.udelit') && !penize) return bez();
     const lide = LIDE.filter(x => x.role !== 'kiosk');
     return ok({
-      day: p.q.get('day') || d, lide: lide.map(x => ({ id: x.id, name: x.name, avatar: x.avatar, role: x.role, jobTitle: x.jobTitle })),
+      day: p.q.get('day') || d, lide: lide.map(x => ({ id: x.id, name: x.name, avatar: x.avatar, role: x.role, jobTitle: x.jobTitle, ...(penize ? { smlouva: smlouva(x.id) } : {}) })),
       smena: lide.filter(x => x.role === 'employee').slice(0, 3).map(x => x.id), uzaverka: p.q.get('closingId') ? [2, 3] : [],
     });
   }

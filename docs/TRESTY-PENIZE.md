@@ -90,7 +90,7 @@ interface PrevodTrestu { id; userId: number|null; userName: string|null /* null 
 Parsování na klientu: `vyberTresty` / `vyberDataTrestu` (lib/tresty) už `penize` i `batchId` čtou. Pomocníci:
 `penizeText(p, money)` („krácení 300 Kč · srážka 500 Kč (čeká na souhlas)"), `cekaNaSouhlas(p)`, `stavSrazky(stav)` (chip: tone + text-klíč).
 
-### 4.2 `GET /api/tresty?strop=1&userId=&day=[&bez=]` (rozšířeno)
+### 4.2 `GET /api/tresty?strop=1&userId=&day=[&bez=]` (rozšířeno; `tresty.udelit` + `finance.mzdy`, jinak 403)
 
 `{ strop, premie, uzKraceno, slozka, zaskok }` — `slozka` = nenároková složka za měsíc (podle dosud odpracovaných
 hodin), `zaskok` = přijatý záskok v měsíci. Strop = složka + nenárokové prémie + záskok − už kráceno.
@@ -103,7 +103,9 @@ Věta pod polem: „Nenároková složka {slozka} + prémie {premie} · krátit 
   userId?: number, userIds?: number[]       // jeden nebo víc lidí (max 50); každý dostane vlastní trest
   text, day?, shiftId?, closingId?, taskId?, typeId?, photoUrl?, points?, sourceKey? // jako dřív (sourceKey jen pro 1 člověka)
   bonusCut?: number                          // A) krácení (finance.mzdy)
-  rozpocitat?: boolean                       // false = „každý X", true = „rozpočítat X" mezi lidi (krácení, srážka, náhrada)
+  rozpocitat?: boolean                       // false = „každý X", true = „rozpočítat X" mezi lidi (krácení, srážka, náhrada);
+                                             // u „rozpočítat" platí stropy (krácení 5 000, srážka/náhrada 200 000) na člověka,
+                                             // u náhrady „každý" nesmí součet náhrad všech přesáhnout škodu
   srazka?: { castka: number, splatky?: 1..12 }                     // C) přímá srážka
   nahrada?: { skoda: number, castka?: number /* výchozí = skoda */, druh: 'zavinena'|'schodek'|'ztrata',
               zavineni?: 'nedbalost'|'umysl', dohoda?: boolean, dohodaDatum?: 'RRRR-MM-DD', splatky?: 1..12 }  // B)
@@ -155,7 +157,8 @@ Háček `useSrazky(urlSrazek({ scope: 'team', stav: 'nesouhlas' }))`.
 
 ### 4.7 `GET /api/tresty/vyber?day=&closingId=` (nové; `tresty.udelit` nebo `finance.mzdy`)
 
-`{ day, lide: [{ id, name, avatar, role, jobTitle }], smena: number[], uzaverka: number[] }` — pro hromadný výběr
+`{ day, lide: [{ id, name, avatar, role, jobTitle, smlouva? }], smena: number[], uzaverka: number[] }` (`smlouva` HPP/DPP/DPC/OSVC/null
+jen s `finance.mzdy` — okno podle ní řekne, jestli srážka počká na souhlas) — pro hromadný výběr
 (zaškrtávání, „celá směna dne" = `smena`, „všichni na uzávěrce" = `uzaverka`, filtr role/pozice z `lide`) a pro záskok.
 Háček `useVyberLidi(urlVyberu(day, closingId))`.
 
@@ -208,7 +211,7 @@ Krácení nad strop (složka + nenárokové prémie období) se ve výplatě nik
 3. **Peníze** (jen `smi.penize`): přepínač Krácení nenárokové části / Náhrada škody / Srážka z výplaty.
    - Krácení: strop pod polem (`strop`, `slozka`, `premie`); 409 → věta pod polem.
    - Náhrada: popis = text trestu, fotka = fotka trestu, částka škody, druh, zavinění, u schodku/ztráty dohoda + datum, splátky; strop/varování z 409 nebo `skoda.varovani`.
-   - Srážka: částka + splátky; jednou větou `vetaSouhlasu(smlouva)` proč hned / až po souhlasu (smlouvu má výplatní listina / `GET /api/payroll`).
+   - Srážka: částka + splátky; jednou větou `vetaSouhlasu(smlouva)` proč hned / až po souhlasu (smlouvu nese `GET /api/tresty/vyber`).
    - U dávky přepínač „každý X" / „rozpočítat X" (`rozpocitat`).
 4. **Komu přejde stržená částka** (jen `smi.penize`, jen když se něco strhává): Nechat podniku / Kdo to napravil (lidé, rovně nebo vlastní částky) / Rozdělit mezi směnu.
 5. Napomenutí a § 52 věta jako dnes. Po uložení `obnovTresty()` (V) nebo `obnovPenize()`.
