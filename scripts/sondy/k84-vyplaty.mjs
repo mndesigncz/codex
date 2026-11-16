@@ -381,4 +381,169 @@ for (const [sirka, jazyk] of [[390, null], [320, 'de'], [320, 'pl']]) {
   await ctx.close();
 }
 
+// ---------------------------------------------------------------------------
+// Kolo 96 — peníze z trestů ve výplatách (docs/TRESTY-PENIZE.md 4.10)
+//   V96 (1280): listina se sloupci Nenárok. a Srážky, chip „čeká na souhlas", věta nad tabulkou, CSV s novými sloupci,
+//               detail s rozpadem (nároková mzda, složka, krácení, náhrada, srážky, čeká na souhlas — neodečteno),
+//               okno Prémie a srážky: zdroje z trestu bez koše, s odkazem „Trest";
+//   K96 (390): karta s chipem a „srážky −1 300 Kč", rozpad zdola;   Z96 (390 světle/tmavě): Můj výdělek s rozpadem
+//               a „Čeká na tvůj souhlas" zvlášť (neodečteno), klepnutí vede do Moje tresty.
+// ---------------------------------------------------------------------------
+const SNIMKY96 = process.env.K96_SNIMKY ? process.env.K96_SNIMKY.replace(/\/?$/, '/') : SNIMKY;
+mkdirSync(SNIMKY96, { recursive: true });
+const UPRAVY96 = [
+  { id: 961, userId: 16, day: den(1), amount: 1000, note: 'Víkendová akce', source: 'premie' },
+  { id: 962, userId: 16, day: den(2), amount: -300, note: 'Trest: Nezavřená lednice', source: 'trest' },
+  { id: 963, userId: 16, day: den(2), amount: -600, note: 'Náhrada škody: Rozlité mléko', source: 'nahrada' },
+  { id: 964, userId: 16, day: den(3), amount: -400, note: 'Srážka: Rozbitá sklenice', source: 'srazka' },
+  { id: 965, userId: 18, day: den(2), amount: 300, note: 'Záskok: Nezavřená lednice', source: 'zaskok' },
+];
+const podvrhVedeni96 = () => {
+  const zaklad = podvrhVedeni();
+  return (req, json, stav) => {
+    const url = new URL(req.url());
+    if (req.method() === 'GET' && url.pathname === '/api/attendance') { const a = nacti('k69-b2-attendance'); return json({ ...a, adjustments: [...(a.adjustments ?? []), ...UPRAVY96] }); }
+    if (req.method() === 'GET' && url.pathname === '/api/payroll') {
+      return json({ ...PAYROLL, od: url.searchParams.get('od'), do: url.searchParams.get('do'),
+        lide: PAYROLL.lide.map(l => (l.id === 16 ? { ...l, slozka: { typ: 'pct', hodnota: 10, vSazbe: true }, cekaNaSouhlas: 1500 } : { ...l, slozka: null, cekaNaSouhlas: 0 })) });
+    }
+    return zaklad(req, json, stav);
+  };
+};
+{
+  const k = await kontext({ viewport: PC, fix: FIX_DOCHAZKA, posunCasu: POSUN, dalsi: podvrhVedeni96() });
+  const { ctx, p, chyby } = k;
+  await otevri(p, '/employer/overview?view=attendance', 'vedeni.dochazka');
+  const w = widget(p, 'dochazka.vyplatni_listina');
+  await dokud(async () => (await w.locator('table tbody tr').count()) > 0, 20000);
+  await p.waitForTimeout(600);
+  const hlava = await w.locator('table thead').innerText();
+  tvrdi('V96 (1280): tabulka má navíc sloupce Nenárok. (složka) a Srážky (krácení a srážky z trestů)', /Nenárok\./.test(hlava) && /Srážky/.test(hlava) && /Prémie/.test(hlava), hlava.replace(/\s+/g, ' '));
+  const eva = w.locator('tr[data-radek-listiny="16"]');
+  const evaText = (await eva.innerText()).replace(/ /g, ' ');
+  tvrdi('V96 (1280): Eva — chip „čeká na souhlas" a Srážky −1 300 Kč (krácení 300 + náhrada 600 + srážka 400)',
+    await eva.locator('[data-ceka-souhlas="1500"]').count() === 1 && /čeká na souhlas/.test(evaText) && (await eva.locator('[data-srazky-radku]').getAttribute('data-srazky-radku')) === '-1300', evaText.replace(/\s+/g, ' '));
+  tvrdi('V96 (1280): věta nad tabulkou „Srážky čekající na souhlas (1 člověk): 1 500 Kč — … nestrhávají"', /Srážky čekající na souhlas \(1 člověk\): 1\s500\sKč — ve výplatě se nestrhávají/.test(await text(w.locator('[data-ceka-listina]'))), await text(w.locator('[data-ceka-listina]')));
+  const orezane = await w.locator('table tbody td, table tfoot td').evaluateAll(els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));
+  tvrdi('V96 (1280): žádné číslo v tabulce není oříznuté', orezane.length === 0, JSON.stringify(orezane));
+  const pr = await preteceni(p);
+  tvrdi('V96 (1280): bez přetečení dokumentu i widgetů', pr.dokument <= 1 && pr.widgety.length === 0, JSON.stringify(pr));
+  await w.scrollIntoViewIfNeeded();
+  await w.screenshot({ path: SNIMKY96 + 'vyplaty-listina-1280.png' });
+  // CSV pro účetní: nové sloupce a čeká na souhlas jen jako informace
+  await w.getByRole('button', { name: 'Další akce: Výplatní listina' }).click();
+  const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 10000 }), p.getByText('CSV pro účetní').click()]);
+  const csv = readFileSync(await dl.path(), 'utf8').replace(/^﻿/, '').split('\n').map(r => r.split(';').map(x => x.replace(/^"|"$/g, '')));
+  const h = csv[0];
+  const evaCsv = csv.find(r => r[0] === 'Eva Testová') ?? [];
+  const sl = (n) => evaCsv[h.indexOf(n)];
+  tvrdi('V96: CSV má Nenároková složka, Prémie a ostatní, Krácení, Náhrada škody, Srážky, Záskok, Čeká na souhlas',
+    ['Nenároková složka (Kč)', 'Prémie a ostatní (Kč)', 'Krácení (Kč)', 'Náhrada škody (Kč)', 'Srážky (Kč)', 'Záskok (Kč)', 'Čeká na souhlas (Kč)'].every(x => h.includes(x)), h.join(' | '));
+  tvrdi('V96: CSV Eva — krácení 300, náhrada 600, srážky 400, čeká na souhlas 1500 (v Doplatit není)', sl('Krácení (Kč)') === '300' && sl('Náhrada škody (Kč)') === '600' && sl('Srážky (Kč)') === '400' && sl('Čeká na souhlas (Kč)') === '1500', evaCsv.join(' | '));
+  // Detail výplaty Evy
+  await w.getByRole('button', { name: 'Rozpad výplaty: Eva Testová' }).click();
+  const d = dialog(p);
+  await dokud(() => d.getByText('Nároková mzda').isVisible().catch(() => false), 4000);
+  const td = await text(d);
+  tvrdi('V96 (1280): detail — Nároková mzda, Nenároková složka „10 % ze mzdy · součást sazby", Krácení (trest), Náhrada škody, Srážky ze mzdy',
+    /Nároková mzda/.test(td) && /Nenároková složka/.test(td) && /10 % ze mzdy · součást sazby/.test(td) && /Krácení \(trest\)/.test(td) && /Náhrada škody/.test(td) && /Srážky ze mzdy/.test(td), td.replace(/\n/g, ' | ').slice(0, 700));
+  tvrdi('V96 (1280): detail — „Čeká na souhlas 1 500 Kč · neodečteno" zvlášť a věta, kde se složka nastavuje',
+    /Čeká na souhlas/.test(await text(d.locator('[data-ceka-na-souhlas]'))) && /neodečteno/.test(await text(d.locator('[data-ceka-na-souhlas]'))) && /Nastavuje se v profilu člena v části Tresty/.test(await text(d.locator('[data-slozka-popis]'))));
+  await p.screenshot({ path: SNIMKY96 + 'vyplaty-detail-1280.png' });
+  await p.keyboard.press('Escape');
+  await dokud(() => d.isHidden().catch(() => true), 3000);
+  const sh = widget(p, 'dochazka.souhrn_hodin');
+  // Profil člena „Výplata · tento měsíc" — stejný rozpad, jen ke čtení
+  const profilBtn = sh.getByRole('button', { name: 'Profil: Eva Testová' }).first();
+  if (await profilBtn.count()) {
+    await profilBtn.click();
+    const prof = p.getByRole('dialog').filter({ hasText: 'Výplata · tento měsíc' });
+    await dokud(() => prof.locator('[data-rozpad-clena]').isVisible().catch(() => false), 8000);
+    const tp = await text(prof.locator('[data-rozpad-clena]'));
+    tvrdi('V96 (1280): profil člena „Výplata · tento měsíc" — Nároková mzda, Nenároková složka, Krácení, Náhrada, Srážky a „Čeká na souhlas" (neodečteno)',
+      ['Nároková mzda', 'Nenároková složka', 'Krácení (trest)', 'Náhrada škody', 'Srážky ze mzdy', 'Čeká na souhlas', 'neodečteno'].every(x => tp.includes(x)), tp.replace(/\n/g, ' | '));
+    await prof.locator('[data-rozpad-clena]').evaluate(e => e.scrollIntoView({ block: 'center' }));
+    await p.waitForTimeout(300);
+    await p.screenshot({ path: SNIMKY96 + 'vyplaty-profil-1280.png' });
+    await p.keyboard.press('Escape');
+    await dokud(async () => (await prof.count()) === 0, 3000);
+  } else tvrdi('V96 (1280): v Souhrnu hodin jde otevřít profil Evy', false);
+  // Okno Prémie a srážky (Souhrn hodin) — zdroje z trestu bez koše
+  await sh.getByRole('button', { name: 'Prémie a srážky: Eva Testová' }).first().click();
+  await p.getByRole('menuitem', { name: /Prémie a srážky \(/ }).first().click();
+  const okno = dialog(p);
+  await dokud(() => okno.locator('[data-zdroj-upravy]').first().isVisible().catch(() => false), 4000);
+  const zdroje = await okno.locator('[data-zdroj-upravy]').evaluateAll(els => els.map(e => e.getAttribute('data-zdroj-upravy')));
+  const to = await text(okno);
+  tvrdi('V96 (1280): Prémie a srážky — krácení, náhrada a srážka z trestu s popiskem, odkazem „Trest" a bez koše; ruční prémie koš má',
+    ['trest', 'nahrada', 'srazka'].every(z => zdroje.includes(z)) && await okno.locator('[data-odkaz-trest]').count() === 3 && await okno.getByRole('button', { name: 'Smazat zápis' }).count() === zdroje.filter(z => !['trest', 'nahrada', 'srazka', 'zaskok'].includes(z)).length
+    && /náhrada škody \(trest\)/.test(to) && /srážka ze mzdy \(trest\)/.test(to) && /se mění u trestu, ne tady/.test(to), JSON.stringify(zdroje) + ' ' + to.replace(/\n/g, ' | ').slice(0, 500));
+  await p.screenshot({ path: SNIMKY96 + 'vyplaty-premie-srazky-1280.png' });
+  await okno.locator('[data-odkaz-trest]').first().click();
+  tvrdi('V96 (1280): odkaz „Trest" vede na Odměny › Tresty (view=rewards&arg=tresty)', await dokud(() => /view=rewards/.test(p.url()) && /arg=tresty/.test(p.url()), 6000), p.url());
+  tvrdi('V96: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+{
+  const { ctx, p, chyby } = await kontext({ viewport: TEL, mobil: true, fix: FIX_DOCHAZKA, posunCasu: POSUN, dalsi: podvrhVedeni96() });
+  await otevri(p, '/employer/overview?view=attendance', 'vedeni.dochazka');
+  const w = widget(p, 'dochazka.vyplatni_listina');
+  await dokud(async () => (await w.locator('.list-row').count()) > 0, 20000);
+  await p.waitForTimeout(600);
+  const karta = w.locator('.list-row').filter({ hasText: 'Eva Testová' }).first();
+  const tk = (await karta.innerText()).replace(/ /g, ' ');
+  tvrdi('K96 (390): karta Evy — „srážky −1 300 Kč" a chip „čeká na souhlas"', /srážky −1\s300\sKč/.test(tk) && /čeká na souhlas/.test(tk), tk.replace(/\n/g, ' | '));
+  const pr = await preteceni(p);
+  tvrdi('K96 (390): bez přetečení', pr.dokument <= 1 && pr.widgety.length === 0, JSON.stringify(pr));
+  await w.scrollIntoViewIfNeeded();
+  await w.screenshot({ path: SNIMKY96 + 'vyplaty-listina-390.png' });
+  await karta.click();
+  const d = dialog(p);
+  await dokud(() => d.getByText('Nároková mzda').isVisible().catch(() => false), 4000);
+  await p.waitForTimeout(900);
+  const o = await d.evaluate(e => ({ s: e.scrollWidth, c: e.clientWidth }));
+  tvrdi('K96 (390): rozpad zdola s Nárokovou mzdou a „Čeká na souhlas", nic nepřetéká', o.s <= o.c + 1 && await d.locator('[data-ceka-na-souhlas]').count() === 1, JSON.stringify(o));
+  await p.screenshot({ path: SNIMKY96 + 'vyplaty-detail-390.png' });
+  tvrdi('K96: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+// Můj výdělek (zaměstnanec) s rozpadem a čekající srážkou
+const ZAM96 = { ...ZAM, adjustments: [
+  { id: 971, userId: 16, day: den(1), amount: 1000, note: 'Víkendová akce', source: 'premie' },
+  { id: 972, userId: 16, day: den(2), amount: -300, note: 'Trest: Nezavřená lednice', source: 'trest' },
+  { id: 973, userId: 16, day: den(3), amount: -400, note: 'Srážka: Rozbitá sklenice', source: 'srazka' },
+  { id: 974, userId: 16, day: den(4), amount: 300, note: 'Záskok: Nedoplněné zásoby', source: 'zaskok' },
+] };
+const PAYROLL_JA96 = { ...PAYROLL_JA, ja: { ...PAYROLL_JA.ja, slozka: { typ: 'pct', hodnota: 10, vSazbe: true }, cekaNaSouhlas: 1500,
+  srazky: [{ id: 501, penaltyId: 106, druh: 'srazka', castka: 1500, splatky: 3, stav: 'ceka', text: 'Rozbitý mlýnek — čištění za chodu', day: den(3) }] } };
+for (const [nazev, tmavy] of [['390', false], ['390-tmavy', true]]) {
+  const k = await kontext({ role: 'employee', viewport: TEL, mobil: true, tmavy, mineData: BARISTA, fix: FIX_MOJE, posunCasu: POSUN, dalsi: podvrhZam(ZAM96, PAYROLL_JA96) });
+  const { ctx, p, chyby } = k;
+  await p.goto(BASE + '/employee/shifts?view=my-shifts', { waitUntil: 'networkidle' });
+  await p.locator('[data-plocha="zamestnanec.moje_smeny"] li[data-instance]:not([hidden])').first().waitFor({ timeout: 20000 });
+  const w = widget(p, 'moje.vydelek');
+  await dokud(async () => (await w.locator('[data-rozpad-vyplaty]').count()) > 0, 20000);
+  await p.waitForTimeout(600);
+  const tw = await text(w);
+  tvrdi(`Z96 (${nazev}): Můj výdělek — rozpad: Nároková mzda, Nenároková složka, Nenárokové prémie, Záskok za kolegy, Krácení (trest), Srážky ze mzdy, K výplatě`,
+    ['Nároková mzda', 'Nenároková složka', 'Nenárokové prémie', 'Záskok za kolegy', 'Krácení (trest)', 'Srážky ze mzdy', 'K výplatě'].every(x => tw.includes(x)), tw.replace(/\n/g, ' | ').slice(0, 800));
+  const ceka = w.locator('[data-ceka-na-souhlas]');
+  const tc = await text(ceka);
+  tvrdi(`Z96 (${nazev}): „Čeká na tvůj souhlas 1 500 Kč · neodečteno" zvlášť, s textem trestu`, /Čeká na tvůj souhlas/.test(tc) && /1\s500\sKč/.test(tc) && /neodečteno/.test(tc) && /Rozbitý mlýnek/.test(tc), tc.replace(/\n/g, ' | '));
+  const pr = await preteceni(p);
+  tvrdi(`Z96 (${nazev}): bez přetečení`, pr.dokument <= 1 && pr.widgety.length === 0, JSON.stringify(pr));
+  // Widget je vyšší než telefon a spodní lišta ho překrývá — snímek po částech: dlaždice, rozpad, čekající srážka.
+  await w.scrollIntoViewIfNeeded();
+  await p.screenshot({ path: SNIMKY96 + `vydelek-${nazev}.png` });
+  await ceka.evaluate(e => e.scrollIntoView({ block: 'center' }));
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: SNIMKY96 + `vydelek-rozpad-${nazev}.png` });
+  if (!tmavy) {
+    await ceka.locator('.list-row').first().click();
+    tvrdi('Z96 (390): klepnutí na „Čeká na tvůj souhlas" vede do Moje tresty (view=rewards&arg=tresty)', await dokud(() => /view=rewards/.test(p.url()) && /arg=tresty/.test(p.url()), 6000), p.url());
+  }
+  tvrdi(`Z96 (${nazev}): bez chyb v konzoli`, skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
 await konec();

@@ -60,6 +60,7 @@ import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { Avatar, BulkBar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Select, SelectBox, Sloupec, Stat, StatRow, SwitchRow, Textarea, Well, runBulk, useSelection, type MenuItem } from '../../ui';
 import { usePlan, UpgradeModal } from '../../Pro';
+import { Icon } from '../../Icons';
 import { ulozSoubor } from '@/lib/stahni';
 import type { Jazyk } from '@/lib/i18n/config';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
@@ -73,6 +74,10 @@ import { useNavrhyTrestu } from '../../tresty-vedeni/data';
 import { DatTrest } from '../../tresty-vedeni/DatTrest';
 import { pozdniKTrestu, type PozdniPrichod, type PredvolbyTrestu } from '../../tresty-vedeni/logika';
 import { useOpravneni } from '../../role/useOpravneni';
+import { RadekCekaNaSouhlas, RadkyRozpadu, maPenize, popisSlozkyT } from '../../tresty/RozpadVyplaty';
+import { cekaVListine, mzdaRadku, premieRadku, srazkyRadku, upravyUcinne } from '../../tresty/vyplatyLogika';
+import { UDALOST_VYPLATY } from '../../tresty-penize/data';
+import { rozpadVyplaty, vyberSlozku, jeStavSrazky, type NastaveniSlozky, type StavSrazky } from '@/lib/trestyPenize';
 import { useCurrency, useMoney, useSymbol } from '../../CurrencyProvider';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { apiMessage, okJson } from '@/lib/api';
@@ -819,6 +824,8 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
   }, [pj, sazba, vlastni, mesic, ted]);
   const mesice = useMemo(() => (pj ? mesiceVyplat(dnes, pj.ja.vyplaty, pj.zamky, 4) : []), [pj, dnes]);
   const [oknoDysko, setOknoDysko] = useState(false);
+  const nav = useNavigace();
+  useObnovaVyplat(brana);
   if (!brana) return <Widget prazdno={null} />;
   const minut = Math.floor(s.ms / 60000);
   const hodiny = minut % 60 > 0 ? t('{h} h {min} min', { h: Math.floor(minut / 60), min: minut % 60 }) : t('{h} h', { h: Math.floor(minut / 60) });
@@ -832,7 +839,13 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
   // Hrubý výdělek (mzda + příplatky + prémie) a co z něj ještě přijde: po odečtení dýška už dostaného z kasy a označených výplat.
   // Kolo 9 (N1): prémie za uznané „navíc" (wage_adjustments source 'navic') jsou v s.upravy; tady se jen pojmenují.
   const navicPremie = useMemo(() => premieZaNavic(upravy), [upravy]);
-  const celkem = (s.mzda ?? 0) + (priplatky?.castka ?? 0) + s.upravy;
+  // Kolo 96 (tresty a peníze): rozpad podle zdroje úprav — nenároková složka, prémie, záskok, krácení (jen do stropu
+  // nenárokové části), náhrada škody, srážky. Srážky čekající na souhlas se NEodečítají, ukazují se zvlášť.
+  const slozka = pj?.ja.slozka ?? null;
+  const rp = rozpadVyplaty({ mzda: s.mzda, ms: s.ms, od, do: doD, upravy, slozka, cekaNaSouhlas: pj?.ja.cekaNaSouhlas ?? 0 });
+  const celkem = rp.hruba + (priplatky?.castka ?? 0);
+  const cekajici = (pj?.ja.srazky ?? []).filter(x => x.stav === 'ceka');
+  const doTrestu = nav.smiPohled('rewards') ? () => nav.onNavigate('rewards', 'tresty') : undefined;
   const kVyplate = Math.round(celkem + (spropitne ?? 0) - zKasy - vyplacenoMesic);
   const datum = (d: string) => fmtDatum(d, { jazyk, styl: 'kratce' });
   if (velikost === 'S') {
@@ -840,8 +853,9 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
       <Widget nacteni={ja.stav ?? data} prazdno={prazdno}>
         <Stat label={nazevMesice} value={money(kVyplate)}
           note={s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip>
+            : rp.cekaNaSouhlas > 0 ? <Chip tone="wait" size="sm" icon="clock">{t('čeká na tvůj souhlas {castka}', { castka: money(rp.cekaNaSouhlas) })}</Chip>
             : zKasy > 0 ? t('zbývá · z kasy už {castka}', { castka: money(zKasy) })
-            : `${hodiny}${s.bezi ? ` · ${t('běží')}` : ''}${s.upravy > 0 ? ` · ${t('prémie {castka}', { castka: sZnamenkem(s.upravy, money) })}` : s.upravy < 0 ? ` · ${t('srážka {castka}', { castka: sZnamenkem(s.upravy, money) })}` : ''}`} />
+            : `${hodiny}${s.bezi ? ` · ${t('běží')}` : ''}${rp.upravyUcinne > 0 ? ` · ${t('prémie {castka}', { castka: sZnamenkem(rp.upravyUcinne, money) })}` : rp.upravyUcinne < 0 ? ` · ${t('srážka {castka}', { castka: sZnamenkem(rp.upravyUcinne, money) })}` : ''}`} />
       </Widget>
     );
   }
@@ -849,6 +863,7 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
   // ve velkém i jejich seznam. Kolo 8: dlaždice Spropitné (podíl podle pravidel podniku, klepnutí = rozpad po
   // dnech), řádky Příplatky a „Z kasy jsi dostal/a", stav výplaty a v L pás měsíců s tím, co bylo vyplacené.
   const denText = (d: string) => fmtDatum(d, { jazyk, styl: 'kratce' });
+  const sRozpadem = maPenize(rp, slozka);
   const poznamkaMesice = s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip>
     : zKasy > 0 || vyplacenoMesic > 0 ? t('zbývá k výplatě') : s.bezi ? t('včetně běžící směny') : t('hrubého, k výplatě');
   return (
@@ -862,12 +877,21 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
             <Stat label={t('Spropitné')} value={money(spropitne)} note={t('podíl podle hodin · po dnech')} />
           </button>
         )}
-        <Stat label={t('Prémie a srážky')} value={upravy.length ? sZnamenkem(s.upravy, money) : '—'} tone={s.upravy > 0 ? 'ok' : s.upravy < 0 ? 'bad' : 'muted'}
+        <Stat label={t('Prémie a srážky')} value={upravy.length ? sZnamenkem(rp.upravyUcinne, money) : '—'} tone={rp.upravyUcinne > 0 ? 'ok' : rp.upravyUcinne < 0 ? 'bad' : 'muted'}
           note={upravy.length ? t('{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}', { n: upravy.length }) : t('zatím nic')} />
       </StatRow>
-      {(priplatky?.castka ?? 0) > 0 || zKasy > 0 || (tentoMesic?.vyplaty.length ?? 0) > 0 || (navicPremie.castka > 0 && velikost !== 'L') ? (
-        <ul className="list mt-3">
+      {/* Čeká na souhlas hned pod dlaždicemi: střední karta se nad 300 px zkracuje a tohle je jediná věc, kterou má člověk udělat. */}
+      {rp.cekaNaSouhlas > 0 && (
+        <div className="mt-3">
+          <RadekCekaNaSouhlas castka={rp.cekaNaSouhlas} kdo="ja" onOtevrit={doTrestu}
+            detail={cekajici.length ? cekajici.slice(0, 2).map(x => x.text).join(' · ') : undefined} />
+        </div>
+      )}
+      {sRozpadem || (priplatky?.castka ?? 0) > 0 || zKasy > 0 || (tentoMesic?.vyplaty.length ?? 0) > 0 || (navicPremie.castka > 0 && velikost !== 'L') ? (
+        <ul className="list mt-3" data-rozpad-vyplaty={sRozpadem ? 'ano' : undefined}>
+          {sRozpadem && <RadkyRozpadu r={rp} slozka={slozka} kdo="ja" mzdaMeta={sazba ? `${hodiny} × ${money(sazba)}/h` : undefined} ostatniBez={velikost !== 'L' ? navicPremie.castka : 0} />}
           {priplatky && priplatky.castka > 0 && <ListRow title={t('Příplatky')} meta={priplatkySlovy(t, jazyk, priplatky)} value={`+${money(priplatky.castka)}`} />}
+          {sRozpadem && spropitne != null && spropitne > 0 && <ListRow title={t('Spropitné')} meta={t('podíl podle hodin · po dnech')} value={`+${money(spropitne)}`} />}
           {zKasy > 0 && (
             <ListRow title={t('Z kasy jsi dostal/a {castka}', { castka: money(zKasy) })} meta={t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}} · zbývá {zbyva}', { n: pj?.ja.zKasyPocet ?? 0, zbyva: money(kVyplate) })}
               value={`−${money(zKasy)}`} />
@@ -878,13 +902,15 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
           {navicPremie.castka > 0 && velikost !== 'L' && (
             <ListRow title={t('Navíc')} meta={t('{n, plural, one {# uznaný zápis} few {# uznané zápisy} other {# uznaných zápisů}} s prémií', { n: navicPremie.pocet })} value={`+${money(navicPremie.castka)}`} />
           )}
+          {sRozpadem && <ListRow title={<span className="font-semibold">{t('K výplatě')}</span>} meta={zKasy > 0 || vyplacenoMesic > 0 ? t('zbývá k výplatě') : undefined}
+            value={<span className="font-bold" data-k-vyplate>{money(kVyplate)}</span>} />}
         </ul>
       ) : null}
       {velikost === 'L' && upravy.length > 0 && (
         <ul className="list mt-3">
           {upravy.slice(0, 6).map(u => (
             <ListRow key={u.id} title={u.note || (Number(u.amount) > 0 ? t('Prémie') : t('Srážka'))}
-              meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : u.source === 'navic' ? ` · ${t('za navíc')}` : u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : ''}`}
+              meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : zdrojUpravy(t, u.source)}`}
               value={<span className={Number(u.amount) > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>} />
           ))}
         </ul>
@@ -1245,6 +1271,23 @@ function sZnamenkem(castka: number, money: (n: number) => string): string {
   return castka >= 0 ? `+${money(castka)}` : `−${money(Math.abs(castka))}`;
 }
 
+/** Zdroje úprav mzdy, které vznikají z trestu (kolo 96) — mění se u trestu, ruční smazání by přepočet vrátil. */
+const ZDROJE_Z_TRESTU: readonly string[] = ['trest', 'nahrada', 'srazka', 'zaskok'];
+
+/** „ · z odměny", „ · krácení prémie (trest)", „ · náhrada škody (trest)" … — zdroj úpravy mzdy do meta řádku. */
+function zdrojUpravy(t: PrekladFn, source: string | null | undefined): string {
+  switch (source) {
+    case 'reward': return ` · ${t('z odměny')}`;
+    case 'navic': return ` · ${t('za navíc')}`;
+    case 'trest': return ` · ${t('krácení prémie (trest)')}`;
+    case 'premie': return ` · ${t('nenároková prémie')}`;
+    case 'nahrada': return ` · ${t('náhrada škody (trest)')}`;
+    case 'srazka': return ` · ${t('srážka ze mzdy (trest)')}`;
+    case 'zaskok': return ` · ${t('záskok za kolegu (trest)')}`;
+    default: return '';
+  }
+}
+
 /**
  * Okno Prémie / srážka: částka ke dni a člověku s poznámkou, pod tím už zapsané úpravy období s košem.
  * Vzor Homebase / 7shifts („Add bonus / deduction" u výplaty). Zápis jde na /api/wage-adjustments,
@@ -1260,6 +1303,7 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
   const money = useMoney();
   const symbol = useSymbol();
   const { jazyk } = useJazyk();
+  const nav = useNavigace();
   const dnes = pragueToday();
   const [druh, setDruh] = useState<'premie' | 'srazka'>(clovek.druh);
   // Typ prémie (spuštění, balík P): tresty smí krátit jen nenárokovou prémii (§ 346b ZP).
@@ -1337,13 +1381,23 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
           <div>
             <p className="t-label mb-1">{t('Zapsané v období')}</p>
             <ul className="list">
-              {upravy.map(u => (
-                <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
-                  meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : u.source === 'navic' ? ` · ${t('za navíc')}` : u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : u.source === 'premie' ? ` · ${t('nenároková prémie')}` : ''}`}
-                  value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>}
-                  actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat zápis')} loading={mazu === u.id} onClick={() => { void smaz(u.id); }} />} />
-              ))}
+              {upravy.map(u => {
+                // Kolo 96: krácení, náhrada, srážka a záskok vznikají z trestu — koš by je smazal jen do dalšího
+                // přepočtu. Místo koše odkaz na tresty (Odměny › Tresty), kde se mění trest nebo srážka.
+                const zTrestu = ZDROJE_Z_TRESTU.includes(String(u.source ?? ''));
+                return (
+                  <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
+                    meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : zdrojUpravy(t, u.source)}`}
+                    value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'} data-zdroj-upravy={u.source ?? 'manual'}>{sZnamenkem(Number(u.amount), money)}</span>}
+                    actions={zTrestu
+                      ? (nav.smiPohled('rewards') ? <Button variant="ghost" size="sm" iconOnly icon="chevronRight" aria-label={t('Otevřít tresty')} title={t('Otevřít tresty')} onClick={() => { onClose(); nav.onNavigate('rewards', 'tresty'); }} data-odkaz-trest /> : undefined)
+                      : <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat zápis')} loading={mazu === u.id} onClick={() => { void smaz(u.id); }} />} />
+                );
+              })}
             </ul>
+            {upravy.some(u => ZDROJE_Z_TRESTU.includes(String(u.source ?? ''))) && (
+              <p className="t-meta mt-2 text-pretty" data-veta-z-trestu>{t('Krácení, náhrady škody, srážky a záskok z trestů se mění u trestu, ne tady.')}</p>
+            )}
           </div>
         )}
       </div>
@@ -1510,10 +1564,20 @@ interface PravidlaPayrollu { dysko: PravidlaDyska; priplatky: PravidlaPriplatku;
 interface Payroll { od: string; do: string; lide: PayrollClovek[]; zamky: ZamekObdobi[]; vidiMzdy: boolean; payDailyCash: boolean; pravidla: PravidlaPayrollu }
 interface PayrollJa {
   od: string; do: string;
-  ja: { zKasy: number; zKasyPocet: number; uzaverky: { id: number; den: string; castka: number; kdo?: string | null }[]; vyplaty: Vyplata[]; spropitne: number | null; spropitnePoDnech: { den: string; castka: number; mojeMs: number; smenaMs: number }[] };
+  ja: {
+    zKasy: number; zKasyPocet: number; uzaverky: { id: number; den: string; castka: number; kdo?: string | null }[]; vyplaty: Vyplata[]; spropitne: number | null; spropitnePoDnech: { den: string; castka: number; mojeMs: number; smenaMs: number }[];
+    /** Kolo 96: nenároková složka, srážky čekající na souhlas (nestrhávají se) a vlastní srážky (čekající kdykoli + z období). */
+    slozka: NastaveniSlozky | null; cekaNaSouhlas: number; srazky: SrazkaJa[];
+  };
   zamky: ZamekObdobi[];
   pravidla: { priplatky: PravidlaPriplatku; showTipsToStaff: boolean };
 }
+
+/** Vlastní srážka z GET /api/payroll?ja=1 (kolo 96). */
+interface SrazkaJa { id: number; penaltyId: number; druh: 'nahrada' | 'srazka'; castka: number; splatky: number; stav: StavSrazky; text: string; day: string }
+const vyberSrazkyJa = (raw: unknown): SrazkaJa[] => (Array.isArray(raw) ? raw as Record<string, unknown>[] : [])
+  .filter(x => Number(x?.id) > 0 && jeStavSrazky(x?.stav))
+  .map(x => ({ id: Number(x.id), penaltyId: Number(x.penaltyId), druh: x.druh === 'nahrada' ? 'nahrada' : 'srazka', castka: Math.round(Number(x.castka) || 0), splatky: Math.max(1, Number(x.splatky) || 1), stav: x.stav as StavSrazky, text: String(x.text ?? ''), day: String(x.day ?? '').slice(0, 10) }));
 
 const urlPayroll = (od: string, doD: string) => `/api/payroll?od=${od}&do=${doD}`;
 const urlPayrollJa = (od: string, doD: string) => `/api/payroll?od=${od}&do=${doD}&ja=1`;
@@ -1522,6 +1586,18 @@ const POUZITE_PAYROLL = new Set<string>();
 function obnovVyplaty(): void {
   for (const u of POUZITE_PAYROLL) obnovDataWidgetu(u);
   obnovDataWidgetu('/api/closings');
+}
+/**
+ * Kolo 96: po změně peněz z trestů (souhlas se srážkou, nový trest, hromadná odměna — components/tresty-penize/data
+ * vyšle UDALOST_VYPLATY) přenačíst výplaty i docházku s úpravami mzdy. Jeden posluchač na widget, který je drží.
+ */
+function useObnovaVyplat(zapnuto: boolean): void {
+  useEffect(() => {
+    if (!zapnuto) return;
+    const f = () => { obnovVyplaty(); obnovDochazku(); };
+    window.addEventListener(UDALOST_VYPLATY, f);
+    return () => window.removeEventListener(UDALOST_VYPLATY, f);
+  }, [zapnuto]);
 }
 
 function vyberPayroll(raw: any, t: PrekladFn): Payroll {
@@ -1537,7 +1613,10 @@ function vyberPayrollJa(raw: any, t: PrekladFn): PayrollJa {
   const j = raw.ja;
   return {
     od: String(raw.od), do: String(raw.do),
-    ja: { zKasy: Number(j.zKasy) || 0, zKasyPocet: Number(j.zKasyPocet) || 0, uzaverky: Array.isArray(j.uzaverky) ? j.uzaverky : [], vyplaty: Array.isArray(j.vyplaty) ? j.vyplaty : [], spropitne: j.spropitne == null ? null : Number(j.spropitne) || 0, spropitnePoDnech: Array.isArray(j.spropitnePoDnech) ? j.spropitnePoDnech : [] },
+    ja: {
+      zKasy: Number(j.zKasy) || 0, zKasyPocet: Number(j.zKasyPocet) || 0, uzaverky: Array.isArray(j.uzaverky) ? j.uzaverky : [], vyplaty: Array.isArray(j.vyplaty) ? j.vyplaty : [], spropitne: j.spropitne == null ? null : Number(j.spropitne) || 0, spropitnePoDnech: Array.isArray(j.spropitnePoDnech) ? j.spropitnePoDnech : [],
+      slozka: vyberSlozku(j.slozka), cekaNaSouhlas: Math.max(0, Math.round(Number(j.cekaNaSouhlas) || 0)), srazky: vyberSrazkyJa(j.srazky),
+    },
     zamky: Array.isArray(raw.zamky) ? raw.zamky : [],
     pravidla: { priplatky: normalizujPravidlaPriplatku(raw.pravidla?.priplatky), showTipsToStaff: raw.pravidla?.showTipsToStaff === true },
   };
@@ -1575,14 +1654,16 @@ function ChipSmlouvy({ r, hranice }: { r: RadekVyplaty; hranice: number | null }
 // Výplatní listina
 // ---------------------------------------------------------------------------
 
-const SLOUPCE = ['smeny', 'hodiny', 'plan', 'sazba', 'mzda', 'priplatky', 'spropitne', 'upravy', 'zKasy', 'doplatit', 'smlouva', 'stav'] as const;
+// Kolo 96: „slozka" (nenároková složka) a „srazky" (krácení + náhrada škody + srážky z trestů) — vidět jen když je v období
+// někdo má; Mzda je pak nároková část a Prémie bez krácení a srážek (stejně jako CSV s `penize: true`).
+const SLOUPCE = ['smeny', 'hodiny', 'plan', 'sazba', 'mzda', 'slozka', 'priplatky', 'spropitne', 'upravy', 'srazky', 'zKasy', 'doplatit', 'smlouva', 'stav'] as const;
 type Sloupec = (typeof SLOUPCE)[number];
 /** Sloupce, které se dají schovat tlačítkem „Sloupce" (Člověk, Doplatit a Stav zůstávají vždy). */
-const VOLITELNE: readonly Sloupec[] = ['smeny', 'hodiny', 'plan', 'sazba', 'mzda', 'priplatky', 'spropitne', 'upravy', 'zKasy', 'smlouva'];
+const VOLITELNE: readonly Sloupec[] = ['smeny', 'hodiny', 'plan', 'sazba', 'mzda', 'slozka', 'priplatky', 'spropitne', 'upravy', 'srazky', 'zKasy', 'smlouva'];
 /** Plán, sazba a smlouva jsou ve výchozím stavu schované: na 1280 px má karta ~920 px a čísla se nesmí zkracovat. */
 const VYCHOZI_SKRYTE = 'plan,sazba,smlouva';
 /** Šířky sloupců v % šířky tabulky (table-fixed): součet viditelných výchozích ≈ 100, zapnuté navíc se úměrně stlačí. */
-const SIRKA: Record<Sloupec, number> = { smeny: 6, hodiny: 8, plan: 8, sazba: 8, mzda: 9, priplatky: 8, spropitne: 8, upravy: 8, zKasy: 9, doplatit: 10, smlouva: 13, stav: 14 };
+const SIRKA: Record<Sloupec, number> = { smeny: 6, hodiny: 8, plan: 8, sazba: 8, mzda: 9, slozka: 9, priplatky: 8, spropitne: 8, upravy: 8, srazky: 9, zKasy: 9, doplatit: 10, smlouva: 13, stav: 14 };
 
 /**
  * Výplatní listina (kolo 8, R8-1; vzor 7shifts „Worked Hours & Wages", Lightspeed „Labor report"): řádek na člověka
@@ -1642,12 +1723,17 @@ function VyplatniListina({ nahled }: WidgetProps) {
     if (!data.data) return [];
     const lide = new Map(data.data.roster.map(m => [String(m.id), { jmeno: m.name ?? '', avatar: m.avatar ?? null }]));
     const souhrn = souhrnHodin(entriesObdobi, ted, sazby, { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravyObdobi), lide, plan: true, priplatky: sPriplatky ? pravidla!.priplatky : null });
-    return seradListinu(vyplatniListina(souhrn, payroll.data?.lide ?? []), razeni.klic, razeni.sestupne);
-  }, [data.data, entriesObdobi, ted, sazby, dyska, upravyObdobi, payroll.data, razeni, sPriplatky, pravidla]);
+    // Kolo 96: s obdobím a úpravami počítá lib i rozpad peněz z trestů a nenárokovou složku (r.penize).
+    return seradListinu(vyplatniListina(souhrn, payroll.data?.lide ?? [], vidiMzdy ? { od: r.od, do: r.do, upravy: upravyObdobi } : undefined), razeni.klic, razeni.sestupne);
+  }, [data.data, entriesObdobi, ted, sazby, dyska, upravyObdobi, payroll.data, razeni, sPriplatky, pravidla, vidiMzdy, r.od, r.do]);
   const soucet = useMemo(() => soucetListiny(radky), [radky]);
   const zamek = payroll.data ? obdobiZamceno(payroll.data.zamky, r.od, r.do) : null;
   const sDyskem = !!dyska && !dyska.skryto;
   const sSmlouvami = radky.some(x => x.smlouva);
+  const sSlozkou = radky.some(x => (x.penize?.slozka ?? 0) > 0);
+  const sSrazkami = radky.some(x => srazkyRadku(x) !== 0);
+  const { castka: cekaCelkem, lidi: cekaLidi } = cekaVListine(radky);
+  useObnovaVyplat(brana);
   const loc = jazyk;
   const hodinyText = (ms: number) => hodinyMinuty(ms);
   const datum = (d: string) => fmtDatum(d, { jazyk, styl: 'kratce' });
@@ -1659,21 +1745,28 @@ function VyplatniListina({ nahled }: WidgetProps) {
     if (s === 'priplatky') return vidiMzdy && sPriplatky;
     if (s === 'spropitne') return sDyskem;
     if (s === 'smlouva') return sSmlouvami || smiZapis;
+    if (s === 'slozka') return vidiMzdy && sSlozkou;
+    if (s === 'srazky') return vidiMzdy && sSrazkami;
     return true;
   };
+  // Mzda je nároková část jen tehdy, když vedle stojí sloupec složky; Prémie bez srážek jen se sloupcem Srážky.
+  const mzdaBunka = (x: RadekVyplaty): number | null => mzdaRadku(x, sloupecVidet('slozka'));
+  const upravyBunka = (x: RadekVyplaty): number => (sloupecVidet('srazky') ? premieRadku(x) : upravyUcinne(x));
+  const suma = (f: (x: RadekVyplaty) => number | null) => radky.reduce((a, x) => a + (f(x) ?? 0), 0);
   const nazvy: Record<Sloupec, string> = {
     smeny: t('Směny'), hodiny: t('Hodiny', undefined, 'widgety'), plan: t('Plán'), sazba: t('Sazba'), mzda: t('Mzda'), priplatky: t('Příplatky'), spropitne: t('Dýško'),
     upravy: t('Prémie / srážky'), zKasy: t('Z kasy'), doplatit: t('Doplatit'), smlouva: t('Smlouva'), stav: t('Stav'),
+    slozka: t('Nenároková složka'), srazky: t('Krácení a srážky z trestů'),
   };
   /** Krátké hlavičky do tabulky (plný název je v `title` a v nabídce Sloupce). */
-  const kratce: Partial<Record<Sloupec, string>> = { upravy: t('Prémie'), priplatky: t('Příplatky') };
+  const kratce: Partial<Record<Sloupec, string>> = { upravy: t('Prémie'), priplatky: t('Příplatky'), slozka: t('Nenárok.'), srazky: t('Srážky') };
   const RAZENI_SLOUPCE: Partial<Record<Sloupec, RazeniListiny>> = { smeny: 'pocet', hodiny: 'hodiny', mzda: 'mzda', spropitne: 'spropitne', zKasy: 'zKasy', doplatit: 'doplatit' };
   const prepniRazeni = (k: RazeniListiny) => setRazeni(x => ({ klic: k, sestupne: x.klic === k ? !x.sestupne : k !== 'jmeno' }));
   const prepniSloupec = (s: Sloupec) => { const n = new Set(skryte); if (n.has(s)) n.delete(s); else n.add(s); setSkryte([...n].join(',')); };
 
   const csv = () => {
     if (!pro) { setUpgrade(true); return; }
-    const radkyCsv = csvVyplatniListiny(radky, { od: r.od, do: r.do, symbol, sazby, priplatky: sPriplatky, spropitne: sDyskem, smlouvy: sSmlouvami });
+    const radkyCsv = csvVyplatniListiny(radky, { od: r.od, do: r.do, symbol, sazby, priplatky: sPriplatky, spropitne: sDyskem, smlouvy: sSmlouvami, penize: vidiMzdy });
     void ulozSoubor(`vyplaty-${r.od}_${r.do}.csv`, csvText(radkyCsv), 'text/csv;charset=utf-8');
   };
   const zamkni = async (odemknout: boolean) => {
@@ -1710,8 +1803,8 @@ function VyplatniListina({ nahled }: WidgetProps) {
           <StatRow podleKarty>
             <Stat label={t('Odpracováno')} value={hodinyText(soucet.ms)} note={t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: soucet.pocet })} />
             {vidiMzdy && (
-              <Stat label={t('Mzdy')} value={money(soucet.mzda + soucet.priplatky + soucet.upravy)}
-                note={[soucet.bezSazby > 0 ? t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: soucet.bezSazby }) : null, soucet.priplatky > 0 ? t('vč. příplatků {castka}', { castka: money(soucet.priplatky) }) : null, soucet.upravy !== 0 ? t('vč. prémií a srážek {castka}', { castka: sZnamenkem(soucet.upravy, money) }) : null].filter(Boolean).join(' · ') || t('hodiny × sazba')} />
+              <Stat label={t('Mzdy')} value={money(suma(x => x.hruba))}
+                note={[soucet.bezSazby > 0 ? t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: soucet.bezSazby }) : null, soucet.priplatky > 0 ? t('vč. příplatků {castka}', { castka: money(soucet.priplatky) }) : null, suma(upravyUcinne) !== 0 ? t('vč. prémií a srážek {castka}', { castka: sZnamenkem(suma(upravyUcinne), money) }) : null].filter(Boolean).join(' · ') || t('hodiny × sazba')} />
             )}
             {sDyskem && <Stat label={t('Spropitné')} value={money(Math.round(soucet.spropitne))} note={t('z uzávěrek')} />}
             {vidiMzdy && (soucet.zKasy > 0 || payroll.data?.payDailyCash) && (
@@ -1720,6 +1813,12 @@ function VyplatniListina({ nahled }: WidgetProps) {
             {vidiMzdy && <Stat label={t('Doplatit')} value={money(soucet.doplatit)} tone="ok" note={soucet.vyplaceno > 0 ? t('vyplaceno {castka}', { castka: money(soucet.vyplaceno) }) : t('po odečtení z kasy')} />}
           </StatRow>
           {dyska?.skryto && <p className="t-meta">{t('Dýško nejde rozdělit — tržby nevidíš celé.')}</p>}
+          {vidiMzdy && cekaCelkem > 0 && (
+            <p className="t-meta flex items-start gap-1.5 text-pretty" data-ceka-listina={cekaCelkem}>
+              <Icon name="clock" size={13} className="shrink-0 mt-0.5" />
+              <span>{t('Srážky čekající na souhlas ({n, plural, one {# člověk} few {# lidé} other {# lidí}}): {castka} — ve výplatě se nestrhávají, dokud člověk nesouhlasí.', { n: cekaLidi, castka: money(cekaCelkem) })}</span>
+            </p>
+          )}
           {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
           <div className="flex flex-wrap items-center justify-between gap-2">
             {/* Na telefonu karty: řadit jde přepínačem, hlavička tabulky tam není. */}
@@ -1769,15 +1868,22 @@ function VyplatniListina({ nahled }: WidgetProps) {
                           {x.pozice && <span className="block truncate text-[11px] text-black/45 font-normal">{x.pozice}</span>}
                         </span>
                       </button>
+                      {(x.penize?.cekaNaSouhlas ?? 0) > 0 && (
+                        <span className="mt-1 block" title={t('Čeká na souhlas: {castka} — nestrhává se', { castka: money(x.penize!.cekaNaSouhlas) })} data-ceka-souhlas={x.penize!.cekaNaSouhlas}>
+                          <Chip tone="wait" size="sm" icon="clock">{t('čeká na souhlas')}</Chip>
+                        </span>
+                      )}
                     </th>
                     {sloupecVidet('smeny') && <td className={cisloBunky}>{x.pocet.toLocaleString(loc)}{x.vynechano > 0 ? <span className="text-wait-ink"> ({x.vynechano}×)</span> : ''}</td>}
                     {sloupecVidet('hodiny') && <td className={cisloBunky} title={`${hodinyText(x.ms)}${x.bezi ? ` · ${t('právě běží')}` : ''}`}>{hMM(x.ms)}</td>}
                     {sloupecVidet('plan') && <td className={cisloBunky}>{x.planMs > 0 ? hMM(x.planMs) : '—'}</td>}
                     {sloupecVidet('sazba') && <td className={cisloBunky}>{sazby.get(x.id) ? money(sazby.get(x.id)!) : '—'}</td>}
-                    {sloupecVidet('mzda') && <td className={cisloBunky}>{x.mzda != null ? money(x.mzda) : '—'}</td>}
+                    {sloupecVidet('mzda') && <td className={cisloBunky}>{mzdaBunka(x) != null ? money(mzdaBunka(x)!) : '—'}</td>}
+                    {sloupecVidet('slozka') && <td className={cisloBunky} title={x.penize && x.penize.slozkaNavic > 0 ? t('navíc ke mzdě') : t('součást sazby')}>{x.penize?.slozka ? (x.penize.slozkaNavic > 0 ? `+${money(x.penize.slozka)}` : money(x.penize.slozka)) : '—'}</td>}
                     {sloupecVidet('priplatky') && <td className={cisloBunky} title={priplatkySlovy(t, loc, x.priplatkyMs) || undefined}>{x.priplatky > 0 ? `+${money(x.priplatky)}` : '—'}</td>}
                     {sloupecVidet('spropitne') && <td className={cisloBunky}>{x.spropitne ? money(Math.round(x.spropitne)) : '—'}</td>}
-                    {sloupecVidet('upravy') && <td className={`${cisloBunky} ${x.upravy > 0 ? 'text-ok-ink' : x.upravy < 0 ? 'text-bad-ink' : ''}`}>{x.upravy ? sZnamenkem(x.upravy, money) : '—'}</td>}
+                    {sloupecVidet('upravy') && <td className={`${cisloBunky} ${upravyBunka(x) > 0 ? 'text-ok-ink' : upravyBunka(x) < 0 ? 'text-bad-ink' : ''}`}>{upravyBunka(x) ? sZnamenkem(upravyBunka(x), money) : '—'}</td>}
+                    {sloupecVidet('srazky') && <td className={`${cisloBunky} ${srazkyRadku(x) < 0 ? 'text-bad-ink' : ''}`} data-srazky-radku={srazkyRadku(x)}>{srazkyRadku(x) ? sZnamenkem(srazkyRadku(x), money) : '—'}</td>}
                     {sloupecVidet('zKasy') && <td className={cisloBunky}>{x.zKasy > 0 ? `−${money(x.zKasy)}` : '—'}</td>}
                     {sloupecVidet('doplatit') && <td className={`${cisloBunky} font-bold text-[#16181A]`}>{money(x.doplatit)}</td>}
                     {sloupecVidet('smlouva') && <td className="px-1.5 py-1.5 text-left">
@@ -1803,10 +1909,12 @@ function VyplatniListina({ nahled }: WidgetProps) {
                   {sloupecVidet('hodiny') && <td className={cisloBunky} title={hodinyText(soucet.ms)}>{hMM(soucet.ms)}</td>}
                   {sloupecVidet('plan') && <td className={cisloBunky}>{soucet.planMs > 0 ? hMM(soucet.planMs) : '—'}</td>}
                   {sloupecVidet('sazba') && <td />}
-                  {sloupecVidet('mzda') && <td className={cisloBunky}>{money(soucet.mzda)}</td>}
+                  {sloupecVidet('mzda') && <td className={cisloBunky}>{money(suma(mzdaBunka))}</td>}
+                  {sloupecVidet('slozka') && <td className={cisloBunky}>{money(suma(x => x.penize?.slozka ?? 0))}</td>}
                   {sloupecVidet('priplatky') && <td className={cisloBunky}>{soucet.priplatky > 0 ? `+${money(soucet.priplatky)}` : '—'}</td>}
                   {sloupecVidet('spropitne') && <td className={cisloBunky}>{money(Math.round(soucet.spropitne))}</td>}
-                  {sloupecVidet('upravy') && <td className={cisloBunky}>{soucet.upravy ? sZnamenkem(soucet.upravy, money) : '—'}</td>}
+                  {sloupecVidet('upravy') && <td className={cisloBunky}>{suma(upravyBunka) ? sZnamenkem(suma(upravyBunka), money) : '—'}</td>}
+                  {sloupecVidet('srazky') && <td className={cisloBunky}>{suma(srazkyRadku) ? sZnamenkem(suma(srazkyRadku), money) : '—'}</td>}
                   {sloupecVidet('zKasy') && <td className={cisloBunky}>{soucet.zKasy > 0 ? `−${money(soucet.zKasy)}` : '—'}</td>}
                   {sloupecVidet('doplatit') && <td className={cisloBunky}>{money(soucet.doplatit)}</td>}
                   {sloupecVidet('smlouva') && <td />}
@@ -1820,13 +1928,18 @@ function VyplatniListina({ nahled }: WidgetProps) {
           <ul className="list lg:hidden">
             {radky.map(x => {
               const radek1 = [t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: x.pocet }), hodinyText(x.ms), x.smlouva ? nazevSmlouvy(x.smlouva) : null].filter(Boolean).join(' · ');
-              const radek2 = vidiMzdy ? [x.mzda != null ? t('mzda {castka}', { castka: money(x.mzda + x.priplatky) }) : null, x.spropitne ? t('dýško {castka}', { castka: money(Math.round(x.spropitne)) }) : null, x.upravy ? sZnamenkem(x.upravy, money) : null, x.zKasy > 0 ? t('z kasy −{castka}', { castka: money(x.zKasy) }) : null].filter(Boolean).join(' · ') : undefined;
+              const radek2 = vidiMzdy ? [x.mzda != null ? t('mzda {castka}', { castka: money(x.mzda + x.priplatky + (x.penize?.slozkaNavic ?? 0)) }) : null, x.spropitne ? t('dýško {castka}', { castka: money(Math.round(x.spropitne)) }) : null,
+                premieRadku(x) ? sZnamenkem(premieRadku(x), money) : null, srazkyRadku(x) ? t('srážky {castka}', { castka: sZnamenkem(srazkyRadku(x), money) }) : null,
+                x.zKasy > 0 ? t('z kasy −{castka}', { castka: money(x.zKasy) }) : null].filter(Boolean).join(' · ') : undefined;
+              const ceka = x.penize?.cekaNaSouhlas ?? 0;
               const spolecne = {
                 lead: vyber.selecting ? <SelectBox checked={vyber.has(x.id)} onChange={() => vyber.toggle(x.id)} label={t('Vybrat: {jmeno}', { jmeno: x.jmeno })} /> : <Avatar emoji={x.avatar} name={x.jmeno} size="sm" />,
                 title: x.jmeno, meta: radek1, detail: radek2,
                 value: vidiMzdy ? money(x.doplatit) : hodinyText(x.ms),
                 valueMeta: vidiMzdy ? t('doplatit') : undefined,
-                right: <ChipStavu r={x} jazyk={jazyk} />,
+                right: ceka > 0
+                  ? <span className="inline-flex flex-wrap justify-end gap-1" data-ceka-souhlas={ceka}><ChipStavu r={x} jazyk={jazyk} /><Chip tone="wait" size="sm" icon="clock">{t('čeká na souhlas')}</Chip></span>
+                  : <ChipStavu r={x} jazyk={jazyk} />,
               };
               return vyber.selecting
                 ? <ListRow key={x.id} {...spolecne} />
@@ -1845,6 +1958,7 @@ function VyplatniListina({ nahled }: WidgetProps) {
       )}
       {okno?.druh === 'detail' && radekPodle(okno.id) && (
         <DetailVyplatyOkno r={radekPodle(okno.id)!} od={r.od} do={r.do} sazba={sazby.get(okno.id) ?? null} vidiMzdy={vidiMzdy} hranice={pravidla?.hraniceOdvodu ?? null}
+          slozka={payroll.data?.lide.find(l => String(l.id) === okno.id)?.slozka ?? null}
           smiZapis={smiZapis} onVyplaceno={() => setOkno({ druh: 'vyplaceno', ids: [okno.id] })} onSmlouva={() => setOkno({ druh: 'smlouva', id: okno.id })} onClose={() => setOkno(null)} />
       )}
       {okno?.druh === 'vyplaceno' && (
@@ -1875,8 +1989,10 @@ function VyplatniListina({ nahled }: WidgetProps) {
 }
 
 /** Rozpad výplaty jednoho člověka: mzda, příplatky, dýško, prémie, z kasy (po uzávěrkách), vyplaceno, doplatit; akce Vyplaceno a Smlouva. */
-function DetailVyplatyOkno({ r, od, do: doD, sazba, vidiMzdy, hranice, smiZapis, onVyplaceno, onSmlouva, onClose }: {
+function DetailVyplatyOkno({ r, od, do: doD, sazba, vidiMzdy, hranice, smiZapis, slozka = null, onVyplaceno, onSmlouva, onClose }: {
   r: RadekVyplaty; od: string; do: string; sazba: number | null; vidiMzdy: boolean; hranice: number | null; smiZapis: boolean;
+  /** Nastavení nenárokové složky člena (GET /api/payroll lide[].slozka) — jen ke čtení, nastavuje se v profilu člena. */
+  slozka?: NastaveniSlozky | null;
   onVyplaceno: () => void; onSmlouva: () => void; onClose: () => void;
 }) {
   const t = useT('widgety');
@@ -1885,6 +2001,8 @@ function DetailVyplatyOkno({ r, od, do: doD, sazba, vidiMzdy, hranice, smiZapis,
   const nav = useNavigace();
   const datum = (d: string) => fmtDatum(d, { jazyk, styl: 'kratce' });
   const limit = stavLimituHodin(r.hodinyLetosMs, r.limitHodin);
+  // Kolo 96: rozpad peněz z trestů a nenárokové složky (r.penize z vyplatniListina s obdobím); bez nich jako dřív.
+  const sRozpadem = vidiMzdy && maPenize(r.penize, slozka);
   return (
     <Modal open onClose={onClose} size="md" title={r.jmeno} subtitle={`${datum(od)} – ${datum(doD)}${r.pozice ? ` · ${r.pozice}` : ''}`}
       footer={smiZapis ? <>
@@ -1901,10 +2019,11 @@ function DetailVyplatyOkno({ r, od, do: doD, sazba, vidiMzdy, hranice, smiZapis,
         <ul className="list">
           <ListRow title={t('Směny')} meta={r.vynechano > 0 ? t('{n}× bez odchodu', { n: r.vynechano.toLocaleString(jazyk) }) : undefined} value={r.pocet.toLocaleString(jazyk)} />
           {r.planMs > 0 && <ListRow title={t('Plán')} value={hodinyMinuty(r.planMs)} valueMeta={r.pozde > 0 ? t('{n}× pozdě', { n: r.pozde.toLocaleString(jazyk) }) : undefined} />}
-          {vidiMzdy && <ListRow title={t('Mzda')} meta={t('hodiny × sazba')} value={r.mzda != null ? money(r.mzda) : '—'} />}
+          {vidiMzdy && !sRozpadem && <ListRow title={t('Mzda')} meta={t('hodiny × sazba')} value={r.mzda != null ? money(r.mzda) : '—'} />}
+          {vidiMzdy && sRozpadem && r.penize && <RadkyRozpadu r={r.penize} slozka={slozka} kdo="clovek" />}
           {vidiMzdy && r.priplatky > 0 && <ListRow title={t('Příplatky')} meta={priplatkySlovy(t, jazyk, r.priplatkyMs)} value={`+${money(r.priplatky)}`} />}
           {r.spropitne != null && <ListRow title={t('Spropitné')} meta={t('podíl podle pravidel podniku')} value={money(Math.round(r.spropitne))} />}
-          {vidiMzdy && r.upravy !== 0 && <ListRow title={t('Prémie a srážky')} value={<span className={r.upravy > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(r.upravy, money)}</span>} />}
+          {vidiMzdy && !sRozpadem && r.upravy !== 0 && <ListRow title={t('Prémie a srážky')} value={<span className={r.upravy > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(r.upravy, money)}</span>} />}
           {vidiMzdy && r.zKasy > 0 && (
             <ListRow title={t('Už vyplaceno z kasy')} value={`−${money(r.zKasy)}`}
               detail={r.uzaverky.map(u => `${datum(u.den)} ${money(u.castka)}${u.kdo ? ` (${u.kdo})` : ''}`).join(' · ')}
@@ -1917,6 +2036,10 @@ function DetailVyplatyOkno({ r, od, do: doD, sazba, vidiMzdy, hranice, smiZapis,
             <ListRow title={t('Smlouva')} meta={limit ? t('letos {h} / {limit} h', { h: limit.odpracovanoH.toLocaleString(jazyk), limit: limit.limitH }) : undefined} right={<ChipSmlouvy r={r} hranice={hranice} />} />
           )}
         </ul>
+        {vidiMzdy && r.penize && <RadekCekaNaSouhlas castka={r.penize.cekaNaSouhlas} kdo="clovek" />}
+        {vidiMzdy && slozka && (
+          <p className="t-meta text-pretty" data-slozka-popis>{t('Nenároková složka: {popis}. Nastavuje se v profilu člena v části Tresty.', { popis: popisSlozkyT(t, slozka, money, jazyk) })}</p>
+        )}
       </div>
     </Modal>
   );

@@ -186,6 +186,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // Data: dnes jen po dnech: GET /api/closings/wage?date → wage{ms,rate,earned}
   // Backend: triviální: /api/closings/wage?month=YYYY-MM (součet) nebo vlastní sazba ve větvi zaměstnance
   // /api/attendance, když má finance.moje_mzda
+  // Kolo 96: rozpad z GET /api/payroll?ja=1 (slozka, cekaNaSouhlas, srazky) a úprav podle `source` — nároková mzda,
+  // nenároková složka, prémie, záskok, krácení, náhrada škody, srážky; „Čeká na tvůj souhlas" zvlášť (neodečteno) s odkazem do Moje tresty.
   {
     id: 'moje.vydelek',
     oblast: 'dochazka',
@@ -244,6 +246,9 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // Kolo 8 (R8-1, vzor 7shifts „Worked Hours & Wages", Lightspeed „Labor report"): řádek na člověka, na počítači
   // tabulka s řazením a Celkem, na telefonu karty; CSV pro účetní; „Vyplaceno" a „Uzavřít období"; Pravidla výplat.
   // Ikona `receipt`: na Docházce ve výchozím rozložení není (AK-19).
+  // Kolo 96 (tresty a peníze, docs/TRESTY-PENIZE.md): s finance.mzdy rozpad peněz z trestů (vyplatniListina s obdobím) —
+  // sloupce Nenároková složka a Krácení a srážky (jen když je někdo v období má), chip „čeká na souhlas" (nestrhává se),
+  // CSV s `penize: true`; nenároková složka jen ke čtení (nastavuje se v profilu člena › Tresty).
   {
     id: 'dochazka.vyplatni_listina',
     oblast: 'dochazka',

@@ -28,6 +28,9 @@ import { useOpravneni } from '../role/useOpravneni';
 import { doplatit, hodinyMinuty, normalizujPravidlaDyska, normalizujPravidlaPriplatku, priplatkyVypnute, sazbyZRosteru, souhrnHodin, spropitneZaObdobi, upravyPoLidech, upravyVRozmezi, zaznamyVRozmezi, type ClenRosteru, type PayrollClovek, type PravidlaDyska, type PravidlaPriplatku, type UpravaMzdy, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
 import { pragueToday } from '@/lib/pragueTime';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
+import { RozpadVyplatyClena } from '../tresty/RozpadVyplaty';
+import { UDALOST_VYPLATY } from '../tresty-penize/data';
+import { rozpadVyplaty, vyberSlozku } from '@/lib/trestyPenize';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
@@ -336,6 +339,14 @@ function VyplataMesice({ employeeId }: { employeeId: number }) {
     return { lide: raw.lide, payDailyCash: raw.payDailyCash === true, pravidla: { dysko: normalizujPravidlaDyska(raw.pravidla?.dysko), priplatky: normalizujPravidlaPriplatku(raw.pravidla?.priplatky) } };
   });
   const [zKasyOkno, setZKasyOkno] = useState(false);
+  // Kolo 96: po změně peněz z trestů (souhlas se srážkou, nový trest, odměna) přenačíst docházku i výplaty.
+  const { reload: obnovDochazku } = data;
+  const { reload: obnovPayroll } = payroll;
+  useEffect(() => {
+    const f = () => { obnovDochazku(); obnovPayroll(); };
+    window.addEventListener(UDALOST_VYPLATY, f);
+    return () => window.removeEventListener(UDALOST_VYPLATY, f);
+  }, [obnovDochazku, obnovPayroll]);
   const ted = Date.now();
   const vse = zaznamyVRozmezi(data.data?.entries ?? [], od, dnes);
   const upravy = upravyVRozmezi(data.data?.adjustments ?? [], od, dnes).filter(u => Number(u.userId) === employeeId);
@@ -350,7 +361,13 @@ function VyplataMesice({ employeeId }: { employeeId: number }) {
   const clovek = payroll.data?.lide.find(l => Number(l.id) === employeeId);
   const zKasy = Math.round(Number(clovek?.zKasy) || 0);
   const vyplaceno = Math.round(Number(clovek?.vyplaceno) || 0);
-  const kDoplaceni = doplatit({ mzda: radek?.mzda ?? null, priplatky: radek?.priplatky ?? 0, spropitne: radek?.spropitne ?? null, upravy: upravySoucet, zKasy, vyplaceno });
+  // Kolo 96 (docs/TRESTY-PENIZE.md 4.10): rozpad jako Výplatní listina — nenároková složka (navíc ke mzdě se přičte),
+  // krácení jen do stropu nenárokové části (zbytek se vrací), srážky čekající na souhlas se neodečítají.
+  const slozka = vyberSlozku(clovek?.slozka);
+  const rp = radek ? rozpadVyplaty({ mzda: radek.mzda, ms: radek.ms, od, do: dnes, upravy, slozka, cekaNaSouhlas: clovek?.cekaNaSouhlas ?? 0 }) : null;
+  const navic = rp ? rp.slozkaNavic + rp.kraceniNadStrop : 0;
+  const upravyZobrazit = rp?.upravyUcinne ?? upravySoucet;
+  const kDoplaceni = doplatit({ mzda: radek?.mzda ?? null, priplatky: radek?.priplatky ?? 0, spropitne: radek?.spropitne ?? null, upravy: upravySoucet + navic, zKasy, vyplaceno });
   const datum = (d: string) => new Date(`${String(d).slice(0, 10)}T12:00:00`).toLocaleDateString(loc, { day: 'numeric', month: 'numeric' });
   if (data.error) return <p className="note note-wait text-sm">{t('Výplatu se nepodařilo spočítat.')} {data.error}</p>;
   return (
@@ -359,8 +376,8 @@ function VyplataMesice({ employeeId }: { employeeId: number }) {
       {data.loading ? <Skeleton className="h-16" /> : (
         <>
           <StatRow podleKarty>
-            <Stat label={t('Mzda')} value={money((radek?.mzda ?? 0) + (radek?.priplatky ?? 0))} note={sazba ? `${hodinyMinuty(radek?.ms ?? 0)} × ${money(sazba)}/h${(radek?.priplatky ?? 0) > 0 ? ` · ${t('vč. příplatků {castka}', { castka: money(radek!.priplatky) })}` : ''}` : t('bez sazby')} />
-            <Stat label={t('Prémie a srážky')} value={sZnamenkem(upravySoucet, money)} note={upravy.length ? t('{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}', { n: upravy.length }) : t('zatím nic')} />
+            <Stat label={t('Mzda')} value={money((radek?.mzda ?? 0) + (radek?.priplatky ?? 0) + (rp?.slozkaNavic ?? 0))} note={sazba ? `${hodinyMinuty(radek?.ms ?? 0)} × ${money(sazba)}/h${(radek?.priplatky ?? 0) > 0 ? ` · ${t('vč. příplatků {castka}', { castka: money(radek!.priplatky) })}` : ''}` : t('bez sazby')} />
+            <Stat label={t('Prémie a srážky')} value={sZnamenkem(upravyZobrazit, money)} note={upravy.length ? t('{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}', { n: upravy.length }) : t('zatím nic')} />
             {dyska && !dyska.skryto && <Stat label={t('Spropitné')} value={money(Math.round(radek?.spropitne ?? 0))} note={t('podíl podle pravidel podniku')} />}
             {(zKasy > 0 || payroll.data?.payDailyCash) && (
               <button type="button" onClick={() => setZKasyOkno(true)} className="block w-full min-w-0 text-left rounded-xl tap-target" aria-label={t('Výplaty z kasy po uzávěrkách')}>
@@ -369,6 +386,7 @@ function VyplataMesice({ employeeId }: { employeeId: number }) {
             )}
             <Stat label={t('Doplatit')} value={money(kDoplaceni)} tone="ok" note={vyplaceno > 0 ? t('vyplaceno {castka}', { castka: money(vyplaceno) }) : t('k výplatě od 1. do dneška')} />
           </StatRow>
+          <RozpadVyplatyClena r={rp} slozka={slozka} />
           {upravy.length > 0 && (
             <ul className="list mt-2">
               {upravy.slice(0, 5).map(u => (

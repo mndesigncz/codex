@@ -13,6 +13,11 @@
 // Z3 Odkaz z oznámení /employee/shifts?view=rewards&arg=tresty → Odměny s otevřeným detailem nejnovějšího
 //    nepotvrzeného (101); bez nepotvrzených detail toho, co se naposled stalo (zrušení 104).
 // Z4 Polština a němčina 320: Domů, detail a Odměny bez přetečení.
+// Z5 Kolo 96 — peníze z výplaty: odkaz z oznámení otevře přednostně trest se srážkou k souhlasu; celé znění dohody,
+//    „Souhlasím se srážkou 1 500 Kč" → 409 s novým zněním (vidět, potvrdit znovu) → Uplatněno + splátky; zavření
+//    detailu z oznámení neotevře další trest; náhrada škody (škoda, druh, fotka); přijatý záskok bez cizích jmen;
+//    malá karta „Srážka čeká na tvůj souhlas" → Zobrazit dohodu → Nesouhlasím s důvodem (PATCH { nesouhlas, duvod });
+//    390 tmavě, 1280 a 320 pl bez přetečení (tlačítka uvnitř karty). Snímky do K96_SNIMKY (jinak K86_SNIMKY / OUT).
 //   SONDY_ZAKLAD=http://localhost:3443 node scripts/sondy/k86-tresty-z.mjs
 import { readFileSync, mkdirSync } from 'node:fs';
 import { kontext, konec, tvrdi, otevri, dokud, jdi, mine, sysRole, DIR, OUT, BASE, ukotviDen } from './k68-spolecne.mjs';
@@ -312,6 +317,196 @@ for (const jazyk of ['pl', 'de']) {
   const karty = await p.$$eval('[data-plocha] li[data-widget] section', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.closest('li').dataset.instance));
   tvrdi('Z4 (320 pl): Odměny s velkým widgetem nepřetékají', await preteceni(p) <= 1 && karty.length === 0, `přetečení ${await preteceni(p)} px, karty ${JSON.stringify(karty)}`);
   await p.screenshot({ path: SNIMKY + 'k86-tresty-odmeny-320-pl.png', fullPage: true });
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// Z5 — kolo 96: peníze z výplaty (docs/TRESTY-PENIZE.md 4.5)
+//   srážka k souhlasu → odkaz z oznámení ji otevře přednostně → celé znění → Souhlasím → 409 s novým zněním
+//   → nové znění vidět → Souhlasím znovu (PATCH s novým zněním) → stav Uplatněno a splátky; nesouhlas
+//   s nepovinným důvodem; náhrada škody (škoda, druh, stav); přijatý záskok „+300 Kč · Za opravu: …"
+//   bez cizích jmen; malá karta „Srážka čeká na tvůj souhlas" → Zobrazit dohodu; 390 světle/tmavě, 1280, 320 pl.
+// ---------------------------------------------------------------------------
+const ZNENI_1 = 'Souhlasím se srážkou 1 500 Kč ze mzdy, rozloženou do 3 výplat od výplaty za 11/2026 (důvod: Rozbitý mlýnek — čištění za chodu, přestože je na něm cedulka.). Jde o dohodu o srážkách ze mzdy podle § 146 písm. b) zákoníku práce s podnikem Kavárna U Testu.';
+const ZNENI_2 = ZNENI_1.replace('od výplaty za 11/2026', 'od výplaty za 12/2026');
+const prvniDalsihoMesice = (d) => { const x = new Date(`${d.slice(0, 7)}-01T12:00:00Z`); x.setUTCMonth(x.getUTCMonth() + 1); return x.toISOString().slice(0, 10); };
+
+/** Tresty s penězi: 106 srážka k souhlasu (stav podle `stav.srazka`), 107 náhrada škody uplatněná, 108 krácení se záskokem. */
+const trestySPenezi = (stav) => {
+  const data = nacti('k86-tresty-z-tresty');
+  const zaklad = data.items[0];
+  const srazka = {
+    id: 501, druh: 'srazka', castka: 1500, splatky: 3, stav: stav.srazka ?? 'ceka', potrebujeSouhlas: true, smlouva: 'HPP', proc: '',
+    zneni: stav.zneniServer ?? ZNENI_1, souhlasAt: stav.srazka === 'uplatneno' ? `${DNY.DNES}T09:00:00.000Z` : null,
+    nesouhlasAt: stav.srazka === 'nesouhlas' ? `${DNY.DNES}T09:00:00.000Z` : null, nesouhlasDuvod: stav.duvod ?? null,
+    odDne: stav.srazka === 'uplatneno' ? DNY.DNES : null,
+    rozvrh: stav.srazka === 'uplatneno' ? [{ den: DNY.DNES, castka: 500 }, { den: prvniDalsihoMesice(DNY.DNES), castka: 500 }, { den: prvniDalsihoMesice(prvniDalsihoMesice(DNY.DNES)), castka: 500 }] : [],
+    skoda: null, zrusenoAt: null,
+  };
+  const nahrada = {
+    id: 502, druh: 'nahrada', castka: 2000, splatky: 1, stav: 'uplatneno', potrebujeSouhlas: true, smlouva: 'HPP', proc: '', zneni: 'Souhlasím se srážkou 2 000 Kč jako náhradu škody…',
+    souhlasAt: `${DNY.PRED5}T10:00:00.000Z`, nesouhlasAt: null, nesouhlasDuvod: null, odDne: DNY.PRED5, rozvrh: [{ den: DNY.PRED5, castka: 2000 }],
+    skoda: { castka: 4200, druh: 'zavinena', zavineni: 'nedbalost', dohoda: false, dohodaDatum: null, prumer: 32000, strop: 144000, varovani: null }, zrusenoAt: null,
+  };
+  const t = (o) => ({ ...zaklad, typeId: null, typeTitle: null, shiftId: null, closingId: null, sourceKey: null, source: 'rucne', response: null, responseAt: null, disputed: false, ...o });
+  data.items = [
+    t({ id: 106, day: DNY.PRED3, text: 'Rozbitý mlýnek — čištění za chodu, přestože je na něm cedulka.', points: 0, bonusCut: 0, seenAt: `${DNY.PRED3}T12:00:00.000Z`,
+      penize: { kraceni: 0, srazky: [srazka], zaskok: { komu: 'lide', zpusob: 'rovne', prevody: [{ id: 1, userId: null, userName: null, castka: 1500, preslo: stav.srazka === 'uplatneno' ? 500 : 0, stav: 'plati' }] },
+        cekaNaSouhlas: srazka.stav === 'ceka' ? 1500 : 0, strzeno: srazka.stav === 'uplatneno' ? 1500 : 0 } }),
+    t({ id: 107, day: DNY.PRED5, text: 'Rozlité mléko ve skladu, krabice nasáklé.', points: 5, bonusCut: 0, seenAt: `${DNY.PRED5}T12:00:00.000Z`, photoUrl: '/api/upload/mleko.png',
+      penize: { kraceni: 0, srazky: [nahrada], zaskok: { komu: 'podnik', zpusob: null, prevody: [] }, cekaNaSouhlas: 0, strzeno: 2000 } }),
+    ...data.items,
+  ];
+  return data;
+};
+const podvrhPenez = (req, json, stav) => {
+  const url = new URL(req.url());
+  const path = url.pathname;
+  const m = req.method();
+  if (path === '/api/tresty/srazky/501' && m === 'PATCH') {
+    const b = telo(req) ?? {};
+    (stav.srazkyZapisy ??= []).push(b);
+    if (b.souhlas === true) {
+      // První souhlas: vedení mezitím změnilo srážku — server vrátí 409 s novým zněním.
+      if (!stav.zmeneno) { stav.zmeneno = true; stav.zneniServer = ZNENI_2; return json({ error: 'Znění dohody se mezitím změnilo — přečti si ho znovu.', zneni: ZNENI_2 }, 409); }
+      if (b.zneni !== (stav.zneniServer ?? ZNENI_1)) return json({ error: 'Znění dohody se mezitím změnilo — přečti si ho znovu.', zneni: stav.zneniServer ?? ZNENI_1 }, 409);
+      stav.srazka = 'uplatneno';
+      return json({ ok: true, srazka: { id: 501, stav: 'uplatneno', castka: 1500, odDne: DNY.DNES, zneni: b.zneni } });
+    }
+    if (b.nesouhlas === true) { stav.srazka = 'nesouhlas'; stav.duvod = typeof b.duvod === 'string' && b.duvod.trim() ? b.duvod.trim() : null; return json({ ok: true, srazka: { id: 501, stav: 'nesouhlas', castka: 1500 } }); }
+    return json({ error: 'Nevím, co se srážkou udělat.' }, 400);
+  }
+  if (path.startsWith('/api/tresty') && m === 'GET') { (stav.cteni ??= []).push(path + url.search); return json(trestySPenezi(stav)); }
+  if (path === '/api/attendance' && m === 'GET') {
+    return json({ roster: [{ id: 16, name: 'Eva Testová', hourlyRate: 160 }], entries: [], adjustments: [
+      { id: 9001, userId: 16, day: DNY.PRED5, amount: 300, note: 'Záskok: Nedoplněné zásoby na ranní směnu', source: 'zaskok' },
+      { id: 9002, userId: 16, day: DNY.PRED5, amount: 500, note: 'Víkendová akce', source: 'premie' },
+    ], pichaniPoloha: false });
+  }
+  return podvrh(req, json, stav);
+};
+const SNIMKY_Z = process.env.K96_SNIMKY ? process.env.K96_SNIMKY.replace(/\/?$/, '/') : SNIMKY;
+mkdirSync(SNIMKY_Z, { recursive: true });
+async function kontextPenez(volby) {
+  const k = await kontext({ role: 'employee', mineData: BARISTA, dalsi: podvrhPenez, ...volby });
+  await k.ctx.route('**/api/upload/**', route => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+  return k;
+}
+
+// Z5a — 390 světle: odkaz z oznámení → souhlas, 409, nové znění, souhlas, Uplatněno; náhrada; záskok
+{
+  const { ctx, p, stav, chyby } = await kontextPenez({ viewport: TEL, mobil: true, fix: FIX_ODMENY });
+  await otevri(p, '/employee/shifts?view=rewards&arg=tresty', 'zamestnanec.odmeny');
+  const d = dialog(p);
+  tvrdi('Z5a (390): odkaz z oznámení otevře přednostně trest se srážkou k souhlasu (106), ne nepotvrzený 101', await dokud(() => d.isVisible().catch(() => false), 6000)
+    && (await d.locator('[data-detail-trestu]').getAttribute('data-detail-trestu')) === '106');
+  await poAnimaci(d);
+  const karta = d.locator('[data-souhlas-srazky="501"]');
+  const tk = await text(karta);
+  tvrdi('Z5a (390): karta „Souhlasíš se srážkou 1 500 Kč?" se splátkami a větou, že bez souhlasu se nic nestrhne',
+    /Souhlasíš se srážkou 1\s?500\s?Kč\?/.test(tk) && /Strhne se ve 3 splátkách, až když souhlasíš\./.test(tk) && /Bez souhlasu se ze mzdy nic nestrhne\./.test(tk), tk.replace(/\n/g, ' | ').slice(0, 400));
+  tvrdi('Z5a (390): celé znění dohody ze serveru (nezkrácené)', (await text(karta.locator('[data-zneni]'))).trim() === ZNENI_1, await text(karta.locator('[data-zneni]')));
+  const souhlasim = karta.getByRole('button', { name: /Souhlasím se srážkou 1\s?500\s?Kč/ });
+  tvrdi('Z5a (390): tlačítka „Souhlasím se srážkou 1 500 Kč" a „Nesouhlasím", obě ≥ 44 px', await souhlasim.count() === 1 && await karta.getByRole('button', { name: 'Nesouhlasím' }).count() === 1
+    && (await souhlasim.boundingBox())?.height >= 44 && (await karta.getByRole('button', { name: 'Nesouhlasím' }).boundingBox())?.height >= 44);
+  tvrdi('Z5a (390): v bloku Dopad srážka s chipem „Čeká na tvůj souhlas" a záskok bez jmen („přejde kolegům")',
+    /Srážka z výplaty/.test(await text(d.locator('[data-srazka="501"]'))) && /Čeká na tvůj souhlas/.test(await text(d.locator('[data-srazka="501"]')))
+    && /přejde kolegům, kteří to napravili/.test(await text(d.locator('[data-zaskok-trestu]'))) && !/Tomáš|Petra|Jakub/.test(await text(d)));
+  tvrdi('Z5a (390): detail nepřetéká', await d.evaluate(el => el.scrollWidth <= el.clientWidth + 1) && await preteceni(p) <= 1, `přetečení ${await preteceni(p)} px`);
+  await p.screenshot({ path: SNIMKY_Z + 'penize-souhlas-390.png' });
+  await karta.scrollIntoViewIfNeeded();
+  await souhlasim.click();
+  tvrdi('Z5a (390): první „Souhlasím" pošle PATCH { souhlas: true, zneni } s tím, co člověk četl', await dokud(() => (stav.srazkyZapisy ?? []).length >= 1, 4000)
+    && stav.srazkyZapisy[0].souhlas === true && stav.srazkyZapisy[0].zneni === ZNENI_1, JSON.stringify(stav.srazkyZapisy));
+  tvrdi('Z5a (390): 409 → upozornění „Znění se mezitím změnilo" a NOVÉ znění v kartě', await dokud(() => karta.locator('[data-zneni-zmeneno]').isVisible().catch(() => false), 4000)
+    && await dokud(async () => (await text(karta.locator('[data-zneni]'))).trim() === ZNENI_2, 4000), await text(karta));
+  await p.screenshot({ path: SNIMKY_Z + 'penize-souhlas-409-390.png' });
+  await karta.getByRole('button', { name: /Souhlasím se srážkou/ }).click();
+  tvrdi('Z5a (390): druhé „Souhlasím" pošle nové znění', await dokud(() => (stav.srazkyZapisy ?? []).length >= 2, 4000) && stav.srazkyZapisy[1].zneni === ZNENI_2, JSON.stringify(stav.srazkyZapisy?.[1]));
+  tvrdi('Z5a (390): Toast „Souhlas uložen — srážka se uplatní ve výplatě." a karta souhlasu zmizí',
+    await dokud(() => p.getByRole('status').filter({ hasText: 'Souhlas uložen — srážka se uplatní ve výplatě.' }).isVisible().catch(() => false), 4000)
+    && await dokud(async () => (await d.locator('[data-souhlas-srazky]').count()) === 0, 4000));
+  const ts = await text(d.locator('[data-srazka="501"]'));
+  tvrdi('Z5a (390): po souhlasu stav „Uplatněno" a splátky (3 × 500 Kč)', /Uplatněno/.test(ts) && /Splátky: .*−500\s?Kč.*−500\s?Kč.*−500\s?Kč/.test(ts) && /Souhlasil\(a\) jsi/.test(ts), ts.replace(/\n/g, ' | '));
+  await p.screenshot({ path: SNIMKY_Z + 'penize-uplatneno-390.png' });
+  await d.getByRole('button', { name: 'Zavřít', exact: true }).last().click();
+  await dokud(async () => (await d.count()) === 0, 2000);
+  await p.waitForTimeout(700);
+  tvrdi('Z5a (390): zavření detailu z oznámení neotevře hned další trest (návrat z okno=1 není nový odkaz)', (await d.count()) === 0);
+
+  const w = widgetLi(p, 'moje-smeny-tresty');
+  await w.locator('[data-tresty-seznam] > li').filter({ hasText: 'Rozlité mléko' }).getByRole('button').first().click();
+  await dokud(() => d.isVisible().catch(() => false), 4000);
+  await poAnimaci(d);
+  const tn = await text(d);
+  tvrdi('Z5a (390): náhrada škody — „Náhrada škody", chip Uplatněno, „Škoda 4 200 Kč · zaviněná škoda", fotka, −2 000 Kč',
+    /Náhrada škody/.test(tn) && /Uplatněno/.test(tn) && /Škoda 4\s?200\s?Kč · zaviněná škoda/.test(tn) && /−2\s?000\s?Kč/.test(tn) && await d.locator('img[alt="Fotka k trestu"]').count() === 1, tn.replace(/\n/g, ' | ').slice(0, 600));
+  await p.screenshot({ path: SNIMKY_Z + 'penize-nahrada-390.png' });
+  await d.getByRole('button', { name: 'Zavřít', exact: true }).last().click();
+  await dokud(async () => (await d.count()) === 0, 2000);
+
+  const tz = await text(w.locator('[data-zaskoky]'));
+  tvrdi('Z5a (390): Moje tresty — „Dostal(a) jsi za záskok · Za opravu: Nedoplněné zásoby… · +300 Kč" bez cizích jmen',
+    /Dostal\(a\) jsi za záskok/.test(tz) && /Za opravu: Nedoplněné zásoby na ranní směnu/.test(tz) && /\+300\s?Kč/.test(tz) && !/Víkendová akce/.test(tz) && !/Tomáš|Petra|Jakub/.test(tz), tz.replace(/\n/g, ' | '));
+  await w.scrollIntoViewIfNeeded();
+  await p.screenshot({ path: SNIMKY_Z + 'penize-moje-tresty-390.png', fullPage: true });
+  tvrdi('Z5a (390): stránka nepřetéká', await preteceni(p) <= 1, `přetečení ${await preteceni(p)} px`);
+  tvrdi('Z5a: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
+// Z5b — nesouhlas s důvodem (390), malá karta na Domů
+{
+  const { ctx, p, stav, chyby } = await kontextPenez({ viewport: TEL, mobil: true, fix: FIX_DOMU });
+  await otevri(p, '/employee/shifts?view=home', 'zamestnanec.domu');
+  const male = widgetLi(p, 'tresty-male');
+  await dokud(() => male.locator('[data-srazky-k-souhlasu]').count().then(n => n > 0), 8000);
+  const tm = await text(male);
+  tvrdi('Z5b (390): malá karta má přednost pro srážku — „Srážka čeká na tvůj souhlas", −1 500 Kč a „Zobrazit dohodu"',
+    /Srážka čeká na tvůj souhlas/.test(tm) && /−1\s?500\s?Kč/.test(tm) && await male.getByRole('button', { name: 'Zobrazit dohodu' }).count() === 1, tm.replace(/\n/g, ' | '));
+  await p.screenshot({ path: SNIMKY_Z + 'penize-domu-mala-390.png', fullPage: true });
+  await male.getByRole('button', { name: 'Zobrazit dohodu' }).click();
+  const d = dialog(p);
+  tvrdi('Z5b (390): „Zobrazit dohodu" otevře detail se souhlasem', await dokud(() => d.locator('[data-souhlas-srazky="501"]').isVisible().catch(() => false), 4000));
+  await poAnimaci(d);
+  const karta = d.locator('[data-souhlas-srazky="501"]');
+  await karta.getByRole('button', { name: 'Nesouhlasím' }).click();
+  const duvod = karta.getByLabel('Proč nesouhlasíš (nepovinné)');
+  tvrdi('Z5b (390): Nesouhlasím → nepovinné „Proč nesouhlasíš" a „Odeslat nesouhlas"', await dokud(() => duvod.isVisible().catch(() => false), 2000) && await karta.getByRole('button', { name: 'Odeslat nesouhlas' }).count() === 1);
+  tvrdi('Z5b (390): pole důvodu má písmo ≥ 16 px', (await duvod.evaluate(el => parseFloat(getComputedStyle(el).fontSize))) >= 16);
+  await duvod.fill('Mlýnek byl rozbitý už ráno, nahlásila jsem to.');
+  await p.screenshot({ path: SNIMKY_Z + 'penize-nesouhlas-390.png' });
+  await karta.getByRole('button', { name: 'Odeslat nesouhlas' }).click();
+  const z = await dokud(() => stav.srazkyZapisy?.find(x => x.nesouhlas), 4000);
+  tvrdi('Z5b (390): PATCH /api/tresty/srazky/501 { nesouhlas: true, duvod }', !!z && z.duvod === 'Mlýnek byl rozbitý už ráno, nahlásila jsem to.', JSON.stringify(z));
+  tvrdi('Z5b (390): Toast „Nesouhlas odeslán — vedení se ti ozve." a v detailu „Tvůj důvod: …"',
+    await dokud(() => p.getByRole('status').filter({ hasText: 'Nesouhlas odeslán — vedení se ti ozve.' }).isVisible().catch(() => false), 4000)
+    && await dokud(async () => /Tvůj důvod: Mlýnek byl rozbitý už ráno/.test(await text(d.locator('[data-nesouhlas]'))), 4000)
+    && await dokud(async () => /Nesouhlasíš/.test(await text(d.locator('[data-srazka="501"]'))), 2000));
+  await p.screenshot({ path: SNIMKY_Z + 'penize-nesouhlas-odeslan-390.png' });
+  tvrdi('Z5b: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
+// Z5c — tmavý režim 390, 1280 a polština 320: karta souhlasu bez přetečení
+for (const [nazev, volby, jazyk] of [['390-tmavy', { viewport: TEL, mobil: true, tmavy: true }, null], ['1280', { viewport: PC, mobil: false }, null], ['320-pl', { viewport: { width: 320, height: 700 }, mobil: true }, 'pl']]) {
+  const { ctx, p, chyby } = await kontextPenez({ ...volby, fix: FIX_ODMENY });
+  if (jazyk) await nastavJazyk(p.context(), jazyk);
+  await otevri(p, '/employee/shifts?view=rewards&arg=tresty', 'zamestnanec.odmeny');
+  const d = dialog(p);
+  await dokud(() => d.locator('[data-souhlas-srazky="501"]').isVisible().catch(() => false), 6000);
+  await poAnimaci(d);
+  tvrdi(`Z5c (${nazev}): karta souhlasu vidět, detail nepřetéká`, await d.locator('[data-souhlas-srazky="501"]').isVisible() && await d.evaluate(el => el.scrollWidth <= el.clientWidth + 1) && await preteceni(p) <= 1);
+  // scrollWidth přesah doleva nevidí (justify-end) — tlačítka se měří proti okraji karty.
+  const kb = await d.locator('[data-souhlas-srazky="501"]').boundingBox();
+  const tl = await d.locator('[data-souhlas-srazky="501"] button').evaluateAll(els => els.map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; }));
+  tvrdi(`Z5c (${nazev}): tlačítka souhlasu leží celá uvnitř karty`, !!kb && tl.length >= 2 && tl.every(([l, r]) => l >= kb.x - 1 && r <= kb.x + kb.width + 1), JSON.stringify({ kb, tl }));
+  if (volby.tmavy) tvrdi('Z5c (tmavý): pozadí je tmavé', await p.evaluate(() => { const c = getComputedStyle(document.body).backgroundColor.match(/\d+/g).map(Number); return c[0] < 80 && c[1] < 80 && c[2] < 80; }));
+  await p.screenshot({ path: SNIMKY_Z + `penize-souhlas-${nazev}.png` });
+  await p.keyboard.press('Escape');
+  await dokud(async () => (await d.count()) === 0, 2000);
+  await p.screenshot({ path: SNIMKY_Z + `penize-moje-tresty-${nazev}.png`, fullPage: true });
+  tvrdi(`Z5c (${nazev}): bez chyb v konzoli`, skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
   await ctx.close();
 }
 
