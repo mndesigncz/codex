@@ -26,6 +26,12 @@
 // Tenhle soubor je čistá logika bez React a bez DB (testy scripts/testy/k86-tresty.ts).
 // Server: app/api/tresty/route.ts, app/api/tresty/[id]/route.ts,
 // app/api/tresty/types/route.ts, app/api/tresty/navrhy/route.ts.
+//
+// Peníze (nenároková složka, náhrada škody, srážka se souhlasem, záskok, hromadné dávky):
+// lib/trestyPenize.ts, kontrakt docs/TRESTY-PENIZE.md. Trest nese `penize` (jen pro toho, koho
+// se týká, a pro finance.mzdy) a `batchId` (společné id hromadného trestu).
+
+import { vyberPenizeTrestu, type PenizeTrestu } from './trestyPenize.ts';
 
 export type StavTrestu = 'plati' | 'zruseno';
 export const STAVY_TRESTU: readonly StavTrestu[] = ['plati', 'zruseno'];
@@ -96,6 +102,10 @@ export interface Trest {
   cancelledAt: string | null;
   cancelNote: string | null;
   createdAt: string;
+  /** Hromadný trest: společné id dávky (každý člověk má vlastní záznam); jinak null. */
+  batchId?: number | null;
+  /** Peněžní část (krácení, srážky, záskok); null = bez peněz nebo je divák nesmí vidět. */
+  penize?: PenizeTrestu | null;
 }
 
 /** Položka sazebníku. */
@@ -131,7 +141,8 @@ export interface NavrhTrestu {
 export interface DataTrestu {
   items: Trest[];
   druhy: DruhTrestu[];
-  smi: { udelit: boolean; sazebnik: boolean; tym: boolean };
+  /** penize = smí peněžní část (finance.mzdy): krácení, srážky, záskok, hromadné odměny. */
+  smi: { udelit: boolean; sazebnik: boolean; tym: boolean; penize?: boolean };
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +193,8 @@ export function vyberTresty(raw: unknown): Trest[] {
       cancelledAt: text(r.cancelledAt),
       cancelNote: text(r.cancelNote),
       createdAt: String(r.createdAt ?? ''),
+      batchId: cele(r.batchId),
+      penize: vyberPenizeTrestu(r.penize),
     });
   }
   return out;
@@ -235,7 +248,7 @@ export function vyberDataTrestu(raw: unknown): DataTrestu {
   return {
     items: vyberTresty(o.items),
     druhy: vyberDruhy(o.druhy),
-    smi: { udelit: smi.udelit === true, sazebnik: smi.sazebnik === true, tym: smi.tym === true },
+    smi: { udelit: smi.udelit === true, sazebnik: smi.sazebnik === true, tym: smi.tym === true, penize: smi.penize === true },
   };
 }
 

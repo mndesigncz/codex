@@ -18,6 +18,7 @@ import { MAX_SHIFT_HOURS, earnedFor } from './wages.ts';
 import { dayPlus, parseDbTime, pragueDayOf, pragueHM, pragueMomentOf } from './pragueTime.ts';
 import { jeSvatek, jeVikend } from './svatky.ts';
 import type { HodnotaDne } from './obdobi.ts';
+import { rozpadVyplaty, type NastaveniSlozky, type RozpadVyplaty } from './trestyPenize.ts';
 
 /**
  * Otevřený příchod delší než tohle je zapomenutý odchod, ne běžící směna —
@@ -1076,6 +1077,10 @@ export interface PayrollClovek {
   hodinyLetosMs?: number;
   zKasy?: number | null; zKasyPocet?: number; uzaverky?: VyplataZKasy[];
   vyplaceno?: number | null; vyplaty?: Vyplata[];
+  /** Nenároková složka výplaty (team_members.nenarokova_*), jen s finance.mzdy; null = žádná. */
+  slozka?: NastaveniSlozky | null;
+  /** Srážky čekající na souhlas zaměstnance (trest v období) — ve výplatě se NEstrhávají, jen ukazují. */
+  cekaNaSouhlas?: number;
 }
 
 export interface CastkyVyplaty { mzda: number | null; priplatky: number; spropitne: number | null; upravy: number; zKasy: number; vyplaceno: number }
@@ -1101,6 +1106,8 @@ export interface RadekVyplaty extends RadekSouhrnu {
   hruba: number;
   doplatit: number;
   stav: StavVyplaty;
+  /** Peníze z trestů a nenároková složka (lib/trestyPenize rozpadVyplaty) — jen když volající předá období a úpravy. */
+  penize?: RozpadVyplaty;
 }
 
 /**
@@ -1108,14 +1115,20 @@ export interface RadekVyplaty extends RadekSouhrnu {
  * (z kasy, vyplaceno, smlouva). Lidé bez záznamu v období, ale s výplatou z kasy, dostanou řádek taky —
  * jinak by se peníze, které odešly, ztratily ze součtu.
  */
-export function vyplatniListina(radky: readonly RadekSouhrnu[], lide: readonly PayrollClovek[]): RadekVyplaty[] {
+export function vyplatniListina(radky: readonly RadekSouhrnu[], lide: readonly PayrollClovek[], penize?: { od: string; do: string; upravy?: readonly UpravaMzdy[] }): RadekVyplaty[] {
   const podle = new Map(lide.map(l => [String(l.id), l]));
   const out = new Map<string, RadekVyplaty>();
+  // Peníze z trestů (kolo 96): s obdobím se spočítá nenároková složka a rozpad úprav. Složka navíc ke mzdě
+  // a krácení nad strop (nenároková složka + nenárokové prémie) se přičtou — nároková mzda se nekrátí.
+  const upravyPo = new Map<string, UpravaMzdy[]>();
+  for (const u of penize?.upravy ?? []) { const k = String(u.userId); upravyPo.set(k, [...(upravyPo.get(k) ?? []), u]); }
   const slozit = (r: RadekSouhrnu, l: PayrollClovek | undefined): RadekVyplaty => {
     const zKasy = Math.round(Number(l?.zKasy) || 0);
     const vyplaceno = Math.round(Number(l?.vyplaceno) || 0);
-    const hruba = (r.mzda ?? 0) + r.priplatky + r.upravy;
-    const d = doplatit({ mzda: r.mzda, priplatky: r.priplatky, spropitne: r.spropitne, upravy: r.upravy, zKasy, vyplaceno });
+    const rp = penize ? rozpadVyplaty({ mzda: r.mzda, ms: r.ms, od: penize.od, do: penize.do, upravy: upravyPo.get(r.id) ?? [], slozka: l?.slozka ?? null, cekaNaSouhlas: l?.cekaNaSouhlas }) : undefined;
+    const navic = rp ? rp.slozkaNavic + rp.kraceniNadStrop : 0;
+    const hruba = (r.mzda ?? 0) + r.priplatky + r.upravy + navic;
+    const d = doplatit({ mzda: r.mzda, priplatky: r.priplatky, spropitne: r.spropitne, upravy: r.upravy + navic, zKasy, vyplaceno });
     const maCo = r.ms > 0 || r.upravy !== 0 || (r.spropitne ?? 0) > 0 || zKasy > 0;
     return {
       ...r,
@@ -1124,6 +1137,7 @@ export function vyplatniListina(radky: readonly RadekSouhrnu[], lide: readonly P
       zKasy, zKasyPocet: Number(l?.zKasyPocet) || (l?.uzaverky?.length ?? 0), uzaverky: l?.uzaverky ?? [],
       vyplaceno, vyplaty: l?.vyplaty ?? [], hruba, doplatit: d,
       stav: vyplaceno > 0 ? 'vyplaceno' : maCo ? 'ceka' : 'nic',
+      ...(rp ? { penize: rp } : {}),
     };
   };
   for (const r of radky) out.set(r.id, slozit(r, podle.get(r.id)));
@@ -1169,18 +1183,32 @@ export function hMM(ms: number): string {
  * CSV pro účetní: jeden řádek na člověka (sloupce listiny) a řádek Celkem. Hlavička česky — soubor jde
  * účetní, ne zaměstnanci; měna jako symbol v hlavičce sloupce, čísla holá, ať je Excel sečte.
  */
-export function csvVyplatniListiny(radky: readonly RadekVyplaty[], o: { od: string; do: string; symbol: string; sazby?: ReadonlyMap<string, number>; priplatky: boolean; spropitne: boolean; smlouvy: boolean }): string[][] {
+export function csvVyplatniListiny(radky: readonly RadekVyplaty[], o: { od: string; do: string; symbol: string; sazby?: ReadonlyMap<string, number>; priplatky: boolean; spropitne: boolean; smlouvy: boolean; /** Sloupce peněz z trestů (řádky s `penize` z vyplatniListina s obdobím). */ penize?: boolean }): string[][] {
   const s = o.symbol;
-  const hlava = ['Jméno', 'Pozice', ...(o.smlouvy ? ['Smlouva'] : []), 'Směny', 'Hodiny', 'Plán', `Sazba (${s})`, `Mzda (${s})`, ...(o.priplatky ? [`Příplatky (${s})`] : []), ...(o.spropitne ? [`Spropitné (${s})`] : []), `Prémie a srážky (${s})`, `Z kasy (${s})`, `Vyplaceno (${s})`, `Doplatit (${s})`, 'Stav', 'Období'];
+  // S penězi z trestů (kolo 96): Mzda = nároková část, Nenároková složka zvlášť, „Prémie a ostatní" bez krácení,
+  // náhrad, srážek a záskoku, které mají vlastní sloupce (kladná čísla se odečítají, záskok se přičítá).
+  // Čeká na souhlas je jen informace — v Doplatit není.
+  const pen = o.penize === true;
+  const hlava = ['Jméno', 'Pozice', ...(o.smlouvy ? ['Smlouva'] : []), 'Směny', 'Hodiny', 'Plán', `Sazba (${s})`, `Mzda (${s})`, ...(pen ? [`Nenároková složka (${s})`] : []), ...(o.priplatky ? [`Příplatky (${s})`] : []), ...(o.spropitne ? [`Spropitné (${s})`] : []),
+    pen ? `Prémie a ostatní (${s})` : `Prémie a srážky (${s})`, ...(pen ? [`Krácení (${s})`, `Náhrada škody (${s})`, `Srážky (${s})`, `Záskok (${s})`, `Čeká na souhlas (${s})`] : []), `Z kasy (${s})`, `Vyplaceno (${s})`, `Doplatit (${s})`, 'Stav', 'Období'];
   const cislo = (n: number | null | undefined) => (n == null ? '' : String(Math.round(n)));
   const stav = (r: RadekVyplaty) => r.stav === 'vyplaceno' ? `vyplaceno ${r.vyplaty.map(v => v.paidAt).filter(Boolean).join(', ')}`.trim() : r.stav === 'ceka' ? 'čeká' : '';
+  const mzdaSloupec = (r: RadekVyplaty) => (pen && r.penize ? r.penize.zakladni : r.mzda);
+  const slozkaSloupec = (r: RadekVyplaty) => r.penize?.slozka ?? 0;
+  const premieSloupec = (r: RadekVyplaty) => (pen && r.penize ? r.penize.premie + r.penize.ostatni : r.upravy);
+  const penizeSloupce = (r: RadekVyplaty) => [r.penize?.kraceniUplatneno ?? 0, r.penize?.nahrada ?? 0, r.penize?.srazky ?? 0, r.penize?.zaskok ?? 0, r.penize?.cekaNaSouhlas ?? 0];
   const radek = (r: RadekVyplaty) => [
     r.jmeno, r.pozice ?? '', ...(o.smlouvy ? [r.smlouva ? nazevSmlouvy(r.smlouva) : ''] : []), String(r.pocet), hMM(r.ms), r.planMs > 0 ? hMM(r.planMs) : '',
-    cislo(o.sazby?.get(r.id) ?? null), cislo(r.mzda), ...(o.priplatky ? [cislo(r.priplatky)] : []), ...(o.spropitne ? [cislo(r.spropitne)] : []),
-    cislo(r.upravy), cislo(r.zKasy), cislo(r.vyplaceno), cislo(r.doplatit), stav(r), `${o.od} – ${o.do}`,
+    cislo(o.sazby?.get(r.id) ?? null), cislo(mzdaSloupec(r)), ...(pen ? [cislo(slozkaSloupec(r))] : []), ...(o.priplatky ? [cislo(r.priplatky)] : []), ...(o.spropitne ? [cislo(r.spropitne)] : []),
+    cislo(premieSloupec(r)), ...(pen ? penizeSloupce(r).map(cislo) : []),
+    cislo(r.zKasy), cislo(r.vyplaceno), cislo(r.doplatit), stav(r), `${o.od} – ${o.do}`,
   ];
   const c = soucetListiny(radky);
-  const celkem = ['Celkem', '', ...(o.smlouvy ? [''] : []), String(c.pocet), hMM(c.ms), c.planMs > 0 ? hMM(c.planMs) : '', '', cislo(c.mzda), ...(o.priplatky ? [cislo(c.priplatky)] : []), ...(o.spropitne ? [cislo(c.spropitne)] : []), cislo(c.upravy), cislo(c.zKasy), cislo(c.vyplaceno), cislo(c.doplatit), '', ''];
+  const suma = (f: (r: RadekVyplaty) => number | null | undefined) => radky.reduce((a, r) => a + (Number(f(r)) || 0), 0);
+  const celkem = ['Celkem', '', ...(o.smlouvy ? [''] : []), String(c.pocet), hMM(c.ms), c.planMs > 0 ? hMM(c.planMs) : '', '', cislo(pen ? suma(mzdaSloupec) : c.mzda), ...(pen ? [cislo(suma(slozkaSloupec))] : []),
+    ...(o.priplatky ? [cislo(c.priplatky)] : []), ...(o.spropitne ? [cislo(c.spropitne)] : []), cislo(pen ? suma(premieSloupec) : c.upravy),
+    ...(pen ? [0, 1, 2, 3, 4].map(i => cislo(suma(r => penizeSloupce(r)[i]))) : []),
+    cislo(c.zKasy), cislo(c.vyplaceno), cislo(c.doplatit), '', ''];
   return [hlava, ...radky.map(radek), celkem];
 }
 
