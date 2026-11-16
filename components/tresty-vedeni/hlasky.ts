@@ -37,6 +37,7 @@ export function prelozHlaskuTrestu(t: PrekladFn, chyba: string): string {
     case 'Vyber druh škody.': return t('Vyber druh škody.');
     case 'Náhrada musí být celé kladné číslo (nejvýš 200 000).': return t('Náhrada musí být celé kladné číslo (nejvýš 200 000).');
     case 'Náhrada nemůže být vyšší než škoda.': return t('Náhrada nemůže být vyšší než škoda.');
+    case 'Dohromady by lidé nahradili víc, než je škoda — zvol Rozpočítat, nebo sniž částku.': return t('Dohromady by lidé nahradili víc, než je škoda — zvol Rozpočítat, nebo sniž částku.');
     case 'Schodek a ztrátu svěřených věcí jde vymáhat jen s podepsanou dohodou o odpovědnosti — zaškrtni ji a doplň datum.':
       return t('Schodek a ztrátu svěřených věcí jde vymáhat jen s podepsanou dohodou o odpovědnosti — zaškrtni ji a doplň datum.');
     case 'Datum dohody o odpovědnosti nemůže být v budoucnu.': return t('Datum dohody o odpovědnosti nemůže být v budoucnu.');

@@ -145,7 +145,7 @@ const podvrh = ({ att = null } = {}) => {
           { id: 16, name: 'Eva Testová', avatar: '👩', role: 'zamestnanec', jobTitle: 'Barista' },
           { id: 17, name: 'Jakub Horák', avatar: '🧔', role: 'zamestnanec', jobTitle: 'Barista' },
           { id: 18, name: 'Tereza Malá', avatar: null, role: 'zamestnanec', jobTitle: 'Kuchař' },
-        ], smena: [16, 17], uzaverka: q.get('closingId') ? [17, 18] : [] });
+        ].map(l => ({ ...l, smlouva: SMLOUVY[l.id] ?? null })), smena: [16, 17], uzaverka: q.get('closingId') ? [17, 18] : [] });
       }
       if (path === '/api/tresty/srazky' && m === 'GET') return json({ items: srazkyTymu.filter(s => !q.get('stav') || s.stav === q.get('stav')) });
       const ms = /^\/api\/tresty\/srazky\/(\d+)$/.exec(path);

@@ -95,5 +95,7 @@
   "Čeká na tvůj souhlas": "Awaiting your consent",
   "čeká na souhlas": "awaiting consent",
   "čeká na tvůj souhlas {castka}": "awaiting your consent {castka}",
-  "Škoda {castka} · {druh}": "Damage {castka} · {druh}"
+  "Škoda {castka} · {druh}": "Damage {castka} · {druh}",
+  "Např. vrácení zálohy": "E.g. repaying an advance",
+  "Bez souhlasu zaměstnance jen to, co dovoluje zákon — třeba vrácení zálohy nebo přeplatku. Manko, škodu a ostatní srážky dej přes trest: zaměstnanec srážku v aplikaci odsouhlasí.": "Without the employee's consent only what the law allows — e.g. repaying an advance or an overpayment. Put cash shortages, damage and other deductions through a penalty: the employee approves the deduction in the app."
 }

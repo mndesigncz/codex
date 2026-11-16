@@ -195,5 +195,8 @@
   "{n, plural, one {# nesouhlas se srážkou} few {# nesouhlasy se srážkou} other {# nesouhlasů se srážkou}}": "{n, plural, one {# nesúhlas so zrážkou} few {# nesúhlasy so zrážkou} other {# nesúhlasov so zrážkou}}",
   "{castka} čeká na souhlas": "{castka} čaká na súhlas",
   "Náhradu škody zapíšeš v detailu uzávěrky.": "Náhradu škody zapíšeš v detaile uzávierky.",
-  "Nesouhlasy se srážkou": "Nesúhlasy so zrážkou"
+  "Nesouhlasy se srážkou": "Nesúhlasy so zrážkou",
+  "Dohromady by lidé nahradili víc, než je škoda — zvol Rozpočítat, nebo sniž částku.": "Spolu by ľudia nahradili viac, než je škoda — zvoľ Rozpočítať, alebo zníž sumu.",
+  "Platí jen tehdy, když ji tak má člověk ve smlouvě nebo mzdovém výměru. Jinak je to nároková mzda a krátit ji nejde.": "Platí len vtedy, keď ju tak má človek v zmluve alebo mzdovom výmere. Inak je to nároková mzda a krátiť ju nejde.",
+  "Stálou nenárokovou složku výplaty nastavíš v profilu člena v sekci Tresty.": "Stálu nenárokovú zložku výplaty nastavíš v profile člena v sekcii Tresty."
 }

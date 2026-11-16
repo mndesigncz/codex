@@ -36,8 +36,11 @@ export function vyberSrazky(raw: unknown): RadekSrazky[] {
   }));
 }
 
-/** GET /api/tresty/vyber: lidé podniku, kdo byl na směně dne a na uzávěrce. */
-export interface VyberLidi { day: string; lide: { id: number; name: string; avatar: string | null; role: string; jobTitle: string | null }[]; smena: number[]; uzaverka: number[] }
+/**
+ * GET /api/tresty/vyber: lidé podniku, kdo byl na směně dne a na uzávěrce. `smlouva` (HPP / DPP / DPC / OSVC / null)
+ * jen s finance.mzdy; `undefined` = server ji neposlal (bez práva) — okno pak řekne obecnou větu.
+ */
+export interface VyberLidi { day: string; lide: { id: number; name: string; avatar: string | null; role: string; jobTitle: string | null; smlouva?: string | null }[]; smena: number[]; uzaverka: number[] }
 
 export function vyberVyberLidi(raw: unknown): VyberLidi {
   const o = (raw ?? {}) as Record<string, unknown>;
@@ -46,6 +49,7 @@ export function vyberVyberLidi(raw: unknown): VyberLidi {
     day: String(o.day ?? ''),
     lide: (Array.isArray(o.lide) ? o.lide as Record<string, unknown>[] : []).filter(l => Number(l?.id) > 0).map(l => ({
       id: Number(l.id), name: String(l.name ?? ''), avatar: typeof l.avatar === 'string' ? l.avatar : null, role: String(l.role ?? ''), jobTitle: typeof l.jobTitle === 'string' ? l.jobTitle : null,
+      ...('smlouva' in l ? { smlouva: typeof l.smlouva === 'string' && l.smlouva ? l.smlouva : null } : {}),
     })),
     smena: ids(o.smena), uzaverka: ids(o.uzaverka),
   };

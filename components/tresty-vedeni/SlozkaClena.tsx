@@ -103,6 +103,12 @@ function OknoSlozky({ clovek, slozka, onClose, onHotovo }: {
                 <p className="t-meta text-pretty mt-1.5">
                   {vSazbe ? t('Výplata se nezmění — jen se z ní tahle část označí jako nenároková.') : t('Platí se navíc ke mzdě z hodin.')}
                 </p>
+                {/* Část dnešní mzdy nejde prohlásit za nenárokovou jednostranně — musí to tak stát ve smlouvě / mzdovém výměru. */}
+                {vSazbe && (
+                  <p className="note note-wait text-sm text-pretty mt-2" data-slozka-smlouva>
+                    {t('Platí jen tehdy, když ji tak má člověk ve smlouvě nebo mzdovém výměru. Jinak je to nároková mzda a krátit ji nejde.')}
+                  </p>
+                )}
               </div>
             </>
           )}

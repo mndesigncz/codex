@@ -100,21 +100,5 @@ export function useStropKraceni(url: string | null): StavDat<StropKraceni> {
   return useDataWidgetu(url, vyberStrop);
 }
 
-/**
- * Typ smlouvy lidí (HPP / DPP / DPC / OSVC / null) pro větu, jestli srážka počká na souhlas.
- * GET /api/tresty/vyber smlouvu nenese — bere se z výplatní listiny (GET /api/payroll, dochazka.zobrazit),
- * stejně jako ji ukazuje Docházka. Bez oprávnění nebo dat null: okno řekne obecnou větu.
- */
-export const urlSmluv = (den: string): string => `/api/payroll?od=${den.slice(0, 7)}-01&do=${den}`;
-export const vyberSmlouvy = (raw: unknown): Map<number, string | null> => {
-  const m = new Map<number, string | null>();
-  const lide = (raw as { lide?: unknown } | null)?.lide;
-  for (const l of Array.isArray(lide) ? (lide as Record<string, unknown>[]) : []) {
-    const id = Number(l?.id);
-    if (id > 0) m.set(id, typeof l.contractType === 'string' && l.contractType ? l.contractType : null);
-  }
-  return m;
-};
-export function useSmlouvy(url: string | null): StavDat<Map<number, string | null>> {
-  return useDataWidgetu(url, vyberSmlouvy);
-}
+// Typ smlouvy lidí (věta, jestli srážka počká na souhlas) nese GET /api/tresty/vyber u každého člověka
+// (`smlouva`, jen s finance.mzdy) — viz components/tresty-penize/data.ts VyberLidi.

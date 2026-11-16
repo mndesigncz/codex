@@ -113,16 +113,18 @@ export const teloZaskoku = (f: PoleZaskoku): Record<string, unknown> => ({ zasko
  */
 export function chybaPenez(f: FormularPenez, pocetLidi: number, dnes: string): string | null {
   const telo = teloPenez(f, pocetLidi);
+  // „Rozpočítat" u dávky: stropy částek platí na člověka (jako server); u náhrady „každý" součet ≤ škoda.
+  const rozpocitat = pocetLidi > 1 && f.rozpocitat;
   if (f.rezim === 'kraceni' && f.kraceni.trim() && !/^\d+$/.test(f.kraceni.trim())) return 'Krácení prémie musí být celé číslo (nejvýš 5 000).';
   if (f.rezim === 'srazka' && f.srazka.trim()) {
     if (!/^\d+$/.test(f.srazka.trim())) return 'Srážka musí být celé kladné číslo (nejvýš 200 000).';
-    const s = validujSrazku(telo.srazka);
+    const s = validujSrazku(telo.srazka, rozpocitat ? pocetLidi : 1);
     if (!s.ok) return s.chyba;
   }
   if (f.rezim === 'nahrada' && (f.skoda.trim() || f.nahrada.trim())) {
     if (!f.skoda.trim() || !/^\d+$/.test(f.skoda.trim())) return 'Výše škody musí být celé kladné číslo.';
     if (f.nahrada.trim() && !/^\d+$/.test(f.nahrada.trim())) return 'Náhrada musí být celé kladné číslo (nejvýš 200 000).';
-    const n = validujNahradu(telo.nahrada, dnes);
+    const n = validujNahradu(telo.nahrada, dnes, { lidi: Math.max(1, pocetLidi), rozpocitat });
     if (!n.ok) return n.chyba;
   }
   if (pocetLidi > 1 && f.rozpocitat && castkyNaOsobu(f, pocetLidi).some(c => c <= 0) && castkaPenez(f) > 0) return 'Po rozpočítání by někomu vyšlo 0 — zvyš částku.';

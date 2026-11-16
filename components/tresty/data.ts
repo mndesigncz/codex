@@ -12,9 +12,9 @@
 import { useEffect } from 'react';
 import { obnovDataWidgetu, useDataWidgetu, type StavDat } from '../widgety/useDataWidgetu';
 import { UDALOST_TRESTY, vyberDataTrestu, type DataTrestu } from '@/lib/tresty';
-import { ApiError, okJson, statusMessage } from '@/lib/api';
-import { URL_SRAZKY, jeStavSrazky, type StavSrazky } from '@/lib/trestyPenize';
-import { obnovPenize } from '../tresty-penize/data';
+import { ApiError } from '@/lib/api';
+import { jeStavSrazky, type StavSrazky } from '@/lib/trestyPenize';
+import { obnovPenize, souhlasSeSrazkou } from '../tresty-penize/data';
 
 const POUZITE = new Set<string>();
 
@@ -47,22 +47,20 @@ export type VysledekSouhlasu =
   | { ok: false; zneni: string; chyba: string };
 
 /**
- * „Souhlasím se srážkou": stejné volání jako `souhlasSeSrazkou` (components/tresty-penize/data), jen 409
- * se změněným zněním neskončí výjimkou — tělo odpovědi nese nové `zneni` a to se má hned ukázat
- * (ApiError z okJson extra pole odpovědi nenese). Ostatní chyby vyhodí ApiError s větou serveru.
- * Po každé odpovědi se obnoví tresty, srážky i výplaty (obnovPenize).
+ * „Souhlasím se srážkou": sdílená akce `souhlasSeSrazkou` (components/tresty-penize/data), jen 409
+ * se změněným zněním neskončí výjimkou — ApiError nese tělo odpovědi (`data.zneni`) a nové znění se má
+ * hned ukázat. Ostatní chyby vyhodí ApiError s větou serveru. Obnovu (obnovPenize) dělá sdílená akce.
  */
 export async function souhlasimSeSrazkou(id: number, zneni: string): Promise<VysledekSouhlasu> {
-  const r = await fetch(`${URL_SRAZKY}/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ souhlas: true, zneni }) });
-  if (r.status === 409) {
-    let telo: { error?: unknown; zneni?: unknown } | null = null;
-    try { telo = await r.json(); } catch { /* chybová odpověď nemusí být JSON */ }
-    obnovPenize();
-    const veta = typeof telo?.error === 'string' && telo.error ? telo.error : statusMessage(409);
-    if (typeof telo?.zneni === 'string' && telo.zneni.trim()) return { ok: false, zneni: telo.zneni, chyba: veta };
-    throw new ApiError(409, veta);
+  try {
+    const d = await souhlasSeSrazkou(id, zneni);
+    return { ok: true, stav: jeStavSrazky(d?.srazka?.stav) ? d.srazka.stav : 'uplatneno', odDne: typeof d?.srazka?.odDne === 'string' ? d.srazka.odDne : null };
+  } catch (e) {
+    const nove = e instanceof ApiError && e.status === 409 ? e.data?.zneni : null;
+    if (typeof nove === 'string' && nove.trim()) {
+      obnovPenize();
+      return { ok: false, zneni: nove, chyba: (e as ApiError).message };
+    }
+    throw e;
   }
-  const d = await okJson(r);
-  obnovPenize();
-  return { ok: true, stav: jeStavSrazky(d?.srazka?.stav) ? d.srazka.stav : 'uplatneno', odDne: typeof d?.srazka?.odDne === 'string' ? d.srazka.odDne : null };
 }

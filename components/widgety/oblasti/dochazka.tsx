@@ -1374,8 +1374,20 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
           </Field>
         </div>
         <Field id="uprava-poznamka" label={t('Poznámka')} hint={t('Za co — uvidí ji i člověk v oznámení.')}>
-          <Input id="uprava-poznamka" value={poznamka} onChange={e => setPoznamka(e.target.value)} maxLength={200} placeholder={druh === 'premie' ? t('Např. víkendová akce') : t('Např. manko v kase')} />
+          <Input id="uprava-poznamka" value={poznamka} onChange={e => setPoznamka(e.target.value)} maxLength={200} placeholder={druh === 'premie' ? t('Např. víkendová akce') : t('Např. vrácení zálohy')} />
         </Field>
+        {/* Ruční srážka nemá souhlas zaměstnance (dohodu o srážce) — jen co dovoluje zákon bez něj. Manko a škoda jdou
+            přes trest (náhrada škody / srážka se souhlasem), jinak by šlo o zakázanou peněžní pokutu (§ 346b ZP). */}
+        {druh === 'srazka' && (
+          <div className="note note-wait text-sm text-pretty" data-veta-rucni-srazka>
+            <p>{t('Bez souhlasu zaměstnance jen to, co dovoluje zákon — třeba vrácení zálohy nebo přeplatku. Manko, škodu a ostatní srážky dej přes trest: zaměstnanec srážku v aplikaci odsouhlasí.')}</p>
+            {nav.smiPohled('rewards') && (
+              <Button variant="ghost" size="sm" icon="chevronRight" className="mt-1 -ml-2" onClick={() => { onClose(); nav.onNavigate('rewards', 'tresty'); }} data-odkaz-tresty-srazka>
+                {t('Otevřít tresty')}
+              </Button>
+            )}
+          </div>
+        )}
         {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
         {upravy.length > 0 && (
           <div>

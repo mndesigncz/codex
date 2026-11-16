@@ -37,7 +37,7 @@ import { VolbaRadek, VolbyRadky } from '../ui/Volby';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useOpravneni } from '../role/useOpravneni';
 import { obnovPenize, urlVyberu, useVyberLidi } from '../tresty-penize/data';
-import { obnovTresty, urlSmluv, urlStropu, useSazebnik, useSmlouvy, useStropKraceni, useTresty } from './data';
+import { obnovTresty, urlStropu, useSazebnik, useStropKraceni, useTresty } from './data';
 import { prelozHlaskuTrestu } from './hlasky';
 import { krokBodu, kraceniVMezich, meniDopad, predvyplnitText, teloTrestu, teloUpravy, type FormularTrestu, type PredvolbyTrestu } from './logika';
 import { castkaPenez, chybaPenez, kraceniZPenez, prazdnePenize, souhrnPenez, strhavaSe, teloPenez, type FormularPenez } from './penize';
@@ -135,7 +135,8 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
   const closingId = upravit?.closingId ?? predvolby?.closingId ?? null;
   const strhava = smiPenize && !upravit && strhavaSe(penize);
   // Lidé k výběru (jeden, víc, záskok): GET /api/tresty/vyber pro den trestu (osádka směny, uzávěrka).
-  const potrebaVyberu = open && !upravit && (!pevnyId || !pevneJmeno || vic || (strhava && penize.zaskokKomu !== 'podnik'));
+  // Se srážkou / náhradou i kvůli smlouvě (vyber ji nese s finance.mzdy): věta „počká na souhlas" a souhrn = server.
+  const potrebaVyberu = open && !upravit && (!pevnyId || !pevneJmeno || vic || (strhava && (penize.zaskokKomu !== 'podnik' || penize.rezim !== 'kraceni')));
   const denOk = !!platnyDen(den, dnes);
   const vyber = useVyberLidi(potrebaVyberu && denOk ? urlVyberu(den, closingId) : null);
   const sazebnik = useSazebnik(open ? URL_DRUHY_TRESTU : null);
@@ -166,8 +167,6 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
   // Strop se mění s každým krácením: při otevření ho vždy načíst znovu (mezipaměť widgetů drží 30 s).
   const obnovStrop = strop.reload;
   useEffect(() => { if (open) obnovStrop(); }, [open, obnovStrop]);
-  // Smlouvy (věta, jestli srážka počká na souhlas) z výplatní listiny — jen u srážky a náhrady.
-  const smlouvy = useSmlouvy(open && smiPenize && ma('dochazka.zobrazit') && penize.rezim !== 'kraceni' && denOk && !upravit ? urlSmluv(den) : null);
 
   const stropKc = jeden ? stropServeru ?? strop.data?.strop ?? null : null;
   const nenarokova = strop.data ? strop.data.premie + strop.data.slozka + strop.data.zaskok : null;
@@ -184,7 +183,11 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
   const zmeny = upravit ? teloUpravy(formular(), upravit) : null;
   const osadka = useMemo(() => [...new Set([...(vyber.data?.smena ?? []), ...(closingId ? vyber.data?.uzaverka ?? [] : [])])]
     .map(id => ({ id, jmeno: vyber.data?.lide.find(l => l.id === id)?.name ?? '' })), [vyber.data, closingId]);
-  const smlouvaId = (id: number): string | null | undefined => (smlouvy.data ? smlouvy.data.get(id) ?? null : undefined);
+  // Smlouva z GET /api/tresty/vyber (s finance.mzdy); undefined = zatím nenačteno → obecná věta, souhrn počítá se souhlasem.
+  const smlouvaId = (id: number): string | null | undefined => {
+    const l = vyber.data?.lide.find(x => x.id === id);
+    return l && 'smlouva' in l ? l.smlouva ?? null : undefined;
+  };
   const souhrn = strhava ? souhrnPenez({
     f: penize, lide: ids.map(id => ({ id, jmeno: jmenoId(id) || (id === userId ? jmeno : ''), smlouva: penize.rezim === 'kraceni' ? null : smlouvaId(id) })),
     osadka, jmena: new Map((vyber.data?.lide ?? []).map(l => [l.id, l.name])),
@@ -230,7 +233,9 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
     const zaklad = upravit ? teloUpravy(f, upravit) : teloTrestu({ ...f, userId: String(ids[0]) }, predvolby ?? {});
     // Stejná pravidla jako na serveru — hláška je vidět dřív, než požadavek odejde.
     // Úprava staršího trestu z manka nesmí spadnout na pravidle „manko trestem není" — klíč návrhu se při úpravě neposílá.
-    const v = validujTrest(upravit ? { ...upravit, ...zaklad, userId: upravit.userId, sourceKey: null } : zaklad, dnes);
+    // „Rozpočítat" u dávky: strop krácení 5 000 platí na člověka (stejně jako server).
+    const v = validujTrest(upravit ? { ...upravit, ...zaklad, userId: upravit.userId, sourceKey: null } : zaklad, dnes,
+      { rozpocitatMezi: !upravit && smiPenize && ids.length > 1 && penize.rozpocitat ? ids.length : 1 });
     if (!v.ok) { setChyba(prelozHlaskuTrestu(t, v.chyba)); return; }
     if (nadStrop) { setChybaKraceni(vetaStropu(stropKc ?? 0)); return; }
     if (smiPenize && !upravit) {
@@ -301,7 +306,7 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
     : !userId
       ? t('Vyber člověka — ukáže se, kolik jde krátit.')
       : bezPremii
-        ? t('Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není. Založ ji v Docházce → Prémie a srážky jako „Nenároková prémie“. Starší prémie bez typu se nepočítají.')
+        ? `${t('Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není. Založ ji v Docházce → Prémie a srážky jako „Nenároková prémie“. Starší prémie bez typu se nepočítají.')} ${t('Stálou nenárokovou složku výplaty nastavíš v profilu člena v sekci Tresty.')}`
         : strop.data
           ? strop.data.slozka > 0
             ? t('Nenároková složka {slozka} + prémie {premie} · krátit jde nejvýš {strop}', { slozka: money(strop.data.slozka), premie: money(strop.data.premie + strop.data.zaskok), strop: money(stropKc ?? 0) })
@@ -419,7 +424,7 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
           {smiPenize && (
             <SekcePenez f={upravit ? { ...penize, rezim: 'kraceni' } : penize} zmen={zmenPenize} pocetLidi={Math.max(1, ids.length)} symbol={symbol} money={money}
               jenKraceni={!!upravit} hintKraceni={hintKraceni} kraceniVypnuto={bezPremii && kraceniCislo === 0}
-              maxKraceni={Math.min(MAX_KRACENI, stropKc ?? MAX_KRACENI)}
+              maxKraceni={Math.min(MAX_KRACENI * (!upravit && ids.length > 1 && penize.rozpocitat ? ids.length : 1), stropKc ?? Infinity)}
               chybaKraceni={chybaKraceni ?? (nadStrop && kraceniCislo > 0 && stropKc ? t('Krátit jde nejvýš {castka}.', { castka: money(stropKc) }) : null)}
               chybaNahrady={chybaNahrady} smlouvy={ids.length ? ids.map(id => smlouvaId(id)) : null} dnes={dnes} />
           )}

@@ -195,5 +195,8 @@
   "{n, plural, one {# nesouhlas se srážkou} few {# nesouhlasy se srážkou} other {# nesouhlasů se srážkou}}": "{n, plural, one {# deduction disagreement} other {# deduction disagreements}}",
   "{castka} čeká na souhlas": "{castka} awaiting consent",
   "Náhradu škody zapíšeš v detailu uzávěrky.": "Record damages in the closing detail.",
-  "Nesouhlasy se srážkou": "Deduction disagreements"
+  "Nesouhlasy se srážkou": "Deduction disagreements",
+  "Dohromady by lidé nahradili víc, než je škoda — zvol Rozpočítat, nebo sniž částku.": "Together the people would pay back more than the damage — choose Split, or lower the amount.",
+  "Platí jen tehdy, když ji tak má člověk ve smlouvě nebo mzdovém výměru. Jinak je to nároková mzda a krátit ji nejde.": "This only applies if the person's contract or pay statement says so. Otherwise it's guaranteed pay and can't be cut.",
+  "Stálou nenárokovou složku výplaty nastavíš v profilu člena v sekci Tresty.": "A fixed discretionary part of pay can be set in the member's profile, in the Penalties section."
 }

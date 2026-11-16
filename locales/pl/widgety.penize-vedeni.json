@@ -195,5 +195,8 @@
   "{n, plural, one {# nesouhlas se srážkou} few {# nesouhlasy se srážkou} other {# nesouhlasů se srážkou}}": "{n, plural, one {# brak zgody na potrącenie} few {# braki zgody na potrącenie} many {# braków zgody na potrącenie} other {# braku zgody na potrącenie}}",
   "{castka} čeká na souhlas": "{castka} czeka na zgodę",
   "Náhradu škody zapíšeš v detailu uzávěrky.": "Odszkodowanie zapiszesz w szczegółach zamknięcia.",
-  "Nesouhlasy se srážkou": "Brak zgody na potrącenia"
+  "Nesouhlasy se srážkou": "Brak zgody na potrącenia",
+  "Dohromady by lidé nahradili víc, než je škoda — zvol Rozpočítat, nebo sniž částku.": "Razem osoby pokryłyby więcej, niż wynosi szkoda — wybierz Rozdziel albo zmniejsz kwotę.",
+  "Platí jen tehdy, když ji tak má člověk ve smlouvě nebo mzdovém výměru. Jinak je to nároková mzda a krátit ji nejde.": "Obowiązuje tylko wtedy, gdy tak stoi w umowie lub w warunkach wynagrodzenia. Inaczej to wynagrodzenie gwarantowane i nie wolno go obniżyć.",
+  "Stálou nenárokovou složku výplaty nastavíš v profilu člena v sekci Tresty.": "Stałą uznaniową część wypłaty ustawisz w profilu członka w sekcji Kary."
 }

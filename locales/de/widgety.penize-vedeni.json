@@ -195,5 +195,8 @@
   "{n, plural, one {# nesouhlas se srážkou} few {# nesouhlasy se srážkou} other {# nesouhlasů se srážkou}}": "{n, plural, one {# Ablehnung eines Abzugs} other {# Ablehnungen von Abzügen}}",
   "{castka} čeká na souhlas": "{castka} warten auf Zustimmung",
   "Náhradu škody zapíšeš v detailu uzávěrky.": "Schadenersatz erfasst du im Detail des Abschlusses.",
-  "Nesouhlasy se srážkou": "Ablehnungen von Abzügen"
+  "Nesouhlasy se srážkou": "Ablehnungen von Abzügen",
+  "Dohromady by lidé nahradili víc, než je škoda — zvol Rozpočítat, nebo sniž částku.": "Zusammen würden die Leute mehr ersetzen, als der Schaden beträgt — wähle Aufteilen oder senke den Betrag.",
+  "Platí jen tehdy, když ji tak má člověk ve smlouvě nebo mzdovém výměru. Jinak je to nároková mzda a krátit ji nejde.": "Gilt nur, wenn es so im Vertrag oder Lohnbescheid der Person steht. Sonst ist es fester Lohn und darf nicht gekürzt werden.",
+  "Stálou nenárokovou složku výplaty nastavíš v profilu člena v sekci Tresty.": "Einen festen freiwilligen Lohnanteil stellst du im Profil des Mitglieds im Bereich Strafen ein."
 }

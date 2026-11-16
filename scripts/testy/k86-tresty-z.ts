@@ -157,6 +157,8 @@ export default function ({ eq, ok }: Testy) {
   const dataSrc = zdroj('components/tresty/data.ts');
   ok('souhlas: tlačítka „Souhlasím se srážkou {castka}" a „Nesouhlasím", znění celé (whitespace-pre-line, bez line-clamp)',
     souhlasSrc.includes("t('Souhlasím se srážkou {castka}'") && souhlasSrc.includes("t('Nesouhlasím')") && /data-zneni/.test(souhlasSrc) && !/line-clamp/.test(souhlasSrc));
-  ok('souhlas: PATCH { souhlas: true, zneni } a na 409 nové znění z těla odpovědi', /souhlas: true, zneni/.test(dataSrc) && /r\.status === 409/.test(dataSrc) && /telo\?\.zneni/.test(dataSrc) && /obnovPenize\(\)/.test(dataSrc));
+  // Kontrola kola 96: souhlas jde sdílenou akcí (PATCH { souhlas: true, zneni } v tresty-penize/data), 409 nese nové znění v ApiError.data.
+  ok('souhlas: PATCH { souhlas: true, zneni } a na 409 nové znění z těla odpovědi', /souhlas: true, zneni/.test(zdroj('components/tresty-penize/data.ts'))
+    && /souhlasSeSrazkou\(id, zneni\)/.test(dataSrc) && /e\.status === 409/.test(dataSrc) && /data\?\.zneni/.test(dataSrc) && /obnovPenize\(\)/.test(dataSrc));
   ok('nesouhlas: přes nesouhlasSeSrazkou z components/tresty-penize/data (push vedení dělá server)', /nesouhlasSeSrazkou\(srazka\.id/.test(souhlasSrc));
 }
