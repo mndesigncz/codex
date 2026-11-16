@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   ARG_TRESTY, VETA_DLOUHY_DUVOD, VETA_ZMENENE_ZNENI, akceTrestu, castkaKSouhlasu, filtrujTresty, kSouhlasu, nepotvrzene, penizeProZamestnance, poctyFiltru,
-  poradiVMesici, prijateZaskoky, sloucTrest, srazkaKSouhlasu, trestKOtevreni, trestyMesice, validujDuvod, validujVyjadreni,
+  poradiVMesici, prijateZaskoky, sloucTrest, souhrnPenezMesice, srazkaKSouhlasu, trestKOtevreni, trestyMesice, validujDuvod, validujVyjadreni,
 } from '../../components/tresty/logika.ts';
 import type { PenizeTrestu, SrazkaTrestu } from '../../lib/trestyPenize.ts';
 
@@ -121,6 +121,8 @@ export default function ({ eq, ok }: Testy) {
   ];
   eq('k souhlasu: jen čekající srážky platných trestů, nejnovější trest první', kSouhlasu(sPenezi).map(x => [x.trest.id, x.srazka.id]), [[33, 8], [32, 7]]);
   eq('k souhlasu: součet 2 300', castkaKSouhlasu(sPenezi), 2300);
+  eq('souhrn měsíce: trest jen se srážkou není napomenutí; srážky čekající i uplatněné (bez zrušeného trestu) = 3 800',
+    souhrnPenezMesice([...sPenezi, tr({ id: 36, day: '2026-10-03', points: 0 })], '2026-10'), { napomenuti: 1, srazky: 1500 + 800 + 1500 });
   eq('k souhlasu: srážka trestu (čekající / uplatněná / zrušený trest)', [srazkaKSouhlasu(sPenezi[1])?.id, srazkaKSouhlasu(sPenezi[4]), srazkaKSouhlasu(sPenezi[3])], [7, null, null]);
   eq('z oznámení: trest se srážkou k souhlasu má přednost před nepotvrzeným', trestKOtevreni(sPenezi)?.id, 33);
   eq('z oznámení: bez srážek k souhlasu jako dřív (nejnovější nepotvrzený)', trestKOtevreni(sPenezi.filter(x => x.id !== 32 && x.id !== 33))?.id, 31);

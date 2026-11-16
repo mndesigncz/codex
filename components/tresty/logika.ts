@@ -151,6 +151,22 @@ export function penizeProZamestnance(t: Pick<Trest, 'status' | 'penize' | 'bonus
   };
 }
 
+/**
+ * Souhrn peněz měsíce pro widget: napomenutí = platný trest bez bodů, bez krácení a bez živé srážky
+ * (lib souhrnTrestu srážky nezná a trest jen se srážkou by počítal jako napomenutí); `srazky` = součet
+ * srážek a náhrad platných trestů, které čekají nebo se strhávají (nesouhlas a zrušené ne).
+ */
+export function souhrnPenezMesice(items: readonly Trest[], mesic: string): { napomenuti: number; srazky: number } {
+  let napomenuti = 0, srazky = 0;
+  for (const t of items) {
+    if (t.status !== 'plati' || !t.day.startsWith(mesic)) continue;
+    const zive = (t.penize?.srazky ?? []).filter(s => s.stav === 'ceka' || s.stav === 'uplatneno');
+    srazky += zive.reduce((a, s) => a + s.castka, 0);
+    if (!t.points && !t.bonusCut && !(t.penize?.srazky ?? []).some(s => s.stav !== 'zruseno')) napomenuti++;
+  }
+  return { napomenuti, srazky };
+}
+
 /** Přijatý záskok (úprava mzdy se `source` zaskok): za co a kolik — bez cizích jmen (poznámka nese jen text trestu). */
 export interface PrijatyZaskok { id: number; den: string; castka: number; zaCo: string; oprava: boolean }
 

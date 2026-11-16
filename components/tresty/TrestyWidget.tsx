@@ -30,7 +30,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { minulyMesic } from '@/lib/odmenyPrehled';
 import { URL_TRESTY, souhrnTrestu, urlTresty, type SouhrnTrestu, type Trest } from '@/lib/tresty';
-import { filtrujTresty, kSouhlasu, nepotvrzene, poctyFiltru, srazkaKSouhlasu, trestyMesice, type FiltrTrestu } from './logika';
+import { filtrujTresty, kSouhlasu, souhrnPenezMesice, nepotvrzene, poctyFiltru, srazkaKSouhlasu, trestyMesice, type FiltrTrestu } from './logika';
 import { StavSrazkyChip, StavTrestuChip, bodyDolu, dopadTrestu, srazkaKratce } from './kusy';
 import { ZaskokySeznam, usePrijateZaskoky } from './Zaskoky';
 import { obnovTresty, useDataTresty } from './data';
@@ -52,7 +52,8 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
   const data = useDataTresty(urlTresty());
   const vse = useMemo(() => data.data?.items ?? [], [data.data]);
   const items = useMemo(() => trestyMesice(vse, mesic), [vse, mesic]);
-  const souhrn = useMemo(() => souhrnTrestu(vse, mesic), [vse, mesic]);
+  // Kolo 96: napomenutí jen bez srážky (lib souhrnTrestu srážky nezná) a součet srážek / náhrad měsíce.
+  const souhrn = useMemo(() => ({ ...souhrnTrestu(vse, mesic), ...souhrnPenezMesice(vse, mesic) }), [vse, mesic]);
   const kPotvrzeni = useMemo(() => nepotvrzene(vse), [vse]);
   // Kolo 96: srážky / náhrady škody čekající na můj souhlas mají přednost před „Beru na vědomí".
   const souhlasy = useMemo(() => kSouhlasu(vse), [vse]);
@@ -213,15 +214,16 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
 }
 
 /** Malá karta bez nepotvrzených: „2 tresty · −30 b" (napomenutí bez bodů jen počtem). */
-function souhrnKratce(t: PrekladFn, s: SouhrnTrestu, money: (n: number) => string): string {
+function souhrnKratce(t: PrekladFn, s: SouhrnTrestu & { srazky?: number }, money: (n: number) => string): string {
   const casti = [t('{n, plural, one {# trest} few {# tresty} other {# trestů}}', { n: s.pocet })];
   if (s.body) casti.push(bodyDolu(t, s.body));
   if (s.kraceni) casti.push(t('krácení {castka}', { castka: money(s.kraceni) }));
+  if (s.srazky) casti.push(t('srážky {castka}', { castka: money(s.srazky) }));
   return casti.join(' · ');
 }
 
 /** Souhrn měsíce ve velké kartě: „2 tresty · −30 b · krácení 300 · 1 napomenutí · 1 zrušený". */
-function souhrnDlouze(t: PrekladFn, s: SouhrnTrestu, money: (n: number) => string): string {
+function souhrnDlouze(t: PrekladFn, s: SouhrnTrestu & { srazky?: number }, money: (n: number) => string): string {
   if (s.pocet === 0 && s.zrusenych === 0) return t('bez trestů');
   const casti = [souhrnKratce(t, s, money)];
   if (s.napomenuti) casti.push(t('z toho napomenutí: {n}', { n: s.napomenuti }));

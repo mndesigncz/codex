@@ -49,10 +49,10 @@ function RadekSrazky({ s, zrusenyTrest }: { s: SrazkaTrestu; zrusenyTrest: boole
           s.rozvrh.length > 1 ? (
             <p data-rozvrh>{t('Splátky: {splatky}', { splatky: s.rozvrh.map(x => `${den(x.den)} −${money(x.castka)}`).join(' · ') })}</p>
           ) : (
-            <p data-rozvrh>{s.odDne ? t('Strhne se z výplaty od {den}.', { den: den(s.odDne) }) : t('Strhne se z nejbližší výplaty.')}</p>
+            <p data-rozvrh>{s.odDne ? t('Strhne se z výplaty od {den}', { den: den(s.odDne) }) : t('Strhne se z nejbližší výplaty.')}</p>
           )
         )}
-        {s.stav === 'uplatneno' && s.souhlasAt && <p>{t('Souhlasil(a) jsi {den}.', { den: den(s.souhlasAt.slice(0, 10)) })}</p>}
+        {s.stav === 'uplatneno' && s.souhlasAt && <p>{t('Souhlasil(a) jsi {den}', { den: den(s.souhlasAt.slice(0, 10)) })}</p>}
         {s.stav === 'nesouhlas' && (
           <p data-nesouhlas>
             {t('Nesouhlasíš — nic se nestrhne. Vedení se ti ozve.')}

@@ -46,13 +46,15 @@ export function SouhlasSeSrazkou({ srazka, nahled = false, onHotovo }: {
   const money = useMoney();
   const idNadpisu = useId();
   const [noveZneni, setNoveZneni] = useState<string | null>(null);
+  // Upozornění „znění se změnilo" drží, dokud člověk znovu nepotvrdí — i když přenačtený seznam už nese nové znění.
+  const [zmeneno, setZmeneno] = useState(false);
   const [nesouhlas, setNesouhlas] = useState(false);
   const [duvod, setDuvod] = useState('');
   const [chyba, setChyba] = useState<string | null>(null);
   const [ukladam, setUkladam] = useState<'souhlas' | 'nesouhlas' | null>(null);
 
   // Jiná srážka = čisté čtení. Nové znění ze serveru (po přenačtení) přebije to z 409, jen když se liší.
-  useEffect(() => { setNoveZneni(null); setNesouhlas(false); setDuvod(''); setChyba(null); setUkladam(null); }, [srazka.id]);
+  useEffect(() => { setNoveZneni(null); setZmeneno(false); setNesouhlas(false); setDuvod(''); setChyba(null); setUkladam(null); }, [srazka.id]);
   useEffect(() => { if (noveZneni && srazka.zneni === noveZneni) setNoveZneni(null); }, [srazka.zneni, noveZneni]);
   const zneni = noveZneni ?? srazka.zneni;
   const castka = money(srazka.castka);
@@ -65,7 +67,9 @@ export function SouhlasSeSrazkou({ srazka, nahled = false, onHotovo }: {
       const v = await souhlasimSeSrazkou(srazka.id, zneni);
       if (!v.ok) {
         setNoveZneni(v.zneni);
-        setChyba(prelozHlaskuSrazky(t, v.chyba));
+        setZmeneno(true);
+        // Věta serveru o změně by jen opakovala upozornění nad zněním — chyba se ukáže jen jiná.
+        setChyba(v.chyba === VETA_ZMENENE_ZNENI ? null : prelozHlaskuSrazky(t, v.chyba));
       } else {
         onHotovo(t('Souhlas uložen — srážka se uplatní ve výplatě.'));
       }
@@ -90,7 +94,6 @@ export function SouhlasSeSrazkou({ srazka, nahled = false, onHotovo }: {
     setUkladam(null);
   };
 
-  const zmeneno = noveZneni != null;
   return (
     <section className="card-wait border rounded-2xl p-4 space-y-3" aria-labelledby={idNadpisu} data-souhlas-srazky={srazka.id}>
       <div className="space-y-1">
@@ -132,7 +135,7 @@ export function SouhlasSeSrazkou({ srazka, nahled = false, onHotovo }: {
 
       {chyba && <p className="note note-danger text-sm text-pretty" role="alert" data-chyba-souhlasu>{chyba}</p>}
 
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-2">
         {nesouhlas ? (
           <>
             <Button variant="secondary" onClick={() => { setNesouhlas(false); setChyba(null); }} disabled={ukladam != null}>{t('Zpět')}</Button>
