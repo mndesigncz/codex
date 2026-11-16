@@ -2,9 +2,15 @@
 // založení a zrušení trestu (body dolů → point_awards kind 'trest' záporně,
 // krácení prémie → wage_adjustments source 'trest' záporně), strop krácení
 // a oznámení. Čistá pravidla jsou v lib/tresty.ts.
+//
+// Kolo 96 (peníze): krácení už nezakládá zalozTrest, ale lib/trestyPenizeDb prepocitejPenizeTrestu
+// (spolu se srážkami a záskokem, s ohledem na uzavřená období). Strop krácení počítá i nenárokovou
+// složku výplaty člena (lib/trestyPenize stropKraceniMesice).
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { slozkaMesiceDb } from '@/lib/trestyPenizeDb';
+import { stropKraceniMesice } from '@/lib/trestyPenize';
 import { ZDROJ_NENAROKOVE_PREMIE, oznameniTrest, oznameniVyjadreni, oznameniZruseni, stropKraceni, type StavTrestu, type Trest, type ZdrojTrestu } from '@/lib/tresty';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -51,21 +57,39 @@ export function tvarTrestu(r: any): Trest {
     cancelledAt: iso(r.cancelled_at),
     cancelNote: r.cancel_note ?? null,
     createdAt: iso(r.created_at) ?? '',
+    batchId: cele(r.batch_id),
+    penize: null,
   };
 }
 
 export async function nactiTrest(id: number, teamId: number): Promise<any | null> {
-  const [row] = await sql`
-    SELECT p.id, p.user_id, p.given_by, p.day, p.shift_id, p.closing_id, p.task_id, p.type_id, p.type_title, p.text, p.photo_url,
-      p.points, p.bonus_cut, p.status, p.source, p.source_key, p.award_id, p.adjustment_id, p.seen_at, p.response, p.response_at,
-      p.disputed, p.dispute_handled_at, p.cancelled_by, p.cancelled_at, p.cancel_note, p.created_at,
-      u.name AS user_name, u.avatar AS user_avatar, g.name AS given_by_name, x.name AS cancelled_by_name
-    FROM penalties p
-    LEFT JOIN users u ON u.id = p.user_id
-    LEFT JOIN users g ON g.id = p.given_by
-    LEFT JOIN users x ON x.id = p.cancelled_by
-    WHERE p.id = ${id} AND p.team_id = ${teamId}`;
-  return row ?? null;
+  try {
+    const [row] = await sql`
+      SELECT p.id, p.user_id, p.given_by, p.day, p.shift_id, p.closing_id, p.task_id, p.type_id, p.type_title, p.text, p.photo_url,
+        p.points, p.bonus_cut, p.status, p.source, p.source_key, p.award_id, p.adjustment_id, p.seen_at, p.response, p.response_at,
+        p.disputed, p.dispute_handled_at, p.cancelled_by, p.cancelled_at, p.cancel_note, p.created_at, p.batch_id, p.zaskok_komu, p.zaskok_zpusob,
+        u.name AS user_name, u.avatar AS user_avatar, g.name AS given_by_name, x.name AS cancelled_by_name
+      FROM penalties p
+      LEFT JOIN users u ON u.id = p.user_id
+      LEFT JOIN users g ON g.id = p.given_by
+      LEFT JOIN users x ON x.id = p.cancelled_by
+      WHERE p.id = ${id} AND p.team_id = ${teamId}`;
+    return row ?? null;
+  } catch (e) {
+    if ((e as { code?: string })?.code !== '42703') throw e;
+    // Před migrací kola 96 (batch_id, zaskok_*): bez nich.
+    const [row] = await sql`
+      SELECT p.id, p.user_id, p.given_by, p.day, p.shift_id, p.closing_id, p.task_id, p.type_id, p.type_title, p.text, p.photo_url,
+        p.points, p.bonus_cut, p.status, p.source, p.source_key, p.award_id, p.adjustment_id, p.seen_at, p.response, p.response_at,
+        p.disputed, p.dispute_handled_at, p.cancelled_by, p.cancelled_at, p.cancel_note, p.created_at,
+        u.name AS user_name, u.avatar AS user_avatar, g.name AS given_by_name, x.name AS cancelled_by_name
+      FROM penalties p
+      LEFT JOIN users u ON u.id = p.user_id
+      LEFT JOIN users g ON g.id = p.given_by
+      LEFT JOIN users x ON x.id = p.cancelled_by
+      WHERE p.id = ${id} AND p.team_id = ${teamId}`;
+    return row ?? null;
+  }
 }
 
 /**
@@ -75,27 +99,33 @@ export async function nactiTrest(id: number, teamId: number): Promise<any | null
  * z katalogu se nepočítají — krátit nárokovou složku mzdy by byl peněžní postih
  * (§ 346b odst. 1 zákoníku práce). Bez tabulky úprav 0 (krátit není z čeho).
  */
-export async function stropKraceniDb(teamId: number, userId: number, day: string, bezTrestu: number | null = null): Promise<{ strop: number; premie: number; uzKraceno: number }> {
+export async function stropKraceniDb(teamId: number, userId: number, day: string, bezTrestu: number | null = null): Promise<{ strop: number; premie: number; uzKraceno: number; slozka: number; zaskok: number }> {
   const od = `${day.slice(0, 7)}-01`;
   const doDne = `${day.slice(0, 7)}-31`;
   try {
     const [r] = await sql`
       SELECT COALESCE(SUM(amount) FILTER (WHERE amount > 0 AND source = ${ZDROJ_NENAROKOVE_PREMIE}), 0)::int AS premie,
+             COALESCE(SUM(amount) FILTER (WHERE source = 'zaskok'), 0)::int AS zaskok,
              COALESCE(-SUM(amount) FILTER (WHERE source = 'trest' AND (${bezTrestu}::int IS NULL OR source_ref IS DISTINCT FROM ${bezTrestu})), 0)::int AS kraceno
       FROM wage_adjustments
       WHERE team_id = ${teamId} AND user_id = ${userId} AND day >= ${od} AND day <= ${doDne}`;
     const premie = Number(r?.premie) || 0;
+    const zaskok = Math.max(0, Number(r?.zaskok) || 0);
     const uzKraceno = Math.max(0, Number(r?.kraceno) || 0);
-    return { strop: stropKraceni(premie, uzKraceno), premie, uzKraceno };
+    // Kolo 96: + nenároková složka výplaty člena za měsíc (podle dosud odpracovaných hodin) a přijatý záskok.
+    const slozka = await slozkaMesiceDb(teamId, userId, day);
+    const strop = slozka || zaskok ? stropKraceniMesice({ slozka, premie: premie + zaskok, uzKraceno }) : stropKraceni(premie, uzKraceno);
+    return { strop, premie, uzKraceno, slozka, zaskok };
   } catch {
-    return { strop: 0, premie: 0, uzKraceno: 0 };
+    return { strop: 0, premie: 0, uzKraceno: 0, slozka: 0, zaskok: 0 };
   }
 }
 
 /**
  * Založí dopad trestu: body dolů do point_awards (kind 'trest', záporně — jdou do
- * Mého výdělku, žebříčku a profilu), krácení do wage_adjustments (source 'trest',
- * záporně — je ve výplatě). Vrací id obou řádků (null, když nic).
+ * Mého výdělku, žebříčku a profilu). Krácení (wage_adjustments source 'trest') od kola 96
+ * zakládá prepocitejPenizeTrestu (lib/trestyPenizeDb) — s ohledem na uzavřená období;
+ * `bonusCut` tady jen kvůli starým volajícím a musí být 0. Vrací id řádků (null, když nic).
  */
 export async function zalozTrest(o: { teamId: number; userId: number; points: number; bonusCut: number; reason: string; day: string; givenBy: number | null; trestId: number }): Promise<{ awardId: number | null; adjustmentId: number | null }> {
   let awardId: number | null = null;
@@ -116,13 +146,6 @@ export async function zalozTrest(o: { teamId: number; userId: number; points: nu
         RETURNING id`;
       awardId = Number(a.id);
     }
-  }
-  if (o.bonusCut > 0) {
-    const [w] = await sql`
-      INSERT INTO wage_adjustments (team_id, user_id, day, amount, note, source, source_ref, created_by)
-      VALUES (${o.teamId}, ${o.userId}, ${o.day}, ${-o.bonusCut}, ${duvod}, 'trest', ${o.trestId}, ${o.givenBy})
-      RETURNING id`;
-    adjustmentId = Number(w.id);
   }
   return { awardId, adjustmentId };
 }

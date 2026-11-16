@@ -6,7 +6,7 @@ import type { Testy } from './_testy.ts';
 import {
   MAX_LIDI_DAVKY, NASOBEK_STROPU_NAHRADY, VETA_BEZ_PRUMERU, VETA_OSVC, VETA_SCHODEK, VETA_SOUHLAS_NEZNAMY, VETA_SOUHLAS_ZP,
   castkyDavky, cekaNaSouhlas, dalsiMesic, dniVMesici, jePracovnepravni, lideDavky, mesicePrumeru, normalizujSlozku, odKdySrazka,
-  penizeText, popisSlozky, potrebujeSouhlas, prumernyVydelek, prvniOtevrenyDen, rozdelZaskok, rozlozSplatky, rozpadUprav, rozpadVyplaty,
+  penizeText, popisSlozky, potrebujeSouhlas, preskalujPodily, prumernyVydelek, prvniOtevrenyDen, rozdelZaskok, rozlozSplatky, rozpadUprav, rozpadVyplaty,
   rozpisPrevoduNaKusy, rozpocitej, rozvrhSplatek, slozkaZaObdobi, slozkaZeSloupcu, srovnejSZamky, stavNoveSrazky, stavSrazky,
   stropKraceniMesice, stropNahrady, ucinneKraceni, validujNahradu, validujOdmenu, validujSrazku, validujZaskok, vetaSouhlasu, vyberPenizeTrestu,
   zneniDohodyOSrazce, ZDROJ_KRACENI, ZDROJ_NAHRADA, ZDROJ_SRAZKA, ZDROJ_ZASKOK,
@@ -112,6 +112,10 @@ export default function ({ eq, ok }: Testy) {
   const vse = rozpisPrevoduNaKusy(pod, [{ den: '2026-12-02', castka: 200 }, { den: '2026-12-10', castka: 150 }, { den: '2027-01-01', castka: 150 }], 500);
   eq('převod po souhlasu se splátkami: přesně podíl', [2, 3].map(k => vse.filter(x => x.klic === k).reduce((a, x) => a + x.castka, 0)), [250, 250]);
   eq('převod při nesouhlasu: jen poměr z krácení', rozpisPrevoduNaKusy([{ klic: 'a', castka: 333 }], [{ den: '2026-12-02', castka: 200 }], 500), [{ klic: 'a', den: '2026-12-02', castka: 133 }]);
+
+  eq('přeškálování podílů: snížení na polovinu, nesouhlas (jen krácení), nula', [preskalujPodily([250, 250], 500, 250), preskalujPodily([167, 167, 166], 500, 200), preskalujPodily([300, 100], 500, 0)],
+    [[125, 125], [67, 67, 66], [0, 0]]);
+  eq('přeškálování: zbytek podniku zůstane poměrně', preskalujPodily([300, 100], 500, 1000), [600, 200]);
 
   // ---- hromadně ----
   eq('dávka: ids bez duplicit, prázdná a moc velká neprojde', [lideDavky({ userIds: [3, '4', 3, 0] }), lideDavky({}).ok, lideDavky({ userIds: Array.from({ length: MAX_LIDI_DAVKY + 1 }, (_, i) => i + 1) }).ok],

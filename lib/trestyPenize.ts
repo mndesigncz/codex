@@ -490,6 +490,24 @@ export function rozpisPrevoduNaKusy<K extends string | number>(podily: readonly 
   return out;
 }
 
+/**
+ * Přepočet plánovaných podílů záskoku na nový základ (krácení snížené, srážka zrušená nebo
+ * nesouhlas): podíly se změní poměrně, součet = podíl původního součtu na novém základu
+ * (metoda největších zbytků, žádná koruna se neztratí ani nepřibude).
+ */
+export function preskalujPodily(castky: readonly number[], staryZaklad: number, novyZaklad: number): number[] {
+  if (!(staryZaklad > 0) || !(novyZaklad > 0)) return castky.map(() => 0);
+  const suma = castky.reduce((a, c) => a + Math.max(0, c), 0);
+  const cil = Math.min(Math.round((suma * novyZaklad) / staryZaklad), Math.round(novyZaklad));
+  if (!(suma > 0)) return castky.map(() => 0);
+  const presne = castky.map(c => (Math.max(0, c) / suma) * cil);
+  const out = presne.map(x => Math.floor(x));
+  let zbyva = cil - out.reduce((a, x) => a + x, 0);
+  const poradi = presne.map((x, i) => ({ i, z: x - Math.floor(x) })).sort((a, b) => b.z - a.z || a.i - b.i);
+  for (let k = 0; zbyva > 0 && poradi.length; k++, zbyva--) out[poradi[k % poradi.length].i] += 1;
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Uzavřená období: srovnat řádky úprav mzdy s cílem
 // ---------------------------------------------------------------------------

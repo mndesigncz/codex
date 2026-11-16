@@ -5,7 +5,9 @@ import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import { MAX_DELKA_VYJADRENI, normalizujPoznamku, normalizujText, trestText, validujTrest, VETA_BEZ_PREMIE } from '@/lib/tresty';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { prepocitejPenizeTrestu } from '@/lib/trestyPenizeDb';
 import { nactiTrest, oznamTrest, oznamVyjadreni, oznamZruseni, predMigraci, stropKraceniDb, tvarTrestu, zalozTrest, zrusDopad } from '../_spolecne';
+import { bezPrav, chcePenize, ctiPenize, pripravPenize, ulozPenize } from '../_penize';
 
 // PATCH /api/tresty/[id]
 //   { seen: true }                       — člověk potvrdí „Beru na vědomí" (jen ten, koho se trest týká)
@@ -15,6 +17,10 @@ import { nactiTrest, oznamTrest, oznamVyjadreni, oznamZruseni, predMigraci, stro
 //   { text?, day?, points?, bonusCut?, typeId?, shiftId?, closingId?, taskId?, photoUrl? }
 //                                        — úprava platného trestu (tresty.udelit); dopad se přepočítá a člověk
 //                                          potvrzuje znovu
+//   Kolo 96 (peníze, jen finance.mzdy): změna bonusCut, { srazka?, nahrada? } = přidat srážku k trestu,
+//   { zaskok } = nově určit, komu přejde stržená částka. Zrušení trestu zruší i srážky a záskok;
+//   peníze se přepočítají (uzavřené období se nemění, oprava jde do dalšího). Souhlas a nesouhlas
+//   zaměstnance se srážkou: PATCH /api/tresty/srazky/[id]. Kontrakt: docs/TRESTY-PENIZE.md.
 
 export const dynamic = 'force-dynamic';
 
@@ -71,11 +77,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const pozn = normalizujPoznamku(b.note);
     if (pozn === false) return chyba('Poznámka je moc dlouhá (nejvýš 300 znaků).', 400);
     try {
-      await zrusDopad(c.teamId, row.award_id ? Number(row.award_id) : null, row.adjustment_id ? Number(row.adjustment_id) : null);
+      // Body pryč; peníze (krácení, srážky, záskok) přepočet — uzavřené období zůstane, oprava jde do dalšího.
+      await zrusDopad(c.teamId, row.award_id ? Number(row.award_id) : null, null);
       await sql`
-        UPDATE penalties SET status = 'zruseno', award_id = NULL, adjustment_id = NULL, cancelled_by = ${c.meId}, cancelled_at = NOW(),
+        UPDATE penalties SET status = 'zruseno', award_id = NULL, cancelled_by = ${c.meId}, cancelled_at = NOW(),
           cancel_note = ${pozn}, dispute_handled_at = CASE WHEN disputed THEN NOW() ELSE dispute_handled_at END, updated_at = NOW()
         WHERE id = ${id} AND team_id = ${c.teamId}`;
+      try {
+        await sql`
+          UPDATE wage_deductions SET status = 'zruseno', cancelled_by = ${c.meId}, cancelled_at = NOW(), cancel_note = ${pozn}, updated_at = NOW()
+          WHERE team_id = ${c.teamId} AND penalty_id = ${id} AND status IN ('ceka', 'uplatneno', 'nesouhlas')`;
+        await sql`UPDATE penalty_transfers SET status = 'zruseno' WHERE team_id = ${c.teamId} AND penalty_id = ${id}`;
+      } catch (e) { if (!predMigraci(e)) throw e; }
+      await prepocitejPenizeTrestu(c.teamId, id, c.meId);
       const item = tvarTrestu(await nactiTrest(id, c.teamId));
       audit(c.teamId, c.meId, 'tresty.zrusit', 'penalty', id, `${item.userName}: ${trestText(puvodni, mena.money)}${pozn ? ` · ${pozn}` : ''}`);
       await oznamZruseni(item, c.meId);
@@ -111,6 +125,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }, pragueToday());
   if (!v.ok) return chyba(v.chyba, 400);
   const z = v.trest;
+  const p = ctiPenize(b ?? {}, pragueToday());
+  if (!p.ok) return p.res;
+  const smiPenize = c.role.opravneni.has('finance.mzdy');
+  if ((z.bonusCut !== puvodni.bonusCut || chcePenize(p.v) || p.v.zaskok) && !smiPenize) return bezPrav();
   try {
     let typeTitle = puvodni.typeTitle;
     if (z.typeId !== puvodni.typeId) {
@@ -131,22 +149,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           : VETA_BEZ_PREMIE, 409, { strop: s.strop });
       }
     }
-    const zmenaDopadu = z.points !== puvodni.points || z.bonusCut !== puvodni.bonusCut || z.day !== puvodni.day;
+    const penize = chcePenize(p.v) || p.v.zaskok
+      ? await pripravPenize({ teamId: c.teamId, ids: [puvodni.userId], v: { ...p.v, rozpocitat: false }, text: z.text, day: z.day, closingId: z.closingId, dnes: pragueToday(), money: mena.money })
+      : null;
+    if (penize && !penize.ok) return penize.res;
+    const zmenaDopadu = z.points !== puvodni.points || z.bonusCut !== puvodni.bonusCut || z.day !== puvodni.day || !!penize;
     let awardId: number | null = row.award_id ? Number(row.award_id) : null;
-    let adjustmentId: number | null = row.adjustment_id ? Number(row.adjustment_id) : null;
-    if (zmenaDopadu) {
-      await zrusDopad(c.teamId, awardId, adjustmentId);
-      const o = await zalozTrest({ teamId: c.teamId, userId: puvodni.userId, points: z.points, bonusCut: z.bonusCut, reason: z.text, day: z.day, givenBy: c.meId, trestId: id });
-      awardId = o.awardId; adjustmentId = o.adjustmentId;
+    if (z.points !== puvodni.points || z.day !== puvodni.day) {
+      await zrusDopad(c.teamId, awardId, null);
+      const o = await zalozTrest({ teamId: c.teamId, userId: puvodni.userId, points: z.points, bonusCut: 0, reason: z.text, day: z.day, givenBy: c.meId, trestId: id });
+      awardId = o.awardId;
     }
     await sql`
       UPDATE penalties SET text = ${z.text}, day = ${z.day}, points = ${z.points}, bonus_cut = ${z.bonusCut}, type_id = ${z.typeId},
         type_title = ${typeTitle}, shift_id = ${z.shiftId}, closing_id = ${z.closingId}, task_id = ${z.taskId}, photo_url = ${z.photoUrl},
-        award_id = ${awardId}, adjustment_id = ${adjustmentId},
+        award_id = ${awardId},
         seen_at = CASE WHEN ${zmenaDopadu} THEN NULL ELSE seen_at END, updated_at = NOW()
       WHERE id = ${id} AND team_id = ${c.teamId}`;
+    // Peníze: nové srážky / záskok, pak přepočet krácení, splátek a převodů (i po změně dne nebo krácení).
+    if (penize && penize.ok) await ulozPenize({ teamId: c.teamId, trestId: id, day: z.day, text: z.text, p: penize.lide[0], kdo: c.meId, dnes: pragueToday(), money: mena.money, jmeno: puvodni.userName });
+    else if (z.bonusCut !== puvodni.bonusCut || z.day !== puvodni.day) await prepocitejPenizeTrestu(c.teamId, id, c.meId);
     const item = tvarTrestu(await nactiTrest(id, c.teamId));
-    audit(c.teamId, c.meId, 'tresty.upravit', 'penalty', id, `${item.userName}: ${trestText(item, mena.money)} · ${z.text.slice(0, 80)}`);
+    audit(c.teamId, c.meId, 'tresty.upravit', 'penalty', id, `${item.userName}: ${trestText(item, mena.money)}${penize ? ' · peníze upraveny' : ''} · ${z.text.slice(0, 80)}`);
     if (zmenaDopadu) await oznamTrest(item, c.meId, mena.money);
     return NextResponse.json({ ok: true, item });
   } catch (e) {
