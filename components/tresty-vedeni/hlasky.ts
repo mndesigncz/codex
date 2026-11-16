@@ -79,7 +79,7 @@ export function prelozHlaskuTrestu(t: PrekladFn, chyba: string): string {
     case 'Období je uzavřené — změna se promítne do dalšího otevřeného období.': return t('Období je uzavřené — změna se promítne do dalšího otevřeného období.');
     // Stav srážky (chip, lib/trestyPenize stavSrazky).
     case 'Čeká na souhlas': return t('Čeká na souhlas');
-    case 'Uplatněno': return t('Uplatněno');
+    case 'Uplatněno': return t('Uplatněno', undefined, 'srazka');
     case 'Nesouhlasí': return t('Nesouhlasí');
     case 'Zrušeno': return t('Zrušeno');
     default: return chyba;

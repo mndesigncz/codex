@@ -295,7 +295,7 @@ export function DatTrest({ open, onClose, predvolby, upravit, onUlozeno, nadOkny
   };
 
   const minDen = posunDni(dnes, -DNI_ZPETNE);
-  const textTlacitka = upravit ? t('Uložit') : napomenuti ? t('Dát napomenutí') : ids.length > 1 ? t('Dát trest {n} lidem', { n: ids.length }) : t('Dát trest');
+  const textTlacitka = upravit ? t('Uložit') : napomenuti ? t('Dát napomenutí') : ids.length > 1 ? t('Dát trest ({n})', { n: ids.length }) : t('Dát trest');
   const hintKraceni = vic
     ? t('Strop hlídá aplikace u každého zvlášť — kdo nemá dost nenárokové části, okno řekne.')
     : !userId

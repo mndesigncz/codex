@@ -12,6 +12,7 @@
 import React, { useMemo, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
+import { Icon } from '../Icons';
 import { Avatar, Button, Select, Skeleton } from '../ui';
 import { VolbaDil, VolbaRadek } from '../ui/Volby';
 import type { VyberLidi as DataVyberu } from '../tresty-penize/data';
@@ -84,9 +85,14 @@ export function VyberLidi({ data, loading, vybrani, onChange, den, closingId, kr
             <div className="max-h-[18.5rem] overflow-y-auto overscroll-contain -mx-1 px-1 py-0.5 rounded-[var(--r-md)]">
               <div className="sloupec sloupec-2" role="group" aria-label={ariaLabel}>
                 {videt.map(l => (
-                  <VolbaRadek key={l.id} vyska="m" vybrano={vybrani.includes(l.id)} onClick={() => onChange(prepniVyber(vybrani, l.id))}
-                    ikona={vybrani.includes(l.id) ? 'check' : undefined} data-clovek={l.id}
-                    titul={<span className="flex min-w-0 items-center gap-2"><Avatar emoji={l.avatar} name={l.name} size="xs" /><span className="min-w-0 truncate">{l.name}</span></span>}
+                  <VolbaRadek key={l.id} vyska="m" vybrano={vybrani.includes(l.id)} onClick={() => onChange(prepniVyber(vybrani, l.id))} data-clovek={l.id}
+                    // Vybraný: na místě avataru fajfka (jedna osa textu pro vybrané i nevybrané).
+                    titul={<span className="flex min-w-0 items-center gap-2">
+                      {vybrani.includes(l.id)
+                        ? <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center"><Icon name="check" size={18} /></span>
+                        : <Avatar emoji={l.avatar} name={l.name} size="xs" />}
+                      <span className="min-w-0 truncate">{l.name}</span>
+                    </span>}
                     hodnota={stitekRole(l) ? <span className="text-xs font-normal opacity-70">{stitekRole(l)}</span> : undefined} />
                 ))}
               </div>

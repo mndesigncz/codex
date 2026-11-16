@@ -44,6 +44,10 @@ const nacti = (jmeno) => {
 };
 const KLICE_TRESTY = ['tresty.zobrazit_tym', 'tresty.udelit', 'tresty.sazebnik'];
 const VEDENI = { ...VLASTNIK, opravneni: [...new Set([...VLASTNIK.opravneni, ...KLICE_TRESTY])] };
+// Vedoucí s tresty, ale bez práva na mzdy (kolo 96): okno bez peněz, u manka jen věta.
+const BEZ_MEZD = { ...VEDENI, opravneni: VEDENI.opravneni.filter(k => k !== 'finance.mzdy') };
+/** Typ smlouvy po lidech (výplatní listina): Jakub DPP → srážka čeká na souhlas, Tereza OSVČ → hned. */
+const SMLOUVY = { 15: 'HPP', 16: 'HPP', 17: 'DPP', 18: 'OSVC' };
 const skutecneChyby = (chyby) => chyby.filter(c => !/Minified React error #418|Hydration|hydrat|Failed to load resource|same key/i.test(c));
 const text = async (loc) => ((await loc.count()) ? await loc.first().innerText() : '').replace(/\u00a0/g, ' ');
 const preteceni = (p) => p.evaluate(() => {
@@ -64,7 +68,11 @@ const podvrh = ({ att = null } = {}) => {
   const druhy = nacti('k86-tresty-ved-types');
   const navrhy = nacti('k86-tresty-ved-navrhy');
   let dalsiId = 100;
-  const jmena = { 16: ['Eva Testová', '👩'], 17: ['Jakub Horák', '🧔'], 18: ['Tereza Malá', null] };
+  const jmena = { 15: ['Martin Nemeškal', null], 16: ['Eva Testová', '👩'], 17: ['Jakub Horák', '🧔'], 18: ['Tereza Malá', null] };
+  let slozka = null;
+  // Fronta nesouhlasů se srážkou (kolo 96): Jakub nesouhlasí se srážkou 400 Kč.
+  const srazkyTymu = [{ id: 55, penaltyId: 3, userId: 17, userName: 'Jakub Horák', userAvatar: '🧔', druh: 'srazka', castka: 400, splatky: 1, stav: 'nesouhlas', day: DNY.VCERA,
+    text: 'Rozbitý mlýnek na kávu', trestPlati: true, nesouhlasDuvod: 'Mlýnek byl vadný už ráno.', nesouhlasAt: new Date(Date.now() + POSUN).toISOString(), souhlasAt: null, createdAt: null }];
   return (req, json, stav) => {
     const url = new URL(req.url());
     const path = url.pathname;
@@ -97,16 +105,57 @@ const podvrh = ({ att = null } = {}) => {
       if (path === '/api/tresty' && m === 'POST') {
         // Server ví víc než okno: krácení nad 1 000 odmítne se stropem 1 000 (mezitím přibyl jiný trest).
         if (Number(telo?.bonusCut) > 1000) return json({ error: 'Krátit jde nejvýš 1 000 Kč — víc prémií ten měsíc nemá.', strop: 1000 }, 409);
+        // Kolo 96: dávka (userIds), krácení / srážka / náhrada „každý" nebo „rozpočítat", záskok; Tereza nenárokovou část nemá.
+        const ids = Array.isArray(telo?.userIds) ? telo.userIds.map(Number) : [Number(telo.userId)];
+        const n = ids.length;
+        const kusy = (c) => (telo.rozpocitat ? Array.from({ length: n }, (_, i) => Math.floor(c / n) + (i < c % n ? 1 : 0)) : ids.map(() => c));
+        const kraceni = kusy(Number(telo.bonusCut) || 0);
+        const i18 = ids.indexOf(18);
+        if (i18 >= 0 && kraceni[i18] > 0) return json({ error: 'Krátit jde jen nenárokovou prémii a tenhle měsíc žádná není. Založ ji v Docházce → Prémie a srážky jako „Nenároková prémie“. Starší prémie bez typu se nepočítají.', strop: 0, userId: 18 }, 409);
         const d = druhy.types.find(x => x.id === telo?.typeId);
-        const x = {
-          id: ++dalsiId, userId: Number(telo.userId), userName: jmena[telo.userId]?.[0] ?? 'Někdo', userAvatar: jmena[telo.userId]?.[1] ?? null,
-          givenBy: 15, givenByName: 'Martin Nemeškal', day: telo.day ?? DNY.DNES, shiftId: telo.shiftId ?? null, closingId: telo.closingId ?? null, taskId: null,
-          typeId: telo.typeId ?? null, typeTitle: d?.title ?? null, text: telo.text, photoUrl: telo.photoUrl ?? null, points: Number(telo.points) || 0, bonusCut: Number(telo.bonusCut) || 0,
-          status: 'plati', source: telo.sourceKey ? telo.sourceKey.split(':')[0] : 'rucne', sourceKey: telo.sourceKey ?? null, seenAt: null, response: null, responseAt: null,
-          disputed: false, disputeHandledAt: null, cancelledBy: null, cancelledByName: null, cancelledAt: null, cancelNote: null, createdAt: new Date(Date.now() + POSUN).toISOString(),
-        };
-        data.items.unshift(x);
-        return json({ ok: true, item: x }, 201);
+        const batchId = n > 1 ? ++dalsiId : null;
+        const srazkyS = telo.srazka ? kusy(Number(telo.srazka.castka)) : [];
+        const srazkyN = telo.nahrada ? kusy(Number(telo.nahrada.castka ?? telo.nahrada.skoda)) : [];
+        const items = ids.map((uid, i) => {
+          const sr = [];
+          const stav = SMLOUVY[uid] === 'OSVC' ? 'uplatneno' : 'ceka';
+          const srazka = (druh, castka, splatky, skoda) => ({ id: ++dalsiId, druh, castka, splatky: splatky ?? 1, stav, potrebujeSouhlas: stav === 'ceka', smlouva: SMLOUVY[uid] ?? null, proc: '', zneni: null,
+            souhlasAt: null, nesouhlasAt: null, nesouhlasDuvod: null, odDne: null, rozvrh: [], skoda, zrusenoAt: null });
+          if (telo.nahrada) sr.push(srazka('nahrada', srazkyN[i], telo.nahrada.splatky, { castka: telo.nahrada.skoda, druh: telo.nahrada.druh, zavineni: telo.nahrada.zavineni ?? 'nedbalost', dohoda: !!telo.nahrada.dohoda, dohodaDatum: telo.nahrada.dohodaDatum ?? null, prumer: null, strop: null, varovani: null }));
+          if (telo.srazka) sr.push(srazka('srazka', srazkyS[i], telo.srazka.splatky, null));
+          const z = telo.zaskok ?? { komu: 'podnik' };
+          const prevody = z.komu === 'lide' ? z.lide.filter(l => l.userId !== uid).map(l => ({ id: ++dalsiId, userId: l.userId, userName: jmena[l.userId]?.[0] ?? 'Martin Nemeškal', castka: l.castka ?? kraceni[i], preslo: 0, stav: 'plati' })) : [];
+          return {
+            id: ++dalsiId, userId: uid, userName: jmena[uid]?.[0] ?? 'Někdo', userAvatar: jmena[uid]?.[1] ?? null,
+            givenBy: 15, givenByName: 'Martin Nemeškal', day: telo.day ?? DNY.DNES, shiftId: telo.shiftId ?? null, closingId: telo.closingId ?? null, taskId: null,
+            typeId: telo.typeId ?? null, typeTitle: d?.title ?? null, text: telo.text, photoUrl: telo.photoUrl ?? null, points: Number(telo.points) || 0, bonusCut: kraceni[i],
+            status: 'plati', source: telo.sourceKey ? telo.sourceKey.split(':')[0] : 'rucne', sourceKey: telo.sourceKey ?? null, seenAt: null, response: null, responseAt: null,
+            disputed: false, disputeHandledAt: null, cancelledBy: null, cancelledByName: null, cancelledAt: null, cancelNote: null, createdAt: new Date(Date.now() + POSUN).toISOString(),
+            batchId,
+            penize: { kraceni: kraceni[i], srazky: sr, zaskok: { komu: z.komu ?? 'podnik', zpusob: z.zpusob ?? null, prevody },
+              cekaNaSouhlas: sr.filter(s => s.stav === 'ceka').reduce((a, s) => a + s.castka, 0), strzeno: kraceni[i] + sr.filter(s => s.stav === 'uplatneno').reduce((a, s) => a + s.castka, 0) },
+          };
+        });
+        data.items.unshift(...items);
+        return json({ ok: true, item: items[0], ...(batchId ? { items, batchId } : {}) }, 201);
+      }
+      if (path === '/api/tresty/vyber') {
+        return json({ day: q.get('day'), lide: [
+          { id: 15, name: 'Martin Nemeškal', avatar: null, role: 'vedeni', jobTitle: 'Provozní' },
+          { id: 16, name: 'Eva Testová', avatar: '👩', role: 'zamestnanec', jobTitle: 'Barista' },
+          { id: 17, name: 'Jakub Horák', avatar: '🧔', role: 'zamestnanec', jobTitle: 'Barista' },
+          { id: 18, name: 'Tereza Malá', avatar: null, role: 'zamestnanec', jobTitle: 'Kuchař' },
+        ], smena: [16, 17], uzaverka: q.get('closingId') ? [17, 18] : [] });
+      }
+      if (path === '/api/tresty/srazky' && m === 'GET') return json({ items: srazkyTymu.filter(s => !q.get('stav') || s.stav === q.get('stav')) });
+      const ms = /^\/api\/tresty\/srazky\/(\d+)$/.exec(path);
+      if (ms && m === 'PATCH') {
+        const s = srazkyTymu.find(x => x.id === Number(ms[1]));
+        if (!s) return json({ error: 'Srážka nenalezena.' }, 404);
+        if (telo?.znovu) s.stav = 'ceka';
+        else if (telo?.status === 'zruseno') s.stav = 'zruseno';
+        else if (telo?.castka) s.castka = Number(telo.castka);
+        return json({ ok: true });
       }
       if (path === '/api/tresty' && m === 'GET') {
         if (q.get('strop') === '1') {
@@ -141,7 +190,17 @@ const podvrh = ({ att = null } = {}) => {
     if (path === '/api/notes') return json([]);
     if (/^\/api\/employees\/\d+$/.test(path)) return json(nacti('k69-b2-employee'));
     if (path === '/api/attendance') return json(att ?? { roster: [], entries: [], adjustments: [] });
-    if (path === '/api/payroll') return json({ lide: [], payDailyCash: false, pravidla: {} });
+    // Kolo 96: smlouvy pro větu „počká na souhlas" (Jakub DPP, Tereza OSVČ), nenároková složka, hromadná odměna.
+    if (path === '/api/payroll') return json({ lide: Object.entries(SMLOUVY).map(([id, typ]) => ({ id: Number(id), name: jmena[id]?.[0] ?? 'Martin Nemeškal', contractType: typ })), payDailyCash: false, pravidla: {} });
+    if (path === '/api/payroll/slozka') {
+      (stav.cti ??= []).push(`${m} ${path}${url.search}`);
+      if (m === 'PUT') { (stav.zapisy ??= []).push({ m, path, telo }); slozka = telo?.typ ? { typ: telo.typ, hodnota: telo.hodnota, vSazbe: telo.vSazbe } : null; return json({ ok: true, userId: telo?.userId, slozka }); }
+      return json({ userId: Number(q.get('userId')), slozka });
+    }
+    if (path === '/api/wage-adjustments/davka') {
+      (stav.zapisy ??= []).push({ m, path, telo, q: url.search });
+      return m === 'POST' ? json({ ok: true, batchId: 501, items: (telo?.userIds ?? []).map((u, i) => ({ id: 900 + i, userId: u, day: telo.day, amount: telo.castka })) }, 201) : json({ ok: true, opravy: 0 });
+    }
     return undefined;
   };
 };
@@ -367,7 +426,36 @@ for (const tmavy of [false, true]) {
   await okno.locator('.overflow-y-auto').first().evaluate(el => { el.scrollTop = el.scrollHeight; });
   await p.waitForTimeout(200);
   if (!tmavy) await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-dat-trest-390-dole.png', fullPage: false });
+  // Kolo 96: víc lidí (celá směna), srážka s větou o souhlasu, záskok a souhrn — na telefonu bez přetečení.
+  await okno.getByRole('tab', { name: 'Víc lidí' }).click();
+  const lideT = okno.locator('[data-vyber-lidi="trest-lide"]');
+  await dokud(async () => (await lideT.locator('[data-rychla-volba="smena"]').count()) === 1, 4000);
+  await lideT.locator('[data-rychla-volba="smena"]').click();
+  await okno.locator('[data-trest-kdo]').evaluate(el => el.scrollIntoView({ block: 'start' }));
+  await p.screenshot({ path: SNIMKY + `k96-dat-trest-390-kdo${tmavy ? '-tmave' : ''}.png`, fullPage: false });
+  await okno.locator('[data-rezim="srazka"]').click();
+  await okno.locator('#trest-srazka').fill('600');
+  await okno.getByRole('tab', { name: 'Rozpočítat' }).click();
+  await okno.locator('[data-zaskok="lide"]').click();
+  await dokud(async () => (await okno.locator('[data-vyber-lidi="zaskok"] [data-clovek="15"]').count()) === 1, 3000);
+  await okno.locator('[data-vyber-lidi="zaskok"] [data-clovek="15"]').click();
+  await p.waitForTimeout(200);
+  const pr3 = await preteceni(p);
+  // Cíl ≥ 44 px: sám prvek, jeho dotyková plocha (.tap-target) nebo pás segmentu (role=tab v tablistu 44).
+  const cile = await okno.locator('[data-vyber-lidi] button, [data-trest-penize] button, [data-trest-zaskok] button').evaluateAll(els => els.filter(e => {
+    const h = e.getBoundingClientRect().height;
+    if (!(h > 0) || h >= 43.5 || e.classList.contains('tap-target')) return false;
+    const pas = e.getAttribute('role') === 'tab' ? e.closest('[role=tablist]')?.parentElement : null;
+    return !(pas && pas.getBoundingClientRect().height >= 43.5);
+  }).map(e => e.textContent?.trim().slice(0, 30)));
+  tvrdi(`T2b (390${sfx}): víc lidí + srážka + záskok — bez přetečení, cíle ≥ 44 px, souhrn Martin +600 Kč`, pr3.karty === 0 && pr3.dokument <= 1 && cile.length === 0
+    && /Martin Nemeškal dostane \+600 Kč/.test(await text(okno.locator('[data-trest-souhrn-penez]'))), JSON.stringify({ pr3, cile, s: await text(okno.locator('[data-trest-souhrn-penez]')) }));
+  await okno.locator('[data-trest-penize]').scrollIntoViewIfNeeded();
+  await p.screenshot({ path: SNIMKY + `k96-dat-trest-390-penize${tmavy ? '-tmave' : ''}.png`, fullPage: false });
+  await okno.locator('[data-trest-souhrn-penez]').scrollIntoViewIfNeeded();
+  await p.screenshot({ path: SNIMKY + `k96-dat-trest-390-souhrn${tmavy ? '-tmave' : ''}.png`, fullPage: false });
   await okno.getByRole('button', { name: 'Zrušit', exact: true }).click();
+  await p.getByRole('button', { name: /Zahodit/ }).first().click({ timeout: 1500 }).catch(() => {});
   await dokud(async () => (await okno.count()) === 0, 3000);
   // Profil člena ze žebříčku: sekce Tresty a Dát trest nad profilem.
   const nastroj = widgetLi(p, 'nastroj');
@@ -389,6 +477,24 @@ for (const tmavy of [false, true]) {
   tvrdi(`T3 (390${sfx}): Dát trest z profilu — okno nad profilem, Eva předvyplněná (bez výběru člověka)`, otevreno && await dokud(() => naKlepnuti(oknoP.locator('#trest-text')), 2000)
     && (await oknoP.locator('#trest-kdo').count()) === 0 && /Eva Testová/.test(await text(oknoP)));
   await oknoP.getByRole('button', { name: 'Zrušit', exact: true }).click();
+  await dokud(async () => (await oknoP.count()) === 0, 3000);
+  // Kolo 96: nenároková složka v sekci Tresty profilu (finance.mzdy čte, finance.sazby_upravit mění).
+  const slozkaR = sekce.locator('[data-slozka-clena]');
+  tvrdi(`T4 (390${sfx}): profil ukáže „Nenároková složka: Bez nenárokové složky" a Nastavit`, await dokud(async () => /Nenároková složka: Bez nenárokové složky/.test(await text(slozkaR)), 4000)
+    && (await slozkaR.getByRole('button', { name: 'Nastavit nenárokovou složku: Eva Testová' }).count()) === 1, await text(slozkaR));
+  if (!tmavy) {
+    await slozkaR.getByRole('button', { name: 'Nastavit nenárokovou složku: Eva Testová' }).click();
+    const oknoS = p.getByRole('dialog', { name: 'Nenároková složka' });
+    await oknoS.waitFor({ timeout: 4000 });
+    await oknoS.locator('[data-slozka-typ="pct"]').click();
+    await oknoS.locator('#slozka-hodnota').fill('10');
+    await doberAnimace(oknoS);
+    await p.screenshot({ path: SNIMKY + 'k96-slozka-390.png', fullPage: false });
+    await oknoS.getByRole('button', { name: 'Uložit' }).click();
+    const put = await dokud(() => (stav.zapisy ?? []).find(z => z.m === 'PUT' && z.path === '/api/payroll/slozka'), 4000);
+    tvrdi('T4: Uložit → PUT /api/payroll/slozka { userId: 16, typ: pct, hodnota: 10, vSazbe: true } a řádek „10 % ze mzdy (součást sazby)"', !!put && put.telo?.userId === 16 && put.telo?.typ === 'pct' && put.telo?.hodnota === 10 && put.telo?.vSazbe === true
+      && await dokud(async () => /10 % ze mzdy \(součást sazby\)/.test(await text(slozkaR)), 4000), JSON.stringify(put?.telo));
+  }
   tvrdi(`T (390${sfx}): bez chyb v konzoli`, skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
   await ctx.close();
 }
@@ -456,15 +562,37 @@ for (const [nazev, volby] of [['1280', { viewport: PC, mobil: false }], ['390', 
   await nastroj.locator('.list-row').first().click();
   const d = p.getByRole('dialog').last();
   tvrdi(`U1 (${nazev}): detail uzávěrky se otevře`, await dokud(() => d.getByText('Vyplněná čísla').isVisible().catch(() => false), 6000));
-  // Spuštění (balík P): manko trestem není (§ 346b ZP) — místo „Dát trest za manko" věta bez akce.
+  // Manko trestem není (§ 346b ZP). Kolo 96: s finance.mzdy „Náhrada škody za manko" → okno rovnou v Náhradě
+  // škody se schodkem 340 Kč (dohoda o odpovědnosti s datem), bez bodů a bez klíče návrhu manko:<id>.
   const manko = d.locator('[data-trest-za-manko]');
-  const maManko = await dokud(async () => (await manko.locator('[data-manko-veta]').count()) === 1, 3000);
-  tvrdi(`U1 (${nazev}): u manka věta „Manko řeš dohodou o odpovědnosti, ne trestem." a žádné tlačítko trestu`, maManko
-    && /Manko řeš dohodou o odpovědnosti, ne trestem\./.test(await text(manko)) && (await manko.getByRole('button').count()) === 0, (await text(d)).slice(0, 200));
+  const tlManko = manko.getByRole('button', { name: 'Náhrada škody za manko' });
+  const maManko = await dokud(async () => (await tlManko.count()) === 1, 3000);
+  tvrdi(`U1 (${nazev}): u manka tlačítko „Náhrada škody za manko" (ne trest)`, maManko && (await manko.getByRole('button', { name: /Dát trest/ }).count()) === 0, (await text(d)).slice(0, 200));
   if (maManko) {
     await manko.scrollIntoViewIfNeeded();
-    if (nazev === '390') await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-uzaverka-manko-390.png', fullPage: false });
-    tvrdi(`U2 (${nazev}): bez okna Dát trest a bez POST`, (await p.getByRole('dialog', { name: 'Dát trest' }).count()) === 0 && !(stav.zapisy ?? []).some(z => z.m === 'POST' && z.path === '/api/tresty'));
+    await tlManko.click();
+    const okno = p.getByRole('dialog', { name: 'Dát trest' });
+    await okno.waitFor({ timeout: 4000 });
+    await doberAnimace(okno);
+    const nahrada = okno.locator('[data-trest-penize="nahrada"]');
+    tvrdi(`U2 (${nazev}): okno v Náhradě škody — schodek vybraný, škoda 340, 0 bodů, věta o dohodě o odpovědnosti`, await dokud(async () => (await nahrada.count()) === 1, 2000)
+      && (await okno.locator('[data-druh-skody="schodek"]').getAttribute('aria-pressed')) === 'true' && (await okno.locator('#trest-skoda').inputValue()) === '340'
+      && (await okno.locator('#trest-body').inputValue()) === '0' && /jen s podepsanou dohodou o odpovědnosti/.test(await text(okno)), (await text(okno)).replace(/\n/g, ' | ').slice(0, 400));
+    if (nazev === '390') {
+      await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-uzaverka-manko-390.png', fullPage: false });
+      await nahrada.scrollIntoViewIfNeeded();
+      await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-manko-nahrada-390.png', fullPage: false });
+    }
+    await okno.getByRole('button', { name: /^(Dát trest|Dát napomenutí)$/ }).click();
+    tvrdi(`U2 (${nazev}): bez dohody o odpovědnosti okno nic nepošle a řekne proč`, await dokud(async () => /zaškrtni ji a doplň datum/.test(await text(okno)), 2000)
+      && !(stav.zapisy ?? []).some(z => z.m === 'POST' && z.path === '/api/tresty'));
+    await okno.getByRole('switch').first().click();
+    await okno.locator('#trest-dohoda-datum').fill(DNY.STARY);
+    await okno.getByRole('button', { name: 'Dát trest', exact: true }).click();
+    const post = await dokud(() => (stav.zapisy ?? []).find(z => z.m === 'POST' && z.path === '/api/tresty'), 4000);
+    tvrdi(`U2 (${nazev}): POST { closingId, points: 0, nahrada: { skoda: 340, druh: schodek, dohoda, datum } } bez sourceKey`, !!post && post.telo?.closingId === stav.detailId && post.telo?.points === 0
+      && post.telo?.nahrada?.skoda === 340 && post.telo?.nahrada?.druh === 'schodek' && post.telo?.nahrada?.dohoda === true && post.telo?.nahrada?.dohodaDatum === DNY.STARY && !post.telo?.sourceKey, JSON.stringify(post?.telo));
+    tvrdi(`U2 (${nazev}): po uložení „Náhrada škody za manko je zapsaná." místo tlačítka`, await dokud(async () => (await manko.locator('[data-manko-vyrizeno]').count()) === 1, 4000));
   }
   const sekce = d.locator('[data-tresty-uzaverky]');
   await sekce.scrollIntoViewIfNeeded();
@@ -472,6 +600,144 @@ for (const [nazev, volby] of [['1280', { viewport: PC, mobil: false }], ['390', 
   tvrdi(`U3 (${nazev}): detail nepřetéká`, await d.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
   if (nazev === '1280') await p.screenshot({ path: SNIMKY + 'k86-tresty-ved-uzaverka-1280.png', fullPage: false });
   tvrdi(`U (${nazev}): bez chyb v konzoli`, skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
+{
+  // Bez práva na mzdy: u manka jen věta o dohodě o odpovědnosti, okno Dát trest bez peněz.
+  const { ctx, p, chyby } = await kontext({ viewport: PC, fix: FIX_UZAVERKY, mineData: BEZ_MEZD, dalsi: podvrh() });
+  await otevri(p, '/employer/overview?view=reports', 'vedeni.uzaverky');
+  const nastroj = widgetLi(p, 'nastroj');
+  await nastroj.locator('.list-row').first().click();
+  const d = p.getByRole('dialog').last();
+  await dokud(() => d.getByText('Vyplněná čísla').isVisible().catch(() => false), 6000);
+  const manko = d.locator('[data-trest-za-manko]');
+  tvrdi('U4 (bez finance.mzdy): u manka věta „Manko řeš dohodou o odpovědnosti, ne trestem." a žádné tlačítko', await dokud(async () => (await manko.locator('[data-manko-veta]').count()) === 1, 4000)
+    && (await manko.getByRole('button').count()) === 0);
+  tvrdi('U4: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// K — kolo 96: peníze z výplaty, hromadně, záskok, fronta srážek, odměna v Kč (1280)
+// ---------------------------------------------------------------------------
+{
+  const { ctx, p, stav, chyby } = await kontext({ viewport: PC, fix: FIX_ODMENY, mineData: VEDENI, dalsi: podvrh() });
+  await otevri(p, ODMENY, 'vedeni.odmeny');
+  const w = widgetLi(p, 'odmeny.tresty_tymu');
+  await dokud(async () => (await w.locator('[data-tresty-souhrn]').count()) > 0, 10000);
+  const posty = () => (stav.zapisy ?? []).filter(z => z.m === 'POST' && z.path === '/api/tresty');
+
+  // K1: hromadný trest 3 lidem s rozpočítáním a záskokem na Martina.
+  await w.getByRole('button', { name: 'Dát trest', exact: true }).first().click();
+  const okno = p.getByRole('dialog', { name: 'Dát trest' });
+  await okno.waitFor({ timeout: 4000 });
+  await okno.getByRole('tab', { name: 'Víc lidí' }).click();
+  const lide = okno.locator('[data-vyber-lidi="trest-lide"]');
+  await dokud(async () => (await lide.locator('[data-rychla-volba="smena"]').count()) === 1, 4000);
+  await lide.locator('[data-rychla-volba="smena"]').click();
+  await lide.locator('[data-clovek="15"]').click();
+  tvrdi('K1: „Celá směna" vybere Evu a Jakuba, ručně přibude Martin → Vybráno: 3', /Vybráno: 3/.test(await text(lide)), await text(lide));
+  await okno.locator('#trest-text').fill('Neuklizený sklad po inventuře.');
+  await okno.locator('#trest-kraceni').fill('900');
+  await okno.getByRole('tab', { name: 'Rozpočítat' }).click();
+  tvrdi('K1: rozpočítat 900 mezi 3 → „každý 300 Kč" a souhrn −300 Kč z prémie u všech tří', /900 Kč mezi 3 lidi — každý 300 Kč\./.test(await text(okno))
+    && (await okno.locator('[data-souhrn-strhne]').count()) === 3 && /Eva Testová: −300 Kč z prémie/.test(await text(okno.locator('[data-trest-souhrn-penez]'))), await text(okno.locator('[data-trest-souhrn-penez]')));
+  await okno.locator('[data-zaskok="smena"]').click();
+  tvrdi('K1: záskok „Celá směna" bez potrestaných = nikdo další (věta serveru)', /Na směně ten den nikdo další nebyl/.test(await text(okno.locator('[data-trest-zaskok]'))));
+  await okno.locator('[data-zaskok="podnik"]').click();
+  tvrdi('K1: tlačítko „Dát trest (3)", podniku zůstane 900 Kč', (await okno.getByRole('button', { name: 'Dát trest (3)' }).count()) === 1 && /Podniku zůstane 900 Kč/.test(await text(okno)));
+  await okno.screenshot({ path: SNIMKY + 'k96-dat-trest-hromadne-1280.png' });
+  await okno.getByRole('button', { name: 'Dát trest (3)' }).click();
+  const p1 = await dokud(() => posty().find(z => Array.isArray(z.telo?.userIds)), 4000);
+  tvrdi('K1: POST { userIds: [16, 17, 15], bonusCut: 900, rozpocitat: true } bez userId a sourceKey', !!p1 && JSON.stringify(p1.telo.userIds) === '[16,17,15]' && p1.telo.bonusCut === 900 && p1.telo.rozpocitat === true
+    && p1.telo.userId === undefined && !p1.telo.sourceKey && !p1.telo.zaskok, JSON.stringify(p1?.telo));
+  tvrdi('K1: toast „Trest udělen 3 lidem" a řádky „Hromadný trest · 3 lidí"', await dokud(() => p.getByText('Trest udělen 3 lidem — každý dostal oznámení.').isVisible().catch(() => false), 3000)
+    && await dokud(async () => (await w.locator('[data-trest-davka]', { hasText: 'Hromadný trest · 3 lidí' }).count()) >= 1, 3000));
+
+  // K2: krácení nad strop v dávce → 409 se jménem pod krácením (Tereza nenárokovou část nemá).
+  await w.getByRole('button', { name: 'Dát trest', exact: true }).first().click();
+  await okno.waitFor({ timeout: 4000 });
+  await okno.getByRole('tab', { name: 'Víc lidí' }).click();
+  await dokud(async () => (await lide.locator('[data-clovek="18"]').count()) === 1, 4000);
+  await lide.locator('[data-clovek="17"]').click();
+  await lide.locator('[data-clovek="18"]').click();
+  await okno.locator('#trest-text').fill('Pozdě na poradu.');
+  await okno.locator('#trest-kraceni').fill('200');
+  await okno.getByRole('button', { name: 'Dát trest (2)' }).click();
+  tvrdi('K2: krácení nad strop → „Tereza Malá: Krátit jde jen nenárokovou prémii…" pod krácením, okno zůstane', await dokud(async () => /Tereza Malá: Krátit jde jen nenárokovou prémii/.test(await text(okno)), 4000)
+    && (await okno.locator('#trest-text').inputValue()) === 'Pozdě na poradu.');
+  await okno.getByRole('button', { name: 'Zrušit', exact: true }).click();
+  await p.getByRole('button', { name: /Zahodit/ }).first().click().catch(() => {});
+  await dokud(async () => (await okno.count()) === 0, 3000);
+
+  // K3: srážka u DPP (Jakub) → věta o souhlasu, souhrn „čeká na souhlas", po uložení chip Čeká na souhlas.
+  await w.getByRole('button', { name: 'Dát trest', exact: true }).first().click();
+  await okno.waitFor({ timeout: 4000 });
+  await okno.locator('#trest-kdo').selectOption('17');
+  await okno.locator('#trest-text').fill('Rozbitý mlýnek — srážka dohodou.');
+  await okno.locator('[data-rezim="srazka"]').click();
+  await okno.locator('#trest-srazka').fill('500');
+  tvrdi('K3: u DPP věta „U HPP, DPP i DPČ se srážka strhne až po souhlasu…" a v souhrnu „čeká na souhlas"', await dokud(async () => /U HPP, DPP i DPČ se srážka strhne až po souhlasu zaměstnance/.test(await text(okno.locator('[data-trest-souhlas]'))), 4000)
+    && /Jakub Horák: −500 Kč srážkou z výplaty/.test(await text(okno.locator('[data-trest-souhrn-penez]'))) && /čeká na souhlas/.test(await text(okno.locator('[data-trest-souhrn-penez]'))), await text(okno.locator('[data-trest-souhrn-penez]')));
+  await okno.screenshot({ path: SNIMKY + 'k96-dat-trest-srazka-1280.png' });
+  await okno.getByRole('button', { name: /^(Dát trest|Dát napomenutí)$/ }).click();
+  const p3 = await dokud(() => posty().find(z => z.telo?.srazka), 4000);
+  tvrdi('K3: POST { userId: 17, srazka: { castka: 500, splatky: 1 }, bonusCut: 0 }', !!p3 && p3.telo.userId === 17 && p3.telo.srazka?.castka === 500 && p3.telo.srazka?.splatky === 1 && p3.telo.bonusCut === 0, JSON.stringify(p3?.telo));
+  tvrdi('K3: toast „… Srážka čeká na souhlas zaměstnance." a řádek „Srážka 500 Kč" s chipem Čeká na souhlas', await dokud(() => p.getByText(/Srážka čeká na souhlas zaměstnance\./).first().isVisible().catch(() => false), 3000)
+    && await dokud(async () => (await w.locator('[data-srazka-stav="ceka"]', { hasText: 'Srážka 500 Kč' }).count()) >= 1 && /Čeká na souhlas/.test(await text(w.locator('[data-srazka-stav="ceka"]'))), 3000));
+
+  // K4: záskok na kolegu → souhrn „Eva: −300 Kč z prémie · Jakub dostane +300 Kč".
+  await w.getByRole('button', { name: 'Dát trest', exact: true }).first().click();
+  await okno.waitFor({ timeout: 4000 });
+  await okno.locator('#trest-kdo').selectOption('16');
+  await okno.locator('#trest-text').fill('Nezavřená lednice, zachránil ji Jakub.');
+  await dokud(async () => /krátit jde nejvýš/.test(await text(okno.locator('[data-trest-strop]'))), 4000);
+  await okno.locator('#trest-kraceni').fill('300');
+  await okno.locator('[data-zaskok="lide"]').click();
+  const zaskok = okno.locator('[data-vyber-lidi="zaskok"]');
+  await dokud(async () => (await zaskok.locator('[data-clovek="17"]').count()) === 1, 4000);
+  tvrdi('K4: v „Kdo to napravil" potrestaná Eva chybí', (await zaskok.locator('[data-clovek="16"]').count()) === 0);
+  await zaskok.locator('[data-clovek="17"]').click();
+  const souhrn4 = await text(okno.locator('[data-trest-souhrn-penez]'));
+  tvrdi('K4: souhrn „Eva Testová: −300 Kč z prémie" a „Jakub Horák dostane +300 Kč"', /Eva Testová: −300 Kč z prémie/.test(souhrn4) && /Jakub Horák dostane \+300 Kč/.test(souhrn4) && !/Podniku zůstane/.test(souhrn4), souhrn4);
+  await okno.getByRole('tab', { name: 'Vlastní částky' }).click();
+  await okno.locator('#zaskok-castka-17').fill('200');
+  tvrdi('K4: vlastní částka 200 → Jakub +200, podniku zůstane 100', /Jakub Horák dostane \+200 Kč/.test(await text(okno.locator('[data-trest-souhrn-penez]'))) && /Podniku zůstane 100 Kč/.test(await text(okno.locator('[data-trest-souhrn-penez]'))));
+  await okno.screenshot({ path: SNIMKY + 'k96-dat-trest-zaskok-1280.png' });
+  await okno.getByRole('button', { name: 'Dát trest', exact: true }).click();
+  const p4 = await dokud(() => posty().find(z => z.telo?.zaskok), 4000);
+  tvrdi('K4: POST { userId: 16, bonusCut: 300, zaskok: { komu: lide, zpusob: castky, lide: [{ userId: 17, castka: 200 }] } }', !!p4 && p4.telo.userId === 16 && p4.telo.bonusCut === 300
+    && JSON.stringify(p4.telo.zaskok) === JSON.stringify({ komu: 'lide', zpusob: 'castky', lide: [{ userId: 17, castka: 200 }] }), JSON.stringify(p4?.telo));
+  tvrdi('K4: řádek trestu ukáže „Přejde: Jakub Horák 200 Kč"', await dokud(async () => (await w.locator('[data-trest-zaskok-radek]', { hasText: 'Přejde: Jakub Horák 200 Kč' }).count()) >= 1, 3000));
+
+  // K5: fronta nesouhlasů se srážkou → Znovu požádat.
+  const fronta = w.locator('[data-fronta-srazek]');
+  tvrdi('K5: widget má frontu „Nesouhlasí se srážkou" s Jakubem a důvodem', await dokud(async () => /Mlýnek byl vadný už ráno\./.test(await text(fronta)), 4000) && /Srážka 400 Kč/.test(await text(fronta)));
+  await fronta.getByRole('button', { name: 'Znovu požádat o souhlas: Jakub Horák' }).click();
+  tvrdi('K5: Znovu požádat → PATCH /api/tresty/srazky/55 { znovu: true } a fronta zmizí', await dokud(() => (stav.zapisy ?? []).some(z => z.m === 'PATCH' && z.path === '/api/tresty/srazky/55' && z.telo?.znovu === true), 4000)
+    && await dokud(async () => (await fronta.count()) === 0, 4000));
+
+  // K6: odměna v Kč hromadně (patka widgetu).
+  await w.locator('[data-odmena-kc-otevrit]').click();
+  const odm = p.getByRole('dialog', { name: 'Odměna v penězích' });
+  await odm.waitFor({ timeout: 4000 });
+  const lideO = odm.locator('[data-vyber-lidi="odmena-lide"]');
+  await dokud(async () => (await lideO.locator('[data-clovek="16"]').count()) === 1, 4000);
+  await lideO.locator('[data-clovek="16"]').click();
+  await lideO.locator('[data-clovek="18"]').click();
+  await odm.locator('#odmena-castka').fill('500');
+  await odm.locator('#odmena-text').fill('Inventura v neděli navíc');
+  tvrdi('K6: souhrn odměny „Eva Testová dostane +500 Kč … Celkem 1 000 Kč"', /Eva Testová dostane \+500 Kč/.test(await text(odm.locator('[data-odmena-souhrn]'))) && /Celkem 1 000 Kč/.test(await text(odm.locator('[data-odmena-souhrn]'))));
+  await odm.screenshot({ path: SNIMKY + 'k96-odmena-kc-1280.png' });
+  await odm.getByRole('button', { name: 'Připsat 2 lidem' }).click();
+  const pO = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/wage-adjustments/davka' && z.m === 'POST'), 4000);
+  tvrdi('K6: POST /api/wage-adjustments/davka { userIds: [16, 18], castka: 500, rozpocitat: false, nenarokova: true, text }', !!pO && JSON.stringify(pO.telo.userIds) === '[16,18]' && pO.telo.castka === 500
+    && pO.telo.rozpocitat === false && pO.telo.nenarokova === true && pO.telo.text === 'Inventura v neděli navíc', JSON.stringify(pO?.telo));
+  tvrdi('K6: toast „Odměna připsána 2 lidem — celkem 1 000 Kč." s „Vzít zpět"', await dokud(async () => /Odměna připsána 2 lidem — celkem 1 000 Kč\./.test(await text(p.locator('body'))), 3000)
+    && await dokud(async () => (await p.getByRole('button', { name: 'Vzít zpět' }).count()) === 1, 2000));
+  await p.screenshot({ path: SNIMKY + 'k96-odmeny-widget-1280.png', fullPage: true });
+  tvrdi('K: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
   await ctx.close();
 }
 
