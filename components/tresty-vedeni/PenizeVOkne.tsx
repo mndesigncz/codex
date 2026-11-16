@@ -153,9 +153,9 @@ export function SekcePenez({ f, zmen, pocetLidi, symbol, money, hintKraceni, chy
             </div>
           ) : (
             <div className="sloupec sloupec-3 well px-3 py-3" data-trest-dohoda>
-              <label className="flex min-h-[var(--h-m)] items-center justify-between gap-3">
+              <label htmlFor="trest-dohoda" className="flex min-h-[var(--h-m)] items-center justify-between gap-3">
                 <span className="min-w-0 text-sm font-semibold text-[#16181A] text-pretty" id="trest-dohoda-nazev">{t('Máme podepsanou dohodu o odpovědnosti')}</span>
-                <Switch checked={f.dohoda} onChange={v => zmen({ dohoda: v })} labelledBy="trest-dohoda-nazev" />
+                <Switch id="trest-dohoda" checked={f.dohoda} onChange={v => zmen({ dohoda: v })} labelledBy="trest-dohoda-nazev" />
               </label>
               {f.dohoda ? (
                 <Field id="trest-dohoda-datum" label={t('Podepsaná dne')}>

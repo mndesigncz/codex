@@ -138,7 +138,7 @@ export function OdmenaVKc({ open, onClose, predvybrani, nadOkny = false }: {
   );
 }
 
-/** Tlačítko „Odměna v Kč" s oknem — jen s finance.mzdy (jinak se nekreslí). */
+/** Tlačítko „Odměna v penězích" s oknem — jen s finance.mzdy (jinak se nekreslí). */
 export function OdmenaVKcTlacitko({ variant = 'ghost', className = '' }: { variant?: 'ghost' | 'secondary'; className?: string }) {
   const t = useT('widgety');
   const { nacteno, ma } = useOpravneni();
@@ -146,7 +146,7 @@ export function OdmenaVKcTlacitko({ variant = 'ghost', className = '' }: { varia
   if (!(nacteno && ma('finance.mzdy'))) return null;
   return (
     <>
-      <Button variant={variant} icon="coins" className={className} onClick={() => setOpen(true)} data-odmena-kc-otevrit="">{t('Odměna v Kč')}</Button>
+      <Button variant={variant} icon="coins" className={className} onClick={() => setOpen(true)} data-odmena-kc-otevrit="">{t('Odměna v penězích')}</Button>
       <OdmenaVKc open={open} onClose={() => setOpen(false)} />
     </>
   );
