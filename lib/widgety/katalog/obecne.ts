@@ -27,6 +27,9 @@ export const ZDROJE_FRONT: Readonly<Record<string, string>> = {
   // Kolo 10: nesouhlasy s tresty k vyřízení — GET pustí každého člena (pozaduj(null)), fronta chce tresty.udelit;
   // stejná adresa jako sporné ve widgetu Tresty v týmu (jedna mezipaměť).
   tresty: '/api/tresty?scope=team&status=plati',
+  // Kolo 96: zaměstnanec nesouhlasí se srážkou z výplaty — GET pustí každého člena (pozaduj(null)), scope=team
+  // jen s finance.mzdy; stejná adresa jako fronta ve widgetu Tresty v týmu (FrontaSrazek, jedna mezipaměť).
+  srazky: '/api/tresty/srazky?scope=team&stav=nesouhlas',
 };
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -37,7 +40,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // guides[approved=false]; GET /api/client/admin/reservations → reservations[status=requested] (60 dní dopředu);
   // GET /api/client/staff/inbox → newCount (orders[status=new]); GET /api/client/admin/summary → reviews.low7;
   // GET /api/navic?scope=team&status=ceka → items[status=ceka] (kolo 9, N1);
-  // GET /api/tresty?scope=team&status=plati → items[disputed && !disputeHandledAt] (kolo 10)
+  // GET /api/tresty?scope=team&status=plati → items[disputed && !disputeHandledAt] (kolo 10);
+  // GET /api/tresty/srazky?scope=team&stav=nesouhlas → items[stav=nesouhlas && trestPlati] (kolo 96)
   // Pozor: rezervace a objednávky nejdou přes /api/client/admin/summary — ten chce klient.prehled, který
   // Provozní (rezervace.schvalovat, objednavky.vyridit) nemá, a fronty by skončily na 403.
   // Pozor: Dnes je fronta hlídaná jen smiPohled(view) — chip „žádost o volno" se ukáže i roli, která volno nesmí
@@ -67,6 +71,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         'objednavky.vyridit',
         'navic.uznat',
         'tresty.udelit',
+        'finance.mzdy',
       ],
       pole: {
         volno: 'volno.schvalovat',
@@ -82,6 +87,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         slaba_hodnoceni: 'zakaznici.recenze',
         navic: 'navic.uznat',
         tresty: 'tresty.udelit',
+        srazky: 'finance.mzdy',
       },
     },
     tarif: 'zdarma',
@@ -104,6 +110,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
           { id: 'slaba_hodnoceni', nazev: 'Slabá hodnocení', opravneni: 'zakaznici.recenze' },
           { id: 'navic', nazev: 'Navíc k uznání', opravneni: 'navic.uznat' },
           { id: 'tresty', nazev: 'Nesouhlasy s tresty', opravneni: 'tresty.udelit' },
+          { id: 'srazky', nazev: 'Nesouhlasy se srážkou', opravneni: 'finance.mzdy' },
         ],
         vychozi: 'vse',
       },

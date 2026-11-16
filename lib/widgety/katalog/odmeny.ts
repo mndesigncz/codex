@@ -89,13 +89,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     id: 'odmeny.pochvaly',
     oblast: 'odmeny',
     nazev: 'Pochvaly',
-    popis: 'Body navíc za dobře odvedenou práci — kdo je dostal, za co a tlačítko Pochválit.',
+    popis: 'Body navíc za dobře odvedenou práci — kdo je dostal, za co a tlačítko Pochválit; s právem na mzdy i odměna v Kč jednomu nebo víc lidem.',
     ikona: 'award',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.odmeny', 'vedeni.prehled'],
-    opravneni: { vse: ['hodnoceni.zobrazit'], nektere: [], pole: { 'akce:pochvalit': 'hodnoceni.hodnotit' } },
+    // Kolo 96: „Odměna v Kč" (POST /api/wage-adjustments/davka) jen s finance.mzdy.
+    opravneni: { vse: ['hodnoceni.zobrazit'], nektere: [], pole: { 'akce:pochvalit': 'hodnoceni.hodnotit', 'akce:odmena_kc': 'finance.mzdy' } },
     tarif: 'pro',
     cil: { pohled: 'rewards' },
     stav: 'hotovo',
@@ -217,13 +218,15 @@ export const WIDGETY: DefiniceWidgetu[] = [
     pridano: '2026-10-14',
     oblast: 'odmeny',
     nazev: 'Tresty v týmu',
-    popis: 'Co kdo pokazil a co za to dostal — body dolů, krácení prémie nebo napomenutí; nesouhlasy k vyřízení a návrhy z docházky, uzávěrek a hodnocení.',
+    popis: 'Co kdo pokazil a co za to dostal — body dolů, peníze z výplaty (krácení, náhrada škody, srážka) nebo napomenutí, jednomu i víc lidem; nesouhlasy k vyřízení a návrhy z docházky, uzávěrek a hodnocení.',
     ikona: 'clipboard',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.odmeny', 'vedeni.prehled'],
-    opravneni: { vse: ['tresty.zobrazit_tym'], nektere: [], pole: { 'akce:udelit': 'tresty.udelit', navrhy: 'tresty.udelit' } },
+    // Kolo 96 (docs/TRESTY-PENIZE.md): `penize` = peníze u trestů, fronta nesouhlasů se srážkou (GET /api/tresty/srazky
+    // ?scope=team&stav=nesouhlas) a odměna v Kč — vše jen s finance.mzdy.
+    opravneni: { vse: ['tresty.zobrazit_tym'], nektere: [], pole: { 'akce:udelit': 'tresty.udelit', navrhy: 'tresty.udelit', penize: 'finance.mzdy' } },
     tarif: 'pro',
     nastaveni: [
       {
