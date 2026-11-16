@@ -9,6 +9,7 @@
 import { chyba, ok, type Obsluha } from '../typy';
 import { LIDE, KDO_JSEM, clen } from '../data/lide';
 import { mojeRole } from './zaklad';
+import { mojeSrazkyDema, penizeClenaDema } from './trestyPenize';
 import { VYCHOZI_PRAVIDLA_DYSKA, VYCHOZI_PRAVIDLA_PRIPLATKU } from '../../dochazkaPrehled';
 
 interface PoznamkaDemo {
@@ -39,7 +40,11 @@ export const vedeni: Obsluha = (p, k) => {
       if (s.role === 'kiosk' || !(opr.has('finance.moje_mzda') || opr.has('finance.mzdy'))) return chyba('Nedostatečná oprávnění', 403);
       return ok({
         od: r.od, do: r.do,
-        ja: { zKasy: 0, zKasyPocet: 0, uzaverky: [], vyplaty: [], spropitne: null, spropitnePoDnech: [] },
+        ja: {
+          zKasy: 0, zKasyPocet: 0, uzaverky: [], vyplaty: [], spropitne: null, spropitnePoDnech: [],
+          // Kolo 96: nenároková složka, srážky čekající na souhlas a vlastní srážky (Můj výdělek).
+          ...penizeClenaDema(meId), srazky: mojeSrazkyDema(meId),
+        },
         zamky: [], pravidla: { priplatky: pravidla.priplatky, showTipsToStaff: true },
       });
     }
@@ -53,6 +58,7 @@ export const vedeni: Obsluha = (p, k) => {
       hodinyLetosMs: l.id === 4 ? 212 * 3_600_000 : 0,
       zKasy: vidiMzdy ? 0 : null, zKasyPocet: 0, uzaverky: [],
       vyplaceno: vidiMzdy ? 0 : null, vyplaty: [],
+      ...(vidiMzdy ? penizeClenaDema(l.id) : { slozka: null, cekaNaSouhlas: 0 }),
     }));
     return ok({ od: r.od, do: r.do, lide, zamky: [], vidiMzdy, payDailyCash: false, pravidla });
   }

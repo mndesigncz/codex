@@ -5,6 +5,7 @@
 import { chyba, ok, type Obsluha } from '../typy';
 import { LIDE, KDO_JSEM, clen } from '../data/lide';
 import { mojeRole } from './zaklad';
+import { upravyDema } from './trestyPenize';
 import type { DemoStav } from '../stav';
 
 function smenaDnes(s: DemoStav, employeeId: number) {
@@ -39,7 +40,8 @@ export const lide: Obsluha = (p, k) => {
             clockIn: x.clockIn, clockOut: x.clockOut, source: x.source, note: x.note,
           }))
           : [];
-        return ok({ roster, entries });
+        // Kolo 96: úpravy mzdy z peněz trestů a hromadných odměn (jen kdo vidí mzdy, jako skutečné API).
+        return ok({ roster, entries, adjustments: opr.has('finance.mzdy') ? upravyDema() : [] });
       }
       const moje = s.pichacky.filter(x => x.employeeId === meId).sort((a, b) => b.clockIn.localeCompare(a.clockIn));
       const otevrena = moje.find(x => x.clockOut == null) ?? null;
@@ -51,7 +53,8 @@ export const lide: Obsluha = (p, k) => {
       ja.shiftEnd = mojeSmena?.endTime ?? null;
       ja.shiftDate = mojeSmena ? s.dnes : null;
       if (opr.has('finance.moje_mzda') || opr.has('finance.mzdy')) ja.hourlyRate = clen(meId).hourlyRate;
-      return ok({ roster: [ja], entries: moje.map(x => ({ id: x.id, employeeId: x.employeeId, clockIn: x.clockIn, clockOut: x.clockOut, source: x.source, note: x.note })) });
+      const mojeUpravy = opr.has('finance.moje_mzda') || opr.has('finance.mzdy') ? upravyDema().filter(u => Number(u.userId) === meId) : [];
+      return ok({ roster: [ja], entries: moje.map(x => ({ id: x.id, employeeId: x.employeeId, clockIn: x.clockIn, clockOut: x.clockOut, source: x.source, note: x.note })), adjustments: mojeUpravy });
     }
     if (metoda === 'POST') {
       const b = p.telo ?? {};

@@ -6,7 +6,7 @@
 //    prázdno = tichý řádek, bez tresty.zobrazit_tym se nekreslí nic;
 //  - `TrestTlacitko`: tlačítko „Dát trest" s oknem a předvolbami pro místa mimo seznamy
 //    trestů — výtka v hodnocení směny. Jen s tresty.udelit. U manka v detailu uzávěrky
-//    (spuštění, balík P) místo tlačítka věta, že manko se řeší dohodou o odpovědnosti.
+//    (spuštění, balík P) náhrada škody se schodkem (kolo 96, finance.mzdy), jinak věta o dohodě o odpovědnosti.
 // Okna jdou nad vlastní překryv detailu (z-80), proto `nadOkny`.
 
 import React, { useState } from 'react';
@@ -45,7 +45,8 @@ export function TrestyUzaverky({ uzaverka, onZmena }: {
         <ul className="list">
           {tresty.map(x => (
             <TrestRadek key={x.id} x={x} smiUdelit={smiUdelit} pracuji={akce.pracuji === x.id}
-              onPlatiDal={akce.platiDal} onZrusit={akce.zrusit} onUpravit={akce.upravit} />
+              onPlatiDal={akce.platiDal} onZrusit={akce.zrusit} onUpravit={akce.upravit} {...akce.penize}
+              davka={x.batchId ? tresty.filter(y => y.batchId === x.batchId).length : undefined} />
           ))}
         </ul>
       )}
@@ -58,6 +59,12 @@ export function TrestyUzaverky({ uzaverka, onZmena }: {
  * Tlačítko „Dát trest" s předvyplněným oknem (manko, výtka). Bez tresty.udelit se nekreslí.
  * S `vyrizeno` (den a klíč návrhu) zmizí, když za totéž už platný trest je — server by druhý
  * odmítl („Za tohle už trest je."). Čte stejnou adresu jako sekce Tresty na směně (jedna mezipaměť).
+ *
+ * Manko (kolo 96): trestem není (§ 346b ZP), ale jde ho řešit NÁHRADOU ŠKODY se schodkem — s dohodou
+ * o odpovědnosti a souhlasem se srážkou (§ 252, § 146 písm. b) ZP). Kdo smí peníze (finance.mzdy),
+ * dostane tlačítko „Náhrada škody za manko", které otevře totéž okno rovnou v Náhradě škody se
+ * schodkem a výší manka (bez klíče návrhu a bez bodů); vyřízené = u uzávěrky už platná náhrada.
+ * Bez finance.mzdy zůstává věta, jak manko řešit.
  */
 export function TrestTlacitko({ predvolby, popisek, nadOkny = true, onUlozeno, vyrizeno, className = '' }: {
   /** Předvolby se čtou až při klepnutí (návrh klíče výtky se mohl mezitím dohledat). */
@@ -65,29 +72,39 @@ export function TrestTlacitko({ predvolby, popisek, nadOkny = true, onUlozeno, v
   popisek?: string;
   nadOkny?: boolean;
   onUlozeno?: () => void;
-  vyrizeno?: { day: string; sourceKey: string };
+  /** Vyřízeno: trest s klíčem návrhu (`sourceKey`), u manka náhrada škody k uzávěrce (`closingId`). */
+  vyrizeno?: { day: string; sourceKey?: string; closingId?: number };
   className?: string;
 }) {
   const t = useT('widgety');
   const { nacteno, ma } = useOpravneni();
   const [okno, setOkno] = useState<PredvolbyTrestu | null>(null);
   const smi = nacteno && ma('tresty.udelit');
+  const smiPenize = nacteno && ma('finance.mzdy');
   const dne = useTresty(smi && vyrizeno && ma('tresty.zobrazit_tym') ? urlTresty({ scope: 'team', day: vyrizeno.day }) : null);
-  const uzJe = !!vyrizeno && (dne.data?.items ?? []).some(x => x.sourceKey === vyrizeno.sourceKey && x.status === 'plati');
-  if (!smi) return null;
-  // Manko trestem není (§ 346b odst. 1 zákoníku práce): místo tlačítka „Dát trest za manko"
-  // věta, jak to řešit. Klíč návrhu manko:<id> by server stejně odmítl.
   const pevne = typeof predvolby === 'function' ? null : predvolby;
-  if (pevne?.druhNavrhu === 'manko' || vyrizeno?.sourceKey.startsWith('manko:')) {
+  const manko = pevne?.druhNavrhu === 'manko' || pevne?.penize?.druhSkody === 'schodek' || !!vyrizeno?.sourceKey?.startsWith('manko:');
+  const uzJe = !!vyrizeno && (dne.data?.items ?? []).some(x => x.status === 'plati' && (manko
+    ? x.closingId === vyrizeno.closingId && !!x.penize?.srazky.some(s => s.druh === 'nahrada' && s.stav !== 'zruseno')
+    : !!vyrizeno.sourceKey && x.sourceKey === vyrizeno.sourceKey));
+  if (!smi) return null;
+  // Manko trestem není (§ 346b odst. 1 zákoníku práce): bez práva na peníze jen věta, jak to řešit.
+  if (manko && !smiPenize) {
     return <p className={`t-meta text-pretty ${className}`} data-manko-veta>{t('Manko řeš dohodou o odpovědnosti, ne trestem.')}</p>;
   }
+  // Klíč návrhu manko:<id> by server odmítl a body za manko nepatří — okno dostane jen náhradu škody.
+  const otevri = () => {
+    const p = typeof predvolby === 'function' ? predvolby() : predvolby;
+    setOkno(manko ? { ...p, sourceKey: null, druhNavrhu: undefined, typeId: null, points: 0, bonusCut: 0, penize: { rezim: 'nahrada', druhSkody: 'schodek', ...p.penize } } : p);
+  };
   // Okno zůstává připojené i po udělení (tlačítko zmizí): drží toast „Trest udělen".
   return (
     <>
       {!uzJe && (
-        <Button variant="secondary" size="sm" icon="warning" className={`tap-target ${className}`}
-          onClick={() => setOkno(typeof predvolby === 'function' ? predvolby() : predvolby)}>{popisek ?? t('Dát trest')}</Button>
+        <Button variant="secondary" size="sm" icon={manko ? 'coins' : 'warning'} className={`tap-target ${className}`} data-manko-nahrada={manko ? '' : undefined}
+          onClick={otevri}>{popisek ?? (manko ? t('Náhrada škody za manko') : t('Dát trest'))}</Button>
       )}
+      {uzJe && manko && <p className={`t-meta text-pretty ${className}`} data-manko-vyrizeno>{t('Náhrada škody za manko je zapsaná.')}</p>}
       <DatTrest open={!!okno} predvolby={okno} nadOkny={nadOkny} onClose={() => setOkno(null)} onUlozeno={() => onUlozeno?.()} />
     </>
   );

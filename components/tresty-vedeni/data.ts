@@ -27,12 +27,16 @@ export const vyberDataSazebniku = (raw: unknown): DataSazebniku => ({
   smiSpravovat: (raw as { smi?: { sazebnik?: unknown } } | null)?.smi?.sazebnik === true,
 });
 
-/** Strop krácení z GET /api/tresty?strop=1: kolik jde ještě krátit, prémie za měsíc, už kráceno. */
-export interface StropKraceni { strop: number; premie: number; uzKraceno: number }
+/**
+ * Strop krácení z GET /api/tresty?strop=1: kolik jde ještě krátit, prémie za měsíc, už kráceno;
+ * kolo 96 navíc nenároková složka za měsíc (`slozka`) a přijatý záskok (`zaskok`) — strop = složka
+ * + nenárokové prémie + záskok − už kráceno.
+ */
+export interface StropKraceni { strop: number; premie: number; uzKraceno: number; slozka: number; zaskok: number }
 export const vyberStrop = (raw: unknown): StropKraceni => {
   const o = (raw ?? {}) as Record<string, unknown>;
   const n = (v: unknown) => Math.max(0, Math.round(Number(v) || 0));
-  return { strop: n(o.strop), premie: n(o.premie), uzKraceno: n(o.uzKraceno) };
+  return { strop: n(o.strop), premie: n(o.premie), uzKraceno: n(o.uzKraceno), slozka: n(o.slozka), zaskok: n(o.zaskok) };
 };
 export const urlStropu = (userId: number, day: string, bez?: number | null): string =>
   `${URL_TRESTY}?strop=1&userId=${userId}&day=${day}${bez ? `&bez=${bez}` : ''}`;
@@ -95,3 +99,6 @@ export function useMankaNavrhu(zapnuto: boolean): number {
 export function useStropKraceni(url: string | null): StavDat<StropKraceni> {
   return useDataWidgetu(url, vyberStrop);
 }
+
+// Typ smlouvy lidí (věta, jestli srážka počká na souhlas) nese GET /api/tresty/vyber u každého člověka
+// (`smlouva`, jen s finance.mzdy) — viz components/tresty-penize/data.ts VyberLidi.

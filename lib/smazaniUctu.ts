@@ -92,6 +92,9 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   penalties: 'ponechat',
   // sazebník trestů: autor položky zůstane anonymní, položka podniku zůstane
   penalty_types: 'ponechat',
+  // tresty a peníze (kolo 96): srážky z výplaty se souhlasem (dohoda o srážkách ze mzdy, náhrada škody), převody záskoku
+  // a hromadné dávky jsou mzdový a pracovněprávní záznam podniku (dopad je v wage_adjustments); autor i člověk zůstanou anonymní
+  wage_deductions: 'ponechat', penalty_transfers: 'ponechat', pay_batches: 'ponechat',
   // zábor volitelného úkolu (kolo 11): krátkodobý stav „beru si", s účtem jde pryč
   extra_claims: 'smazat',
   daily_reports: 'ponechat', recipes: 'ponechat', guides: 'ponechat', procedures: 'ponechat', polls: 'ponechat',
@@ -161,6 +164,8 @@ export const TYMOVE_TABULKY = [
   'extra_work', 'extra_offers',
   // kolo 10: tresty
   'penalties', 'penalty_types', 'penalty_dismissed',
+  // kolo 96: peníze z výplaty u trestů (srážky, záskok, hromadné dávky)
+  'wage_deductions', 'penalty_transfers', 'pay_batches',
   // kolo 11: volitelné úkoly
   'extra_claims',
   // spuštění (balík Q): párování kartičky s účtem z pokladny

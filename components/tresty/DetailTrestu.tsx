@@ -4,6 +4,10 @@
 // uzávěrce, položka sazebníku a kolikátá je v měsíci, fotka, kdo trest dal, dopad
 // (body dolů, krácení prémie s větou, že jde jen o prémii, ne o mzdu) a stav.
 //
+// Kolo 96 (peníze z výplaty): srážka nebo náhrada škody čekající na souhlas má hned pod textem kartu
+// SouhlasSeSrazkou (celé znění dohody, Souhlasím / Nesouhlasím s nepovinným proč); v bloku Dopad jsou
+// srážky se stavem, splátkami a škodou a záskok bez jmen kolegů (RadkyPenezTrestu).
+//
 // Akce člověka, kterého se trest týká:
 //  - „Beru na vědomí" (PATCH { seen: true }) — jen u nepotvrzeného platného trestu;
 //  - „Vyjádřit se" — textarea do 500 znaků a přepínač „Nesouhlasím s trestem"
@@ -23,10 +27,12 @@ import { useNavigace } from '../widgety/NavigaceKontext';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDatum, fmtMesic } from '@/lib/i18n/format';
 import { apiMessage, okJson } from '@/lib/api';
-import { MAX_DELKA_VYJADRENI, URL_TRESTY, jeNapomenuti, vyberTresty, type Trest } from '@/lib/tresty';
-import { akceTrestu, poradiVMesici, validujVyjadreni } from './logika';
-import { StavTrestuChip, bodyDolu } from './kusy';
+import { MAX_DELKA_VYJADRENI, URL_TRESTY, vyberTresty, type Trest } from '@/lib/tresty';
+import { akceTrestu, poradiVMesici, srazkaKSouhlasu, validujVyjadreni } from './logika';
+import { StavTrestuChip, bodyDolu, jeNapomenutiSPenezi } from './kusy';
 import { obnovTresty } from './data';
+import { SouhlasSeSrazkou } from './SouhlasSrazky';
+import { RadkyPenezTrestu } from './PenizeTrestu';
 
 /** Hlášky validace vyjádření (stejné jako server) přeložené výslovně. */
 function prelozChybu(t: PrekladFn, chyba: string): string {
@@ -117,7 +123,9 @@ export function DetailTrestu({ trest, onClose, vsechny = [], nahled = false }: {
   const denDlouze = (d: string) => fmtDatum(d, { jazyk, styl: 'denDlouze' });
   const poradi = tr ? poradiVMesici(vsechny, tr) : null;
   const zruseno = tr?.status === 'zruseno';
-  const napomenuti = tr ? jeNapomenuti(tr) : false;
+  const napomenuti = tr ? jeNapomenutiSPenezi(tr) : false;
+  // Kolo 96: srážka / náhrada škody čekající na souhlas — karta s dohodou hned pod textem trestu.
+  const kSouhlasu = tr && !pisu ? srazkaKSouhlasu(tr) : null;
   const mesic = tr ? fmtMesic(tr.day.slice(0, 7), { jazyk }) : '';
 
   const paticka = !tr ? null : pisu ? (
@@ -150,6 +158,10 @@ export function DetailTrestu({ trest, onClose, vsechny = [], nahled = false }: {
             </div>
             <p className="text-[15px] leading-snug text-[#16181A] whitespace-pre-line break-words text-pretty" data-text-trestu>{tr.text}</p>
 
+            {kSouhlasu && (
+              <SouhlasSeSrazkou srazka={kSouhlasu} nahled={nahled} onHotovo={veta => setToast({ text: veta, tone: 'ok', id: Date.now() })} />
+            )}
+
             {/* Dopad: body dolů a krácení prémie — vždy s větou, že jde jen o prémii, ne o mzdu. */}
             <Well pad="sm" data-dopad-trestu>
               {napomenuti ? (
@@ -171,6 +183,7 @@ export function DetailTrestu({ trest, onClose, vsechny = [], nahled = false }: {
                       <p className="t-meta mt-0.5 text-pretty" data-veta-premie>{t('Krátí se jen prémie za {mesic}, ne mzda.', { mesic })}</p>
                     </li>
                   )}
+                  <RadkyPenezTrestu trest={tr} />
                 </ul>
               )}
               {zruseno && !napomenuti && <p className="t-meta mt-2 text-pretty">{t('Trest je zrušený — body i krácení se vrátily.')}</p>}

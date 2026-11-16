@@ -122,6 +122,18 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'tresty.sazebnik.pridat': 'Přidána položka sazebníku trestů',
   'tresty.sazebnik.upravit': 'Upravena položka sazebníku trestů',
   'tresty.sazebnik.smazat': 'Smazána položka sazebníku trestů',
+  // Tresty a peníze z výplaty (kolo 96)
+  'tresty.davka': 'Hromadný trest',
+  'tresty.srazka': 'Srážka z výplaty k trestu',
+  'tresty.srazka_souhlas': 'Souhlas se srážkou ze mzdy',
+  'tresty.srazka_nesouhlas': 'Nesouhlas se srážkou ze mzdy',
+  'tresty.srazka_zrusit': 'Zrušena srážka z výplaty',
+  'tresty.srazka_znovu': 'Znovu žádost o souhlas se srážkou',
+  'tresty.srazka_upravit': 'Snížena srážka z výplaty',
+  'tresty.zaskok': 'Stržená částka přejde kolegům (záskok)',
+  'vyplata.slozka': 'Změna nenárokové složky výplaty člena',
+  'wage.davka': 'Hromadná odměna k výplatě',
+  'wage.davka_zpet': 'Hromadná odměna vzata zpět',
   // Záloha dat (spuštění, balík P): stažení z odkazu v denním e-mailu
   'data.zaloha.stazeni': 'Stažena záloha dat podniku',
   // docházka (kolo 7: ruční oprava s důvodem)

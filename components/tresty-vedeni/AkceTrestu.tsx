@@ -12,9 +12,13 @@ import { apiMessage, okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 import { Button, Field, Input, Modal, Toast } from '../ui';
 import { useMoney } from '../CurrencyProvider';
+import type { SrazkaTrestu } from '@/lib/trestyPenize';
+import { useOpravneni } from '../role/useOpravneni';
+import { obnovPenize } from '../tresty-penize/data';
 import { obnovTresty } from './data';
 import { DatTrest, NadPlochou } from './DatTrest';
-import { dopadTrestu } from './TrestRadek';
+import { pozadejZnovu, UpravaSrazky, ZmenitZaskok } from './PenizeRadku';
+import { dopadTrestu, type AkceSrazky } from './TrestRadek';
 
 /** Okno zrušení trestu: co se ruší a nepovinný důvod (člověk ho uvidí v oznámení i u trestu). */
 export function ZrusitTrest({ x, onClose, onHotovo, nadOkny = false }: {
@@ -37,6 +41,7 @@ export function ZrusitTrest({ x, onClose, onHotovo, nadOkny = false }: {
         body: JSON.stringify({ status: 'zruseno', ...(duvod.trim() ? { note: duvod.trim() } : {}) }),
       }).then(okJson);
       obnovTresty();
+      obnovPenize();
       onHotovo?.((d?.item ?? { ...x, status: 'zruseno' }) as Trest);
       onClose();
     } catch (e) {
@@ -71,10 +76,25 @@ export function ZrusitTrest({ x, onClose, onHotovo, nadOkny = false }: {
 /** Háček: obsluha akcí řádku a okna, která k nim patří (vykreslit `okna` jednou pod seznamem). */
 export function useAkceTrestu({ nadOkny = false, onZmena }: { nadOkny?: boolean; onZmena?: () => void } = {}) {
   const t = useT('widgety');
+  const { nacteno, ma } = useOpravneni();
+  const smiPenize = nacteno && ma('finance.mzdy');
   const [pracuji, setPracuji] = useState<number | null>(null);
   const [rusim, setRusim] = useState<Trest | null>(null);
   const [upravuji, setUpravuji] = useState<Trest | null>(null);
+  const [srazka, setSrazka] = useState<{ x: Trest; s: SrazkaTrestu; akce: 'snizit' | 'zrusit' } | null>(null);
+  const [zaskok, setZaskok] = useState<Trest | null>(null);
   const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
+
+  // Kolo 96: peníze u trestu (finance.mzdy) — srážka (snížit / zrušit / znovu o souhlas) a záskok.
+  const onSrazka = useCallback((x: Trest, s: SrazkaTrestu, akce: AkceSrazky) => {
+    if (akce !== 'znovu') { setSrazka({ x, s, akce }); return; }
+    setPracuji(x.id);
+    void pozadejZnovu(t, s, x.userName).then(r => {
+      setToast({ ...r, id: Date.now() });
+      setPracuji(null);
+      if (r.tone === 'ok') onZmena?.();
+    });
+  }, [t, onZmena]);
 
   const platiDal = useCallback(async (x: Trest) => {
     setPracuji(x.id);
@@ -99,6 +119,14 @@ export function useAkceTrestu({ nadOkny = false, onZmena }: { nadOkny?: boolean;
           onHotovo={() => { setToast({ text: t('Trest zrušen — body i krácení se vrátily.'), tone: 'ok', id: Date.now() }); onZmena?.(); }} />
       )}
       <DatTrest open={!!upravuji} upravit={upravuji} nadOkny={nadOkny} onClose={() => setUpravuji(null)} onUlozeno={() => onZmena?.()} />
+      {srazka && (
+        <UpravaSrazky x={srazka.x} s={srazka.s} akce={srazka.akce} nadOkny={nadOkny} onClose={() => setSrazka(null)}
+          onHotovo={text => { setToast({ text, tone: 'ok', id: Date.now() }); onZmena?.(); }} />
+      )}
+      {zaskok && (
+        <ZmenitZaskok x={zaskok} nadOkny={nadOkny} onClose={() => setZaskok(null)}
+          onHotovo={text => { setToast({ text, tone: 'ok', id: Date.now() }); onZmena?.(); }} />
+      )}
       <Toast message={toast?.text ?? null} tone={toast?.tone} id={toast?.id} onClose={() => setToast(null)} />
     </>
   );
@@ -108,6 +136,8 @@ export function useAkceTrestu({ nadOkny = false, onZmena }: { nadOkny?: boolean;
     platiDal: (x: Trest) => { void platiDal(x); },
     zrusit: (x: Trest) => setRusim(x),
     upravit: (x: Trest) => setUpravuji(x),
+    /** Props pro TrestRadek: akce nad penězi (jen s finance.mzdy). */
+    penize: { smiPenize, onSrazka, onZaskok: (x: Trest) => setZaskok(x) },
     okna,
   };
 }
