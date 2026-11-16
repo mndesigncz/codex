@@ -61,7 +61,7 @@ export function srazkaKratce(t: PrekladFn, s: Pick<SrazkaTrestu, 'druh' | 'castk
 export function textStavuSrazky(t: PrekladFn, stav: StavSrazky): string {
   switch (stav) {
     case 'ceka': return t('Čeká na tvůj souhlas');
-    case 'uplatneno': return t('Uplatněno');
+    case 'uplatneno': return t('Uplatněno', undefined, 'srazka');
     case 'nesouhlas': return t('Nesouhlasíš');
     default: return t('Zrušeno');
   }
