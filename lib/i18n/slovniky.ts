@@ -40,6 +40,9 @@ export const SEKCE_VZDY: readonly Sekce[] = SEKCE;
  */
 export const CASTI_SEKCI: Partial<Record<Sekce, readonly string[]>> = {
   'klient-host': ['domov', 'podnik', 'odmeny', 'ucet'],
+  // Tresty a peníze z výplaty (kolo 96, docs/TRESTY-PENIZE.md): UI vedení a UI zaměstnance + výplat jdou
+  // souběžně, každé píše nové věty jen do své části (penize-vedeni / penize-vyplaty).
+  widgety: ['penize-vedeni', 'penize-vyplaty'],
 };
 
 const rozpracovano = new Map<string, Promise<Slovnik>>();

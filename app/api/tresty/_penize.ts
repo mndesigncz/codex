@@ -58,6 +58,8 @@ export const bezPrav = () => chyba(VETA_BEZ_PRAV_PENIZE, 403);
  */
 export async function pripravPenize(o: {
   teamId: number; ids: readonly number[]; v: VstupPenez; text: string; day: string; closingId: number | null; dnes: string; money: (n: number) => string;
+  /** Základ záskoku po lidech bez nových srážek (krácení, u úpravy i dosavadní srážky) — kvůli kontrole částek kolegům. */
+  zakladBez: readonly number[];
 }): Promise<{ ok: true; lide: PenizeOsoby[] } | { ok: false; res: NextResponse }> {
   const n = o.ids.length;
   const srazky = o.v.srazka ? castkyDavky(o.v.srazka.castka, n, o.v.rozpocitat) : [];
@@ -100,6 +102,13 @@ export async function pripravPenize(o: {
       } });
     }
     if (o.v.srazka) sr.push({ druh: 'srazka', castka: srazky[i], splatky: o.v.srazka.splatky, duvod: o.text });
+    // Částky kolegům se ověří proti tomu, co se z trestu strhne (víc převést nejde).
+    if (z && z.komu !== 'podnik') {
+      const zaklad = (o.zakladBez[i] ?? 0) + sr.reduce((a, x) => a + x.castka, 0);
+      if (!zaklad) return { ok: false, res: chyba('Z trestu se nic nestrhne — není co převést kolegům.', 400) };
+      const r = rozdelZaskok({ zaklad, zpusob: z.zpusob, prijemci, krome: [userId] });
+      if (!r.ok) return { ok: false, res: chyba(r.chyba, 400) };
+    }
     lide.push({ userId, srazky: sr, smlouva, zaskok: z ? { komu: z.komu, zpusob: z.komu === 'podnik' ? null : z.zpusob, prijemci } : null });
   }
   return { ok: true, lide };

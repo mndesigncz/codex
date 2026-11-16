@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
           : VETA_BEZ_PREMIE, 409, { strop: s.strop, userId: ids[i] });
       }
     }
-    const penize = await pripravPenize({ teamId: c.teamId, ids, v: p.v, text: z.text, day: z.day, closingId: z.closingId, dnes, money: mena.money });
+    const penize = await pripravPenize({ teamId: c.teamId, ids, v: p.v, text: z.text, day: z.day, closingId: z.closingId, dnes, money: mena.money, zakladBez: kraceni });
     if (!penize.ok) return penize.res;
     if (z.sourceKey) {
       const [zahozen] = await sql`SELECT 1 AS x FROM penalty_dismissed WHERE team_id = ${c.teamId} AND source_key = ${z.sourceKey}`;

@@ -5,7 +5,7 @@ import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import { MAX_DELKA_VYJADRENI, normalizujPoznamku, normalizujText, trestText, validujTrest, VETA_BEZ_PREMIE } from '@/lib/tresty';
 import { menaPodniku } from '@/lib/menaPodniku';
-import { prepocitejPenizeTrestu } from '@/lib/trestyPenizeDb';
+import { prepocitejPenizeTrestu, zakladZaskoku } from '@/lib/trestyPenizeDb';
 import { nactiTrest, oznamTrest, oznamVyjadreni, oznamZruseni, predMigraci, stropKraceniDb, tvarTrestu, zalozTrest, zrusDopad } from '../_spolecne';
 import { bezPrav, chcePenize, ctiPenize, pripravPenize, ulozPenize } from '../_penize';
 
@@ -150,7 +150,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
     const penize = chcePenize(p.v) || p.v.zaskok
-      ? await pripravPenize({ teamId: c.teamId, ids: [puvodni.userId], v: { ...p.v, rozpocitat: false }, text: z.text, day: z.day, closingId: z.closingId, dnes: pragueToday(), money: mena.money })
+      ? await pripravPenize({ teamId: c.teamId, ids: [puvodni.userId], v: { ...p.v, rozpocitat: false }, text: z.text, day: z.day, closingId: z.closingId, dnes: pragueToday(), money: mena.money,
+        zakladBez: [(await zakladZaskoku(c.teamId, id)) - puvodni.bonusCut + z.bonusCut] })
       : null;
     if (penize && !penize.ok) return penize.res;
     const zmenaDopadu = z.points !== puvodni.points || z.bonusCut !== puvodni.bonusCut || z.day !== puvodni.day || !!penize;
