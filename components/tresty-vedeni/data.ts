@@ -27,12 +27,16 @@ export const vyberDataSazebniku = (raw: unknown): DataSazebniku => ({
   smiSpravovat: (raw as { smi?: { sazebnik?: unknown } } | null)?.smi?.sazebnik === true,
 });
 
-/** Strop krácení z GET /api/tresty?strop=1: kolik jde ještě krátit, prémie za měsíc, už kráceno. */
-export interface StropKraceni { strop: number; premie: number; uzKraceno: number }
+/**
+ * Strop krácení z GET /api/tresty?strop=1: kolik jde ještě krátit, prémie za měsíc, už kráceno;
+ * kolo 96 navíc nenároková složka za měsíc (`slozka`) a přijatý záskok (`zaskok`) — strop = složka
+ * + nenárokové prémie + záskok − už kráceno.
+ */
+export interface StropKraceni { strop: number; premie: number; uzKraceno: number; slozka: number; zaskok: number }
 export const vyberStrop = (raw: unknown): StropKraceni => {
   const o = (raw ?? {}) as Record<string, unknown>;
   const n = (v: unknown) => Math.max(0, Math.round(Number(v) || 0));
-  return { strop: n(o.strop), premie: n(o.premie), uzKraceno: n(o.uzKraceno) };
+  return { strop: n(o.strop), premie: n(o.premie), uzKraceno: n(o.uzKraceno), slozka: n(o.slozka), zaskok: n(o.zaskok) };
 };
 export const urlStropu = (userId: number, day: string, bez?: number | null): string =>
   `${URL_TRESTY}?strop=1&userId=${userId}&day=${day}${bez ? `&bez=${bez}` : ''}`;
@@ -94,4 +98,23 @@ export function useMankaNavrhu(zapnuto: boolean): number {
 /** Strop krácení pro člověka a den (jen tresty.udelit); null = neptat se. */
 export function useStropKraceni(url: string | null): StavDat<StropKraceni> {
   return useDataWidgetu(url, vyberStrop);
+}
+
+/**
+ * Typ smlouvy lidí (HPP / DPP / DPC / OSVC / null) pro větu, jestli srážka počká na souhlas.
+ * GET /api/tresty/vyber smlouvu nenese — bere se z výplatní listiny (GET /api/payroll, dochazka.zobrazit),
+ * stejně jako ji ukazuje Docházka. Bez oprávnění nebo dat null: okno řekne obecnou větu.
+ */
+export const urlSmluv = (den: string): string => `/api/payroll?od=${den.slice(0, 7)}-01&do=${den}`;
+export const vyberSmlouvy = (raw: unknown): Map<number, string | null> => {
+  const m = new Map<number, string | null>();
+  const lide = (raw as { lide?: unknown } | null)?.lide;
+  for (const l of Array.isArray(lide) ? (lide as Record<string, unknown>[]) : []) {
+    const id = Number(l?.id);
+    if (id > 0) m.set(id, typeof l.contractType === 'string' && l.contractType ? l.contractType : null);
+  }
+  return m;
+};
+export function useSmlouvy(url: string | null): StavDat<Map<number, string | null>> {
+  return useDataWidgetu(url, vyberSmlouvy);
 }

@@ -106,6 +106,13 @@ export interface PredvolbyTrestu {
    * nejsou zadané předem.
    */
   druhNavrhu?: DruhNavrhu;
+  /** Hromadně: víc lidí předem (okno se otevře ve výběru „Víc lidí"). Kolo 96. */
+  userIds?: number[];
+  /**
+   * Peníze předem (kolo 96): cesta a částky — manko z uzávěrky otevře rovnou Náhradu škody se
+   * schodkem a výší manka. Bez finance.mzdy se ignorují (okno sekci Peníze nekreslí).
+   */
+  penize?: { rezim?: 'kraceni' | 'nahrada' | 'srazka'; skoda?: number; druhSkody?: 'zavinena' | 'schodek' | 'ztrata'; srazka?: number };
 }
 
 /** Předvolby z návrhu: text z dat, položka sazebníku podle druhu (body a krácení z ní), klíč návrhu. */
