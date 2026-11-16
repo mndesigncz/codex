@@ -17,6 +17,7 @@ import { useTresty } from './data';
 import { DatTrest } from './DatTrest';
 import { TrestRadek } from './TrestRadek';
 import { useAkceTrestu } from './AkceTrestu';
+import { SlozkaClena } from './SlozkaClena';
 
 export function TrestyClena({ clovek, onZmena }: { clovek: { id: number; jmeno: string }; onZmena?: () => void }) {
   const t = useT('widgety');
@@ -32,6 +33,7 @@ export function TrestyClena({ clovek, onZmena }: { clovek: { id: number; jmeno: 
   const items = data.data?.items ?? [];
   const s = souhrnTrestu(items, mesic);
   const posledni = items.slice(0, 3);
+  const cekaSouhlas = items.reduce((a, x) => a + (x.status === 'plati' ? x.penize?.cekaNaSouhlas ?? 0 : 0), 0);
   return (
     <section aria-labelledby="profil-tresty" data-tresty-clena>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -49,6 +51,7 @@ export function TrestyClena({ clovek, onZmena }: { clovek: { id: number; jmeno: 
             {s.body > 0 && <Chip tone="muted" size="sm">{t('−{n} b', { n: s.body })}</Chip>}
             {s.kraceni > 0 && <Chip tone="muted" size="sm">{t('krácení {castka}', { castka: money(s.kraceni) })}</Chip>}
             {s.sporu > 0 && <Chip tone="wait" size="sm">{t('Nesouhlasí: {n}', { n: s.sporu })}</Chip>}
+            {cekaSouhlas > 0 && <Chip tone="wait" size="sm">{t('Srážka čeká na souhlas: {castka}', { castka: money(cekaSouhlas) })}</Chip>}
           </div>
           {posledni.length === 0 ? (
             <p className="t-meta mt-2">{t('Žádné tresty za poslední tři měsíce.')}</p>
@@ -56,12 +59,14 @@ export function TrestyClena({ clovek, onZmena }: { clovek: { id: number; jmeno: 
             <ul className="list mt-1">
               {posledni.map(x => (
                 <TrestRadek key={x.id} x={x} bezJmena smiUdelit={smiUdelit} pracuji={akce.pracuji === x.id}
-                  onPlatiDal={akce.platiDal} onZrusit={akce.zrusit} onUpravit={akce.upravit} />
+                  onPlatiDal={akce.platiDal} onZrusit={akce.zrusit} onUpravit={akce.upravit} {...akce.penize} />
               ))}
             </ul>
           )}
         </>
       )}
+      {/* Kolo 96: nenároková složka výplaty — z ní (a z nenárokových prémií) jde krátit trestem. */}
+      <SlozkaClena clovek={clovek} onZmena={onZmena} />
       <DatTrest open={davam} nadOkny predvolby={{ userId: clovek.id, jmeno: clovek.jmeno }} onClose={() => setDavam(false)} onUlozeno={() => onZmena?.()} />
       {akce.okna}
     </section>
