@@ -880,6 +880,13 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
         <Stat label={t('Prémie a srážky')} value={upravy.length ? sZnamenkem(rp.upravyUcinne, money) : '—'} tone={rp.upravyUcinne > 0 ? 'ok' : rp.upravyUcinne < 0 ? 'bad' : 'muted'}
           note={upravy.length ? t('{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}', { n: upravy.length }) : t('zatím nic')} />
       </StatRow>
+      {/* Čeká na souhlas hned pod dlaždicemi: střední karta se nad 300 px zkracuje a tohle je jediná věc, kterou má člověk udělat. */}
+      {rp.cekaNaSouhlas > 0 && (
+        <div className="mt-3">
+          <RadekCekaNaSouhlas castka={rp.cekaNaSouhlas} kdo="ja" onOtevrit={doTrestu}
+            detail={cekajici.length ? cekajici.slice(0, 2).map(x => x.text).join(' · ') : undefined} />
+        </div>
+      )}
       {sRozpadem || (priplatky?.castka ?? 0) > 0 || zKasy > 0 || (tentoMesic?.vyplaty.length ?? 0) > 0 || (navicPremie.castka > 0 && velikost !== 'L') ? (
         <ul className="list mt-3" data-rozpad-vyplaty={sRozpadem ? 'ano' : undefined}>
           {sRozpadem && <RadkyRozpadu r={rp} slozka={slozka} kdo="ja" mzdaMeta={sazba ? `${hodiny} × ${money(sazba)}/h` : undefined} ostatniBez={velikost !== 'L' ? navicPremie.castka : 0} />}
@@ -899,12 +906,6 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
             value={<span className="font-bold" data-k-vyplate>{money(kVyplate)}</span>} />}
         </ul>
       ) : null}
-      {rp.cekaNaSouhlas > 0 && (
-        <div className="mt-3">
-          <RadekCekaNaSouhlas castka={rp.cekaNaSouhlas} kdo="ja" onOtevrit={doTrestu}
-            detail={cekajici.length ? cekajici.slice(0, 2).map(x => x.text).join(' · ') : undefined} />
-        </div>
-      )}
       {velikost === 'L' && upravy.length > 0 && (
         <ul className="list mt-3">
           {upravy.slice(0, 6).map(u => (

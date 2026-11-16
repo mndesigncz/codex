@@ -452,8 +452,23 @@ const podvrhVedeni96 = () => {
   await p.screenshot({ path: SNIMKY96 + 'vyplaty-detail-1280.png' });
   await p.keyboard.press('Escape');
   await dokud(() => d.isHidden().catch(() => true), 3000);
-  // Okno Prémie a srážky (Souhrn hodin) — zdroje z trestu bez koše
   const sh = widget(p, 'dochazka.souhrn_hodin');
+  // Profil člena „Výplata · tento měsíc" — stejný rozpad, jen ke čtení
+  const profilBtn = sh.getByRole('button', { name: 'Profil: Eva Testová' }).first();
+  if (await profilBtn.count()) {
+    await profilBtn.click();
+    const prof = p.getByRole('dialog').filter({ hasText: 'Výplata · tento měsíc' });
+    await dokud(() => prof.locator('[data-rozpad-clena]').isVisible().catch(() => false), 8000);
+    const tp = await text(prof.locator('[data-rozpad-clena]'));
+    tvrdi('V96 (1280): profil člena „Výplata · tento měsíc" — Nároková mzda, Nenároková složka, Krácení, Náhrada, Srážky a „Čeká na souhlas" (neodečteno)',
+      ['Nároková mzda', 'Nenároková složka', 'Krácení (trest)', 'Náhrada škody', 'Srážky ze mzdy', 'Čeká na souhlas', 'neodečteno'].every(x => tp.includes(x)), tp.replace(/\n/g, ' | '));
+    await prof.locator('[data-rozpad-clena]').evaluate(e => e.scrollIntoView({ block: 'center' }));
+    await p.waitForTimeout(300);
+    await p.screenshot({ path: SNIMKY96 + 'vyplaty-profil-1280.png' });
+    await p.keyboard.press('Escape');
+    await dokud(async () => (await prof.count()) === 0, 3000);
+  } else tvrdi('V96 (1280): v Souhrnu hodin jde otevřít profil Evy', false);
+  // Okno Prémie a srážky (Souhrn hodin) — zdroje z trestu bez koše
   await sh.getByRole('button', { name: 'Prémie a srážky: Eva Testová' }).first().click();
   await p.getByRole('menuitem', { name: /Prémie a srážky \(/ }).first().click();
   const okno = dialog(p);
