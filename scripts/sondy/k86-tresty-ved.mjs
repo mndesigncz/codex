@@ -489,6 +489,7 @@ for (const tmavy of [false, true]) {
     await oknoS.locator('[data-slozka-typ="pct"]').click();
     await oknoS.locator('#slozka-hodnota').fill('10');
     await doberAnimace(oknoS);
+    tvrdi('T4: „Součást sazby" řekne, že platí jen podle smlouvy / mzdového výměru', /Platí jen tehdy, když ji tak má člověk ve smlouvě nebo mzdovém výměru/.test(await text(oknoS.locator('[data-slozka-smlouva]'))), await text(oknoS));
     await p.screenshot({ path: SNIMKY + 'k96-slozka-390.png', fullPage: false });
     await oknoS.getByRole('button', { name: 'Uložit' }).click();
     const put = await dokud(() => (stav.zapisy ?? []).find(z => z.m === 'PUT' && z.path === '/api/payroll/slozka'), 4000);
@@ -639,8 +640,15 @@ for (const [nazev, volby] of [['1280', { viewport: PC, mobil: false }], ['390', 
   await lide.locator('[data-clovek="15"]').click();
   tvrdi('K1: „Celá směna" vybere Evu a Jakuba, ručně přibude Martin → Vybráno: 3', /Vybráno: 3/.test(await text(lide)), await text(lide));
   await okno.locator('#trest-text').fill('Neuklizený sklad po inventuře.');
-  await okno.locator('#trest-kraceni').fill('900');
+  // Kontrola kola 96: „rozpočítat 9 000 mezi 3" = každý 3 000 — strop 5 000 platí na člověka, okno požadavek pustí
+  // (podvržený server pak odmítne stropem 1 000, ne okno hláškou „nejvýš 5 000").
+  await okno.locator('#trest-kraceni').fill('9000');
   await okno.getByRole('tab', { name: 'Rozpočítat' }).click();
+  await okno.getByRole('button', { name: 'Dát trest (3)' }).click();
+  const p9 = await dokud(() => posty().find(z => Array.isArray(z.telo?.userIds) && z.telo.bonusCut === 9000), 4000);
+  tvrdi('K1: rozpočítat 9 000 mezi 3 (každý 3 000) projde kontrolou okna — strop 5 000 na člověka, ne na celek', !!p9 && p9.telo.rozpocitat === true
+    && !/nejvýš 5\s000/.test(await text(okno)), await text(okno.locator('#trest-kraceni').locator('xpath=ancestor::*[contains(@class,"field")][1]')));
+  await okno.locator('#trest-kraceni').fill('900');
   tvrdi('K1: rozpočítat 900 mezi 3 → „každý 300 Kč" a souhrn −300 Kč z prémie u všech tří', /900 Kč mezi 3 lidi — každý 300 Kč\./.test(await text(okno))
     && (await okno.locator('[data-souhrn-strhne]').count()) === 3 && /Eva Testová: −300 Kč z prémie/.test(await text(okno.locator('[data-trest-souhrn-penez]'))), await text(okno.locator('[data-trest-souhrn-penez]')));
   await okno.locator('[data-zaskok="smena"]').click();
@@ -649,7 +657,7 @@ for (const [nazev, volby] of [['1280', { viewport: PC, mobil: false }], ['390', 
   tvrdi('K1: tlačítko „Dát trest (3)", podniku zůstane 900 Kč', (await okno.getByRole('button', { name: 'Dát trest (3)' }).count()) === 1 && /Podniku zůstane 900 Kč/.test(await text(okno)));
   await okno.screenshot({ path: SNIMKY + 'k96-dat-trest-hromadne-1280.png' });
   await okno.getByRole('button', { name: 'Dát trest (3)' }).click();
-  const p1 = await dokud(() => posty().find(z => Array.isArray(z.telo?.userIds)), 4000);
+  const p1 = await dokud(() => posty().find(z => Array.isArray(z.telo?.userIds) && z.telo.bonusCut !== 9000), 4000);
   tvrdi('K1: POST { userIds: [16, 17, 15], bonusCut: 900, rozpocitat: true } bez userId a sourceKey', !!p1 && JSON.stringify(p1.telo.userIds) === '[16,17,15]' && p1.telo.bonusCut === 900 && p1.telo.rozpocitat === true
     && p1.telo.userId === undefined && !p1.telo.sourceKey && !p1.telo.zaskok, JSON.stringify(p1?.telo));
   tvrdi('K1: toast „Trest udělen 3 lidem" a řádky „Hromadný trest · 3 lidí"', await dokud(() => p.getByText('Trest udělen 3 lidem — každý dostal oznámení.').isVisible().catch(() => false), 3000)

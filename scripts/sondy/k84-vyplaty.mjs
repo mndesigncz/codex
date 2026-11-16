@@ -479,6 +479,13 @@ const podvrhVedeni96 = () => {
     ['trest', 'nahrada', 'srazka'].every(z => zdroje.includes(z)) && await okno.locator('[data-odkaz-trest]').count() === 3 && await okno.getByRole('button', { name: 'Smazat zápis' }).count() === zdroje.filter(z => !['trest', 'nahrada', 'srazka', 'zaskok'].includes(z)).length
     && /náhrada škody \(trest\)/.test(to) && /srážka ze mzdy \(trest\)/.test(to) && /se mění u trestu, ne tady/.test(to), JSON.stringify(zdroje) + ' ' + to.replace(/\n/g, ' | ').slice(0, 500));
   await p.screenshot({ path: SNIMKY96 + 'vyplaty-premie-srazky-1280.png' });
+  // Kontrola kola 96: ruční srážka nesmí obcházet souhlas — věta, kdy smí bez souhlasu, a odkaz na tresty.
+  await okno.getByRole('tab', { name: 'Srážka', exact: true }).first().click();
+  const veta = okno.locator('[data-veta-rucni-srazka]');
+  tvrdi('V96 (1280): ruční srážka — věta „Bez souhlasu zaměstnance jen to, co dovoluje zákon…", příklad zálohy, odkaz na tresty',
+    await dokud(() => veta.isVisible().catch(() => false), 3000) && /Bez souhlasu zaměstnance jen to, co dovoluje zákon/.test(await text(veta))
+    && await okno.locator('[data-odkaz-tresty-srazka]').count() === 1 && (await okno.locator('#uprava-poznamka').getAttribute('placeholder')) === 'Např. vrácení zálohy', await text(veta));
+  await p.screenshot({ path: SNIMKY96 + 'vyplaty-rucni-srazka-1280.png' });
   await okno.locator('[data-odkaz-trest]').first().click();
   tvrdi('V96 (1280): odkaz „Trest" vede na Odměny › Tresty (view=rewards&arg=tresty)', await dokud(() => /view=rewards/.test(p.url()) && /arg=tresty/.test(p.url()), 6000), p.url());
   tvrdi('V96: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
