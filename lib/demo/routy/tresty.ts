@@ -7,6 +7,8 @@ import { KDO_JSEM, LIDE, clen } from '../data/lide';
 import { dnes, posunDen } from '../cas';
 import { mojeRole } from './zaklad';
 import { normalizujText, platnyKlicNavrhu, validujDruh, validujTrest, type DruhTrestu, type NavrhTrestu, type Trest } from '@/lib/tresty';
+import { castkyDavky, lideDavky, VETA_BEZ_PRAV_PENIZE } from '@/lib/trestyPenize';
+import { ctiPenizeDema, napojTrestyDema, penizeTrestuDema, pridejPenizeDema, zrusPenizeDema } from './trestyPenize';
 
 const jmeno = (id: number) => clen(id)?.name ?? 'Někdo';
 const avatar = (id: number) => clen(id)?.avatar ?? null;
@@ -30,7 +32,14 @@ const TRESTY: Trest[] = [
     seenAt: `${posunDen(dnes(), -4)}T08:00:00.000Z`, response: 'Lednici jsem zavírala, těsnění nedrží.', responseAt: `${posunDen(dnes(), -4)}T08:05:00.000Z`, disputed: true }),
   zaklad({ id: 4, userId: 3, day: posunDen(dnes(), -1), text: 'Pozdní příchod o 15 min.', typeId: 1, typeTitle: 'Pozdní příchod', points: 10, source: 'pozde', sourceKey: 'pozde:9004' }),
   zaklad({ id: 3, userId: 3, day: posunDen(dnes(), -12), text: 'Nevynesený koš před zavřením.', seenAt: `${posunDen(dnes(), -11)}T09:00:00.000Z` }),
+  // Kolo 96 (peníze): náhrada škody čekající na souhlas (Eliška) a krácení, které přešlo Tomášovi (záskok).
+  zaklad({ id: 5, userId: 3, day: posunDen(dnes(), -3), text: 'Rozbitý mlýnek — čištění za chodu, přestože je na něm cedulka.', points: 0 }),
+  zaklad({ id: 6, userId: 4, day: posunDen(dnes(), -6), text: 'Nedoplněné zásoby na ranní směnu, Tomáš to dodělal za něj.', points: 10, bonusCut: 200, seenAt: `${posunDen(dnes(), -5)}T08:00:00.000Z` }),
 ];
+napojTrestyDema(() => TRESTY, {
+  srazka: { trestId: 5, userId: 3, castka: 1500, splatky: 3, skoda: 4200, day: posunDen(dnes(), -3), duvod: 'Rozbitý mlýnek — čištění za chodu, přestože je na něm cedulka.' },
+  zaskok: { trestId: 6, userId: 2, castka: 200 },
+});
 const NAVRHY: NavrhTrestu[] = [
   { klic: 'pozde:9002', druh: 'pozde', userId: 3, userName: jmeno(3), userAvatar: avatar(3), day: posunDen(dnes(), -1), closingId: null, shiftId: null, minuty: 18, castka: null, poznamka: null },
 ];
@@ -42,7 +51,7 @@ export const tresty: Obsluha = (p, k) => {
   if (!cesta.startsWith('/api/tresty')) return undefined;
   const opr = new Set(mojeRole(s).opravneni);
   const ja = KDO_JSEM[s.role];
-  const smi = { udelit: opr.has('tresty.udelit'), sazebnik: opr.has('tresty.sazebnik'), tym: opr.has('tresty.zobrazit_tym') };
+  const smi = { udelit: opr.has('tresty.udelit'), sazebnik: opr.has('tresty.sazebnik'), tym: opr.has('tresty.zobrazit_tym'), penize: opr.has('finance.mzdy') };
   const d = dnes();
 
   if (cesta === '/api/tresty/types') {
@@ -105,12 +114,14 @@ export const tresty: Obsluha = (p, k) => {
     }
     if (!smi.udelit) return chyba('Upravovat tresty smí jen ten, kdo je uděluje.', 403);
     if (b.status === 'zruseno') {
+      zrusPenizeDema(t.id);
       Object.assign(t, { status: 'zruseno', cancelledBy: ja, cancelledByName: jmeno(ja), cancelledAt: new Date().toISOString(), cancelNote: typeof b.note === 'string' && b.note.trim() ? b.note.trim() : null, disputeHandledAt: t.disputed ? new Date().toISOString() : t.disputeHandledAt });
       return ok({ ok: true, item: t });
     }
     if (b.disputeHandled === true) { t.disputeHandledAt = new Date().toISOString(); return ok({ ok: true, item: t }); }
     const v = validujTrest({ ...t, ...b, userId: t.userId, sourceKey: null }, d);
     if (!v.ok) return chyba(v.chyba);
+    if (v.trest.bonusCut !== t.bonusCut && !smi.penize) return chyba(VETA_BEZ_PRAV_PENIZE, 403);
     const zmena = v.trest.points !== t.points || v.trest.bonusCut !== t.bonusCut;
     Object.assign(t, { text: v.trest.text, day: v.trest.day, points: v.trest.points, bonusCut: v.trest.bonusCut, typeId: v.trest.typeId,
       typeTitle: DRUHY.find(x => x.id === v.trest.typeId)?.title ?? null, seenAt: zmena ? null : t.seenAt });
@@ -119,7 +130,7 @@ export const tresty: Obsluha = (p, k) => {
 
   if (cesta === '/api/tresty') {
     if (metoda === 'GET') {
-      if (p.q.get('strop') === '1') return ok({ strop: 1500, premie: 1500, uzKraceno: 0 });
+      if (p.q.get('strop') === '1') return ok({ strop: 1500, premie: 1500, uzKraceno: 0, slozka: 0, zaskok: 0 });
       const scope = p.q.get('scope') === 'team' && smi.tym ? 'team' : 'mine';
       const stav = p.q.get('status');
       const mesic = p.q.get('month');
@@ -128,27 +139,47 @@ export const tresty: Obsluha = (p, k) => {
       const userId = scope === 'team' ? Number(p.q.get('userId')) || null : ja;
       const items = TRESTY.filter(t => (!userId || t.userId === userId) && (!stav || t.status === stav) && (!mesic || t.day.startsWith(mesic)) && (!den || t.day === den) && (!closingId || t.closingId === closingId))
         .sort((a, b) => b.day.localeCompare(a.day));
-      return ok({ items, druhy: smi.udelit || smi.sazebnik ? DRUHY.filter(x => x.active) : [], smi });
+      // Peníze: vlastní trest vždy, cizí jen s finance.mzdy (jako server).
+      const sPenezi = items.map(t => ({ ...t, penize: t.userId === ja || smi.penize ? penizeTrestuDema(t, smi.penize) : null }));
+      return ok({ items: sPenezi, druhy: smi.udelit || smi.sazebnik ? DRUHY.filter(x => x.active) : [], smi });
     }
     if (metoda === 'POST') {
       if (!smi.udelit) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
       const b = p.telo ?? {};
-      const v = validujTrest(b, d);
+      // Jeden člověk nebo dávka (userIds) — každý vlastní záznam, společné batchId.
+      const l = lideDavky(b);
+      if (!l.ok) return chyba(l.chyba);
+      const v = validujTrest({ ...b, userId: l.ids[0] }, d);
       if (!v.ok) return chyba(v.chyba);
-      if (!LIDE.some(l => l.id === v.trest.userId)) return chyba('Člověk není v podniku.', 404);
+      if (l.ids.length > 1 && v.trest.sourceKey) return chyba('Návrh trestu jde dát jen jednomu člověku.');
+      const cizi = l.ids.find(id => !LIDE.some(x => x.id === id));
+      if (cizi) return chyba('Člověk není v podniku.', 404, { userId: cizi });
+      const pv = ctiPenizeDema(b, d);
+      if (!pv.ok) return chyba(pv.chyba);
+      if ((v.trest.bonusCut > 0 || pv.chce) && !smi.penize) return chyba(VETA_BEZ_PRAV_PENIZE, 403);
       const druh = v.trest.typeId ? DRUHY.find(x => x.id === v.trest.typeId) ?? null : null;
       if (v.trest.typeId && !druh) return chyba('Položka sazebníku už neexistuje.', 404);
       if (v.trest.sourceKey && TRESTY.some(t => t.sourceKey === v.trest.sourceKey)) return chyba('Za tohle už trest je.', 409);
-      const t = zaklad({
-        id: ++dalsiId, userId: v.trest.userId, day: v.trest.day, text: v.trest.text, givenBy: ja, givenByName: jmeno(ja),
-        shiftId: v.trest.shiftId, closingId: v.trest.closingId, taskId: v.trest.taskId, typeId: v.trest.typeId, typeTitle: druh?.title ?? null,
-        photoUrl: v.trest.photoUrl,
-        points: b.points == null || b.points === '' ? druh?.points ?? 0 : v.trest.points,
-        bonusCut: b.bonusCut == null || b.bonusCut === '' ? druh?.bonusCut ?? 0 : v.trest.bonusCut,
-        source: v.trest.source, sourceKey: v.trest.sourceKey, createdAt: new Date().toISOString(),
-      });
-      TRESTY.unshift(t);
-      return ok({ ok: true, item: t }, 201);
+      const n = l.ids.length;
+      const rozpocitat = b.rozpocitat === true;
+      const kraceni = castkyDavky(b.bonusCut == null || b.bonusCut === '' ? (smi.penize ? druh?.bonusCut ?? 0 : 0) : v.trest.bonusCut, n, rozpocitat);
+      const batchId = n > 1 ? ++dalsiId : null;
+      const items: Trest[] = [];
+      for (let i = 0; i < n; i++) {
+        const t = zaklad({
+          id: ++dalsiId, userId: l.ids[i], day: v.trest.day, text: v.trest.text, givenBy: ja, givenByName: jmeno(ja),
+          shiftId: v.trest.shiftId, closingId: v.trest.closingId, taskId: v.trest.taskId, typeId: v.trest.typeId, typeTitle: druh?.title ?? null,
+          photoUrl: v.trest.photoUrl,
+          points: b.points == null || b.points === '' ? druh?.points ?? 0 : v.trest.points,
+          bonusCut: kraceni[i],
+          source: v.trest.source, sourceKey: v.trest.sourceKey, createdAt: new Date().toISOString(), batchId,
+        });
+        const e = pridejPenizeDema(t, pv, { i, n, rozpocitat, ids: l.ids });
+        if (e) return chyba(e);
+        TRESTY.unshift(t);
+        items.push({ ...t, penize: penizeTrestuDema(t, true) });
+      }
+      return ok({ ok: true, item: items[0], ...(batchId != null ? { items, batchId } : {}) }, 201);
     }
     return ok();
   }

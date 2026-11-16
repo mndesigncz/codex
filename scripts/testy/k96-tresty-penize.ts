@@ -2,6 +2,7 @@
 // souhlas se srážkou podle smlouvy (HPP/DPP/DPČ až po souhlasu, OSVČ hned), náhrada škody se stropem
 // 4,5× průměru, splátky, záskok (rovně / částkami / poměrně ke strženým kusům), uzavřené období
 // (opravný řádek do dalšího otevřeného), hromadné dávky a rozpad výplaty.
+import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   MAX_LIDI_DAVKY, NASOBEK_STROPU_NAHRADY, VETA_BEZ_PRUMERU, VETA_OSVC, VETA_SCHODEK, VETA_SOUHLAS_NEZNAMY, VETA_SOUHLAS_ZP,
@@ -162,4 +163,25 @@ export default function ({ eq, ok }: Testy) {
   eq('penize do věty', penizeText(p, kc), 'krácení 300 Kč · srážka 500 Kč (čeká na souhlas)');
   eq('trest z odpovědi nese penize i dávku', [vyberTresty([{ id: 1, userId: 2, day: '2026-11-10', batchId: 4, penize: { kraceni: 100 } }])[0].penize?.kraceni, vyberTresty([{ id: 1, userId: 2, day: '2026-11-10', batchId: 4 }])[0].batchId], [100, 4]);
   eq('trest bez peněz: penize null', vyberTresty([{ id: 1, userId: 2, day: '2026-11-10' }])[0].penize, null);
+
+  // ---- pojistky nad zdrojáky (server dodržuje pravidla) ----
+  const cti = (f: string) => readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8');
+  const db = cti('lib/trestyPenizeDb.ts');
+  ok('bez souhlasu se nic nestrhne: do výplaty jdou jen uplatněné srážky', /plati && stav === 'uplatneno' && s\.apply_from \? rozvrhSplatek/.test(db));
+  ok('nová srážka: stav podle smlouvy (potrebujeSouhlas → ceka, OSVČ uplatneno)', /const souhlas = potrebujeSouhlas\(o\.smlouva\);/.test(db) && /const stav: StavSrazky = souhlas \? 'ceka' : 'uplatneno';/.test(db));
+  ok('každá změna peněz jde přes srovnání se zámky období', /srovnejSZamky\(/.test(db) && /zamkyOd\(teamId, day\)/.test(db));
+  const souhlas = cti('app/api/tresty/srazky/[id]/route.ts');
+  ok('souhlas: jen dotčený, jen čekající, přesné znění, zápis do consents', /if \(!muj\) return chyba\('Souhlasit se srážkou může jen ten, koho se týká\.', 403\)/.test(souhlas)
+    && /if \(stav !== 'ceka'\)/.test(souhlas) && /b\.zneni\.trim\(\) !== zneni/.test(souhlas) && /zapisSouhlasSrazky\(/.test(souhlas));
+  ok('nesouhlas: push vedení (finance.mzdy)', /oznamNesouhlas\(/.test(souhlas) && /clenoveSOpravnenim\(teamId, 'finance\.mzdy'\)/.test(cti('app/api/tresty/_penize.ts')));
+  const post = cti('app/api/tresty/route.ts');
+  ok('peníze v trestu jen s finance.mzdy, strop krácení dál 409', /if \(\(z\.bonusCut > 0 \|\| chcePenize\(p\.v\)\) && !smiPenize\) return bezPrav\(\);/.test(post) && /VETA_BEZ_PREMIE, 409/.test(post));
+  ok('GET tresty: cizí peníze jen s finance.mzdy', /t\.userId === c\.meId \|\| smiPenize/.test(post));
+  const pay = cti('app/api/payroll/route.ts');
+  ok('výplaty: složka a čeká na souhlas u lidí i v Mém výdělku', /slozka: vidiMzdy \?/.test(pay) && /cekaNaSouhlas: vidiMzdy \?/.test(pay) && /srazky: await mojeSrazky\(/.test(pay));
+  const smaz = cti('lib/smazaniUctu.ts');
+  ok('smazání účtu a podniku zná nové tabulky', ['wage_deductions', 'penalty_transfers', 'pay_batches'].every(t => new RegExp(`${t}: 'ponechat'`).test(smaz) && new RegExp(`'${t}'`).test(smaz)));
+  ok('export dat obsahuje srážky a záskoky', /FROM wage_deductions WHERE user_id = \$\{id\}/.test(cti('app/api/account/export/route.ts')) && /srazky: sekce\.srazky/.test(cti('lib/exportUctu.ts')));
+  ok('ukázka umí peníze: srážka čeká na souhlas, souhlas, výběr lidí, složka, odměna', /stav: 'ceka'/.test(cti('lib/demo/routy/trestyPenize.ts')) && /\/api\/tresty\/vyber/.test(cti('lib/demo/routy/trestyPenize.ts'))
+    && /\/api\/wage-adjustments\/davka/.test(cti('lib/demo/routy/trestyPenize.ts')) && /trestyPenize, tresty/.test(cti('lib/demo/mockApi.ts')));
 }
