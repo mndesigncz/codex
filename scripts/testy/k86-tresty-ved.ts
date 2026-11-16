@@ -158,7 +158,7 @@ export default function ({ eq, ok }: Testy) {
   ok('profil člena: nenároková složka uvnitř sekce Tresty (čte finance.mzdy, mění finance.sazby_upravit)', /<SlozkaClena clovek=\{clovek\}/.test(tc)
     && /ma\('finance\.mzdy'\)/.test(zdroj('components/tresty-vedeni/SlozkaClena.tsx')) && /ma\('finance\.sazby_upravit'\)/.test(zdroj('components/tresty-vedeni/SlozkaClena.tsx')));
   const odmenyW = zdroj('components/widgety/oblasti/odmeny.tsx');
-  ok('widget Tresty v týmu: fronta nesouhlasů se srážkou a odměna v Kč; Pochvaly mají odměnu v Kč', /<FrontaSrazek zapnuto=\{smiPenize\}/.test(odmenyW) && (odmenyW.match(/<OdmenaVKcTlacitko \/>/g) ?? []).length === 2);
+  ok('widget Tresty v týmu: fronta nesouhlasů se srážkou a odměna v penězích; Navíc v týmu ji má taky', /<FrontaSrazek zapnuto=\{smiPenize\}/.test(odmenyW) && (odmenyW.match(/<OdmenaVKcTlacitko \/>/g) ?? []).length === 2);
   ok('Čeká na tebe: fronta „srazky" (nesouhlas se srážkou) jako čtrnáctý háček', /id: 'srazky', ikona: 'coins'/.test(obecne) && /useFronta\(FRONTY\[13\], zap\(FRONTY\[13\]\)\)/.test(obecne)
     && ZDROJE_FRONT.srazky === '/api/tresty/srazky?scope=team&stav=nesouhlas' && ceka.opravneni.pole?.srazky === 'finance.mzdy');
   eq('katalog: Tresty v týmu mají pole penize (finance.mzdy)', w?.opravneni.pole?.penize, 'finance.mzdy');

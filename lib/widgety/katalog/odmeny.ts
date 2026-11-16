@@ -95,8 +95,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.odmeny', 'vedeni.prehled'],
-    // Kolo 96: „Odměna v Kč" (POST /api/wage-adjustments/davka) jen s finance.mzdy.
-    opravneni: { vse: ['hodnoceni.zobrazit'], nektere: [], pole: { 'akce:pochvalit': 'hodnoceni.hodnotit', 'akce:odmena_kc': 'finance.mzdy' } },
+    opravneni: { vse: ['hodnoceni.zobrazit'], nektere: [], pole: { 'akce:pochvalit': 'hodnoceni.hodnotit' } },
     tarif: 'pro',
     cil: { pohled: 'rewards' },
     stav: 'hotovo',
@@ -190,7 +189,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.odmeny', 'vedeni.prehled'],
-    opravneni: { vse: ['navic.zobrazit_tym'], nektere: [], pole: { 'akce:uznat': 'navic.uznat', 'akce:zapsat_za_clena': 'navic.uznat' } },
+    // Kolo 96: „Odměna v penězích" (POST /api/wage-adjustments/davka) jen s finance.mzdy.
+    opravneni: { vse: ['navic.zobrazit_tym'], nektere: [], pole: { 'akce:uznat': 'navic.uznat', 'akce:zapsat_za_clena': 'navic.uznat', 'akce:odmena_kc': 'finance.mzdy' } },
     tarif: 'pro',
     nastaveni: [
       {

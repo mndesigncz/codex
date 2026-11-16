@@ -1251,11 +1251,9 @@ function Pochvaly({ velikost, nahled }: WidgetProps) {
   // Kolo 8: vedle Pochválit (body od vedení) i Poděkovat (body z vlastního měsíčního příspěvku — vedoucí je taky kolega).
   const [dekuji, setDekuji] = useState(false);
   // v4 (V16, P12): Pochválit + Poděkovat jako pár ½ + ½ v patce widgetu (L→R × 44).
-  // Kolo 96: s finance.mzdy i „Odměna v Kč" — peníze k výplatě jednomu i víc lidem (stejný výběr jako u trestu).
   const tlacitko = smiChvalit && <>
     <Button variant="secondary" icon="award" onClick={() => setOkno(true)}>{t('Pochválit')}</Button>
     {!nahled && <Button variant="ghost" className="justify-end !pr-2" onClick={() => setDekuji(true)}>{t('Poděkovat')}</Button>}
-    {!nahled && <OdmenaVKcTlacitko />}
     {dekuji && <PodekovaniOkno onClose={() => setDekuji(false)} />}
   </>;
   return (
@@ -1693,9 +1691,12 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
     souhrn.premie > 0 ? money(souhrn.premie) : null,
     pocetCeka > 0 ? t('{n, plural, one {# čeká} few {# čekají} other {# čeká}}', { n: pocetCeka }) : null,
   ].filter(Boolean);
-  const tlacitko = smiUznat && (
+  // Kolo 96: s finance.mzdy vedle „Zapsat za člena" i „Odměna v penězích" — peníze k výplatě jednomu i víc lidem
+  // (stejný výběr lidí jako u trestu); pár ½ + ½ v patce.
+  const tlacitko = smiUznat && <>
     <Button variant="secondary" icon="star" onClick={() => setZapisuji(true)}>{t('Zapsat za člena')}</Button>
-  );
+    {!nahled && <OdmenaVKcTlacitko />}
+  </>;
   const okna = (
     <>
       {rozhoduji && !nahled && <UznatNavic zapis={rozhoduji.z} akce={rozhoduji.akce} onClose={() => setRozhoduji(null)} onHotovo={hotovo} />}

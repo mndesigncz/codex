@@ -2,7 +2,7 @@
 
 // Odměna v penězích (kolo 96, sada V) — přidat peníze je stejně snadné jako je strhnout: jednomu
 // i víc lidem najednou, se stejným výběrem lidí jako okno „Dát trest" (zaškrtávání, celá směna dne,
-// filtr role). Otvírá se z widgetů, kde se dnes dávají odměny (Pochvaly, Navíc v týmu) a z widgetu
+// filtr role). Otvírá se z widgetů, kde se dnes dávají odměny v penězích (Navíc v týmu) a z widgetu
 // Tresty v týmu. POST /api/wage-adjustments/davka (finance.mzdy): „každý X" nebo „rozpočítat X",
 // den (ne do budoucna; v uzavřeném období server posune na první otevřený), za co, a jestli je to
 // nenároková prémie (výchozí — dá se z ní krátit trestem), nebo mzda / ostatní. Po uložení toast
