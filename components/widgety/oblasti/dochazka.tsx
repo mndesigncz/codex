@@ -1389,7 +1389,7 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
                     meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : zdrojUpravy(t, u.source)}`}
                     value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'} data-zdroj-upravy={u.source ?? 'manual'}>{sZnamenkem(Number(u.amount), money)}</span>}
                     actions={zTrestu
-                      ? (nav.smiPohled('rewards') ? <Button variant="ghost" size="sm" iconAfter="chevronRight" onClick={() => { onClose(); nav.onNavigate('rewards', 'tresty'); }} data-odkaz-trest>{t('Trest')}</Button> : undefined)
+                      ? (nav.smiPohled('rewards') ? <Button variant="ghost" size="sm" iconOnly icon="chevronRight" aria-label={t('Otevřít tresty')} title={t('Otevřít tresty')} onClick={() => { onClose(); nav.onNavigate('rewards', 'tresty'); }} data-odkaz-trest /> : undefined)
                       : <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat zápis')} loading={mazu === u.id} onClick={() => { void smaz(u.id); }} />} />
                 );
               })}
