@@ -15,6 +15,7 @@ import {
   stavPauzy, vahaPozice, vyplatniListina, type PravidlaDyska, type RadekSouhrnu, type ZaznamDochazky,
 } from '../../lib/dochazkaPrehled.ts';
 import { pragueMomentOf } from '../../lib/pragueTime.ts';
+import { cekaVListine, mzdaRadku, premieRadku, srazkyRadku, upravyUcinne } from '../../components/tresty/vyplatyLogika.ts';
 import { widget } from '../../lib/widgety/katalog/index.ts';
 import { STRANKA as DOCHAZKA } from '../../lib/widgety/stranky/vedeni.dochazka.ts';
 import { AUDIT_POPISKY } from '../../lib/auditPopisky.ts';
@@ -171,4 +172,46 @@ export default function ({ eq, ok }: Testy) {
   ok('widget: peníze jen přes useMoney, žádné „Kč" natvrdo', !/Kč/.test(widgetKod));
   ok('widget: tabulka listiny je table-fixed a jen od lg; pod ním karty', /table-fixed/.test(widgetSrc) && /hidden lg:block rounded-2xl/.test(widgetSrc) && /className="list lg:hidden"/.test(widgetSrc));
   ok('API: /api/payroll odečítá self_payout bez ohledu na payout_from_register (vyplaceno bokem je taky vyplaceno)', /self_payout > 0/.test(zdroj('app/api/payroll/route.ts')) && !/payout_from_register/.test(zdroj('app/api/payroll/route.ts')));
+
+  // ---- kolo 96: peníze z trestů ve výplatní listině, CSV a Mém výdělku (docs/TRESTY-PENIZE.md 4.10) ----
+  const OBD = { od: '2026-11-01', do: '2026-11-30' };
+  const U = (id: number, userId: number, amount: number, source: string) => ({ id, userId, day: '2026-11-10', amount, note: '', source });
+  const souhrn96 = [
+    radek('3', 'Eliška', { ms: 100 * H, pocet: 12, mzda: 20000, upravy: 1000 - 2500 - 600 - 400 + 300, vyplata: 0 }),
+    radek('4', 'Tomáš', { ms: 50 * H, pocet: 6, mzda: 10000, upravy: -900 }),
+  ];
+  const upravy96 = [U(1, 3, 1000, 'premie'), U(2, 3, -2500, 'trest'), U(3, 3, -600, 'nahrada'), U(4, 3, -400, 'srazka'), U(5, 3, 300, 'zaskok'), U(6, 4, -900, 'trest')];
+  const lide96 = [
+    { id: 3, name: 'Eliška', slozka: { typ: 'pct' as const, hodnota: 10, vSazbe: true }, cekaNaSouhlas: 1500, zKasy: 0, vyplaceno: 0, vyplaty: [] },
+    { id: 4, name: 'Tomáš', slozka: { typ: 'kc_mesic' as const, hodnota: 500, vSazbe: false }, cekaNaSouhlas: 0, zKasy: 0, vyplaceno: 0, vyplaty: [] },
+  ];
+  const [el, to] = vyplatniListina(souhrn96, lide96, { ...OBD, upravy: upravy96 });
+  // Eliška: složka 10 % z 20 000 = 2 000 (v sazbě), strop krácení = 2 000 + 1 000 prémie + 300 záskok = 3 300 ≥ 2 500 → celé.
+  eq('listina 96: Eliška — nároková 18 000, složka 2 000, krácení 2 500 celé, náhrada 600, srážky 400, záskok 300, čeká 1 500',
+    [el.penize?.zakladni, el.penize?.slozka, el.penize?.kraceniUplatneno, el.penize?.nahrada, el.penize?.srazky, el.penize?.zaskok, el.penize?.cekaNaSouhlas], [18000, 2000, 2500, 600, 400, 300, 1500]);
+  eq('listina 96: sloupce Eliška — Mzda 18 000 (vedle složky) / 20 000 (bez), Prémie +1 300, Srážky −3 500, součet = účinné úpravy',
+    [mzdaRadku(el, true), mzdaRadku(el, false), premieRadku(el), srazkyRadku(el), premieRadku(el) + srazkyRadku(el) === upravyUcinne(el)], [18000, 20000, 1300, -3500, true]);
+  eq('listina 96: čekající srážka se NEodečítá — doplatit = mzda + účinné úpravy', el.doplatit, 20000 + upravyUcinne(el));
+  // Tomáš: složka 500 Kč/měsíc navíc ke mzdě (celý měsíc), krácení 900 > strop 500 → strhne se 500, 400 se vrací.
+  eq('listina 96: Tomáš — složka navíc 500 se přičte, krácení jen do stropu (500), 400 nad strop se vrací',
+    [to.penize?.slozkaNavic, to.penize?.kraceniUplatneno, to.penize?.kraceniNadStrop, mzdaRadku(to, false), srazkyRadku(to), to.doplatit], [500, 500, 400, 10500, -500, 10000 + 500 - 500]);
+  eq('listina 96: kolik čeká na souhlas a u kolika lidí', cekaVListine([el, to]), { castka: 1500, lidi: 1 });
+  eq('listina 96: bez období a úprav (bez finance.mzdy) se nic nemění — žádný rozpad', vyplatniListina(souhrn96, lide96)[0].penize, undefined);
+
+  const csv96 = csvVyplatniListiny([el, to], { ...OBD, symbol: 'Kč', priplatky: false, spropitne: false, smlouvy: false, penize: true });
+  const hlava96 = csv96[0];
+  ok('CSV 96: sloupce Mzda (nároková), Nenároková složka, Prémie a ostatní, Krácení, Náhrada škody, Srážky, Záskok, Čeká na souhlas',
+    ['Mzda (Kč)', 'Nenároková složka (Kč)', 'Prémie a ostatní (Kč)', 'Krácení (Kč)', 'Náhrada škody (Kč)', 'Srážky (Kč)', 'Záskok (Kč)', 'Čeká na souhlas (Kč)', 'Doplatit (Kč)'].every(h => hlava96.includes(h)));
+  const sl = (h: string) => hlava96.indexOf(h);
+  eq('CSV 96: Eliška — 18 000 · 2 000 · krácení 2 500 · náhrada 600 · srážky 400 · záskok 300 · čeká 1 500',
+    ['Mzda (Kč)', 'Nenároková složka (Kč)', 'Krácení (Kč)', 'Náhrada škody (Kč)', 'Srážky (Kč)', 'Záskok (Kč)', 'Čeká na souhlas (Kč)'].map(h => csv96[1][sl(h)]), ['18000', '2000', '2500', '600', '400', '300', '1500']);
+  eq('CSV 96: řádek Celkem sčítá i čeká na souhlas', csv96[3][sl('Čeká na souhlas (Kč)')], '1500');
+
+  // Zdroj UI: listina počítá s obdobím a úpravami jen s finance.mzdy, CSV s penize, okno Prémie a srážky bez koše u trestů.
+  ok('UI 96: vyplatniListina dostane období a úpravy (vidiMzdy), CSV `penize: vidiMzdy`',
+    /vyplatniListina\(souhrn, payroll\.data\?\.lide \?\? \[\], vidiMzdy \? \{ od: r\.od, do: r\.do, upravy: upravyObdobi \} : undefined\)/.test(widgetSrc) && /penize: vidiMzdy \}\)/.test(widgetSrc));
+  ok('UI 96: Prémie a srážky — trest/náhrada/srážka/záskok bez koše, s odkazem na Tresty', /ZDROJE_Z_TRESTU: readonly string\[\] = \['trest', 'nahrada', 'srazka', 'zaskok'\]/.test(widgetSrc) && /nav\.onNavigate\('rewards', 'tresty'\)/.test(widgetSrc));
+  ok('UI 96: Můj výdělek počítá rozpadVyplaty se složkou a čekajícími srážkami z /api/payroll?ja=1', /rozpadVyplaty\(\{ mzda: s\.mzda, ms: s\.ms, od, do: doD, upravy, slozka, cekaNaSouhlas: pj\?\.ja\.cekaNaSouhlas \?\? 0 \}\)/.test(widgetSrc) && /RadekCekaNaSouhlas castka=\{rp\.cekaNaSouhlas\} kdo="ja"/.test(widgetSrc));
+  ok('UI 96: profil člena — rozpad se složkou a čekajícími srážkami, jen čtení', /rozpadVyplaty\(\{ mzda: radek\.mzda/.test(zdroj('components/employer/EmployeeProfile.tsx')) && /<RozpadVyplatyClena r=\{rp\} slozka=\{slozka\} \/>/.test(zdroj('components/employer/EmployeeProfile.tsx')));
+  ok('UI 96: výplaty se přenačtou po změně peněz (UDALOST_VYPLATY)', /addEventListener\(UDALOST_VYPLATY/.test(widgetSrc) && /addEventListener\(UDALOST_VYPLATY/.test(zdroj('components/employer/EmployeeProfile.tsx')));
 }

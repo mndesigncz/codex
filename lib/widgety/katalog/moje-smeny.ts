@@ -112,6 +112,9 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // PATCH /api/tresty/[id] { seen } / { response, disagree } — kolo 10 (balík Z), okno components/tresty/DetailTrestu.
   // Pozor: vlastní data (každý člen bez oprávnění; vedení vidí svoje, tým má widget odmeny.tresty_tymu).
   // Malá karta na Přehledu (Domů) se bez nepotvrzeného trestu v klidu nekreslí (prazdno={null}).
+  // Kolo 96 (peníze z výplaty): srážka / náhrada škody čekající na souhlas má v malé kartě přednost („Zobrazit dohodu"),
+  // detail nese celé znění dohody a Souhlasím / Nesouhlasím (PATCH /api/tresty/srazky/[id]); M/L ukazují i přijatý
+  // záskok z úprav mzdy (GET /api/attendance, jen s finance.moje_mzda / finance.mzdy) bez cizích jmen.
   {
     id: 'moje-smeny.tresty',
     // Kolo 11: přibyl 14. 10. 2026 — doplní se i do uložených rozložení (lib/widgety/rozlozeni.ts doplnNove).

@@ -75,6 +75,7 @@ import { DatTrest } from '../../tresty-vedeni/DatTrest';
 import { pozdniKTrestu, type PozdniPrichod, type PredvolbyTrestu } from '../../tresty-vedeni/logika';
 import { useOpravneni } from '../../role/useOpravneni';
 import { RadekCekaNaSouhlas, RadkyRozpadu, maPenize, popisSlozkyT } from '../../tresty/RozpadVyplaty';
+import { cekaVListine, mzdaRadku, premieRadku, srazkyRadku, upravyUcinne } from '../../tresty/vyplatyLogika';
 import { UDALOST_VYPLATY } from '../../tresty-penize/data';
 import { rozpadVyplaty, vyberSlozku, jeStavSrazky, type NastaveniSlozky, type StavSrazky } from '@/lib/trestyPenize';
 import { useCurrency, useMoney, useSymbol } from '../../CurrencyProvider';
@@ -908,7 +909,7 @@ function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }
         <ul className="list mt-3">
           {upravy.slice(0, 6).map(u => (
             <ListRow key={u.id} title={u.note || (Number(u.amount) > 0 ? t('Prémie') : t('Srážka'))}
-              meta={`${denText(String(u.day).slice(0, 10))}${zdrojUpravy(t, u.source)}`}
+              meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : zdrojUpravy(t, u.source)}`}
               value={<span className={Number(u.amount) > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>} />
           ))}
         </ul>
@@ -1385,7 +1386,7 @@ function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
                 const zTrestu = ZDROJE_Z_TRESTU.includes(String(u.source ?? ''));
                 return (
                   <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
-                    meta={`${denText(String(u.day).slice(0, 10))}${zdrojUpravy(t, u.source)}`}
+                    meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'trest' ? ` · ${t('krácení prémie (trest)')}` : zdrojUpravy(t, u.source)}`}
                     value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'} data-zdroj-upravy={u.source ?? 'manual'}>{sZnamenkem(Number(u.amount), money)}</span>}
                     actions={zTrestu
                       ? (nav.smiPohled('rewards') ? <Button variant="ghost" size="sm" iconAfter="chevronRight" onClick={() => { onClose(); nav.onNavigate('rewards', 'tresty'); }} data-odkaz-trest>{t('Trest')}</Button> : undefined)
@@ -1663,11 +1664,6 @@ const VYCHOZI_SKRYTE = 'plan,sazba,smlouva';
 /** Šířky sloupců v % šířky tabulky (table-fixed): součet viditelných výchozích ≈ 100, zapnuté navíc se úměrně stlačí. */
 const SIRKA: Record<Sloupec, number> = { smeny: 6, hodiny: 8, plan: 8, sazba: 8, mzda: 9, slozka: 9, priplatky: 8, spropitne: 8, upravy: 8, srazky: 9, zKasy: 9, doplatit: 10, smlouva: 13, stav: 14 };
 
-/** Peníze řádku listiny po sloupcích (kolo 96): Prémie bez krácení a srážek, Srážky záporně, Mzda nároková. */
-const premieRadku = (x: RadekVyplaty): number => (x.penize ? x.penize.premie + x.penize.zaskok + x.penize.ostatni : x.upravy);
-const srazkyRadku = (x: RadekVyplaty): number => (x.penize ? -(x.penize.kraceniUplatneno + x.penize.nahrada + x.penize.srazky) : 0);
-const upravyUcinne = (x: RadekVyplaty): number => x.penize?.upravyUcinne ?? x.upravy;
-
 /**
  * Výplatní listina (kolo 8, R8-1; vzor 7shifts „Worked Hours & Wages", Lightspeed „Labor report"): řádek na člověka
  * — směny, hodiny, plán, sazba, mzda, příplatky, dýško, prémie a srážky, co už odešlo z kasy, kolik doplatit a stav.
@@ -1735,8 +1731,7 @@ function VyplatniListina({ nahled }: WidgetProps) {
   const sSmlouvami = radky.some(x => x.smlouva);
   const sSlozkou = radky.some(x => (x.penize?.slozka ?? 0) > 0);
   const sSrazkami = radky.some(x => srazkyRadku(x) !== 0);
-  const cekaCelkem = radky.reduce((a, x) => a + (x.penize?.cekaNaSouhlas ?? 0), 0);
-  const cekaLidi = radky.filter(x => (x.penize?.cekaNaSouhlas ?? 0) > 0).length;
+  const { castka: cekaCelkem, lidi: cekaLidi } = cekaVListine(radky);
   useObnovaVyplat(brana);
   const loc = jazyk;
   const hodinyText = (ms: number) => hodinyMinuty(ms);
@@ -1754,7 +1749,7 @@ function VyplatniListina({ nahled }: WidgetProps) {
     return true;
   };
   // Mzda je nároková část jen tehdy, když vedle stojí sloupec složky; Prémie bez srážek jen se sloupcem Srážky.
-  const mzdaBunka = (x: RadekVyplaty): number | null => (x.mzda == null ? null : sloupecVidet('slozka') && x.penize?.zakladni != null ? x.penize.zakladni : x.mzda + (x.penize?.slozkaNavic ?? 0));
+  const mzdaBunka = (x: RadekVyplaty): number | null => mzdaRadku(x, sloupecVidet('slozka'));
   const upravyBunka = (x: RadekVyplaty): number => (sloupecVidet('srazky') ? premieRadku(x) : upravyUcinne(x));
   const suma = (f: (x: RadekVyplaty) => number | null) => radky.reduce((a, x) => a + (f(x) ?? 0), 0);
   const nazvy: Record<Sloupec, string> = {

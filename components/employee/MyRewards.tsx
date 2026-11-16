@@ -21,6 +21,9 @@
 // tady, ne ve widgetu: osobní rozložení widget Moje tresty mít nemusí a odkaz musí fungovat
 // i tak. Layout argument nástroji nepředává, čte se z adresy (useSearchParams, jako Navíc
 // u vedení); stejný odkaz podruhé (nový objekt parametrů) okno otevře znovu.
+//
+// Kolo 96 (peníze z výplaty): na stejnou adresu vede i oznámení „Srážka X čeká na tvůj souhlas" — trestKOtevreni
+// proto otevře přednostně trest se srážkou k souhlasu a detail nese kartu se zněním dohody (Souhlasím / Nesouhlasím).
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';

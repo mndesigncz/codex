@@ -1,9 +1,15 @@
 // Tresty (kolo 10 — balík Z): klientská logika components/tresty/logika.ts, katalog
 // a stránky widgetu moje-smeny.tresty, rozpad bodů „Tresty" v lib/odmenyPrehled.ts.
+// Kolo 96: srážka k souhlasu, nesouhlas s důvodem, 409 se změněným zněním, záskok bez jmen.
+import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
-  ARG_TRESTY, akceTrestu, filtrujTresty, nepotvrzene, poctyFiltru, poradiVMesici, sloucTrest, trestKOtevreni, trestyMesice, validujVyjadreni,
+  ARG_TRESTY, VETA_DLOUHY_DUVOD, VETA_ZMENENE_ZNENI, akceTrestu, castkaKSouhlasu, filtrujTresty, kSouhlasu, nepotvrzene, penizeProZamestnance, poctyFiltru,
+  poradiVMesici, prijateZaskoky, sloucTrest, srazkaKSouhlasu, trestKOtevreni, trestyMesice, validujDuvod, validujVyjadreni,
 } from '../../components/tresty/logika.ts';
+import type { PenizeTrestu, SrazkaTrestu } from '../../lib/trestyPenize.ts';
+
+const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 import { odkudBody, vyberOdmeny } from '../../lib/odmenyPrehled.ts';
 import { widget } from '../../lib/widgety/katalog/index.ts';
 import { stranka } from '../../lib/widgety/stranky/index.ts';
@@ -99,4 +105,56 @@ export default function ({ eq, ok }: Testy) {
   eq('Odměny: Moje tresty jako velká sekce za Navíc', [vychoziOdmeny.find(x => x.w === 'moje-smeny.tresty')?.s,
     vychoziOdmeny.findIndex(x => x.w === 'moje-smeny.tresty') === vychoziOdmeny.findIndex(x => x.w === 'moje-smeny.navic') + 1], ['L', true]);
   ok('Domů i Odměny: Moje tresty mezi doporučenými', domu.doporucene.includes('moje-smeny.tresty') && odmeny.doporucene.includes('moje-smeny.tresty'));
+
+  // ---- kolo 96: peníze z výplaty — srážka k souhlasu, nesouhlas, záskok (docs/TRESTY-PENIZE.md) ----
+  const sr = (p: Partial<SrazkaTrestu>): SrazkaTrestu => ({
+    id: 1, druh: 'srazka', castka: 1500, splatky: 1, stav: 'ceka', potrebujeSouhlas: true, smlouva: 'HPP', proc: '', zneni: 'Souhlasím se srážkou 1 500 Kč ze mzdy…',
+    souhlasAt: null, nesouhlasAt: null, nesouhlasDuvod: null, odDne: null, rozvrh: [], skoda: null, zrusenoAt: null, ...p,
+  });
+  const pen = (p: Partial<PenizeTrestu>): PenizeTrestu => ({ kraceni: 0, srazky: [], zaskok: { komu: 'podnik', zpusob: null, prevody: [] }, cekaNaSouhlas: 0, strzeno: 0, ...p });
+  const sPenezi = [
+    tr({ id: 31, day: '2026-10-12', seenAt: null }),                                                                  // nepotvrzený, bez peněz
+    tr({ id: 32, day: '2026-10-08', points: 0, penize: pen({ srazky: [sr({ id: 7, castka: 1500, splatky: 3 })], cekaNaSouhlas: 1500 }) }),
+    tr({ id: 33, day: '2026-10-10', penize: pen({ srazky: [sr({ id: 8, druh: 'nahrada', castka: 800 })], cekaNaSouhlas: 800 }) }),
+    tr({ id: 34, day: '2026-10-11', status: 'zruseno', penize: pen({ srazky: [sr({ id: 9, castka: 300 })] }) }),     // zrušený trest nic nechce
+    tr({ id: 35, day: '2026-10-09', penize: pen({ srazky: [sr({ id: 10, stav: 'uplatneno' })] }) }),
+  ];
+  eq('k souhlasu: jen čekající srážky platných trestů, nejnovější trest první', kSouhlasu(sPenezi).map(x => [x.trest.id, x.srazka.id]), [[33, 8], [32, 7]]);
+  eq('k souhlasu: součet 2 300', castkaKSouhlasu(sPenezi), 2300);
+  eq('k souhlasu: srážka trestu (čekající / uplatněná / zrušený trest)', [srazkaKSouhlasu(sPenezi[1])?.id, srazkaKSouhlasu(sPenezi[4]), srazkaKSouhlasu(sPenezi[3])], [7, null, null]);
+  eq('z oznámení: trest se srážkou k souhlasu má přednost před nepotvrzeným', trestKOtevreni(sPenezi)?.id, 33);
+  eq('z oznámení: bez srážek k souhlasu jako dřív (nejnovější nepotvrzený)', trestKOtevreni(sPenezi.filter(x => x.id !== 32 && x.id !== 33))?.id, 31);
+
+  eq('nesouhlas: důvod je nepovinný (prázdný = null), oříznutý, do 300 znaků jako server',
+    [validujDuvod('   '), validujDuvod('  Mlýnek byl rozbitý.\r\n '), validujDuvod('x'.repeat(301)).ok, validujDuvod('x'.repeat(300)).ok],
+    [{ ok: true, duvod: null }, { ok: true, duvod: 'Mlýnek byl rozbitý.' }, false, true]);
+  eq('nesouhlas: hláška délky stejná jako server', validujDuvod('x'.repeat(301)), { ok: false, chyba: VETA_DLOUHY_DUVOD });
+  eq('409: věta o změněném znění je přesně ta ze serveru', VETA_ZMENENE_ZNENI, 'Znění dohody se mezitím změnilo — přečti si ho znovu.');
+  ok('409: server posílá stejnou větu (app/api/tresty/srazky/[id])', zdroj('app/api/tresty/srazky/[id]/route.ts').includes(`'${VETA_ZMENENE_ZNENI}'`));
+
+  // Peníze pro zaměstnance: záskok bez jmen, zrušené srážky jen u zrušeného trestu.
+  const sZaskokem = tr({ id: 40, bonusCut: 300, penize: pen({ kraceni: 300, srazky: [sr({ id: 11, castka: 500 }), sr({ id: 12, castka: 200, stav: 'zruseno' })],
+    zaskok: { komu: 'lide', zpusob: 'rovne', prevody: [{ id: 1, userId: null, userName: null, castka: 400, preslo: 150, stav: 'plati' }, { id: 2, userId: null, userName: null, castka: 400, preslo: 150, stav: 'zruseno' }] } }) });
+  eq('peníze pro zaměstnance: krácení, platné srážky, kolegům 400 (jen platné převody), celkem 800',
+    (({ kraceni, srazky, kolegum, preslo, celkem }) => [kraceni, srazky.map(s => s.id), kolegum, preslo, celkem])(penizeProZamestnance(sZaskokem)!), [300, [11], 400, 150, 800]);
+  eq('peníze pro zaměstnance: zrušený trest ukáže i zrušenou srážku (přeškrtnutou)', penizeProZamestnance({ ...sZaskokem, status: 'zruseno' })!.srazky.map(s => s.id), [11, 12]);
+  eq('peníze pro zaměstnance: podnik = bez řádku kolegům; bez peněz null', [penizeProZamestnance(tr({ bonusCut: 200, penize: pen({ kraceni: 200 }) }))?.kolegum, penizeProZamestnance(tr({}))], [null, null]);
+  ok('záskok: tvar pro zaměstnance nenese jména příjemců (kontrakt) — UI je ani nečte', !/userName/.test(zdroj('components/tresty/PenizeTrestu.tsx')) && !/userName/.test(zdroj('components/tresty/logika.ts').split('Peníze z výplaty')[1] ?? ''));
+
+  const upr = [
+    { id: 1, userId: 5, day: '2026-10-12', amount: 300, note: 'Záskok: Nedoplněné zásoby na ranní směnu', source: 'zaskok' },
+    { id: 2, userId: 5, day: '2026-11-01', amount: -100, note: 'Záskok: Rozbitý mlýnek (oprava za uzavřené období)', source: 'zaskok' },
+    { id: 3, userId: 6, day: '2026-10-12', amount: 300, note: 'Záskok: cizí', source: 'zaskok' },
+    { id: 4, userId: 5, day: '2026-10-12', amount: 500, note: 'Víkendová akce', source: 'premie' },
+  ];
+  eq('přijatý záskok: jen můj, jen source zaskok, text bez předpony', prijateZaskoky(upr, 5, '2026-10'), [{ id: 1, den: '2026-10-12', castka: 300, zaCo: 'Nedoplněné zásoby na ranní směnu', oprava: false }]);
+  eq('přijatý záskok: opravný řádek za uzavřené období se pozná a zbaví poznámky', prijateZaskoky(upr, 5).map(z => [z.id, z.zaCo, z.oprava]), [[2, 'Rozbitý mlýnek', true], [1, 'Nedoplněné zásoby na ranní směnu', false]]);
+
+  // Zdroj UI: souhlas jen s přesným zněním, 409 čte nové znění z těla, nesouhlas přes sdílenou akci.
+  const souhlasSrc = zdroj('components/tresty/SouhlasSrazky.tsx');
+  const dataSrc = zdroj('components/tresty/data.ts');
+  ok('souhlas: tlačítka „Souhlasím se srážkou {castka}" a „Nesouhlasím", znění celé (whitespace-pre-line, bez line-clamp)',
+    souhlasSrc.includes("t('Souhlasím se srážkou {castka}'") && souhlasSrc.includes("t('Nesouhlasím')") && /data-zneni/.test(souhlasSrc) && !/line-clamp/.test(souhlasSrc));
+  ok('souhlas: PATCH { souhlas: true, zneni } a na 409 nové znění z těla odpovědi', /souhlas: true, zneni/.test(dataSrc) && /r\.status === 409/.test(dataSrc) && /telo\?\.zneni/.test(dataSrc) && /obnovPenize\(\)/.test(dataSrc));
+  ok('nesouhlas: přes nesouhlasSeSrazkou z components/tresty-penize/data (push vedení dělá server)', /nesouhlasSeSrazkou\(srazka\.id/.test(souhlasSrc));
 }
