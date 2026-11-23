@@ -3249,6 +3249,19 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_login_kody_email ON client_login_kody (email, created_at DESC)`);
     // ---- konec Host ----
 
+    // ---- Pro účetní (export podkladů, podepsaný odkaz, měsíční e-mail) ----
+    // Účetní podniku: kam chodí podklady, jestli automaticky 3. den v měsíci a jestli s výplatami.
+    // accountant_link_ver: verze podepsaných odkazů — zvýšení zneplatní všechny vydané (lib/ucetniOdkaz).
+    // accountant_last_sent: „RRRR-MM", za který měsíc automat naposledy poslal (idempotence cronu).
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS accountant_email TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS accountant_auto BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS accountant_payroll BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS accountant_link_ver INTEGER DEFAULT 1`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS accountant_last_sent TEXT`);
+    // Příjemka: číslo dodacího listu / faktury a fotky dokladu (pole adres /api/upload/<id>, nejvýš 4).
+    await ddl(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS doc_number TEXT`);
+    await ddl(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS doc_photos JSONB`);
+
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
