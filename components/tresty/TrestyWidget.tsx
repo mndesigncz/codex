@@ -30,8 +30,9 @@ import { pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { minulyMesic } from '@/lib/odmenyPrehled';
 import { URL_TRESTY, souhrnTrestu, urlTresty, type SouhrnTrestu, type Trest } from '@/lib/tresty';
-import { filtrujTresty, nepotvrzene, poctyFiltru, trestyMesice, type FiltrTrestu } from './logika';
-import { StavTrestuChip, bodyDolu, dopadTrestu } from './kusy';
+import { filtrujTresty, kSouhlasu, souhrnPenezMesice, nepotvrzene, poctyFiltru, srazkaKSouhlasu, trestyMesice, type FiltrTrestu } from './logika';
+import { StavSrazkyChip, StavTrestuChip, bodyDolu, dopadTrestu, srazkaKratce } from './kusy';
+import { ZaskokySeznam, usePrijateZaskoky } from './Zaskoky';
 import { obnovTresty, useDataTresty } from './data';
 import { DetailTrestu } from './DetailTrestu';
 
@@ -51,8 +52,12 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
   const data = useDataTresty(urlTresty());
   const vse = useMemo(() => data.data?.items ?? [], [data.data]);
   const items = useMemo(() => trestyMesice(vse, mesic), [vse, mesic]);
-  const souhrn = useMemo(() => souhrnTrestu(vse, mesic), [vse, mesic]);
+  // Kolo 96: napomenutí jen bez srážky (lib souhrnTrestu srážky nezná) a součet srážek / náhrad měsíce.
+  const souhrn = useMemo(() => ({ ...souhrnTrestu(vse, mesic), ...souhrnPenezMesice(vse, mesic) }), [vse, mesic]);
   const kPotvrzeni = useMemo(() => nepotvrzene(vse), [vse]);
+  // Kolo 96: srážky / náhrady škody čekající na můj souhlas mají přednost před „Beru na vědomí".
+  const souhlasy = useMemo(() => kSouhlasu(vse), [vse]);
+  const zaskoky = usePrijateZaskoky(mesic, velikost !== 'S' && !nahled);
   const [otevreny, setOtevreny] = useState<number | null>(null);
   const [filtr, setFiltr] = useState<FiltrTrestu>('vse');
   const [potvrzuji, setPotvrzuji] = useState(false);
@@ -84,8 +89,31 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
 
   if (velikost === 'S') {
     const prvni = kPotvrzeni[0] ?? null;
-    // Přehled (Domů): nahoře jen tehdy, když je co potvrdit — jinak se v klidu nekreslí.
-    const skryt = pohledStranky === 'home' && !!data.data && !prvni;
+    const souhlas = souhlasy[0] ?? null;
+    // Přehled (Domů): nahoře jen tehdy, když je co potvrdit nebo odsouhlasit — jinak se v klidu nekreslí.
+    const skryt = pohledStranky === 'home' && !!data.data && !prvni && !souhlas;
+    if (souhlas) {
+      // Srážka k souhlasu: částka, za co a „Zobrazit dohodu" (souhlas se dává až nad celým zněním v detailu).
+      const celkem = souhlasy.reduce((a, x) => a + x.srazka.castka, 0);
+      return (
+        <>
+          <Widget nacteni={data} kostra="text"
+            patka={<Button variant="secondary" icon="chevronRight" disabled={nahled} onClick={() => setOtevreny(souhlas.trest.id)} data-zobrazit-dohodu>{t('Zobrazit dohodu')}</Button>}>
+            <Sloupec mezera={2} data-srazky-k-souhlasu={souhlasy.length}>
+              <p className="t-label">{souhlasy.length > 1
+                ? t('{n, plural, one {# srážka čeká na tvůj souhlas} few {# srážky čekají na tvůj souhlas} other {# srážek čeká na tvůj souhlas}}', { n: souhlasy.length })
+                : souhlas.srazka.druh === 'nahrada' ? t('Náhrada škody čeká na tvůj souhlas') : t('Srážka čeká na tvůj souhlas')}</p>
+              <button type="button" onClick={() => setOtevreny(souhlas.trest.id)} disabled={nahled}
+                className="block w-full min-w-0 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+                <span className="block text-[17px] font-semibold leading-snug text-[#16181A] tabular-nums">−{money(celkem)}</span>
+                <span className="block t-meta mt-0.5 line-clamp-2 break-words text-pretty">{souhlas.trest.text}</span>
+              </button>
+            </Sloupec>
+          </Widget>
+          {okna}
+        </>
+      );
+    }
     return (
       <>
         <Widget nacteni={data} kostra="text" prazdno={skryt ? null : undefined}
@@ -132,6 +160,9 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
   // vlastního textu by vytlačily nepotvrzené tresty pod odlesk (vyjádření nese i detail).
   const radek = (tr: Trest) => {
     const zruseno = tr.status === 'zruseno';
+    const ceka = srazkaKSouhlasu(tr);
+    const srazky = (tr.penize?.srazky ?? []).filter(s => s.stav !== 'zruseno' || zruseno);
+    const sumaSrazek = srazky.reduce((a, s) => a + s.castka, 0);
     return (
       <ListRow key={tr.id} onClick={() => setOtevreny(tr.id)}
         title={<span className="block whitespace-normal text-pretty line-clamp-2 break-words">{tr.text}</span>}
@@ -142,10 +173,13 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
         </>}
         detail={zruseno ? (tr.cancelNote ? t('Zrušeno: {poznamka}', { poznamka: tr.cancelNote }) : undefined)
           : L && tr.response ? t('Tvoje vyjádření: {text}', { text: tr.response.length > 90 ? `${tr.response.slice(0, 90)}…` : tr.response }) : undefined}
-        right={<StavTrestuChip trest={tr} />}
-        value={<span className={zruseno ? 'line-through text-black/45' : undefined} data-dopad>{tr.points ? bodyDolu(t, tr.points) : tr.bonusCut ? `−${money(tr.bonusCut)}` : t('Napomenutí')}</span>}
+        right={ceka ? <StavSrazkyChip stav="ceka" /> : <StavTrestuChip trest={tr} />}
+        value={<span className={zruseno ? 'line-through text-black/45' : undefined} data-dopad>{tr.points ? bodyDolu(t, tr.points) : tr.bonusCut ? `−${money(tr.bonusCut)}` : sumaSrazek ? `−${money(sumaSrazek)}` : t('Napomenutí')}</span>}
         valueMeta={tr.points && tr.bonusCut ? <span className={zruseno ? 'line-through' : undefined}>{t('krácení {castka}', { castka: money(tr.bonusCut) })}</span>
-          : !tr.points && tr.bonusCut ? t('krácení prémie') : undefined} />
+          : !tr.points && tr.bonusCut ? t('krácení prémie')
+          : tr.points && srazky.length ? <span className={zruseno ? 'line-through' : undefined} data-penize-radku>{srazkaKratce(t, srazky[0], money)}</span>
+          : !tr.points && !tr.bonusCut && srazky.length ? <span data-penize-radku>{srazky[0].druh === 'nahrada' ? t('náhrada škody') : t('srážka z výplaty')}</span>
+          : undefined} />
     );
   };
 
@@ -154,7 +188,7 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
   return (
     <>
       <Widget nacteni={data}
-        prazdno={data.data && items.length === 0 ? (
+        prazdno={data.data && items.length === 0 && zaskoky.length === 0 ? (
           <EmptyState compact illustration="odmeny" title={minuly ? t('Minulý měsíc bez trestů') : t('Tento měsíc bez trestů')}
             hint={t('Když vedení něco vytkne, uvidíš to tady a potvrdíš, že o tom víš.')} />
         ) : undefined}
@@ -171,6 +205,7 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
             <p className="t-meta">{L ? t('Žádný trest v tomhle stavu.') : prazdnoText}</p>
           )}
           {!L && items.length > videt.length && <p className="t-meta">{t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n: items.length - videt.length })}</p>}
+          <ZaskokySeznam items={zaskoky} max={L ? 10 : 3} />
         </Sloupec>
       </Widget>
       {okna}
@@ -179,15 +214,16 @@ export function TrestyWidget({ velikost, nastaveni, nahled }: WidgetProps<{ obdo
 }
 
 /** Malá karta bez nepotvrzených: „2 tresty · −30 b" (napomenutí bez bodů jen počtem). */
-function souhrnKratce(t: PrekladFn, s: SouhrnTrestu, money: (n: number) => string): string {
+function souhrnKratce(t: PrekladFn, s: SouhrnTrestu & { srazky?: number }, money: (n: number) => string): string {
   const casti = [t('{n, plural, one {# trest} few {# tresty} other {# trestů}}', { n: s.pocet })];
   if (s.body) casti.push(bodyDolu(t, s.body));
   if (s.kraceni) casti.push(t('krácení {castka}', { castka: money(s.kraceni) }));
+  if (s.srazky) casti.push(t('srážky {castka}', { castka: money(s.srazky) }));
   return casti.join(' · ');
 }
 
 /** Souhrn měsíce ve velké kartě: „2 tresty · −30 b · krácení 300 · 1 napomenutí · 1 zrušený". */
-function souhrnDlouze(t: PrekladFn, s: SouhrnTrestu, money: (n: number) => string): string {
+function souhrnDlouze(t: PrekladFn, s: SouhrnTrestu & { srazky?: number }, money: (n: number) => string): string {
   if (s.pocet === 0 && s.zrusenych === 0) return t('bez trestů');
   const casti = [souhrnKratce(t, s, money)];
   if (s.napomenuti) casti.push(t('z toho napomenutí: {n}', { n: s.napomenuti }));

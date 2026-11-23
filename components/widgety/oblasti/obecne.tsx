@@ -42,6 +42,7 @@ import { vyberNavic } from '@/lib/navic';
 import { otevriCastNavic } from '../../navic-vedeni/cast';
 import { cekaSpor, vyberTresty } from '@/lib/tresty';
 import { otevriCastTresty } from '../../tresty-vedeni/cast';
+import { vyberSrazky } from '../../tresty-penize/data';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
 import { useDraft } from '@/lib/useDraft';
@@ -120,7 +121,7 @@ const ID_CEKA = 'prehled.ceka_na_tebe';
 
 type IdFronty =
   | 'volno' | 'vymeny' | 'uzaverky' | 'navrhy_skladu' | 'hlaseni' | 'odmeny'
-  | 'postupy' | 'navody' | 'rezervace' | 'objednavky' | 'slaba_hodnoceni' | 'navic' | 'tresty';
+  | 'postupy' | 'navody' | 'rezervace' | 'objednavky' | 'slaba_hodnoceni' | 'navic' | 'tresty' | 'srazky';
 
 interface Fronta {
   id: IdFronty;
@@ -211,6 +212,14 @@ const FRONTY: readonly Fronta[] = [
     pocet: raw => vyberTresty(raw).filter(cekaSpor).length,
     otevri: nav => otevriCastTresty(nav),
   },
+  {
+    // Kolo 96: zaměstnanec nesouhlasí se srážkou z výplaty (finance.mzdy) — proklik otevře Odměny › Tresty, widget
+    // Tresty v týmu má frontu „Nesouhlasí se srážkou" se Znovu požádat / Zrušit srážku.
+    id: 'srazky', ikona: 'coins', pohled: 'rewards',
+    text: (t, n) => t('{n, plural, one {# nesouhlas se srážkou} few {# nesouhlasy se srážkou} other {# nesouhlasů se srážkou}}', { n }),
+    pocet: raw => vyberSrazky(raw).filter(s => s.stav === 'nesouhlas' && s.trestPlati).length,
+    otevri: nav => otevriCastTresty(nav),
+  },
 ];
 
 /** Názvy front z nastavení widgetu — do věty „Nenačetly se: …". */
@@ -229,7 +238,7 @@ const NAZVY_FRONT: ReadonlyMap<string, string> = (() => {
  */
 const WIDGET_FRONTY: Partial<Record<IdFronty, string>> = {
   volno: 'rozvrh.zadosti_volno', vymeny: 'rozvrh.vymeny', uzaverky: 'uzaverky.ke_schvaleni',
-  navic: 'odmeny.navic_tymu', tresty: 'odmeny.tresty_tymu', odmeny: 'odmeny.zadosti',
+  navic: 'odmeny.navic_tymu', tresty: 'odmeny.tresty_tymu', srazky: 'odmeny.tresty_tymu', odmeny: 'odmeny.zadosti',
   navrhy_skladu: 'sklad.navrhy', hlaseni: 'sklad.hlaseni', postupy: 'postupy.navrhy', navody: 'navody.navrhy',
 };
 
@@ -304,7 +313,7 @@ function CekaNaTebe({ nastaveni, nahled }: WidgetProps<{ fronty?: unknown }>) {
     const k = klicCasti(ID_CEKA, f.id);
     return !!k && vybrane.has(f.id) && smi(k);
   };
-  // Háčky v pevném pořadí, třináct front — každá má vlastní dotaz a mezipaměť
+  // Háčky v pevném pořadí, čtrnáct front — každá má vlastní dotaz a mezipaměť
   // sdílenou s ostatními widgety (objednávky i sklad se tak neptají dvakrát).
   const stavy = [
     useFronta(FRONTY[0], zap(FRONTY[0])),
@@ -320,6 +329,7 @@ function CekaNaTebe({ nastaveni, nahled }: WidgetProps<{ fronty?: unknown }>) {
     useFronta(FRONTY[10], zap(FRONTY[10])),
     useFronta(FRONTY[11], zap(FRONTY[11])),
     useFronta(FRONTY[12], zap(FRONTY[12])),
+    useFronta(FRONTY[13], zap(FRONTY[13])),
   ];
   const aktivni = FRONTY.map((f, i) => ({ f, s: stavy[i] })).filter(x => !x.s.vypnuto);
   const selhane = aktivni.filter(x => x.s.error);

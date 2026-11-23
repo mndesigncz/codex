@@ -6,6 +6,7 @@ import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { normalizeMovements, vyplatyZKasyUzaverky } from '@/lib/closing';
 import { spropitneZaObdobi, rozeberZaznam, denZaznamu, normalizujSmlouvu, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
 import { idsZeSmeny, nactiPravidla, nactiZamky, pozicePodniku, rozmeziZDotazu } from './_spolecne';
+import { cekajiciSrazky, mojeSrazky, nactiSlozky, slozkaClena } from '@/lib/trestyPenizeDb';
 
 // Výplaty (kolo 8, R8-1): co o výplatě ví jen server.
 //
@@ -18,6 +19,12 @@ import { idsZeSmeny, nactiPravidla, nactiZamky, pozicePodniku, rozmeziZDotazu } 
 //   GET /api/payroll?od&do&ja=1   zaměstnanec (finance.moje_mzda): vlastní z kasy, výplaty, zámky a — když to
 //                                 podnik zapnul — podíl na dýšku spočítaný tady stejnou funkcí jako u vedení
 //                                 (cizí hodiny ani uzávěrky klientovi nejdou)
+//
+// Kolo 96 (tresty a peníze, docs/TRESTY-PENIZE.md): u člověka `slozka` (nenároková složka výplaty) a
+// `cekaNaSouhlas` (srážky z trestů v období, které čekají na souhlas — ve výplatě se nestrhávají); u `ja`
+// navíc `srazky` (vlastní srážky: čekající kdykoli a ty z období). Krácení, náhrady, srážky a záskok jsou
+// úpravy mzdy (GET /api/attendance → adjustments, source trest | nahrada | srazka | zaskok); rozpad počítá
+// lib/trestyPenize rozpadVyplaty a vyplatniListina(radky, lide, { od, do, upravy }).
 
 export const dynamic = 'force-dynamic';
 
@@ -136,6 +143,7 @@ export async function GET(req: NextRequest) {
         spropitnePoDnech.sort((a, b) => b.den.localeCompare(a.den));
       } catch { spropitne = null; spropitnePoDnech = []; }
     }
+    const cekaJa = await cekajiciSrazky(c.teamId, r.od, r.do, c.meId);
     return NextResponse.json({
       od: r.od, do: r.do,
       ja: {
@@ -143,6 +151,9 @@ export async function GET(req: NextRequest) {
         uzaverky: zKasy.map(x => ({ id: x.id, den: x.den, castka: x.castka, kdo: x.kdo })),
         vyplaty: vyplaty.map(({ user_id: _u, ...v }) => v),
         spropitne, spropitnePoDnech,
+        slozka: await slozkaClena(c.teamId, c.meId),
+        cekaNaSouhlas: cekaJa.get(c.meId) ?? 0,
+        srazky: await mojeSrazky(c.teamId, c.meId, r.od, r.do),
       },
       zamky,
       pravidla: { priplatky: pravidla.priplatky, showTipsToStaff: pravidla.showTipsToStaff },
@@ -161,6 +172,8 @@ export async function GET(req: NextRequest) {
   const zKasy = vidiMzdy ? await vyplatyZKasy(c.teamId, r.od, r.do) : [];
   const vyplaty = vidiMzdy ? await oznaceneVyplaty(c.teamId, r.od, r.do) : [];
   const zamky = await nactiZamky(c.teamId, r.od, r.do);
+  const slozky = vidiMzdy ? await nactiSlozky(c.teamId) : new Map();
+  const cekaji = vidiMzdy ? await cekajiciSrazky(c.teamId, r.od, r.do) : new Map<number, number>();
   const out = lide.map(l => {
     const id = String(l.id);
     const moje = zKasy.filter(x => x.user_id === l.id);
@@ -174,6 +187,8 @@ export async function GET(req: NextRequest) {
       uzaverky: moje.map(x => ({ id: x.id, den: x.den, castka: x.castka, kdo: x.kdo })),
       vyplaceno: vidiMzdy ? v.reduce((a, x) => a + x.amount, 0) : null,
       vyplaty: v.map(({ user_id: _u, ...x }) => x),
+      slozka: vidiMzdy ? slozky.get(l.id) ?? null : null,
+      cekaNaSouhlas: vidiMzdy ? cekaji.get(l.id) ?? 0 : 0,
     };
   });
   return NextResponse.json({

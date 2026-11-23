@@ -28,6 +28,10 @@ export interface SekceExportu {
   upravyMzdy?: Record<string, unknown>[] | null;
   hodnoceni?: Record<string, unknown>[] | null;
   hodnoceniPolozek?: Record<string, unknown>[] | null;
+  // Kolo 96: srážky z výplaty (náhrada škody, přímá srážka) i se souhlasem nebo nesouhlasem a převody
+  // záskoku, které člověk dostal.
+  srazky?: Record<string, unknown>[] | null;
+  zaskoky?: Record<string, unknown>[] | null;
 }
 
 export const VERZE_EXPORTU = 1;
@@ -44,7 +48,7 @@ export function sestavExport(sekce: SekceExportu, vytvoreno: Date = new Date(), 
     aplikace: 'Managero',
     verze: VERZE_EXPORTU,
     vytvoreno: vytvoreno.toISOString(),
-    poznamka: 'Jen tvoje vlastní data: profil, nastavení, tvoje směny, docházka (včetně výsledku ověření polohy, ukládá se jen vzdálenost), žádosti o volno, dostupnost, zprávy, které jsi napsal(a), tresty, body, zápisy navíc, úpravy mzdy a hodnocení směn. Zprávy ostatních a data podniku v souboru nejsou.',
+    poznamka: 'Jen tvoje vlastní data: profil, nastavení, tvoje směny, docházka (včetně výsledku ověření polohy, ukládá se jen vzdálenost), žádosti o volno, dostupnost, zprávy, které jsi napsal(a), tresty, body, zápisy navíc, úpravy mzdy, srážky z výplaty (i s tvým souhlasem nebo nesouhlasem), záskoky a hodnocení směn. Zprávy ostatních a data podniku v souboru nejsou.',
     ucet,
     nastaveni: sekce.nastaveni,
     clenstvi: sekce.clenstvi ?? [],
@@ -59,6 +63,8 @@ export function sestavExport(sekce: SekceExportu, vytvoreno: Date = new Date(), 
     upravyMzdy: sekce.upravyMzdy ?? [],
     hodnoceni: sekce.hodnoceni ?? [],
     hodnoceniPolozek: sekce.hodnoceniPolozek ?? [],
+    srazky: sekce.srazky ?? [],
+    zaskoky: sekce.zaskoky ?? [],
     nedostupne,
     oriznute,
   };

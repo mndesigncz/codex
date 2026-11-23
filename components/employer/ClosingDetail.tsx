@@ -374,15 +374,17 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       <span className="text-sm font-semibold">{diff === 0 ? t('Kasa sedí') : diff > 0 ? t('Přebytek') : t('Manko')}</span>
                       <span className="text-sm font-bold tabular-nums">{diff > 0 ? '+' : ''}{money(diff)}</span>
                     </div>
-                    {/* Manko trestem není (§ 346b ZP): TrestTlacitko s klíčem manko:<id> místo tlačítka ukáže větu,
-                        jak to řešit (jen s tresty.udelit). Popisek tlačítka by se nikdy nezobrazil, proto žádný není. */}
+                    {/* Manko trestem není (§ 346b ZP). Kolo 96: s finance.mzdy otevře TrestTlacitko okno „Dát trest" rovnou
+                        v Náhradě škody se schodkem a výší manka (dohoda o odpovědnosti, souhlas se srážkou; autor
+                        předvyplněný, „Všichni na uzávěrce" ve výběru lidí); bez něj věta, jak manko řešit. */}
                     {diff < 0 && c.created_by ? (
                       <div className="mb-1.5 flex justify-end" data-trest-za-manko>
                         <TrestTlacitko onUlozeno={onChanged}
-                          vyrizeno={{ day: String(c.shift_date ?? c.date).slice(0, 10), sourceKey: `manko:${id}` }}
+                          vyrizeno={{ day: String(c.shift_date ?? c.date).slice(0, 10), closingId: id }}
                           predvolby={{
                             userId: Number(c.created_by), jmeno: c.author_name ?? undefined, day: String(c.shift_date ?? c.date).slice(0, 10), closingId: id,
-                            text: textNavrhu({ druh: 'manko', castka: -diff, minuty: null, poznamka: null }, money, t), sourceKey: `manko:${id}`, druhNavrhu: 'manko',
+                            text: textNavrhu({ druh: 'manko', castka: -diff, minuty: null, poznamka: null }, money, t), druhNavrhu: 'manko',
+                            penize: { rezim: 'nahrada', druhSkody: 'schodek', skoda: -diff },
                           }} />
                       </div>
                     ) : null}

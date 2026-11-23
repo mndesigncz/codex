@@ -13,8 +13,11 @@ import React from 'react';
 import { cekaSpor, jeNapomenuti, stavTrestu, type Trest } from '@/lib/tresty';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
-import { Avatar, Button, Chip, ListRow, Menu, Rada } from '../ui';
+import { Avatar, Button, Chip, ListRow, Menu, Rada, type MenuItem } from '../ui';
+import type { SrazkaTrestu } from '@/lib/trestyPenize';
 import { useMoney } from '../CurrencyProvider';
+import { akceSrazky, platneSrazky } from './penize';
+import { PenizeVRadku } from './PenizeRadku';
 
 /**
  * Tón a text chipu stavu — texty z lib/tresty (česky) jako klíče t(). „Vzato na vědomí" je u vedení
@@ -31,17 +34,31 @@ export function chipStavuTrestu(t: PrekladFn, x: Trest): { tone: 'wait' | 'ok' |
   }
 }
 
-/** „−10 b · krácení 300 Kč", nebo „Napomenutí" (přeložené; měna podniku). */
-export function dopadTrestu(t: PrekladFn, x: Pick<Trest, 'points' | 'bonusCut'>, money: (n: number) => string): string {
-  if (jeNapomenuti(x)) return t('Napomenutí');
+/**
+ * „−10 b · krácení 300 Kč", nebo „Napomenutí" (přeložené; měna podniku). Kolo 96: s `penize`
+ * přibudou platné srážky a náhrady („srážka 500 Kč") — trest jen se srážkou napomenutí není.
+ */
+export function dopadTrestu(t: PrekladFn, x: Pick<Trest, 'points' | 'bonusCut'> & Partial<Pick<Trest, 'penize'>>, money: (n: number) => string): string {
+  const srazky = platneSrazky(x.penize).filter(s => s.stav !== 'nesouhlas');
+  if (jeNapomenuti(x) && !srazky.length) return t('Napomenutí');
   return [
     x.points ? t('−{n} b', { n: x.points }) : null,
     x.bonusCut ? t('krácení {castka}', { castka: money(x.bonusCut) }) : null,
+    ...srazky.map(s => (s.druh === 'nahrada' ? t('náhrada škody {castka}', { castka: money(s.castka) }) : t('srážka {castka}', { castka: money(s.castka) }))),
   ].filter(Boolean).join(' · ');
 }
 
-export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, pracuji = false, bezJmena = false, as }: {
+/** Akce nad srážkou z menu řádku. */
+export type AkceSrazky = 'snizit' | 'zrusit' | 'znovu';
+
+export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, pracuji = false, bezJmena = false, as, davka, smiPenize = false, onSrazka, onZaskok }: {
   x: Trest;
+  /** Kolik lidí má hromadný trest (batchId) v seznamu — „Hromadný trest · 3 lidí". */
+  davka?: number;
+  /** Divák smí peníze (finance.mzdy) — menu dostane akce nad srážkou a záskokem. */
+  smiPenize?: boolean;
+  onSrazka?: (x: Trest, s: SrazkaTrestu, akce: AkceSrazky) => void;
+  onZaskok?: (x: Trest) => void;
   /** Divák smí tresty udělovat (tresty.udelit) — sporný řádek dostane akce, platný „···". */
   smiUdelit: boolean;
   onPlatiDal?: (x: Trest) => void;
@@ -81,6 +98,7 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
       {bezJmena ? null : <span className="block text-[#16181A]">{x.text}</span>}
       {vyjadreni && <span className={`block ${spor ? 'text-[#16181A]' : 'text-black/55'}`} data-trest-vyjadreni>{vyjadreni}</span>}
       {zruseni && <span className="block text-black/55">{zruseni}</span>}
+      <PenizeVRadku x={x} davka={davka} />
       {x.photoUrl && (
         <a href={x.photoUrl} target="_blank" rel="noreferrer" className="inline-block underline underline-offset-2 tap-target-sm">{t('Fotka')}</a>
       )}
@@ -97,12 +115,27 @@ export function TrestRadek({ x, smiUdelit, onPlatiDal, onZrusit, onUpravit, prac
       )}
     </>
   );
-  const maDetail = !bezJmena || !!vyjadreni || !!zruseni || !!x.photoUrl || spor;
+  const srazky = platneSrazky(x.penize);
+  const maDetail = !bezJmena || !!vyjadreni || !!zruseni || !!x.photoUrl || spor || srazky.length > 0 || !!x.batchId
+    || !!x.penize?.zaskok.prevody.some(p => p.stav === 'plati');
+  // Kolo 96: akce nad penězi (finance.mzdy) — snížit / zrušit srážku, znovu o souhlas, změnit záskok.
+  const kolik = (c: number) => (srazky.length > 1 ? ` (${money(c)})` : '');
+  const polozkyPenez: MenuItem[] = smiPenize && !zruseno && onSrazka ? srazky.flatMap(s => {
+    const a = akceSrazky(s, x.status === 'plati');
+    return [
+      ...(a.znovu ? [{ label: t('Znovu požádat o souhlas') + kolik(s.castka), icon: 'refresh', onClick: () => onSrazka(x, s, 'znovu') }] : []),
+      ...(a.snizit ? [{ label: t('Snížit srážku…') + kolik(s.castka), icon: 'minus', onClick: () => onSrazka(x, s, 'snizit') }] : []),
+      ...(a.zrusit ? [{ label: t('Zrušit srážku…') + kolik(s.castka), icon: 'close', onClick: () => onSrazka(x, s, 'zrusit') }] : []),
+    ];
+  }) : [];
+  const strhava = !!x.penize && (x.penize.kraceni > 0 || srazky.some(s => s.stav !== 'nesouhlas'));
+  if (smiPenize && !zruseno && onZaskok && strhava) polozkyPenez.push({ label: t('Změnit záskok…'), icon: 'swap', onClick: () => onZaskok(x) });
   const menu = !rozhodnuti && !zruseno && smiUdelit && onUpravit && onZrusit ? (
     // `!flex-none`: na telefonu by první prvek ocasu natáhlo přes řádek a „···" by stálo vlevo pod textem.
     <span className="!flex-none">
       <Menu size="sm" label={t('Upravit nebo zrušit trest: {jmeno}', { jmeno: x.userName })} items={[
         { label: t('Upravit…'), icon: 'pencil', onClick: () => onUpravit(x) },
+        ...polozkyPenez,
         { label: t('Zrušit trest…'), icon: 'close', danger: true, onClick: () => onZrusit(x) },
       ]} />
     </span>

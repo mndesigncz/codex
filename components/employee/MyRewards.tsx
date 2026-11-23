@@ -21,8 +21,11 @@
 // tady, ne ve widgetu: osobní rozložení widget Moje tresty mít nemusí a odkaz musí fungovat
 // i tak. Layout argument nástroji nepředává, čte se z adresy (useSearchParams, jako Navíc
 // u vedení); stejný odkaz podruhé (nový objekt parametrů) okno otevře znovu.
+//
+// Kolo 96 (peníze z výplaty): na stejnou adresu vede i oznámení „Srážka X čeká na tvůj souhlas" — trestKOtevreni
+// proto otevře přednostně trest se srážkou k souhlasu a detail nese kartu se zněním dohody (Souhlasím / Nesouhlasím).
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, EmptyState, ErrorState, Skeleton } from '../ui';
 import { ProGate } from '../Pro';
@@ -92,8 +95,16 @@ function TrestZOznameni() {
   const zAdresy = q?.get('view') === 'rewards' && q.get('arg') === ARG_TRESTY;
   const [ceka, setCeka] = useState(false);
   const [otevreny, setOtevreny] = useState<number | null>(null);
-  // Nová adresa (nový objekt parametrů) = nový hluboký odkaz.
-  useEffect(() => { if (zAdresy) setCeka(true); }, [q, zAdresy]);
+  // Nová adresa (nový objekt parametrů) = nový hluboký odkaz. Výjimka: okno si při otevření přidá do adresy
+  // `okno=1` a při zavření ho vrátí zpět (lib/useModal) — návrat z `okno=1` není nový odkaz, jinak by zavření
+  // detailu hned otevřelo další trest (kolo 96: sonda Z5 to chytila po souhlasu se srážkou).
+  const sOknem = useRef(false);
+  useEffect(() => {
+    const ted = q?.get('okno') === '1';
+    const zOkna = sOknem.current && !ted;
+    sOknem.current = ted;
+    if (zAdresy && !ted && !zOkna) setCeka(true);
+  }, [q, zAdresy]);
   // Data až s odkazem — bez něj si je drží widget Moje tresty (stejná adresa, sdílená mezipaměť).
   const data = useDataTresty(ceka || otevreny != null ? urlTresty() : null);
   const items = useMemo(() => data.data?.items ?? [], [data.data]);

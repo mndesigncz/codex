@@ -12,6 +12,9 @@
 import { useEffect } from 'react';
 import { obnovDataWidgetu, useDataWidgetu, type StavDat } from '../widgety/useDataWidgetu';
 import { UDALOST_TRESTY, vyberDataTrestu, type DataTrestu } from '@/lib/tresty';
+import { ApiError } from '@/lib/api';
+import { jeStavSrazky, type StavSrazky } from '@/lib/trestyPenize';
+import { obnovPenize, souhlasSeSrazkou } from '../tresty-penize/data';
 
 const POUZITE = new Set<string>();
 
@@ -32,4 +35,32 @@ export function useDataTresty(url: string | null): StavDat<DataTrestu> {
 export function obnovTresty(): void {
   for (const u of POUZITE) obnovDataWidgetu(u);
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(UDALOST_TRESTY));
+}
+
+// ---------------------------------------------------------------------------
+// Souhlas se srážkou (kolo 96, docs/TRESTY-PENIZE.md 4.5)
+// ---------------------------------------------------------------------------
+
+export type VysledekSouhlasu =
+  | { ok: true; stav: StavSrazky; odDne: string | null }
+  /** 409: znění se mezitím změnilo — `zneni` je nové, ukázat a nechat potvrdit znovu. */
+  | { ok: false; zneni: string; chyba: string };
+
+/**
+ * „Souhlasím se srážkou": sdílená akce `souhlasSeSrazkou` (components/tresty-penize/data), jen 409
+ * se změněným zněním neskončí výjimkou — ApiError nese tělo odpovědi (`data.zneni`) a nové znění se má
+ * hned ukázat. Ostatní chyby vyhodí ApiError s větou serveru. Obnovu (obnovPenize) dělá sdílená akce.
+ */
+export async function souhlasimSeSrazkou(id: number, zneni: string): Promise<VysledekSouhlasu> {
+  try {
+    const d = await souhlasSeSrazkou(id, zneni);
+    return { ok: true, stav: jeStavSrazky(d?.srazka?.stav) ? d.srazka.stav : 'uplatneno', odDne: typeof d?.srazka?.odDne === 'string' ? d.srazka.odDne : null };
+  } catch (e) {
+    const nove = e instanceof ApiError && e.status === 409 ? e.data?.zneni : null;
+    if (typeof nove === 'string' && nove.trim()) {
+      obnovPenize();
+      return { ok: false, zneni: nove, chyba: (e as ApiError).message };
+    }
+    throw e;
+  }
 }
