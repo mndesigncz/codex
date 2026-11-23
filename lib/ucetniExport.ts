@@ -17,6 +17,7 @@
 
 import { cashDifference, normalizeMovements, normalizePhotos, type FotoDokladu, type Movement } from './closing.ts';
 import { POPISKY_KATEGORII_CS, jeKategorieUctenky } from './financeWidgety.ts';
+import { currencySymbol } from './money.ts';
 import type { ListXlsx, SloupecXlsx, BunkaXlsx } from './xlsx.ts';
 
 // ---------------------------------------------------------------------------
@@ -171,6 +172,22 @@ export function priponaZTypu(mime: string | null | undefined): string {
 export function idUploadu(url: string | null | undefined): number | null {
   const m = /^\/api\/upload\/(\d{1,12})$/.exec(String(url ?? ''));
   return m ? Number(m[1]) : null;
+}
+
+/** Nejvýš tolik fotek dokladu (dodací list, faktura) u jedné příjemky. */
+export const MAX_FOTEK_PRIJEMKY = 4;
+
+/** Adresy dokladů objednávky (orders.doc_photos): jen tvar /api/upload/<id>, bez opakování, nejvýš 4. */
+export function fotkyObjednavky(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map(x => String(x ?? '').trim()).filter(x => idUploadu(x) != null))].slice(0, MAX_FOTEK_PRIJEMKY);
+}
+
+/** Číslo dodacího listu / faktury: ořezané, bez řídicích znaků, nejvýš 60 znaků; prázdné = null. */
+export function cisloDokladu(raw: unknown): string | null {
+  // eslint-disable-next-line no-control-regex
+  const s = String(raw ?? '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, 60);
+  return s || null;
 }
 
 export interface FotkaVZipu { url: string; uploadId: number; cesta: string; mime: string | null }
@@ -350,7 +367,7 @@ const DRUH_POHYBU_CS: Record<Movement['kind'], string> = { expense: 'Výdaj z ka
 export interface VolbyListu { chybiVUlozisti?: readonly string[] }
 
 export function sestavListy(d: DataExportu, plan: PlanFotek, souhrn: Souhrn, volby: VolbyListu = {}): ListExportu[] {
-  const sym = menaVNazvu(d.podnik.mena) === 'Kc' ? 'Kč' : d.podnik.mena.toUpperCase(); // i18n-ok (hlavička sloupce pro účetní)
+  const sym = currencySymbol(d.podnik.mena);
   const chybi = new Set(volby.chybiVUlozisti ?? []);
   const soubor = (url: string | null | undefined) => {
     if (!url) return '';
@@ -444,16 +461,16 @@ export function sestavListy(d: DataExportu, plan: PlanFotek, souhrn: Souhrn, vol
 
 function listSouhrnu(d: DataExportu, s: Souhrn, sym: string): { sloupce: SloupecXlsx[]; radky: BunkaXlsx[][] } {
   const r: BunkaXlsx[][] = [];
-  const t = (a: string, b: BunkaXlsx = '') => r.push([a, b, null]);
+  const tx = (a: string, b: BunkaXlsx = '') => r.push([a, b, null]);
   const c = (a: string, n: number | null) => r.push([a, null, n]);
   // i18n-ok (celý souhrn je obsah pro účetní, česky)
-  t('Podnik', d.podnik.nazev); // i18n-ok
-  if (d.podnik.ico) t('IČO', d.podnik.ico); // i18n-ok
-  if (d.podnik.dic) t('DIČ', d.podnik.dic); // i18n-ok
-  t('Období', `${d.od} – ${d.do}`); // i18n-ok
-  t('Měna', d.podnik.mena.toUpperCase()); // i18n-ok
-  t('');
-  t('Tržby podle uzávěrek'); // i18n-ok
+  tx('Podnik', d.podnik.nazev); // i18n-ok
+  if (d.podnik.ico) tx('IČO', d.podnik.ico); // i18n-ok
+  if (d.podnik.dic) tx('DIČ', d.podnik.dic); // i18n-ok
+  tx('Období', `${d.od} – ${d.do}`); // i18n-ok
+  tx('Měna', d.podnik.mena.toUpperCase()); // i18n-ok
+  tx('');
+  tx('Tržby podle uzávěrek'); // i18n-ok
   c('Tržba hotově', s.uzaverky.hotove); // i18n-ok
   c('Tržba kartou', s.uzaverky.kartou); // i18n-ok
   c('Tržba celkem', s.uzaverky.celkem); // i18n-ok
@@ -464,12 +481,12 @@ function listSouhrnu(d: DataExportu, s: Souhrn, sym: string): { sloupce: Sloupec
   c('Výplaty z kasy', s.uzaverky.vyplatyZKasy); // i18n-ok
   c('Vklady do kasy', s.uzaverky.vklady); // i18n-ok
   c('Rozdíly v kase (+ přebytek, − manko)', s.uzaverky.rozdily); // i18n-ok
-  t('Počet uzávěrek', s.uzaverky.pocet); // i18n-ok
+  tx('Počet uzávěrek', s.uzaverky.pocet); // i18n-ok
   if (s.pokladna) {
-    t('');
-    t('Tržby z pokladny (POS)'); // i18n-ok
-    t('Dní s tržbou', s.pokladna.dni); // i18n-ok
-    t('Účtenek', s.pokladna.uctenek); // i18n-ok
+    tx('');
+    tx('Tržby z pokladny (POS)'); // i18n-ok
+    tx('Dní s tržbou', s.pokladna.dni); // i18n-ok
+    tx('Účtenek', s.pokladna.uctenek); // i18n-ok
     c('Tržba celkem', s.pokladna.celkem); // i18n-ok
     c('Hotově', s.pokladna.hotove); // i18n-ok
     c('Kartou', s.pokladna.kartou); // i18n-ok
@@ -478,25 +495,25 @@ function listSouhrnu(d: DataExportu, s: Souhrn, sym: string): { sloupce: Sloupec
     c('Bez DPH', s.pokladna.bezDph); // i18n-ok
     for (const x of s.pokladna.dph) { c(`Základ ${cisloCs(x.sazba)} %`, x.zaklad); c(`DPH ${cisloCs(x.sazba)} %`, x.dph); } // i18n-ok
   }
-  t('');
-  t('Nákupy'); // i18n-ok
-  t('Účtenek', s.uctenky.pocet); // i18n-ok
+  tx('');
+  tx('Nákupy'); // i18n-ok
+  tx('Účtenek', s.uctenky.pocet); // i18n-ok
   c('Účtenky celkem', s.uctenky.soucet); // i18n-ok
-  t('Příjemek', s.prijemky.pocet); // i18n-ok
+  tx('Příjemek', s.prijemky.pocet); // i18n-ok
   c('Příjemky celkem', s.prijemky.soucet); // i18n-ok
   if (s.vyplaty) {
-    t('');
-    t('Výplaty'); // i18n-ok
-    t('Zapsaných výplat', s.vyplaty.pocet); // i18n-ok
+    tx('');
+    tx('Výplaty'); // i18n-ok
+    tx('Zapsaných výplat', s.vyplaty.pocet); // i18n-ok
     c('Zapsané výplaty celkem', s.vyplaty.soucet); // i18n-ok
     c('Výplaty z kasy', s.uzaverky.vyplatyZKasy); // i18n-ok
   }
-  t('');
-  t('Fotky dokladů', s.fotky.celkem); // i18n-ok
+  tx('');
+  tx('Fotky dokladů', s.fotky.celkem); // i18n-ok
   if (s.varovani.length) {
-    t('');
-    t('K dořešení'); // i18n-ok
-    for (const v of s.varovani) t(textVarovani(v));
+    tx('');
+    tx('K dořešení'); // i18n-ok
+    for (const v of s.varovani) tx(textVarovani(v));
   }
   return { sloupce: [{ nazev: 'Položka', sirka: 40 }, { nazev: 'Hodnota', sirka: 28 }, { nazev: `Částka (${sym})`, typ: 'castka' }], radky: r }; // i18n-ok
 }

@@ -17,6 +17,7 @@ import { cenaZDb, cenaZFormulare } from '@/lib/cena';
 import { cenaKZapisu, sloupecJeDesetinny } from '@/lib/cenaSloupce';
 import { overPrijem, type PolozkaObjednavky } from '@/lib/skladPrehled';
 import { audit } from '@/lib/audit';
+import { cisloDokladu, fotkyObjednavky, idUploadu, MAX_FOTEK_PRIJEMKY } from '@/lib/ucetniExport';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +45,8 @@ const shape = (r: any, sCenou: boolean) => ({
   id: r.id, supplier: r.supplier, items: polozkyProRoli(r.items, sCenou), totalCost: sCenou ? cenaZDb(r.total_cost) : null, // NUMERIC chodí jako řetězec
   status: r.status, note: r.note, createdAt: r.created_at, receivedAt: r.received_at,
   createdByName: r.created_by_name ?? null,
+  // Doklad k příjemce (pro účetní): číslo dodacího listu / faktury a jeho fotky.
+  docNumber: r.doc_number ?? null, docPhotos: fotkyObjednavky(r.doc_photos),
 });
 
 // GET — objednávky podniku.
@@ -170,6 +173,19 @@ export async function PATCH(req: NextRequest) {
     if (!o.ok) return NextResponse.json({ error: o.chyba }, { status: o.status });
     poPolozkach = o;
   }
+  // Doklad k příjmu (pro účetní): číslo dodacího listu / faktury a nejvýš 4 fotky. Fotky musí
+  // být nahrané v TOMHLE podniku — cizí adresa /api/upload/<id> se odmítne dřív, než se cokoli zapíše.
+  const docNumber = action === 'received' ? cisloDokladu(b.docNumber) : null;
+  const docPhotos = action === 'received' ? fotkyObjednavky(b.docPhotos) : [];
+  if (action === 'received' && Array.isArray(b.docPhotos) && b.docPhotos.length > MAX_FOTEK_PRIJEMKY) {
+    return NextResponse.json({ error: `K příjmu jdou přiložit nejvýš ${MAX_FOTEK_PRIJEMKY} fotky dokladu.` }, { status: 400 });
+  }
+  if (docPhotos.length) {
+    const ids = docPhotos.map(u => idUploadu(u)!);
+    const nalezene = await sql`SELECT id FROM uploads WHERE team_id = ${c.teamId} AND id = ANY(${ids})` as any[];
+    if (nalezene.length !== ids.length) return NextResponse.json({ error: 'Fotka dokladu nepatří k tomuto podniku. Vyfoť ji znovu.' }, { status: 400 });
+  }
+
   // Množství skladu je v DDL INTEGER, dokud někdo nespustí migraci (lib/cenaSloupce):
   // 2,5 kg se pak naskladní zaokrouhleně, jinak by databáze přičtení odmítla.
   const desetinne = poPolozkach ? await sloupecJeDesetinny('inventory_items.quantity') : true;
@@ -198,6 +214,17 @@ export async function PATCH(req: NextRequest) {
           received_at = ${action === 'received' ? new Date().toISOString() : null}
       WHERE id = ${id}
       RETURNING *`;
+
+  let radek = row;
+  if (action === 'received' && (docNumber || docPhotos.length)) {
+    try {
+      const [s2] = await sql`
+        UPDATE orders SET doc_number = ${docNumber}, doc_photos = ${docPhotos.length ? JSON.stringify(docPhotos) : null}
+        WHERE id = ${id} AND team_id = ${c.teamId}
+        RETURNING *`;
+      if (s2) radek = s2;
+    } catch { /* sloupce před migrací — příjem platí i bez dokladu */ }
+  }
 
   // Auto-restock: add received (bez received[] objednané) quantities to matching inventory items.
   let restocked = 0;
@@ -251,7 +278,7 @@ export async function PATCH(req: NextRequest) {
 
   // Příjem surovin může odblokovat výrobu (vlajky v nákupu zmizí, úkol se přepíše).
   if (restocked > 0) { try { await ensureProductionTasks(c.teamId, c.meId); } catch { /* před migrací */ } }
-  return NextResponse.json({ ok: true, order: shape(row, c.role.opravneni.has('sklad.ceny')), restocked, castecny });
+  return NextResponse.json({ ok: true, order: shape(radek, c.role.opravneni.has('sklad.ceny')), restocked, castecny });
 }
 
 // DELETE ?id= — remove an order record.

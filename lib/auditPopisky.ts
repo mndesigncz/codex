@@ -124,6 +124,13 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'tresty.sazebnik.smazat': 'Smazána položka sazebníku trestů',
   // Záloha dat (spuštění, balík P): stažení z odkazu v denním e-mailu
   'data.zaloha.stazeni': 'Stažena záloha dat podniku',
+  // Pro účetní: ZIP s podklady, podepsaný odkaz a e-mail účetní
+  'ucetni.export': 'Staženy podklady pro účetní',
+  'ucetni.stazeni_odkazem': 'Účetní stáhla podklady odkazem',
+  'ucetni.odkaz': 'Vytvořen odkaz na podklady pro účetní',
+  'ucetni.poslano': 'Podklady poslány účetní',
+  'ucetni.nastaveni': 'Změněno nastavení účetní',
+  'ucetni.zneplatneno': 'Zneplatněny odkazy pro účetní',
   // docházka (kolo 7: ruční oprava s důvodem)
   'dochazka.upravit': 'Ručně upraven záznam docházky',
   'dochazka.pridat': 'Ručně přidán záznam docházky',
@@ -313,6 +320,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   inventory: 'sklad', supplier: 'sklad', receipt: 'sklad', order: 'sklad',
   // kasa a menu
   pos: 'kasa', menu: 'kasa',
+  // podklady pro účetní (export, odkaz, e-mail)
+  ucetni: 'kasa',
   // uzávěrky
   closing: 'uzaverky',
   // odměny, prémie, pochvaly

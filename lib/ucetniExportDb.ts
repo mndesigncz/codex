@@ -10,6 +10,7 @@ import { get } from '@vercel/blob';
 import { normalizeCurrency } from './money';
 import { normalizePhotos } from './closing';
 import { pragueDaySafe } from './pragueTime';
+import { fotkyObjednavky } from './ucetniExport';
 import type { DataExportu, PosUctenkaVstup, PrijemkaVstup, UctenkaVstup, UzaverkaVstup, VyplataVstup } from './ucetniExport';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -19,11 +20,6 @@ const cisloNebo = (v: unknown): number | null => (v == null || v === '' ? null :
 /** Pražský den z časového razítka databáze (TIMESTAMP bez zóny = UTC). */
 const den = (v: unknown): string => pragueDaySafe(v);
 const ADRESA = /^\/api\/upload\/\d{1,12}$/;
-/** Adresy dokladů objednávky (pole řetězců), jen tvar /api/upload/<id>, nejvýš 4. */
-export function fotkyObjednavky(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return [...new Set(raw.map(x => String(x ?? '').trim()).filter(x => ADRESA.test(x)))].slice(0, 4);
-}
 
 export interface PodnikUcetni {
   nazev: string; ico: string | null; dic: string | null; adresa: string | null; mena: string;
