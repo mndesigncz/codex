@@ -32,6 +32,7 @@ export const ROUTY_TARIFU: { soubor: string; metody: string[]; tarif: PotrebnyTa
   { soubor: 'app/api/share/route.ts', metody: ['PATCH'], tarif: 'pro', funkce: 'Vlastní vzhled sdílených stránek' },
   { soubor: 'app/api/pos/insights/route.ts', metody: ['GET'], tarif: 'pro', funkce: 'Přehledy z pokladny' },
   { soubor: 'app/api/ucetni/export/route.ts', metody: ['GET'], tarif: 'pro', funkce: 'Pro účetní: ZIP s podklady' },
+  { soubor: 'app/api/ucetni/prehled/route.ts', metody: ['GET'], tarif: 'pro', funkce: 'Pro účetní: náhled podkladů' },
   { soubor: 'app/api/ucetni/odkaz/route.ts', metody: ['POST'], tarif: 'pro', funkce: 'Pro účetní: odkaz pro účetní' },
   { soubor: 'app/api/ucetni/poslat/route.ts', metody: ['POST'], tarif: 'pro', funkce: 'Pro účetní: e-mail účetní' },
   // Max

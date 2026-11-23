@@ -24,6 +24,8 @@ const ADRESA = /^\/api\/upload\/\d{1,12}$/;
 export interface PodnikUcetni {
   nazev: string; ico: string | null; dic: string | null; adresa: string | null; mena: string;
   email: string | null; auto: boolean; mzdy: boolean; verze: number; posledni: string | null;
+  /** Podnik zablokovaný správcem (`teams.blocked_at`) — veřejný odkaz pro účetní pak nic nevydá. */
+  zablokovany: boolean;
 }
 
 /** Podnik a nastavení účetní (před migrací výchozí hodnoty). */
@@ -31,17 +33,19 @@ export async function nactiPodnik(teamId: number): Promise<PodnikUcetni | null> 
   let t: Record<string, unknown> | undefined;
   try {
     [t] = await sql`
-      SELECT name, ico, dic, address, currency, accountant_email, accountant_auto, accountant_payroll, accountant_link_ver, accountant_last_sent
+      SELECT name, ico, dic, address, currency, accountant_email, accountant_auto, accountant_payroll, accountant_link_ver, accountant_last_sent,
+             blocked_at
       FROM teams WHERE id = ${teamId}`;
   } catch {
-    [t] = await sql`SELECT name FROM teams WHERE id = ${teamId}`;
+    // Před migrací sloupců účetní: aspoň název a blokace (blocked_at je starší).
+    try { [t] = await sql`SELECT name, blocked_at FROM teams WHERE id = ${teamId}`; } catch { [t] = await sql`SELECT name FROM teams WHERE id = ${teamId}`; }
   }
   if (!t) return null;
   return {
     nazev: String(t.name ?? ''), ico: (t.ico as string) || null, dic: (t.dic as string) || null, adresa: (t.address as string) || null,
     mena: normalizeCurrency(t.currency as string | null), email: (t.accountant_email as string) || null,
     auto: t.accountant_auto === true, mzdy: t.accountant_payroll === true, verze: Number(t.accountant_link_ver) > 0 ? Number(t.accountant_link_ver) : 1,
-    posledni: (t.accountant_last_sent as string) || null,
+    posledni: (t.accountant_last_sent as string) || null, zablokovany: t.blocked_at != null,
   };
 }
 
@@ -121,18 +125,23 @@ export async function nactiDataExportu(teamId: number, od: string, doD: string, 
       FROM pos_bills
       WHERE team_id = ${teamId} AND day >= ${od} AND day <= ${doD} AND deleted = FALSE AND refunded = FALSE
       GROUP BY day ORDER BY day` as any[];
-    const sazby = await sql`
-      SELECT b.day, t.key AS sazba, SUM(t.value::numeric) AS dph
-      FROM pos_bills b CROSS JOIN LATERAL jsonb_each_text(COALESCE(b.tax_summaries, '{}'::jsonb)) AS t
-      WHERE b.team_id = ${teamId} AND b.day >= ${od} AND b.day <= ${doD} AND b.deleted = FALSE AND b.refunded = FALSE
-        AND jsonb_typeof(COALESCE(b.tax_summaries, '{}'::jsonb)) = 'object'
-      GROUP BY b.day, t.key` as any[];
+    // DPH po sazbách ve vlastním try: vadný tax_summaries (text, pole, null hodnota) nesmí shodit
+    // celé tržby. Bere se jen objekt { "<sazba %>": <částka DPH> } a z něj jen číselné hodnoty
+    // s číselným klíčem (tak to ukládá lib/storyous.ts toBillHead → lib/posMirror.ts).
     const dphDne = new Map<string, Record<string, number>>();
-    for (const s of sazby) {
-      const m = dphDne.get(String(s.day)) ?? {};
-      m[String(s.sazba)] = cislo(s.dph);
-      dphDne.set(String(s.day), m);
-    }
+    try {
+      const sazby = await sql`
+        SELECT b.day, t.key AS sazba, SUM((t.value #>> '{}')::numeric) AS dph
+        FROM pos_bills b CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(b.tax_summaries) = 'object' THEN b.tax_summaries ELSE '{}'::jsonb END) AS t
+        WHERE b.team_id = ${teamId} AND b.day >= ${od} AND b.day <= ${doD} AND b.deleted = FALSE AND b.refunded = FALSE
+          AND jsonb_typeof(t.value) = 'number' AND t.key ~ '^[0-9]+([.,][0-9]+)?$'
+        GROUP BY b.day, t.key` as any[];
+      for (const s of sazby) {
+        const m = dphDne.get(String(s.day)) ?? {};
+        m[String(s.sazba)] = cislo(s.dph);
+        dphDne.set(String(s.day), m);
+      }
+    } catch (e) { console.error('ucetni/pos-dph', e instanceof Error ? e.message : ''); }
     for (const d of dny) {
       pos.push({
         den: String(d.day), pocet: Number(d.pocet) || 0, finalPrice: cislo(d.celkem), withoutTax: cisloNebo(d.bez_dph), tips: cislo(d.tips),

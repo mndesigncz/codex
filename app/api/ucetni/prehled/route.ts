@@ -1,8 +1,10 @@
 // GET /api/ucetni/prehled?od&do[&mzdy=1] — náhled podkladů pro účetní: počty, součty, fotky, varování.
+// Tarif Pro jako export (náhled je součást placené funkce, ne čtení dřívějších dat).
 // Fotky se tu nestahují; počítá se z řádků a záznamů nahraných souborů podniku.
 
 import { NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { pozadujTarif } from '@/lib/tarifServer';
 import { nazevZipu, overObdobi, posPoDnech } from '@/lib/ucetniExport';
 import { nahledPodkladu } from '@/lib/ucetniServer';
 
@@ -12,6 +14,8 @@ export const maxDuration = 60;
 export async function GET(req: Request) {
   const c = await pozaduj('finance.exportovat');
   if (jeOdpoved(c)) return c;
+  const tarif = await pozadujTarif(c.teamId, 'pro');
+  if (tarif) return tarif;
   const q = new URL(req.url).searchParams;
   const o = overObdobi(q.get('od'), q.get('do'));
   if (!o.ok) return NextResponse.json({ error: o.chyba }, { status: 400 });

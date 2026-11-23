@@ -3007,5 +3007,7 @@
   "Zneplatnit": "Revoke",
   "Žádný dřív poslaný ani zkopírovaný odkaz na podklady už nepůjde otevřít. Účetní pak pošli nový.": "No previously sent or copied link to the documents will open anymore. Then send the accountant a new one.",
   "Vše pro účetní": "All for accountant",
-  "ZIP s tabulkami a fotkami dokladů, odkaz pro účetní.": "ZIP with tables and document photos, link for the accountant."
+  "ZIP s tabulkami a fotkami dokladů, odkaz pro účetní.": "ZIP with tables and document photos, link for the accountant.",
+  "E-mail účetní uložen. Výplaty se k automatickému e-mailu už nepřikládají — znovu je zapne jen ten, kdo vidí mzdy.": "Accountant's e-mail saved. Payroll is no longer attached to the automatic e-mail — only someone who can see payroll can turn it back on.",
+  "Změna e-mailu vypne přikládání výplat.": "Changing the e-mail turns off attaching payroll."
 }

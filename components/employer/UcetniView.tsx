@@ -32,7 +32,7 @@ interface Prehled {
   pocty: { uctenky: number; prijemky: number; uzaverky: number; dnyPokladny: number; vyplaty: number | null };
   souhrn: Souhrn;
 }
-interface Nastaveni { email: string; auto: boolean; mzdy: boolean; posledni: string | null; denAutomatu: number; smiMzdy: boolean; ico: string | null; dic: string | null }
+interface Nastaveni { email: string; auto: boolean; mzdy: boolean; posledni: string | null; denAutomatu: number; smiMzdy: boolean; ico: string | null; dic: string | null; vyplatyVypnuty?: boolean }
 
 const URL_NASTAVENI = '/api/ucetni/nastaveni';
 const dotaz = (od: string, doD: string, mzdy: boolean) => `od=${od}&do=${doD}${mzdy ? '&mzdy=1' : ''}`;
@@ -280,7 +280,7 @@ function NastaveniUcetni({ nastaveni, chyba, onZnovu, onUlozeno, onChyba }: {
     setUkladam(co);
     try {
       const d = await fetch(URL_NASTAVENI, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(zmena) }).then(okJson) as Nastaveni;
-      onUlozeno(d, text);
+      onUlozeno(d, d.vyplatyVypnuty ? t('E-mail účetní uložen. Výplaty se k automatickému e-mailu už nepřikládají — znovu je zapne jen ten, kdo vidí mzdy.') : text);
     } catch (e) { onChyba(apiMessage(e, t('Nastavení se nepodařilo uložit.'))); }
     setUkladam(null);
   };
@@ -291,7 +291,8 @@ function NastaveniUcetni({ nastaveni, chyba, onZnovu, onUlozeno, onChyba }: {
         {chyba ? <ErrorState compact vlevo title={chyba} onRetry={onZnovu} /> : !nastaveni ? <Skeleton className="h-24" /> : (
           <>
             <form className="flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={e => { e.preventDefault(); void uloz({ email }, 'email', t('E-mail účetní uložen.')); }}>
-              <Field id="ucetni-email" label={t('E-mail účetní')} className="flex-1">
+              <Field id="ucetni-email" label={t('E-mail účetní')} className="flex-1"
+                hint={!nastaveni.smiMzdy && nastaveni.mzdy ? t('Změna e-mailu vypne přikládání výplat.') : undefined}>
                 <Input id="ucetni-email" type="email" inputMode="email" autoComplete="email" value={email} placeholder={t('např. ucetni@firma.cz')}
                   onChange={e => setEmail(e.target.value)} />
               </Field>

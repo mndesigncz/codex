@@ -7,6 +7,8 @@
 //     odkazy" se zeptá a pošle PATCH { zneplatnit: true }.
 //  C) Telefon 390 a 320: bez vodorovného přetečení, tři akce pod sebou s dotykovou plochou ≥ 44 px.
 //  D) Role bez finance.exportovat: položka v navigaci není a pohled ukáže „bez oprávnění".
+//  F) Bez finance.mzdy se zapnutými výplatami: u e-mailu nápověda, že změna výplaty vypne, a po uložení
+//     to ohlásí (odpověď vyplatyVypnuty) a přepínač výplat je vypnutý.
 //  E) Příjem objednávky: pole „Číslo dodacího listu / faktury" a fotka dokladu jdou do PATCH /api/orders.
 // Snímky do scripts/sondy/shots/ucetni-*.png (necommitují se).
 import { readFileSync } from 'node:fs';
@@ -40,11 +42,14 @@ function podvrh(stav0) {
     if (path === '/api/ucetni/nastaveni') {
       if (m === 'PATCH') {
         const b = JSON.parse(req.postData() || '{}'); s.patche.push(b);
+        // Jako server: e-mail změněný bez finance.mzdy vypne výplaty a řekne to.
+        if (b.email !== undefined && b.email !== s.nastaveni.email && !s.nastaveni.smiMzdy && s.nastaveni.mzdy) { s.nastaveni.mzdy = false; s.vypnuto = true; }
         if (b.email !== undefined) s.nastaveni.email = b.email;
         if (b.auto !== undefined) s.nastaveni.auto = b.auto;
         if (b.mzdy !== undefined) s.nastaveni.mzdy = b.mzdy;
       }
-      return json(s.nastaveni);
+      const vyplatyVypnuty = s.vypnuto === true; s.vypnuto = false;
+      return json({ ...s.nastaveni, vyplatyVypnuty });
     }
     if (path === '/api/ucetni/odkaz' && m === 'POST') { s.odkazy.push(JSON.parse(req.postData() || '{}')); return json({ ok: true, url: `${BASE}/api/ucetni/odkaz?t=1.20261001.20261031.0.1.9999999999.podpisPodpisPodpisPodpis`, vyprsi: '2026-12-07T06:00:00.000Z', sMzdami: false }); }
     if (path === '/api/ucetni/poslat' && m === 'POST') { s.poslano.push(JSON.parse(req.postData() || '{}')); return json({ ok: true, komu: s.nastaveni.email, sMzdami: false }); }
@@ -170,6 +175,27 @@ for (const w of [390, 320]) {
   tvrdi('D: bez finance.exportovat se pohled neotevře', (await p.locator('[data-ucetni]').count()) === 0);
   tvrdi('D: a v navigaci položka není', (await p.getByRole('navigation').getByText('Pro účetní', { exact: true }).count()) === 0);
   tvrdi('D: náhled se vůbec nevolá', s.prehledy.length === 0);
+  await ctx.close();
+}
+
+// ===========================================================================
+// F) Změna e-mailu bez finance.mzdy vypne výplaty
+// ===========================================================================
+{
+  const s = novyStav();
+  s.nastaveni.smiMzdy = false; s.nastaveni.mzdy = true;
+  const { ctx, p } = await kontextUcetni({ viewport: { width: 1280, height: 950 } }, s);
+  await jdi(p, BASE + '/employer/overview?view=ucetni');
+  const koren = p.locator('[data-ucetni]');
+  await koren.waitFor({ timeout: 15000 });
+  await dokud(async () => (await koren.getByText('Změna e-mailu vypne přikládání výplat.').count()) > 0, 6000);
+  tvrdi('F1: u e-mailu nápověda, že změna vypne výplaty', (await koren.getByText('Změna e-mailu vypne přikládání výplat.').count()) > 0);
+  await koren.locator('#ucetni-email').fill('jina@adresa.cz');
+  await koren.locator('#ucetni-email').press('Enter');
+  await dokud(async () => (await p.getByText(/Výplaty se k automatickému e-mailu už nepřikládají/).count()) > 0, 5000);
+  tvrdi('F2: po uložení hlášení o vypnutých výplatách', (await p.getByText(/Výplaty se k automatickému e-mailu už nepřikládají/).count()) > 0, JSON.stringify(s.patche));
+  const vyplaty = koren.getByRole('switch', { name: /Přiložit výplaty k automatickému e-mailu/ });
+  tvrdi('F3: přepínač výplat je vypnutý', (await vyplaty.getAttribute('aria-checked')) === 'false');
   await ctx.close();
 }
 

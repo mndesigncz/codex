@@ -1,7 +1,8 @@
 // Odkaz na podklady pro účetní bez účtu v aplikaci.
 //
 // GET ?t=<token> — VEŘEJNÉ (bez přihlášení): ověří podpis, platnost (14 dní) a verzi odkazů
-//   podniku (po „Zneplatnit všechny odkazy" starý odkaz nesedí) a streamuje tentýž ZIP jako
+//   podniku (po „Zneplatnit všechny odkazy" starý odkaz nesedí), že podnik není zablokovaný
+//   a má tarif Pro (jinak 410 se stránkou) a streamuje tentýž ZIP jako
 //   stažení v aplikaci. Výplaty jen, když je odkaz nese (tvůrce měl finance.mzdy).
 //   Odkaz otevírá účetní v prohlížeči — chyby jsou krátká stránka, ne JSON.
 // POST { od, do, mzdy? } — vytvoří odkaz (finance.exportovat; příznak mezd jen s finance.mzdy).
@@ -52,6 +53,11 @@ export async function GET(req: Request) {
     return stranka('Teď to nejde', 'Podklady se nepodařilo připravit. Zkuste to za chvíli znovu.', 503);
   }
   if (!podnik) return stranka('Podnik nenalezen', 'Podnik z odkazu už v aplikaci není.', 404);
+  // Zablokovaný podnik ani podnik bez tarifu Pro podklady přes odkaz nevydá (vydaný odkaz tarif neobchází).
+  if (podnik.zablokovany) return stranka('Odkaz už neplatí', 'Podklady z tohoto podniku teď nejde stáhnout. Obraťte se přímo na podnik.', 410);
+  if (await pozadujTarif(o.obsah.teamId, 'pro')) {
+    return stranka('Odkaz už neplatí', 'Podnik teď nemá tarif, ve kterém jdou podklady přes odkaz stáhnout. Obraťte se přímo na podnik.', 410);
+  }
   if (!platnaVerze(o.obsah, podnik.verze)) {
     return stranka('Odkaz byl zrušen', 'Podnik tenhle odkaz zneplatnil. O nový požádejte podnik, který vám ho poslal.', 410);
   }

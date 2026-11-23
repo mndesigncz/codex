@@ -3007,5 +3007,7 @@
   "Zneplatnit": "Ungültig machen",
   "Žádný dřív poslaný ani zkopírovaný odkaz na podklady už nepůjde otevřít. Účetní pak pošli nový.": "Kein früher gesendeter oder kopierter Link zu den Unterlagen lässt sich mehr öffnen. Sende der Buchhaltung dann einen neuen.",
   "Vše pro účetní": "Alles für Buchhaltung",
-  "ZIP s tabulkami a fotkami dokladů, odkaz pro účetní.": "ZIP mit Tabellen und Belegfotos, Link für die Buchhaltung."
+  "ZIP s tabulkami a fotkami dokladů, odkaz pro účetní.": "ZIP mit Tabellen und Belegfotos, Link für die Buchhaltung.",
+  "E-mail účetní uložen. Výplaty se k automatickému e-mailu už nepřikládají — znovu je zapne jen ten, kdo vidí mzdy.": "E-Mail der Buchhaltung gespeichert. Löhne werden der automatischen E-Mail nicht mehr beigefügt — wieder einschalten kann sie nur, wer Löhne sieht.",
+  "Změna e-mailu vypne přikládání výplat.": "Eine Änderung der E-Mail schaltet das Beifügen der Löhne aus."
 }

@@ -1,4 +1,6 @@
-// Cron: 3. den v měsíci ráno pošle účetním podklady za minulý měsíc (vercel.json).
+// Cron: 3.–10. den v měsíci ráno pošle účetním podklady za minulý měsíc (vercel.json `17 5 3-10 * *`).
+// Běží denně osm dní, aby se po výpadku (e-mail, databáze, nasazení) měsíc dohnal; poslat
+// se ale smí jen jednou — 4.–10. den běh projde jen podniky, kterým to zatím neodešlo.
 //
 // Jen podniky se zapnutým `accountant_auto` a vyplněným e-mailem, v tarifu Pro a výš.
 // Idempotentní přes `accountant_last_sent` („RRRR-MM"): ten se zapíše PŘED odesláním

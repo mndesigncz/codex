@@ -72,11 +72,14 @@ export function celyMesic(od: string, doD: string): string | null {
 
 /** Den v měsíci, kdy chodí automatický e-mail účetní (cron běží ráno toho dne). */
 export const DEN_AUTOMATU = 3;
+/** Poslední den, kdy cron ještě dohání zmeškané odeslání (vercel.json `17 5 3-10 * *`). */
+export const POSLEDNI_DEN_AUTOMATU = 10;
 
 /**
  * Měsíc, za který má automat právě teď poslat podklady, nebo null.
  * Posílá se od 3. dne v měsíci za minulý měsíc, jednou (idempotence přes `accountant_last_sent`):
- * opakovaný běh cronu ve stejném měsíci ani ruční spuštění nic nepošle podruhé.
+ * opakovaný běh cronu ve stejném měsíci ani ruční spuštění nic nepošle podruhé. Cron běží
+ * 3.–10. den; když odeslání selže, `accountant_last_sent` se vrátí a další den se to zkusí znovu.
  */
 export function mesicProAutomat(dnes: string, posledniOdeslany: string | null | undefined): string | null {
   if (!platnyDen(dnes)) return null;
@@ -232,7 +235,8 @@ const DRUH_FOTKY_CS: Record<FotoDokladu['druh'], string> = { terminal: 'výpis z
 
 export type KodVarovani = 'uctenky_bez_fotky' | 'uctenky_bez_castky' | 'prijemky_bez_ceny' | 'prijemky_bez_dokladu' | 'uzaverky_neschvalene' | 'fotky_chybi';
 export interface Varovani { kod: KodVarovani; pocet: number }
-export interface DphSazby { sazba: number; zaklad: number; dph: number }
+/** `zaklad` null = nejde dopočítat (sazba 0 %: z nulové DPH základ nevyjde). */
+export interface DphSazby { sazba: number; zaklad: number | null; dph: number }
 
 export interface Souhrn {
   uctenky: { pocet: number; soucet: number; bezFotky: number; bezCastky: number };
@@ -262,19 +266,30 @@ export function posPoDnech(pos: readonly PosUctenkaVstup[]): PosDen[] {
     const d = dny.get(b.den) ?? { den: b.den, uctenek: 0, celkem: 0, hotove: 0, kartou: 0, jinak: 0, spropitne: 0, bezDph: 0, dph: new Map() };
     d.uctenek += b.pocet ?? 1; d.celkem += cislo(b.finalPrice); d.hotove += cislo(b.cash); d.kartou += cislo(b.card); d.jinak += cislo(b.other); d.spropitne += cislo(b.tips);
     d.bezDph = d.bezDph != null && b.withoutTax != null ? d.bezDph + cislo(b.withoutTax) : null;
-    // tax_summaries z pokladny: sazba v % → částka DPH v té sazbě.
-    for (const [k, v] of Object.entries(b.taxSummaries ?? {})) {
-      const sazba = Number(String(k).replace(',', '.'));
-      if (!Number.isFinite(sazba) || sazba < 0 || sazba > 100) continue;
-      d.dph.set(sazba, (d.dph.get(sazba) ?? 0) + cislo(v));
+    // tax_summaries z pokladny (Storyous `taxSummaries`, uložené přes lib/storyous.ts toBillHead):
+    // { "<sazba v %>": <částka DPH v té sazbě> }. Ne-čísla a nečíselné klíče se přeskočí
+    // (stejně jako SQL v lib/ucetniExportDb.ts), ať vadná účtenka nevyrobí falešnou sazbu.
+    const ts = b.taxSummaries;
+    if (ts && typeof ts === 'object' && !Array.isArray(ts)) {
+      for (const [k, v] of Object.entries(ts)) {
+        if (typeof v !== 'number' || !Number.isFinite(v) || !RE_SAZBA.test(String(k))) continue;
+        const sazba = Number(String(k).replace(',', '.'));
+        if (sazba > 100) continue;
+        d.dph.set(sazba, (d.dph.get(sazba) ?? 0) + v);
+      }
     }
     dny.set(b.den, d);
   }
   return [...dny.values()].sort((a, b) => (a.den < b.den ? -1 : 1));
 }
 
-/** Základ daně z částky DPH a sazby (0 % základ nemá jak dopočítat). */
-const zakladZDph = (dph: number, sazba: number) => (sazba > 0 ? r2((dph * 100) / sazba) : 0);
+const RE_SAZBA = /^\d+([.,]\d+)?$/;
+
+/**
+ * Základ daně z částky DPH a sazby: základ = DPH × 100 / sazba (tax_summaries nese jen DPH).
+ * U 0 % z nulové DPH základ nevyjde → null (prázdná buňka, ne zavádějící nula).
+ */
+export const zakladZDph = (dph: number, sazba: number): number | null => (sazba > 0 ? r2((dph * 100) / sazba) : null);
 
 /** Odvod jedné uzávěrky: během směny + po přepočtu na konci. */
 const odvodUzaverky = (z: UzaverkaVstup) => cislo(z.cash_removed) + cislo(z.final_removal);
@@ -527,9 +542,10 @@ function bunkaCsv(v: BunkaXlsx, typ: SloupecXlsx['typ']): string {
   if (v == null) return '';
   if (typeof v === 'number') return typ === 'castka' ? castkaCs(v) : cisloCs(v);
   const s = String(v);
-  // Uvozovky jen tam, kde jsou potřeba; vzorec na začátku (=, +, -, @) se zneškodní apostrofem,
-  // ať Excel neotevře buňku jako vzorec (CSV injection).
-  const bezpecny = /^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s) ? `'${s}` : s;
+  // Uvozovky jen tam, kde jsou potřeba; vzorec na začátku (=, +, -, @, tab, CR) se zneškodní apostrofem,
+  // ať Excel neotevře buňku jako vzorec (CSV injection). Výjimka jen pro čisté číslo („-12,50"):
+  // „-2+3+cmd|…" začíná číslicí, ale je to vzorec.
+  const bezpecny = /^[=+\-@\t\r]/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s) ? `'${s}` : s;
   return /[;"\r\n]/.test(bezpecny) ? `"${bezpecny.replace(/"/g, '""')}"` : bezpecny;
 }
 

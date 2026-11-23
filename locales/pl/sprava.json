@@ -3007,5 +3007,7 @@
   "Zneplatnit": "Unieważnij",
   "Žádný dřív poslaný ani zkopírovaný odkaz na podklady už nepůjde otevřít. Účetní pak pošli nový.": "Żaden wcześniej wysłany ani skopiowany link do dokumentów nie będzie się już otwierał. Wyślij potem księgowej nowy.",
   "Vše pro účetní": "Wszystko dla księgowej",
-  "ZIP s tabulkami a fotkami dokladů, odkaz pro účetní.": "ZIP z tabelami i zdjęciami dokumentów, link dla księgowej."
+  "ZIP s tabulkami a fotkami dokladů, odkaz pro účetní.": "ZIP z tabelami i zdjęciami dokumentów, link dla księgowej.",
+  "E-mail účetní uložen. Výplaty se k automatickému e-mailu už nepřikládají — znovu je zapne jen ten, kdo vidí mzdy.": "E-mail księgowej zapisany. Wypłaty nie są już dołączane do automatycznego e-maila — ponownie włączyć je może tylko osoba, która widzi wynagrodzenia.",
+  "Změna e-mailu vypne přikládání výplat.": "Zmiana e-maila wyłącza dołączanie wypłat."
 }
