@@ -3,12 +3,12 @@
 // Fotky dokladu k příjmu objednávky (dodací list, faktura) — pro účetní.
 //
 // Stejná stavba jako fotky dokladů u uzávěrky (components/employee/CashClosing.tsx):
-// skrytý input s `capture="environment"` otevře na telefonu rovnou zadní fotoaparát,
+// input souboru s `capture="environment"` otevře na telefonu rovnou zadní fotoaparát,
 // fotka se zmenší v prohlížeči (lib/clientImage) a nahraje přes POST /api/upload do
 // soukromého úložiště; do objednávky se ukládá jen adresa /api/upload/<id>.
 // Nejvýš `strop` fotek (příjemka: 4), každá jde odebrat.
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '../ui';
 import { Icon } from '../Icons';
 import { useT } from '@/lib/i18n/client';
@@ -21,7 +21,6 @@ export default function FotkyDokladu({ fotky, onChange, strop = 4 }: {
   strop?: number;
 }) {
   const t = useT('widgety');
-  const vstup = useRef<HTMLInputElement>(null);
   const [nahravam, setNahravam] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const plno = fotky.length >= strop;
@@ -41,13 +40,23 @@ export default function FotkyDokladu({ fotky, onChange, strop = 4 }: {
       setChyba(apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
     }
     setNahravam(false);
-    if (vstup.current) vstup.current.value = '';
+  };
+  // Výběr souboru přes input vytvořený až při klepnutí: v okně příjmu tak není skryté pole navíc
+  // (měření polí a pořadí fokusu v okně ho nevidí) a stejnou fotku jde vybrat znovu.
+  const vyfot = () => {
+    setChyba(null);
+    const i = document.createElement('input');
+    i.type = 'file'; i.accept = 'image/*'; i.setAttribute('capture', 'environment');
+    i.setAttribute('data-fotky-prijemky-vstup', '');
+    i.style.display = 'none';
+    i.onchange = () => { void nahraj(i.files?.[0] ?? null); i.remove(); };
+    i.addEventListener('cancel', () => i.remove());
+    document.body.appendChild(i);
+    i.click();
   };
 
   return (
     <div className="space-y-2" data-fotky-prijemky="">
-      <input ref={vstup} type="file" accept="image/*" capture="environment" className="hidden" aria-hidden tabIndex={-1}
-        onChange={e => void nahraj(e.target.files?.[0] ?? null)} />
       {fotky.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label={t('Fotky dokladu')}>
           {fotky.map((url, i) => (
@@ -64,7 +73,7 @@ export default function FotkyDokladu({ fotky, onChange, strop = 4 }: {
           ))}
         </ul>
       )}
-      <Button variant="secondary" size="sm" icon="camera" loading={nahravam} disabled={plno || nahravam} onClick={() => { setChyba(null); vstup.current?.click(); }}>
+      <Button variant="secondary" size="sm" icon="camera" loading={nahravam} disabled={plno || nahravam} onClick={vyfot}>
         {fotky.length ? t('Vyfotit další stranu') : t('Vyfotit dodací list / fakturu')}
       </Button>
       {plno && <p className="t-meta">{t('Nejvýš {n} fotky — odeber některou, když chceš jinou.', { n: strop })}</p>}

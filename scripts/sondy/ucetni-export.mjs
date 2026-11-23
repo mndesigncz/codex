@@ -201,7 +201,8 @@ for (const w of [390, 320]) {
   const cislo = okno.getByLabel('Číslo dodacího listu / faktury');
   tvrdi('E1: okno příjmu má pole čísla dokladu', await cislo.isVisible());
   await cislo.fill('FA 2026/15');
-  await okno.locator('[data-fotky-prijemky] input[type="file"]').setInputFiles({ name: 'doklad.png', mimeType: 'image/png', buffer: PNG });
+  const [vyber] = await Promise.all([p.waitForEvent('filechooser'), okno.getByRole('button', { name: 'Vyfotit dodací list / fakturu' }).click()]);
+  await vyber.setFiles({ name: 'doklad.png', mimeType: 'image/png', buffer: PNG });
   await dokud(async () => (await okno.locator('[data-fotky-prijemky] img').count()) === 1, 6000);
   tvrdi('E2: fotka dokladu se nahraje a ukáže náhled', nahrano.length === 1 && (await okno.locator('[data-fotky-prijemky] img').count()) === 1);
   const m = await okno.evaluate(el => el.scrollWidth - el.clientWidth);
