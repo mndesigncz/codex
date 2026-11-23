@@ -17,13 +17,14 @@ export default function ({ eq, ok }: Testy) {
   eq('výchozí vedení: skupiny a pořadí jako dřív', v.sekce.map(s => [s.title, ids(s.items)]), [
     [null, ['overview']],
     ['Směny', ['shifts', 'my-shifts', 'attendance']],
-    ['Kasa & sklad', ['reports', 'finance', 'inventory', 'recipes']],
+    // Pro účetní (podklady pro účetní, 2026-11) hned za Financemi.
+    ['Kasa & sklad', ['reports', 'finance', 'ucetni', 'inventory', 'recipes']],
     ['Práce', ['tasks', 'procedures', 'planning']],
     ['Tým', ['rewards', 'chat', 'guides', 'suggestions']],
   ]);
   eq('výchozí vedení: dok', ids(v.dok), ['overview', 'shifts', 'inventory', 'chat']);
   eq('výchozí vedení: nic skrytého', v.skryte, []);
-  eq('výchozí vedení: všech 15 pohledů', v.vse.length, 15);
+  eq('výchozí vedení: všech 16 pohledů', v.vse.length, 16);
   const z = slozNavigaci({ rozhrani: 'zamestnanec', smiPohled: vse, nastaveni: null, jazyk: 'cs' });
   // Kolo 6 (Z16): denní věci baristy v doku; Sklad a Chat zůstávají v listu Více (chat tam s odznakem).
   eq('výchozí zaměstnanec: dok', ids(z.dok), ['home', 'my-shifts', 'tasks', 'closing']);
@@ -70,7 +71,7 @@ export default function ({ eq, ok }: Testy) {
   ] } }) });
   eq('vlastní skupiny: pořadí a přejmenování skupiny', [sek.sekce[0].title, sek.sekce[1].title], ['Peníze', 'Směny']);
   eq('vlastní skupiny: zadané položky stojí první', [ids(sek.sekce[0].items).slice(0, 2), sek.sekce[1].items[0].id], [['finance', 'reports'], 'shifts']);
-  ok('položky mimo vlastní skupiny se neztratí (vrátí se do výchozí skupiny, jinak na konec)', ids(sek.vse).length === 15 && ids(sek.vse).includes('overview') && ids(sek.vse).includes('inventory'));
+  ok('položky mimo vlastní skupiny se neztratí (vrátí se do výchozí skupiny, jinak na konec)', ids(sek.vse).length === 16 && ids(sek.vse).includes('overview') && ids(sek.vse).includes('inventory'));
   ok('položka je nejvýš v jedné skupině', new Set(ids(sek.vse)).size === ids(sek.vse).length);
 
   // ---- normalizace uložené konfigurace ----

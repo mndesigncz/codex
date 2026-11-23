@@ -47,6 +47,7 @@ import { useMoney, useSymbol } from '../../CurrencyProvider';
 import PoleMnozstvi from '../../inventory/PoleMnozstvi';
 import type { ToMake } from '../../inventory/ProductionBoard';
 import NewStockEntry from '../../inventory/NewStockEntry';
+import FotkyDokladu from '../../ucetni/FotkyDokladu';
 import StocktakeModal from '../../inventory/Stocktake';
 import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
@@ -779,6 +780,8 @@ const URL_OBJEDNAVKY = '/api/orders';
 
 /** Řádek příjmu po položkách, jak jde na server (PATCH /api/orders `received`). */
 interface PrijatyRadek { i: number; itemId: number | null; qty: number; unitCost?: number }
+/** Doklad k příjmu pro účetní: číslo dodacího listu / faktury a fotky (adresy /api/upload/<id>). */
+interface DokladPrijmu { docNumber: string; docPhotos: string[] }
 
 /**
  * Okno příjmu objednávky: co v ní je, volitelná celková cena a Přijmout /
@@ -800,7 +803,7 @@ function OknoPrijmu({ o, radky: radkyZApi, ceny, smiCenu, onPrijmout, onZrusit, 
   /** Předvyplnění ceny za balení podle položky skladu (poslední příjem, jinak cena ve skladu). */
   ceny: Record<number, number>;
   smiCenu: boolean;
-  onPrijmout: (cena: number | null, prijato: PrijatyRadek[] | null) => Promise<void>;
+  onPrijmout: (cena: number | null, prijato: PrijatyRadek[] | null, doklad: DokladPrijmu) => Promise<void>;
   onZrusit: () => void;
   onZavrit: () => void;
 }) {
@@ -825,6 +828,9 @@ function OknoPrijmu({ o, radky: radkyZApi, ceny, smiCenu, onPrijmout, onZrusit, 
   const [cenaRucne, setCenaRucne] = useState(false);
   const [pracuji, setPracuji] = useState(false);
   const [chyba, setChyba] = useState('');
+  // Doklad pro účetní (nepovinný): číslo dodacího listu / faktury a jeho fotky.
+  const [cisloDokladu, setCisloDokladu] = useState('');
+  const [fotkyDokladu, setFotkyDokladu] = useState<string[]>([]);
   const upravit = rezim === 'upravit';
 
   const rozbor = radky.map((r, i) => {
@@ -847,7 +853,7 @@ function OknoPrijmu({ o, radky: radkyZApi, ceny, smiCenu, onPrijmout, onZrusit, 
     const prijato: PrijatyRadek[] | null = upravit
       ? rozbor.map(x => ({ i: x.r.i, itemId: x.r.itemId, qty: x.qty ?? 0, ...(smiCenu && x.cena != null ? { unitCost: x.cena } : {}) }))
       : null;
-    try { await onPrijmout(castka, prijato); onZavrit(); }
+    try { await onPrijmout(castka, prijato, { docNumber: cisloDokladu.trim(), docPhotos: fotkyDokladu }); onZavrit(); }
     catch (e) { setChyba(apiMessage(e, t('Příjem se nepodařil.'))); setPracuji(false); }
   };
   const naEnter = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') { e.preventDefault(); void potvrdit(); } };
@@ -922,6 +928,11 @@ function OknoPrijmu({ o, radky: radkyZApi, ceny, smiCenu, onPrijmout, onZrusit, 
                 onKeyDown={naEnter} />
             </Field>
           )}
+          <Field id={`sklad-prijem-doklad-${o.id}`} label={t('Číslo dodacího listu / faktury')} hint={t('Nepovinné — s fotkou dokladu dostane účetní příjemku celou.')}>
+            <Input id={`sklad-prijem-doklad-${o.id}`} value={cisloDokladu} maxLength={60} autoComplete="off" placeholder={t('např. FA 2026/123')}
+              onChange={e => setCisloDokladu(e.target.value)} onKeyDown={naEnter} />
+          </Field>
+          <FotkyDokladu fotky={fotkyDokladu} onChange={setFotkyDokladu} />
           <p className="t-meta">{!upravit ? t('Přijetí přičte objednané množství ke skladu.') : smiCenu ? t('Ke skladu se přičte, co přišlo; cena za balení se zapíše k položce.') : t('Ke skladu se přičte, co přišlo.')}</p>
           {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
           {/* Zrušení je destruktivní a vzácné — stranou pod obsahem, ne vedle
@@ -967,13 +978,15 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
   useEffect(() => { if (upravy || nahled) { setPrijimam(null); setRusim(null); setMazu(null); } }, [upravy, nahled]);
 
   const cekajici = data.data ?? [];
-  const zmen = async (o: Objednavka, action: 'received' | 'cancelled', cena: number | null = null, prijato: PrijatyRadek[] | null = null) => {
+  const zmen = async (o: Objednavka, action: 'received' | 'cancelled', cena: number | null = null, prijato: PrijatyRadek[] | null = null, doklad: DokladPrijmu | null = null) => {
     const res = await fetch(URL_OBJEDNAVKY, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: o.id, action,
         ...(action === 'received' && cena != null ? { totalCost: cena } : {}),
         ...(action === 'received' && prijato ? { received: prijato } : {}),
+        ...(action === 'received' && doklad?.docNumber ? { docNumber: doklad.docNumber } : {}),
+        ...(action === 'received' && doklad?.docPhotos.length ? { docPhotos: doklad.docPhotos } : {}),
       }),
     });
     const d = await okJson(res);
@@ -986,8 +999,8 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
     }
     return d as { restocked?: number; castecny?: boolean } | null;
   };
-  const prijmout = async (o: Objednavka, cena: number | null, prijato: PrijatyRadek[] | null) => {
-    const d = await zmen(o, 'received', cena, prijato);
+  const prijmout = async (o: Objednavka, cena: number | null, prijato: PrijatyRadek[] | null, doklad: DokladPrijmu) => {
+    const d = await zmen(o, 'received', cena, prijato, doklad);
     const n = typeof d?.restocked === 'number' ? d.restocked : o.polozky.length;
     const chybi = prijato ? prijato.filter(r => r.qty < (radkyObj.data?.[o.id]?.[r.i]?.mnozstvi ?? 0)).length : 0;
     if (d?.castecny && chybi > 0) {
@@ -1108,7 +1121,7 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
       </Widget>
       {prijimam && (
         <OknoPrijmu o={prijimam} smiCenu={smiZapsatCenu} radky={radkyObj.data?.[prijimam.id]} ceny={cenyKPrijmu}
-          onPrijmout={(cena, prijato) => prijmout(prijimam, cena, prijato)}
+          onPrijmout={(cena, prijato, doklad) => prijmout(prijimam, cena, prijato, doklad)}
           onZrusit={() => { setRusim(prijimam); setPrijimam(null); }}
           onZavrit={() => setPrijimam(null)} />
       )}

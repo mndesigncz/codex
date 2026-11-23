@@ -2795,5 +2795,14 @@
   "Uzávěrka a kasa": "Uzávierka a kasa",
   "Čistota": "Čistota",
   "Na směně s tebou: {jmena}": "Na zmene s tebou: {jmena}",
-  "Pro tebe:": "Pre teba:"
+  "Pro tebe:": "Pre teba:",
+  "Fotky dokladu": "Fotky dokladu",
+  "Otevřít doklad {n}": "Otvoriť doklad {n}",
+  "Odebrat doklad {n}": "Odobrať doklad {n}",
+  "Vyfotit další stranu": "Odfotiť ďalšiu stranu",
+  "Vyfotit dodací list / fakturu": "Odfotiť dodací list / faktúru",
+  "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "Najviac {n} fotky — odober niektorú, keď chceš inú.",
+  "Číslo dodacího listu / faktury": "Číslo dodacieho listu / faktúry",
+  "Nepovinné — s fotkou dokladu dostane účetní příjemku celou.": "Nepovinné — s fotkou dokladu dostane účtovník príjemku celú.",
+  "např. FA 2026/123": "napr. FA 2026/123"
 }

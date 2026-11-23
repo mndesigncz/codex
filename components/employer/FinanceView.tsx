@@ -45,7 +45,7 @@ import { obsahuje } from '@/lib/hledani';
 import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
-import { useSmi } from '../widgety/NavigaceKontext';
+import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
 import { MesicStrankyFinanci, SrovnaniStrankyFinanci } from '../widgety/oblasti/finance';
 import {
@@ -625,9 +625,12 @@ export default function FinanceView() {
   const smiExport = smi('finance.exportovat') && smi('finance.zobrazit');
   const smiPevne = smi('finance.nastaveni');
   const exportovat = () => (pro ? setExportuji(true) : setUpgrade(t('Export pro účetní')));
+  const nav = useNavigace();
   const menu: MenuItem[] = [
     // Na telefonu je export v „···" (stažení CSV do telefonu není hlavní akce — V12); na monitoru je limetkou.
     ...(smiExport && !monitor ? [{ label: t('Export pro účetní'), icon: 'download', onClick: exportovat }] : []),
+    // Stránka Pro účetní: jeden ZIP s tabulkami a fotkami dokladů, odkaz a měsíční e-mail účetní.
+    ...(nav.smiPohled('ucetni') ? [{ label: t('Vše pro účetní'), icon: 'receipt', hint: t('ZIP s tabulkami a fotkami dokladů, odkaz pro účetní.'), onClick: () => nav.onNavigate('ucetni') }] : []),
     ...(smiPevne ? [{ label: t('Pravidelné náklady…'), icon: 'coins', hint: t('Nájem, energie — výsledek měsíce je po nich'), onClick: () => setPevne(true) }] : []),
     // Seskupení knihy výdajů — jako položka menu, ne druhý Segmented vedle druhů.
     ...(smi('finance.zobrazit') ? [podleDodavatelu

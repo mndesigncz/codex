@@ -2792,5 +2792,14 @@
   "Uzávěrka a kasa": "Zamknięcie i kasa",
   "Čistota": "Czystość",
   "Na směně s tebou: {jmena}": "Na zmianie z tobą: {jmena}",
-  "Pro tebe:": "Dla ciebie:"
+  "Pro tebe:": "Dla ciebie:",
+  "Fotky dokladu": "Zdjęcia dokumentu",
+  "Otevřít doklad {n}": "Otwórz dokument {n}",
+  "Odebrat doklad {n}": "Usuń dokument {n}",
+  "Vyfotit další stranu": "Zrób zdjęcie kolejnej strony",
+  "Vyfotit dodací list / fakturu": "Zrób zdjęcie dowodu dostawy / faktury",
+  "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "Najwyżej {n} zdjęcia — usuń jedno, żeby dodać inne.",
+  "Číslo dodacího listu / faktury": "Numer dowodu dostawy / faktury",
+  "Nepovinné — s fotkou dokladu dostane účetní příjemku celou.": "Opcjonalne — ze zdjęciem dokumentu księgowa dostanie przyjęcie w całości.",
+  "např. FA 2026/123": "np. FV 2026/123"
 }
