@@ -25,6 +25,9 @@ const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\
   const bare = p.replace(/[/]/g, '_'); return have.has(bare) ? bare : null; };
 export const fixtura = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
 
+/** Obsah GET /api/upload/<id> v podvrhu: PNG 2 × 2 (šedá). */
+const PNG_NAHRANY = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGOYAAYMEAoAL04GwT5NowIAAAAASUVORK5CYII=', 'base64');
+
 const tokeny = {};
 export const tokenPro = (role) => (tokeny[role] ??= execSync(
   `NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? 'design-round-secret-0123456789ab'} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} ${role}`,
@@ -161,6 +164,9 @@ export async function kontext({ viewport = { width: 1280, height: 950 }, role = 
       const dnes = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
       return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k68-schedule.json', 'utf8').replaceAll('"DNES"', `"${dnes}"`) });
     }
+    // Nahraný soubor (náhled fotky, doklad): skutečný server vrací obrázek. JSON by byl rozbitý
+    // náhled — a okna s fotkou ho teď správně zahodí jako nenahranou fotku (sonda ukol-fotka).
+    if (m === 'GET' && /^\/api\/upload\/[A-Za-z0-9_-]+$/.test(path)) return route.fulfill({ status: 200, contentType: 'image/png', body: PNG_NAHRANY });
     if (stav.chyby[path]) return json({ error: 'Server spadl' }, stav.chyby[path]);
     if (m !== 'GET') return json({ ok: true });
     const k = keyFor(u);

@@ -140,9 +140,10 @@ export default function ({ eq, ok }: Testy) {
     && /SELECT id FROM uploads WHERE id = \$\{idSouboru\} AND team_id = \$\{c\.teamId\}/.test(apiF) && /'ukoly\.fotka'/.test(apiF)
     && /completionPhoto: platnaFotka\(r\.completion_photo\)/.test(apiF) && /requirePhoto: r\.require_photo === true/.test(apiF));
   const okno = zdroj('components/ukoly/PrilozFoto.tsx');
-  ok('okno Přilož fotku: Modal sm, input image/* s capture (zadní fotoaparát), POST /api/upload, náhled max-h-48 max-w-full, „Označit" až po nahrání',
+  // Nahrání přes lib/nahrajFotku (JPEG, nečitelná fotka se odmítne) — testy v scripts/testy/ukol-fotka.ts.
+  ok('okno Přilož fotku: Modal sm, input image/* s capture (zadní fotoaparát), nahrajFotku, náhled max-h-48 max-w-full, „Označit" až po nahrání',
     /<Modal open onClose=\{onClose\} size="sm"/.test(okno) && /type="file" accept="image\/\*" capture="environment"/.test(okno)
-    && /fetch\('\/api\/upload', \{ method: 'POST', body: fd \}\)\.then\(okJson\)/.test(okno) && /max-h-48 w-auto max-w-full/.test(okno)
+    && /await nahrajFotku\(soubor\)/.test(okno) && /max-h-48 w-auto max-w-full/.test(okno)
     && /disabled=\{!url \|\| nahravam\}/.test(okno) && /size="lg" block icon="camera"/.test(okno));
   eq('okno Přilož fotku volají všechna místa odškrtnutí (vedení, zaměstnanec, widget, tablet)',
     ['components/employer/TaskManager.tsx', 'components/employee/Tasks.tsx', 'components/widgety/oblasti/ukoly.tsx', 'components/kiosk/KioskTasks.tsx']
