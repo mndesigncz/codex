@@ -9,17 +9,18 @@
 // Vzor: Jolt „Photo required" u položky checklistu, Connecteam podúkol typu Image.
 //
 // Obsluha fotí telefonem: skrytý input s `capture="environment"` otevře rovnou zadní
-// fotoaparát (na počítači výběr souboru), fotka se zmenší v prohlížeči
-// (lib/clientImage — 12 MB z fotoaparátu by přes limit těla požadavku neprošlo)
-// a nahraje přes existující POST /api/upload. „Označit jako hotový" je aktivní až
-// s nahranou fotkou; chyba nahrání i uložení zůstane v okně, nic se tiše nezahodí.
+// fotoaparát (na počítači výběr souboru), fotka se v prohlížeči převede na zmenšený
+// JPEG a nahraje (lib/nahrajFotku — 12 MB z fotoaparátu by přes limit těla požadavku
+// neprošlo a HEIC z iPhonu by vedení v Chromu neotevřelo). „Označit jako hotový" je
+// aktivní až s nahranou fotkou, jejíž náhled se opravdu načetl; chyba nahrání,
+// nečitelná fotka i chyba uložení zůstanou v okně, nic se tiše nezahodí.
 // Jen jedna fotka, ne galerie. Na telefonu okno vyjede zdola (to dělá Modal sám).
 
 import { useRef, useState } from 'react';
 import { Button, Modal } from '../ui';
 import { useT } from '@/lib/i18n/client';
-import { apiMessage, okJson } from '@/lib/api';
-import { platnaFotka } from '@/lib/ukolyPrehled';
+import { apiMessage } from '@/lib/api';
+import { nahrajFotku, NecitelnaFotka } from '@/lib/nahrajFotku';
 
 export function PrilozFoto({ nazev, zaKoho, onClose, onHotovo }: {
   /** Název úkolu (podtitulek okna). */
@@ -42,14 +43,13 @@ export function PrilozFoto({ nazev, zaKoho, onClose, onHotovo }: {
     setNahravam(true);
     setChyba(null);
     try {
-      const { compressImage } = await import('@/lib/clientImage');
-      const fd = new FormData();
-      fd.append('file', await compressImage(soubor));
-      const d = await fetch('/api/upload', { method: 'POST', body: fd }).then(okJson);
-      if (platnaFotka(d?.url)) setUrl(d.url);
+      const nova = await nahrajFotku(soubor);
+      if (nova) setUrl(nova);
       else setChyba(t('Fotku se nepodařilo nahrát.'));
     } catch (e) {
-      setChyba(apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
+      setChyba(e instanceof NecitelnaFotka
+        ? t('Tuhle fotku prohlížeč neumí otevřít (třeba HEIC z iPhonu). Vyfoť ji znovu, nebo vyber fotku ve formátu JPEG.')
+        : apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
     }
     setNahravam(false);
     // Stejnou fotku jde vybrat znovu (change by se jinak nespustil).
@@ -76,8 +76,10 @@ export function PrilozFoto({ nazev, zaKoho, onClose, onHotovo }: {
         <input ref={vstup} type="file" accept="image/*" capture="environment" className="hidden" aria-hidden tabIndex={-1}
           onChange={e => void nahraj(e.target.files?.[0] ?? null)} />
         {url && (
+          // Náhled, který se nenačte, je fotka, kterou neuvidí ani vedení — nahrát znovu.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt={t('Náhled fotky')} className="block rounded-2xl max-h-48 w-auto max-w-full" />
+          <img src={url} alt={t('Náhled fotky')} className="block rounded-2xl max-h-48 w-auto max-w-full"
+            onError={() => { setUrl(null); setChyba(t('Fotku se nepodařilo nahrát.')); }} />
         )}
         <Button variant="secondary" size="lg" block icon="camera" loading={nahravam} onClick={() => vstup.current?.click()}>
           {url ? t('Vyfotit znovu') : t('Vyfotit / nahrát')}

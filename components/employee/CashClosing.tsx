@@ -35,6 +35,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { okJson, apiMessage } from '@/lib/api';
 import { platnaFotka } from '@/lib/ukolyPrehled';
+import { nahrajFotku, NecitelnaFotka } from '@/lib/nahrajFotku';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
@@ -230,8 +231,8 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
 /**
  * Fotky dokladů k uzávěrce (kolo 8, R8-5): výpis z platebního terminálu, Z-report pokladny,
  * účtenka výdaje z kasy. Skrytý input s `capture="environment"` otevře na telefonu rovnou
- * zadní fotoaparát (na počítači výběr souboru), fotka se zmenší v prohlížeči (lib/clientImage)
- * a nahraje přes existující POST /api/upload — do uzávěrky jde jen adresa a druh.
+ * zadní fotoaparát (na počítači výběr souboru), fotka se v prohlížeči převede na zmenšený JPEG
+ * a nahraje (lib/nahrajFotku) — do uzávěrky jde jen adresa a druh.
  * Stejný postup jako PrilozFoto u úkolu, jen bez okna: tady se fotí uprostřed formuláře.
  */
 function FotkyDokladu({ fotky, onChange, druhy, strop = 3, kompaktni = false }: {
@@ -259,14 +260,13 @@ function FotkyDokladu({ fotky, onChange, druhy, strop = 3, kompaktni = false }: 
     setNahravam(true);
     setChyba(null);
     try {
-      const { compressImage } = await import('@/lib/clientImage');
-      const fd = new FormData();
-      fd.append('file', await compressImage(soubor));
-      const d = await fetch('/api/upload', { method: 'POST', body: fd }).then(okJson);
-      if (platnaFotka(d?.url)) onChange([...fotky, { url: d.url, druh }]);
+      const url = await nahrajFotku(soubor);
+      if (url) onChange([...fotky, { url, druh }]);
       else setChyba(t('Fotku se nepodařilo nahrát.'));
     } catch (e) {
-      setChyba(apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
+      setChyba(e instanceof NecitelnaFotka
+        ? t('Tuhle fotku prohlížeč neumí otevřít (třeba HEIC z iPhonu). Vyfoť ji znovu, nebo vyber fotku ve formátu JPEG.')
+        : apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
     }
     setNahravam(false);
     if (vstup.current) vstup.current.value = '';

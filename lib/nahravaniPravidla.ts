@@ -1,6 +1,7 @@
 // Co se smí nahrát a kam (spuštění, balík S). Společné pro klasické nahrávání
 // přes server (app/api/upload, do 4,5 MB — víc serverless funkce nepřijme)
-// i pro přímé nahrávání do Vercel Blob (app/api/upload/primo). Čisté.
+// i pro přímé nahrávání do Vercel Blob (app/api/upload/primo) a pro fotky
+// jako důkaz (lib/nahrajFotku). Čisté.
 
 /** Klasické nahrávání přes server (a záloha do Postgresu do 4 MB). */
 export const MAX_BYTES = 10 * 1024 * 1024;
@@ -47,6 +48,37 @@ export function povolenyTyp(nazev: string | null | undefined, typ: string | null
 /** Název do chatu i do cesty v úložišti: bez lomítek, bez „..", bez řídicích znaků. */
 export function cistyNazev(nazev: string | null | undefined): string {
   return (String(nazev || 'soubor')).replace(/[\u0000-\u001f\u007f/\\]+/g, '_').replace(/\.\.+/g, '.').slice(0, 200) || 'soubor';
+}
+
+// ---------------------------------------------------------------------------
+// Fotka jako důkaz nebo doklad (úkol „jen s fotkou", doklady k uzávěrce).
+//
+// Fotku pak uvidí někdo jiný na jiném zařízení (vedení v detailu úkolu, kontrola
+// uzávěrky), takže se nahrává jen ve formátu, který ukáže každý prohlížeč. HEIC
+// z iPhonu Chrome, Edge ani Firefox neotevřou: dřív odešel nezmenšený (přes 4,5 MB
+// ho Vercel odmítl holým 413 → „Server odpověděl 413.", menší se nahrál a náhled
+// i detail úkolu ukázaly rozbitý obrázek). Prohlížeč, který fotku přečte, ji
+// převede na JPEG; který ne, řekne to člověku hned, místo aby ji poslal.
+// ---------------------------------------------------------------------------
+
+/** Formáty fotek, které ukáže každý prohlížeč. */
+export const ZOBRAZITELNE_FOTKY = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+/** Zobrazitelná fotka do téhle velikosti jde beze změny; větší se zmenší. */
+export const FOTKA_BEZ_PREVODU_DO = 900 * 1024;
+
+const typFotky = (typ: string | null | undefined) => String(typ ?? '').toLowerCase().split(';')[0].trim();
+
+/** Co s vybranou fotkou před nahráním: poslat, jak je, nebo převést na menší JPEG. */
+export function postupFotky(typ: string | null | undefined, velikost: number): 'poslat' | 'prevest' {
+  return ZOBRAZITELNE_FOTKY.has(typFotky(typ)) && velikost <= FOTKA_BEZ_PREVODU_DO ? 'poslat' : 'prevest';
+}
+
+/**
+ * Prohlížeč fotku nepřečetl (HEIC v Chromu, poškozený soubor). Zobrazitelný formát
+ * se pošle, jak je (velký přímo do úložiště, lib/nahrajSoubor), ostatní se odmítne.
+ */
+export function poNeprectene(typ: string | null | undefined): 'poslat' | 'odmitnout' {
+  return ZOBRAZITELNE_FOTKY.has(typFotky(typ)) ? 'poslat' : 'odmitnout';
 }
 
 /**
