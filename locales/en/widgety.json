@@ -2793,5 +2793,14 @@
   "Uzávěrka a kasa": "Closing and till",
   "Čistota": "Cleanliness",
   "Na směně s tebou: {jmena}": "On the shift with you: {jmena}",
-  "Pro tebe:": "For you:"
+  "Pro tebe:": "For you:",
+  "Fotky dokladu": "Document photos",
+  "Otevřít doklad {n}": "Open document {n}",
+  "Odebrat doklad {n}": "Remove document {n}",
+  "Vyfotit další stranu": "Photograph next page",
+  "Vyfotit dodací list / fakturu": "Photograph delivery note / invoice",
+  "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "At most {n} photos — remove one to add another.",
+  "Číslo dodacího listu / faktury": "Delivery note / invoice number",
+  "Nepovinné — s fotkou dokladu dostane účetní příjemku celou.": "Optional — with a photo of the document the accountant gets the complete record.",
+  "např. FA 2026/123": "e.g. INV 2026/123"
 }

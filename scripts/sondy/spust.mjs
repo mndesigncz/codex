@@ -206,6 +206,8 @@ export const ZELENE = [
   'k93-jazyk-ui',
   // správa platformy jen na admin.managero.app (lokálně admin.localhost): přihlášení heslem + TOTP, na www /admin 404
   'sprava-host',
+  // podklady pro účetní (2026-11): pohled Pro účetní, náhled, ZIP, odkaz, e-mail, nastavení; doklad u příjmu objednávky
+  'ucetni-export',
 ];
 
 const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy', 'preteceni-jadro']);

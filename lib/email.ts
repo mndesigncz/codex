@@ -263,6 +263,39 @@ export async function sendBackupEmail(to: string, podnik: string, den: string, u
 }
 
 /**
+ * Podklady pro účetní (ruční „Poslat účetní" i měsíční automat 3. dne): ODKAZ ke stažení ZIPu,
+ * ne příloha. Odkaz je podepsaný (lib/ucetniOdkaz), platí `dni` dní a funguje bez účtu v aplikaci;
+ * podnik ho může kdykoli zneplatnit. V e-mailu jsou jen součty a varování, žádná jména.
+ * Česky: jde účetní v ČR (obsah podkladů je také česky).
+ */
+export async function sendUcetniEmail(to: string, o: {
+  podnik: string; obdobi: string; url: string; dni: number;
+  radky: [string, string][]; varovani: string[]; replyTo?: string | null;
+}): Promise<SendResult> {
+  const jmeno = o.podnik.replace(/[<>"\r\n]/g, '').trim().slice(0, 60) || 'podnik';
+  const tabulka = o.radky.map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#5c6353;">${escHtml(k)}</td><td style="padding:4px 0;text-align:right;font-weight:600;white-space:nowrap;">${escHtml(v)}</td></tr>`).join('');
+  const varovani = o.varovani.length
+    ? `<p style="color:#5c6353;font-size:13px;margin:16px 0 4px;">K dořešení:</p><ul style="margin:0;padding-left:18px;color:#16181A;font-size:13px;">${o.varovani.map(v => `<li>${escHtml(v)}</li>`).join('')}</ul>`
+    : '';
+  return send({
+    label: `Managero — ${jmeno}`,
+    to,
+    replyTo: o.replyTo ?? null,
+    subject: `Podklady pro účetnictví — ${jmeno} · ${o.obdobi}`,
+    html: `
+      <div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto;padding:28px;background:#F1F4EC;color:#16181A;border-radius:20px;">
+        <h1 style="font-size:20px;margin:0 0 8px;">Podklady za ${escHtml(o.obdobi)}</h1>
+        <p style="color:#5c6353;font-size:14px;">Podnik ${escHtml(jmeno)} vám posílá podklady pro účetnictví: tabulky (CSV a Excel), souhrn a fotky účtenek, dodacích listů a uzávěrek v jednom ZIPu. Odkaz platí ${o.dni} dní a nepotřebuje přihlášení.</p>
+        <table style="border-collapse:collapse;font-size:14px;margin:12px 0;">${tabulka}</table>
+        ${varovani}
+        <a href="${escHtml(o.url)}" style="display:inline-block;margin-top:16px;background:#C8F542;color:#16181A;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:bold;">Stáhnout podklady (ZIP)</a>
+        <p style="color:#5c6353;font-size:13px;margin-top:22px;">Podklady se skládají až při stažení, takže obsahují i doklady doplněné po odeslání tohoto e-mailu. Odkaz nikomu dalšímu nepřeposílejte.</p>
+        <p style="color:#8a917f;font-size:12px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(o.url)}</p>
+      </div>`,
+  });
+}
+
+/**
  * Objednávka dodavateli. `replyTo` je tu to podstatné: e-mail výslovně
  * prosí o odpověď s termínem dodání, a ta musí dojít do podniku, ne na
  * adresu odesílací služby.

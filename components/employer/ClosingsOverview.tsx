@@ -34,7 +34,7 @@ import { okJson } from '@/lib/api';
 import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
-import { useSmi } from '../widgety/NavigaceKontext';
+import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import {
   KLIC_DEN, KLIC_VYPLNIT, UDALOST_DEN, UDALOST_VYPLNIT,
   denUzaverky, hosteUzaverky, jeHlavni, rozdilUzaverky, type RadekUzaverky,
@@ -82,6 +82,7 @@ export default function ClosingsOverview() {
   const loc = useLocale();
   const money = useMoney();
   const smi = useSmi();
+  const nav = useNavigace();
   const { pro } = usePlan();
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -238,10 +239,16 @@ export default function ClosingsOverview() {
     );
   }
 
-  const menu = smiExport && topLevel.length > 0 ? [
-    { label: t('Export CSV'), icon: 'download', onClick: exportCsv },
-    { label: t('Pro účetní'), icon: 'receipt', hint: t('Tržby po dnech a souhrn nákladů.'), onClick: () => { void exportAccountant(); } },
-  ] : undefined;
+  // „Vše pro účetní": stránka s jedním ZIPem (uzávěrky, účtenky, příjemky, tržby, fotky dokladů), odkazem a e-mailem.
+  const vseProUcetni = nav.smiPohled('ucetni') ? [{ label: t('Vše pro účetní'), icon: 'receipt', hint: t('ZIP s tabulkami a fotkami dokladů, odkaz pro účetní.'), onClick: () => nav.onNavigate('ucetni') }] : [];
+  const menuPolozky = [
+    ...(smiExport && topLevel.length > 0 ? [
+      { label: t('Export CSV'), icon: 'download', onClick: exportCsv },
+      { label: t('Pro účetní'), icon: 'receipt', hint: t('Tržby po dnech a souhrn nákladů.'), onClick: () => { void exportAccountant(); } },
+    ] : []),
+    ...vseProUcetni,
+  ];
+  const menu = menuPolozky.length ? menuPolozky : undefined;
 
   const nastroj = (
     <Card pad="none" aria-labelledby="uzaverky-seznam-t">

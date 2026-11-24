@@ -44,6 +44,8 @@ export const VYCHOZI_NAV: Record<Rozhrani, VychoziNav> = {
       { id: 'planning', label: 'Plánování', icon: 'kanban' },
       { id: 'reports', label: 'Uzávěrky', icon: 'trend' },
       { id: 'finance', label: 'Finance', icon: 'coins' },
+      // Podklady pro účetní (ZIP s tabulkami a fotkami, odkaz, měsíční e-mail) — jen finance.exportovat.
+      { id: 'ucetni', label: 'Pro účetní', icon: 'receipt' },
       { id: 'suggestions', label: 'Nápady', icon: 'bulb' },
       { id: 'attendance', label: 'Docházka', icon: 'clock' },
       { id: 'my-shifts', label: 'Moje směny', icon: 'swap' },
@@ -52,7 +54,7 @@ export const VYCHOZI_NAV: Record<Rozhrani, VychoziNav> = {
     sekce: [
       { id: 'prehled', title: null, ids: ['overview'] },
       { id: 'smeny', title: 'Směny', ids: ['shifts', 'my-shifts', 'attendance'] },
-      { id: 'kasa', title: 'Kasa & sklad', ids: ['reports', 'finance', 'inventory', 'recipes'] },
+      { id: 'kasa', title: 'Kasa & sklad', ids: ['reports', 'finance', 'ucetni', 'inventory', 'recipes'] },
       { id: 'prace', title: 'Práce', ids: ['tasks', 'procedures', 'planning'] },
       { id: 'tym', title: 'Tým', ids: ['rewards', 'chat', 'guides', 'suggestions'] },
     ],

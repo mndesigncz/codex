@@ -72,6 +72,7 @@ const EventsView = naLine(() => import('./EventsView'));
 const ClosingsOverview = naLine(() => import('./ClosingsOverview'));
 const OrgOverview = naLine(() => import('./OrgOverview'));
 const FinanceView = naLine(() => import('./FinanceView'));
+const UcetniView = naLine(() => import('./UcetniView'));
 const MenuEditor = naLine(() => import('./MenuEditor'));
 const SuggestionsBoard = naLine(() => import('../SuggestionsBoard'));
 const TaskManager = naLine(() => import('./TaskManager'));
@@ -108,6 +109,7 @@ const KLICE_POHLEDU: Record<string, readonly string[] | null> = {
   planning: ['planovani.zobrazit'],
   reports: ['uzaverky.zobrazit_vse'],
   finance: ['finance.zobrazit', 'finance.trzby'],
+  ucetni: ['finance.exportovat'],
   suggestions: ['napady.spravovat', 'napady.pridat'],
   attendance: ['dochazka.zobrazit'],
   rewards: ['odmeny.zebricek', 'odmeny.katalog'],
@@ -319,6 +321,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'reports':   return <ClosingsOverview />;
       case 'org':       return <OrgOverview onOpenTeam={prepniAOtevri} />;
       case 'finance':   return <FinanceView />;
+      case 'ucetni':    return <UcetniView />;
       case 'suggestions': return <SuggestionsBoard />;
       case 'settings':  return <Settings user={user as any} initialTab={(settingsTab ?? 'account') as any} tabNonce={settingsNonce} />;
       case 'team-settings': return <TeamManagement user={user as any} />;

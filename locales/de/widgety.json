@@ -2794,5 +2794,14 @@
   "Uzávěrka a kasa": "Abschluss und Kasse",
   "Čistota": "Sauberkeit",
   "Na směně s tebou: {jmena}": "Mit dir in der Schicht: {jmena}",
-  "Pro tebe:": "Für dich:"
+  "Pro tebe:": "Für dich:",
+  "Fotky dokladu": "Belegfotos",
+  "Otevřít doklad {n}": "Beleg {n} öffnen",
+  "Odebrat doklad {n}": "Beleg {n} entfernen",
+  "Vyfotit další stranu": "Nächste Seite fotografieren",
+  "Vyfotit dodací list / fakturu": "Lieferschein / Rechnung fotografieren",
+  "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "Höchstens {n} Fotos – entferne eines, um ein anderes hinzuzufügen.",
+  "Číslo dodacího listu / faktury": "Lieferschein- / Rechnungsnummer",
+  "Nepovinné — s fotkou dokladu dostane účetní příjemku celou.": "Optional — mit Foto des Belegs bekommt die Buchhaltung den Wareneingang vollständig.",
+  "např. FA 2026/123": "z. B. RE 2026/123"
 }
