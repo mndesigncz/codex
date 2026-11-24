@@ -161,6 +161,7 @@ export const ZELENE = [
   'k83-rezervace',
   'k83-rozvrh',
   'k83-ukoly',
+  'ukol-fotka',
   'k83-sklad',
   'k83-postupy',
   'k83-nastaveni',

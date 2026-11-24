@@ -26,6 +26,12 @@
 // Tenhle soubor je čistá logika bez React a bez DB (testy scripts/testy/k86-tresty.ts).
 // Server: app/api/tresty/route.ts, app/api/tresty/[id]/route.ts,
 // app/api/tresty/types/route.ts, app/api/tresty/navrhy/route.ts.
+//
+// Peníze (nenároková složka, náhrada škody, srážka se souhlasem, záskok, hromadné dávky):
+// lib/trestyPenize.ts, kontrakt docs/TRESTY-PENIZE.md. Trest nese `penize` (jen pro toho, koho
+// se týká, a pro finance.mzdy) a `batchId` (společné id hromadného trestu).
+
+import { vyberPenizeTrestu, type PenizeTrestu } from './trestyPenize.ts';
 
 export type StavTrestu = 'plati' | 'zruseno';
 export const STAVY_TRESTU: readonly StavTrestu[] = ['plati', 'zruseno'];
@@ -96,6 +102,10 @@ export interface Trest {
   cancelledAt: string | null;
   cancelNote: string | null;
   createdAt: string;
+  /** Hromadný trest: společné id dávky (každý člověk má vlastní záznam); jinak null. */
+  batchId?: number | null;
+  /** Peněžní část (krácení, srážky, záskok); null = bez peněz nebo je divák nesmí vidět. */
+  penize?: PenizeTrestu | null;
 }
 
 /** Položka sazebníku. */
@@ -131,7 +141,8 @@ export interface NavrhTrestu {
 export interface DataTrestu {
   items: Trest[];
   druhy: DruhTrestu[];
-  smi: { udelit: boolean; sazebnik: boolean; tym: boolean };
+  /** penize = smí peněžní část (finance.mzdy): krácení, srážky, záskok, hromadné odměny. */
+  smi: { udelit: boolean; sazebnik: boolean; tym: boolean; penize?: boolean };
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +193,8 @@ export function vyberTresty(raw: unknown): Trest[] {
       cancelledAt: text(r.cancelledAt),
       cancelNote: text(r.cancelNote),
       createdAt: String(r.createdAt ?? ''),
+      batchId: cele(r.batchId),
+      penize: vyberPenizeTrestu(r.penize),
     });
   }
   return out;
@@ -235,7 +248,7 @@ export function vyberDataTrestu(raw: unknown): DataTrestu {
   return {
     items: vyberTresty(o.items),
     druhy: vyberDruhy(o.druhy),
-    smi: { udelit: smi.udelit === true, sazebnik: smi.sazebnik === true, tym: smi.tym === true },
+    smi: { udelit: smi.udelit === true, sazebnik: smi.sazebnik === true, tym: smi.tym === true, penize: smi.penize === true },
   };
 }
 
@@ -270,11 +283,15 @@ export function normalizujBody(raw: unknown): number | null | false {
   return n;
 }
 
-/** Krácení prémie: celé číslo 0–MAX_KRACENI (kladně); null = nezadáno; false = nesmysl. */
-export function normalizujKraceni(raw: unknown): number | null | false {
+/**
+ * Krácení prémie: celé číslo 0–MAX_KRACENI (kladně); null = nezadáno; false = nesmysl.
+ * `lidi` > 1 = částka se rozpočítá mezi tolik lidí: strop platí na člověka (celkem nejvýš MAX_KRACENI × lidi).
+ */
+export function normalizujKraceni(raw: unknown, lidi = 1): number | null | false {
   if (raw == null || raw === '') return null;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0 || n > MAX_KRACENI || Math.round(n) !== n) return false;
+  const max = MAX_KRACENI * Math.max(1, Math.floor(lidi) || 1);
+  if (!Number.isFinite(n) || n < 0 || n > max || Math.round(n) !== n) return false;
   return n;
 }
 
@@ -319,7 +336,7 @@ export interface ZapisTrestu {
  * Z těla požadavku udělá platný trest, nebo vrátí chybu (klíč hlášky — překládá
  * se v UI i na serveru). Body a krácení bez zadání = 0 (napomenutí).
  */
-export function validujTrest(b: Record<string, unknown>, dnes: string): { ok: true; trest: ZapisTrestu } | { ok: false; chyba: string } {
+export function validujTrest(b: Record<string, unknown>, dnes: string, o: { rozpocitatMezi?: number } = {}): { ok: true; trest: ZapisTrestu } | { ok: false; chyba: string } {
   const id = (v: unknown): number | null => { const n = cele(v); return n != null && n > 0 ? n : null; };
   const userId = id(b.userId);
   if (!userId) return { ok: false, chyba: 'Vyber, koho se trest týká.' };
@@ -330,7 +347,8 @@ export function validujTrest(b: Record<string, unknown>, dnes: string): { ok: tr
   if (!d) return { ok: false, chyba: 'Den nesedí — nejvýš 31 dní zpětně a ne do budoucna.' };
   const body = normalizujBody(b.points);
   if (body === false) return { ok: false, chyba: 'Body musí být celé číslo 0–500.' };
-  const kraceni = normalizujKraceni(b.bonusCut);
+  // Hromadný trest „rozpočítat X": strop 5 000 platí na člověka, ne na celou částku.
+  const kraceni = normalizujKraceni(b.bonusCut, o.rozpocitatMezi ?? 1);
   if (kraceni === false) return { ok: false, chyba: 'Krácení prémie musí být celé číslo (nejvýš 5 000).' };
   const fotka = b.photoUrl == null || b.photoUrl === '' ? null : platnaFotka(b.photoUrl) ? b.photoUrl : false;
   if (fotka === false) return { ok: false, chyba: 'Fotka má neplatnou adresu.' };

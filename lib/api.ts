@@ -25,10 +25,13 @@ import { tg } from './i18n/stav.ts';
 /** Chyba s HTTP stavem — obrazovka podle něj může rozlišit 403 od výpadku. */
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** Celé tělo chybové odpovědi (když bylo JSON) — extra pole jako `strop` nebo nové `zneni` u 409. */
+  data: Record<string, unknown> | null;
+  constructor(status: number, message: string, data: Record<string, unknown> | null = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -36,6 +39,8 @@ export class ApiError extends Error {
 export function statusMessage(status: number): string {
   if (status === 401 || status === 403) return 'Na tohle nemáš oprávnění.';
   if (status === 404) return 'Tohle už neexistuje.';
+  // Vercel odmítne tělo přes 4,5 MB holým textem dřív, než doběhne náš kód.
+  if (status === 413) return 'Soubor je na nahrání moc velký.';
   if (status === 429) return 'Moc rychle po sobě. Zkus to za chvíli.';
   if (status >= 500) return 'Server právě nestíhá.';
   // Jediná věta s číslem: parametr se dosadí až po překladu, proto `tg` a ne šablona.
@@ -52,13 +57,15 @@ export function statusMessage(status: number): string {
 export async function okJson(r: Response): Promise<any> {
   if (r.ok) return r.json();
   let written = '';
+  let data: Record<string, unknown> | null = null;
   try {
     const body = await r.json();
+    if (body && typeof body === 'object' && !Array.isArray(body)) data = body as Record<string, unknown>;
     if (body && typeof body.error === 'string') written = body.error;
   } catch {
     // Chybová odpověď nemusí být JSON (třeba HTML stránka od proxy).
   }
-  throw new ApiError(r.status, written || statusMessage(r.status));
+  throw new ApiError(r.status, written || statusMessage(r.status), data);
 }
 
 /** Totéž pro odpovědi, které nejsou JSON — třeba SVG náhled. */

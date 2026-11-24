@@ -101,6 +101,8 @@ import { DatTrest } from '../../tresty-vedeni/DatTrest';
 import { TrestRadek } from '../../tresty-vedeni/TrestRadek';
 import { NavrhyTrestu } from '../../tresty-vedeni/NavrhyTrestu';
 import { useAkceTrestu } from '../../tresty-vedeni/AkceTrestu';
+import { FrontaSrazek } from '../../tresty-vedeni/PenizeRadku';
+import { OdmenaVKcTlacitko } from '../../tresty-vedeni/OdmenaVKc';
 import {
   NAVRHU_M, filtrujTresty, lideZTrestu, mesicZNastaveni as mesicTrestu, poctyFiltru, predvolbyZNavrhu, sloucSporne,
   type FiltrTrestu, type PredvolbyTrestu,
@@ -1689,9 +1691,12 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
     souhrn.premie > 0 ? money(souhrn.premie) : null,
     pocetCeka > 0 ? t('{n, plural, one {# čeká} few {# čekají} other {# čeká}}', { n: pocetCeka }) : null,
   ].filter(Boolean);
-  const tlacitko = smiUznat && (
+  // Kolo 96: s finance.mzdy vedle „Zapsat za člena" i „Odměna v penězích" — peníze k výplatě jednomu i víc lidem
+  // (stejný výběr lidí jako u trestu); pár ½ + ½ v patce.
+  const tlacitko = smiUznat && <>
     <Button variant="secondary" icon="star" onClick={() => setZapisuji(true)}>{t('Zapsat za člena')}</Button>
-  );
+    {!nahled && <OdmenaVKcTlacitko />}
+  </>;
   const okna = (
     <>
       {rozhoduji && !nahled && <UznatNavic zapis={rozhoduji.z} akce={rozhoduji.akce} onClose={() => setRozhoduji(null)} onHotovo={hotovo} />}
@@ -1782,6 +1787,9 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
   const [clovek, setClovek] = useState<string>('');
   const [davam, setDavam] = useState<PredvolbyTrestu | null>(null);
   const akce = useAkceTrestu();
+  // Kolo 96: peníze z výplaty (finance.mzdy) — fronta nesouhlasů se srážkou, odměna v Kč, akce srážek u řádků.
+  const smiPenize = ok && smi(klicCasti(ID_TRESTY, 'penize') ?? 'finance.mzdy');
+  const [toastPenez, setToastPenez] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
   const odkaz = useOdkazOdmeny();
   // Odkaz vede rovnou na část Tresty (RewardsView čte `arg` z adresy po přechodu).
   const odkazTresty = odkaz ? { ...odkaz, arg: 'tresty' } : undefined;
@@ -1803,6 +1811,7 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
   const vsechnyNavrhy = navrhy.data ?? [];
   const navrhyVidet = L ? vsechnyNavrhy : vsechnyNavrhy.slice(0, NAVRHU_M);
   const zNavrhu = (n: NavrhTrestu) => setDavam(predvolbyZNavrhu(n, druhy, money, t));
+  const cekaSouhlas = (mesicni.data?.items ?? []).reduce((a, x) => a + (x.status === 'plati' ? x.penize?.cekaNaSouhlas ?? 0 : 0), 0);
 
   const souhrnText = [
     nastaveni.obdobi === 'minuly' ? t('Minulý měsíc') : t('Tento měsíc'),
@@ -1810,25 +1819,35 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
     souhrn.body > 0 ? t('−{n} b', { n: cislo(souhrn.body) }) : null,
     souhrn.kraceni > 0 ? t('krácení {castka}', { castka: money(souhrn.kraceni) }) : null,
     sporu > 0 ? t('{n} nesouhlasí', { n: cislo(sporu) }) : null,
+    cekaSouhlas > 0 ? t('{castka} čeká na souhlas', { castka: money(cekaSouhlas) }) : null,
   ].filter(Boolean);
   const vetaManko = manka > 0 && (!L || filtr === 'vse' || filtr === 'plati') ? (
     <p className="t-meta text-pretty" data-tresty-manko>
       {t('{n, plural, one {# uzávěrka s mankem.} few {# uzávěrky s mankem.} other {# uzávěrek s mankem.}}', { n: manka })} {t('Manko řeš dohodou o odpovědnosti, ne trestem.')}
+      {smiPenize && <> {t('Náhradu škody zapíšeš v detailu uzávěrky.')}</>}
     </p>
   ) : null;
-  const tlacitko = smiUdelit && (
+  // „Dát trest" (jednomu i víc lidem) a s finance.mzdy „Odměna v Kč" — pár ½ + ½ v patce.
+  const tlacitko = smiUdelit && <>
     <Button variant="secondary" icon="warning" onClick={() => setDavam({})}>{t('Dát trest')}</Button>
-  );
+    {smiPenize && <OdmenaVKcTlacitko />}
+  </>;
   const okna = !nahled && (
     <>
       <DatTrest open={!!davam} predvolby={davam} onClose={() => setDavam(null)} />
       {akce.okna}
+      <Toast message={toastPenez?.text ?? null} tone={toastPenez?.tone} id={toastPenez?.id} onClose={() => setToastPenez(null)} />
     </>
   );
+  // Hromadný trest: kolik lidí dávky je v seznamu („Hromadný trest · 3 lidí").
+  const davky = new Map<number, number>();
+  for (const x of vse ?? []) if (x.batchId) davky.set(x.batchId, (davky.get(x.batchId) ?? 0) + 1);
   const radek = (x: Trest) => (
     <TrestRadek key={x.id} x={x} smiUdelit={smiUdelit} pracuji={akce.pracuji === x.id}
-      onPlatiDal={akce.platiDal} onZrusit={akce.zrusit} onUpravit={akce.upravit} />
+      onPlatiDal={akce.platiDal} onZrusit={akce.zrusit} onUpravit={akce.upravit}
+      {...akce.penize} smiPenize={smiPenize && !nahled} davka={x.batchId ? davky.get(x.batchId) : undefined} />
   );
+  const frontaSrazek = <FrontaSrazek zapnuto={smiPenize} nahled={nahled} onToast={x => setToastPenez({ ...x, id: Date.now() })} />;
 
   return (
     <Widget nacteni={ceka ? CEKA : [mesicni, platne]} odkaz={odkazTresty}
@@ -1836,6 +1855,7 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
       prazdno={vse && vse.length === 0 && vsechnyNavrhy.length === 0 ? (
         <Sloupec mezera={4} data-tresty-prazdno>
           <p className="t-meta text-pretty">{t('Tento měsíc bez trestů. Když něco nevyjde, dej trest nebo napomenutí odsud, z profilu člena, z uzávěrky nebo z docházky.')}</p>
+          {frontaSrazek}
           {vetaManko}
           {tlacitko && <AkcePrazdna>{tlacitko}</AkcePrazdna>}
           {okna}
@@ -1868,6 +1888,7 @@ function TrestyTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'ten
             <ul className="list" data-tresty-seznam>{sporne.map(radek)}</ul>
           </Sloupec>
         )}
+        {(!L || filtr !== 'zruseno') && frontaSrazek}
         {navrhyVidet.length > 0 && (!L || filtr === 'vse' || filtr === 'plati') && (
           <Sloupec mezera={1} data-tresty-navrhy>
             <p className="t-label">{t('Návrhy')}</p>

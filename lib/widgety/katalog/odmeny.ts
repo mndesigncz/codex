@@ -189,7 +189,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.odmeny', 'vedeni.prehled'],
-    opravneni: { vse: ['navic.zobrazit_tym'], nektere: [], pole: { 'akce:uznat': 'navic.uznat', 'akce:zapsat_za_clena': 'navic.uznat' } },
+    // Kolo 96: „Odměna v penězích" (POST /api/wage-adjustments/davka) jen s finance.mzdy.
+    opravneni: { vse: ['navic.zobrazit_tym'], nektere: [], pole: { 'akce:uznat': 'navic.uznat', 'akce:zapsat_za_clena': 'navic.uznat', 'akce:odmena_kc': 'finance.mzdy' } },
     tarif: 'pro',
     nastaveni: [
       {
@@ -223,7 +224,9 @@ export const WIDGETY: DefiniceWidgetu[] = [
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.odmeny', 'vedeni.prehled'],
-    opravneni: { vse: ['tresty.zobrazit_tym'], nektere: [], pole: { 'akce:udelit': 'tresty.udelit', navrhy: 'tresty.udelit' } },
+    // Kolo 96 (docs/TRESTY-PENIZE.md): `penize` = peníze u trestů, fronta nesouhlasů se srážkou (GET /api/tresty/srazky
+    // ?scope=team&stav=nesouhlas) a odměna v Kč — vše jen s finance.mzdy.
+    opravneni: { vse: ['tresty.zobrazit_tym'], nektere: [], pole: { 'akce:udelit': 'tresty.udelit', navrhy: 'tresty.udelit', penize: 'finance.mzdy' } },
     tarif: 'pro',
     nastaveni: [
       {

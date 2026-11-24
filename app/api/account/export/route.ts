@@ -29,7 +29,7 @@ export async function GET() {
   const brana = await hit(`export-dat:${id}`, 6, 60 * 60, { failClosed: true });
   if (!brana.ok) return NextResponse.json({ error: 'Příliš mnoho stažení. Zkus to později.' }, { status: 429 });
 
-  const [ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy, tresty, body, navic, upravyMzdy, hodnoceni, hodnoceniPolozek] = await Promise.all([
+  const [ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy, tresty, body, navic, upravyMzdy, hodnoceni, hodnoceniPolozek, srazky, zaskoky] = await Promise.all([
     sekce(async () => {
       // S verzí souhlasu s podmínkami (spuštění, balík P); před migrací sloupců bez ní.
       try {
@@ -96,10 +96,20 @@ export async function GET() {
     sekce(async () => await sql`
       SELECT id, team_id, work_date, kind, points, note, flagged, created_at
       FROM shift_review_items WHERE employee_id = ${id} ORDER BY work_date, id LIMIT ${STROP}` as Record<string, unknown>[]),
+    // Srážky z výplaty (kolo 96): náhrada škody a přímá srážka i se zněním dohody o srážce, souhlasem nebo nesouhlasem.
+    sekce(async () => await sql`
+      SELECT id, team_id, penalty_id, kind, amount, installments, reason, day, status, contract_type, damage_amount, damage_kind, fault,
+             liability_agreement, liability_agreement_date, avg_earnings, cap, apply_from, consent_text, consent_version, consent_at,
+             refused_at, refuse_note, cancelled_at, cancel_note, created_at
+      FROM wage_deductions WHERE user_id = ${id} ORDER BY id LIMIT ${STROP}` as Record<string, unknown>[]),
+    // Záskoky, které člověk dostal (peníze z cizího trestu za to, že věc napravil).
+    sekce(async () => await sql`
+      SELECT id, team_id, penalty_id, amount, status, created_at
+      FROM penalty_transfers WHERE user_id = ${id} ORDER BY id LIMIT ${STROP}` as Record<string, unknown>[]),
   ]);
 
   const ted = new Date();
-  const dokument = sestavExport({ ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy, tresty, body, navic, upravyMzdy, hodnoceni, hodnoceniPolozek }, ted, STROP);
+  const dokument = sestavExport({ ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy, tresty, body, navic, upravyMzdy, hodnoceni, hodnoceniPolozek, srazky, zaskoky }, ted, STROP);
   return new NextResponse(JSON.stringify(dokument, null, 2), {
     status: 200,
     headers: {

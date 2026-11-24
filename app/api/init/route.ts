@@ -3016,6 +3016,92 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (team_id, source_key)
       )`);
+    // ---- Tresty a peníze z výplaty (kolo 96, lib/trestyPenize.ts, docs/TRESTY-PENIZE.md) ----
+    // Nenároková složka výplaty člena: typ pct (% ze mzdy) | kc_hod | kc_mesic, hodnota, a jestli je
+    // součástí sazby (TRUE = výplata se nezmění, jen se rozdělí) nebo se platí navíc. NULL = žádná.
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS nenarokova_typ TEXT`);
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS nenarokova_hodnota NUMERIC`);
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS nenarokova_v_sazbe BOOLEAN NOT NULL DEFAULT TRUE`);
+    // Hromadný trest / odměna: každý člověk má vlastní záznam, společné id dávky.
+    await ddl(sql`ALTER TABLE penalties ADD COLUMN IF NOT EXISTS batch_id INTEGER`);
+    // Komu přejde stržená částka: podnik | lide | smena; jak se dělí mezi lidi: rovne | castky.
+    await ddl(sql`ALTER TABLE penalties ADD COLUMN IF NOT EXISTS zaskok_komu TEXT NOT NULL DEFAULT 'podnik'`);
+    await ddl(sql`ALTER TABLE penalties ADD COLUMN IF NOT EXISTS zaskok_zpusob TEXT`);
+    // Úpravy mzdy z dávky (hromadná odměna); zdroje 'nahrada', 'srazka', 'zaskok' nesou source_ref
+    // (srážka / převod) — index pro přepočet po zrušení nebo souhlasu.
+    await ddl(sql`ALTER TABLE wage_adjustments ADD COLUMN IF NOT EXISTS batch_id INTEGER`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS wage_adjustments_source ON wage_adjustments (team_id, source, source_ref)`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS pay_batches (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        text TEXT,
+        count INTEGER NOT NULL DEFAULT 0,
+        total INTEGER NOT NULL DEFAULT 0,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    // wage_deductions: srážka z výplaty k trestu — kind nahrada (náhrada škody, § 250 a násl. ZP, s údaji
+    // o škodě a stropem 4,5× průměru) | srazka (přímá srážka). status ceka (čeká na souhlas zaměstnance —
+    // u HPP/DPP/DPČ a neznámé smlouvy) | uplatneno | nesouhlas | zruseno. Uplatněná srážka se rozloží do
+    // `installments` výplat od `apply_from` jako wage_adjustments (source = kind, source_ref = id).
+    // Souhlas (dohoda o srážkách ze mzdy, § 146 písm. b) se ukládá i do `consents` (consent_id).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS wage_deductions (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        penalty_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        installments INTEGER NOT NULL DEFAULT 1,
+        reason TEXT NOT NULL,
+        day TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'ceka',
+        needs_consent BOOLEAN NOT NULL DEFAULT TRUE,
+        contract_type TEXT,
+        damage_amount INTEGER,
+        damage_kind TEXT,
+        fault TEXT,
+        liability_agreement BOOLEAN NOT NULL DEFAULT FALSE,
+        liability_agreement_date TEXT,
+        avg_earnings INTEGER,
+        cap INTEGER,
+        cap_warning TEXT,
+        apply_from TEXT,
+        consent_text TEXT,
+        consent_version TEXT,
+        consent_at TIMESTAMP,
+        consent_id INTEGER,
+        refused_at TIMESTAMP,
+        refuse_note TEXT,
+        cancelled_by INTEGER,
+        cancelled_at TIMESTAMP,
+        cancel_note TEXT,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS wage_deductions_penalty ON wage_deductions (team_id, penalty_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS wage_deductions_user ON wage_deductions (team_id, user_id, status)`);
+    // penalty_transfers: záskok — komu přejde stržená částka trestu (plánovaný podíl `amount` ze základu
+    // `base` = krácení + srážky v době zápisu). Skutečně přešlé peníze jsou wage_adjustments source 'zaskok',
+    // source_ref = id převodu (poměrně ke strženým kusům; ze srážky čekající na souhlas až s ní).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS penalty_transfers (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        penalty_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        amount INTEGER NOT NULL,
+        base INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'plati',
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS penalty_transfers_penalty ON penalty_transfers (team_id, penalty_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS penalty_transfers_user ON penalty_transfers (team_id, user_id)`);
     // ---- konec Tresty ----
 
     // ---- Volitelné úkoly za body (kolo 11): nabídka navíc s opakováním, kapacitou a záborem ----
