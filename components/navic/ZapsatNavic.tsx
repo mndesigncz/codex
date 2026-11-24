@@ -7,8 +7,8 @@
 // Nahoře pilulky z nabídky vedení („Vytřít sklad · 20 b" — klepnutí předvyplní text a
 // připne offerId; u položky „uzná se samo" to člověk vidí hned), textarea s počítadlem
 // do 500 znaků, den (výchozí dnes nebo den směny; zaměstnanec nejvýš 14 dní zpětně,
-// vedení libovolně), nepovinná fotka stejnou cestou jako u úkolů (lib/clientImage →
-// POST /api/upload, náhled). Hlášky validace jsou tytéž, co vrací server (lib/navic),
+// vedení libovolně), nepovinná fotka stejnou cestou jako u úkolů (lib/nahrajFotku:
+// zmenšený JPEG, náhled; chyba fotky u tlačítka fotky). Hlášky validace jsou tytéž, co vrací server (lib/navic),
 // chyba serveru se ukáže větou pod polem (409 limitu srozumitelně, jak ho server napsal).
 // Rozepsaný text se neztratí: Modal se při uklepnutí ptá (DiscardGuard přes useModal).
 // Po uložení Toast „Zapsáno — čeká na uznání" / „Zapsáno a uznáno: +15 b" (toast žije
@@ -22,7 +22,7 @@ import { Button, Field, Input, Modal, Textarea, Toast } from '../ui';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import { useT } from '@/lib/i18n/client';
-import { apiMessage, okJson } from '@/lib/api';
+import { apiMessage } from '@/lib/api';
 import { pragueToday } from '@/lib/pragueTime';
 import {
   DNI_ZPETNE, MAX_DELKA_TEXTU, URL_NAVIC, platnaFotkaNavic, posunDni, validujZapis, vyberNavic, zapisyDne,
@@ -31,6 +31,7 @@ import {
 import { NabidkaChipy, prelozChybu } from './NabidkaChipy';
 import { chybiPovinnaFotka, obsazeneNabidky, odmenaKratce, predvyplnitText, urlUkolyZaBody } from './logika';
 import { obnovNavic, urlNavicMine, useDataNavic, useUkolyZaBody } from './data';
+import { nahrajFotku, NecitelnaFotka } from '@/lib/nahrajFotku';
 
 export interface PredvolbyNavic {
   /** RRRR-MM-DD; výchozí dnes. */
@@ -119,15 +120,16 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
     if (!soubor) return;
     setNahravam(true);
     setChyba(null);
+    setChybaFotky(null);
+    // Chyba fotky patří k tlačítku fotky (role=alert), ne pod pole s textem.
     try {
-      const { compressImage } = await import('@/lib/clientImage');
-      const fd = new FormData();
-      fd.append('file', await compressImage(soubor));
-      const d = await fetch('/api/upload', { method: 'POST', body: fd }).then(okJson);
-      if (platnaFotkaNavic(d?.url)) { setFotka(d.url); setChybaFotky(null); }
-      else setChyba(t('Fotku se nepodařilo nahrát.'));
+      const url = await nahrajFotku(soubor);
+      if (platnaFotkaNavic(url)) setFotka(url);
+      else setChybaFotky(t('Fotku se nepodařilo nahrát.'));
     } catch (e) {
-      setChyba(apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
+      setChybaFotky(e instanceof NecitelnaFotka
+        ? t('Tuhle fotku prohlížeč neumí otevřít (třeba HEIC z iPhonu). Vyfoť ji znovu, nebo vyber fotku ve formátu JPEG.')
+        : apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
     }
     setNahravam(false);
     if (vstup.current) vstup.current.value = '';
@@ -231,7 +233,8 @@ export function ZapsatNavic({ open, onClose, predvolby, actingAs = null, userId,
                 // Řada 52 jako pole vedle: náhled, „Jinou" pružně do R, odebrat (V6, P7).
                 <div className="flex items-center gap-2 min-w-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={fotka} alt={t('Náhled fotky')} className="block h-[3.25rem] w-[3.25rem] shrink-0 rounded-[var(--r-md)] object-cover" />
+                  <img src={fotka} alt={t('Náhled fotky')} className="block h-[3.25rem] w-[3.25rem] shrink-0 rounded-[var(--r-md)] object-cover"
+                    onError={() => { setFotka(null); setChybaFotky(t('Fotku se nepodařilo nahrát.')); }} />
                   <Button variant="secondary" size="lg" icon="camera" loading={nahravam} onClick={() => vstup.current?.click()} className="flex-1 min-w-0 !px-4">{t('Jinou')}</Button>
                   <Button variant="secondary" size="lg" iconOnly icon="close" aria-label={t('Odebrat fotku')} onClick={() => setFotka(null)} />
                 </div>

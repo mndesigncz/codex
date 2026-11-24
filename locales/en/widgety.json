@@ -221,6 +221,7 @@
   "Fotka: {nazev}": "Photo: {nazev}",
   "Fotku se nepodařilo nahrát — zkontroluj připojení.": "The photo could not be uploaded — check the connection.",
   "Fotku se nepodařilo nahrát.": "The photo could not be uploaded.",
+  "Tuhle fotku prohlížeč neumí otevřít (třeba HEIC z iPhonu). Vyfoť ji znovu, nebo vyber fotku ve formátu JPEG.": "This browser can't open this photo (an iPhone HEIC, for example). Take it again, or choose a JPEG photo.",
   "Fronta objednávek od stolu k přijetí a odeslání do kasy.": "Queue of orders from the table to acceptance and sending to the register.",
   "Graf": "Chart",
   "Graf po": "Chart by",

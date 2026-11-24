@@ -39,6 +39,8 @@ export class ApiError extends Error {
 export function statusMessage(status: number): string {
   if (status === 401 || status === 403) return 'Na tohle nemáš oprávnění.';
   if (status === 404) return 'Tohle už neexistuje.';
+  // Vercel odmítne tělo přes 4,5 MB holým textem dřív, než doběhne náš kód.
+  if (status === 413) return 'Soubor je na nahrání moc velký.';
   if (status === 429) return 'Moc rychle po sobě. Zkus to za chvíli.';
   if (status >= 500) return 'Server právě nestíhá.';
   // Jediná věta s číslem: parametr se dosadí až po překladu, proto `tg` a ne šablona.
